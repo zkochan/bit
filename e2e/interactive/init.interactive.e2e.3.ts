@@ -6,7 +6,7 @@ import {
   PACKAGE_MANAGER_MSG_Q,
   CHOOSE_COMPILER_MSG_Q,
   CHOOSE_CUSTOM_COMPILER_MSG_Q
-} from '../../src/interactive/commands/init-interactive';
+} from '../../src/interactive/commands/init-interactive/init-interactive';
 import { CFG_INIT_INTERACTIVE, CFG_INTERACTIVE, IS_WINDOWS } from '../../src/constants';
 import { INTERACTIVE_KEYS } from '../../src/interactive/utils/run-interactive-cmd';
 

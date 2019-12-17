@@ -1,39 +1,12 @@
 import inquirer from 'inquirer';
 import format from 'string-format';
 import chalk from 'chalk';
-import { init, listScope } from '../../api/consumer';
-import logger from '../../logger/logger';
+import { init, listScope } from '../../../api/consumer';
+import logger from '../../../logger/logger';
 
 inquirer.registerPrompt('fuzzypath', require('inquirer-fuzzy-path'));
 
 type ENVS_TYPE = 'compiler' | 'tester';
-
-export const TOP_MESSAGE = `This utility initialize an empty Bit workspace and walks you through creating a bit configuration.
-You can later edit your configuration in your package.json or bit.json.
-Press ^C at any time to quit.
-
-After setting up the workspace, use 'bit add' to track components and modules.`;
-
-export const PACKAGE_MANAGER_MSG_Q = 'Which package manager would you like to use for installing components?';
-export const DEFAULT_DIR_MSG_Q = 'Where would you like to store imported components?';
-export const CHOOSE_ENV_MSG_TEMPLATE_Q = 'Which {type} would you like to use for the components?';
-export const CHOOSE_CUSTOM_ENV_MSG_TEMPLATE_Q =
-  'Paste the "bit import" command for the {type} (press "enter" to skip).';
-export const CHOOSE_COMPILER_MSG_Q = format(CHOOSE_ENV_MSG_TEMPLATE_Q, { type: 'compiler' });
-// export const CHOOSE_TESTER_MSG_Q = format(CHOOSE_ENV_MSG_TEMPLATE_Q, { type: 'tester' });
-export const CHOOSE_CUSTOM_COMPILER_MSG_Q = format(CHOOSE_CUSTOM_ENV_MSG_TEMPLATE_Q, { type: 'compiler' });
-const SKIP_DEFINE_ENV_TEMPLATE_ANS = 'no {type}';
-const SKIP_DEFINE_COMPILER_ANS = format(SKIP_DEFINE_ENV_TEMPLATE_ANS, { type: 'compiler' });
-// const SKIP_DEFINE_TESTER_ANS = format(SKIP_DEFINE_ENV_TEMPLATE_ANS, { type: 'tester' });
-const CUSTOM_ENV_TEMPLATE_ANS = 'I have my own {type}';
-const CUSTOM_COMPILER_ANS = format(CUSTOM_ENV_TEMPLATE_ANS, { type: 'compiler' });
-// const CUSTOM_TESTER_ANS = format(CUSTOM_ENV_TEMPLATE_ANS, { type: 'tester' });
-const SKIP_CUSTOM_ENV_KEYWORD = 'skip';
-const BIT_ENVS_SCOPE_NAME = 'bit.envs';
-const CUSTOM_COMPILER_PROP_NAME = 'custom-compiler';
-const DEFAULT_LOCATION_DIR = 'components';
-const DEFAULT_LOCATION_NOTE = "(bit's default location)";
-const DEFAULT_LOCATION_ANS = `${DEFAULT_LOCATION_DIR} ${DEFAULT_LOCATION_NOTE}`;
 
 function _generateChooseEnvQ(
   envType: ENVS_TYPE,
