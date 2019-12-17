@@ -1,18 +1,5 @@
 import R from 'ramda';
-
-// interface DepsObject {
-//   dependencies?: Record<string, string>,
-//   devDependencies?: Record<string, string>,
-//   peerDependencies?: Record<string, string>
-// }
-
-type Framework = 'react' | 'angular' | 'vue' | 'node';
-type Stylings = 'styled-components' | 'emotion';
-type Typings = 'plain' | 'flow' | 'typescript';
-type DepsTypes = 'dependencies' | 'devDependencies' | 'peerDependencies';
-type DepsObject = {
-  [T in DepsTypes]?: Record<string, string>;
-};
+import { Framework, StylingFrameworks, TypingsSystem, DepsObject, DepsTypes } from './init-interactive-types';
 
 const COMPILERS_MAPPING = {
   react: {
@@ -140,11 +127,11 @@ const OVERRIDES_MAPPING = {
   }
 };
 
-export default function getCompilerByFrameworkAndTypingSystem(framework: Framework, typing?: Typings): string {
+export default function getCompilerByFrameworkAndTypingSystem(framework: Framework, typing?: TypingsSystem): string {
   return R.path([framework, typing], COMPILERS_MAPPING);
 }
 
-export function getOverrides(framework: Framework, typing?: Typings, styling?: Stylings): DepsObject {
+export function getOverrides(framework: Framework, typing?: TypingsSystem, styling?: StylingFrameworks): DepsObject {
   const frameworkDeps = R.path([framework], OVERRIDES_MAPPING);
   const frameworkTypedDeps = R.path([framework, typing], OVERRIDES_MAPPING);
   const stylingDeps = R.path([styling], OVERRIDES_MAPPING);
