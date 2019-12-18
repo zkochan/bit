@@ -209,6 +209,13 @@ const defaultFilterFunction = val => {
   return lower;
 };
 
+/**
+ * Wrap a specific when function of a question with a check if the user press cancel in case the project was already
+ * initialized by bit.
+ * It will also generate a when with this check only if there is no specific when
+ * This will return a new when function to pass to inquirer
+ * @param specificWhen The when function of the specific question
+ */
 const wrapWhenWithCancelCheck = (specificWhen?: (answers) => boolean): ((answers) => boolean) => (answers): boolean => {
   if (answers.handleAlreadyInitialized === ALREADY_INITIALIZED_CANCEL_OPTION) {
     return false;
