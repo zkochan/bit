@@ -8,17 +8,20 @@ Press ^C at any time to quit.
 After setting up the workspace, use 'bit add' to track components and modules.`;
 
 export const ALREADY_INITIALIZED_Q = 'target workspace already exists. pick an action';
-export const ALREADY_INITIALIZED_CHOICES = ['overwrite', 'cancel'];
+export const ALREADY_INITIALIZED_CANCEL_OPTION = 'cancel';
+export const ALREADY_INITIALIZED_CHOICES = ['overwrite', ALREADY_INITIALIZED_CANCEL_OPTION];
 
 export const PROJECT_TYPE_DETECTED_TEMPLATE_Q = '{type} project type detected';
-export const PROJECT_TYPE_DETECTED_Q = type => format(PROJECT_TYPE_DETECTED_TEMPLATE_Q, type);
+export const PROJECT_TYPE_DETECTED_Q = type => format(PROJECT_TYPE_DETECTED_TEMPLATE_Q, { type });
 export const PROJECT_TYPE_Q = 'Select project framework';
 export const PROJECT_TYPES_CHOICES = ['React', 'Angular', 'Vue', 'Node', 'Abort'];
 export const MANUAL_SELECT_FRAMEWORK_OPTION = 'select different framework';
-export const PROJECT_TYPE_DETECTED_CHOICES = ['proceed', MANUAL_SELECT_FRAMEWORK_OPTION];
+export const PROJECT_TYPE_DETECTED_CHOICES = type =>
+  getAutoDetectedChoicesWithValue(type, [MANUAL_SELECT_FRAMEWORK_OPTION]);
 
 export const PROJECT_TYPE_SYSTEM_DETECTED_TEMPLATE_Q = '{typeSystem} configuration detected';
-export const PROJECT_TYPE_SYSTEM_DETECTED_Q = typeSystem => format(PROJECT_TYPE_SYSTEM_DETECTED_TEMPLATE_Q, typeSystem);
+export const PROJECT_TYPE_SYSTEM_DETECTED_Q = typeSystem =>
+  format(PROJECT_TYPE_SYSTEM_DETECTED_TEMPLATE_Q, { typeSystem });
 export const PROJECT_TYPE_SYSTEM_Q = 'Select typing';
 export const PROJECT_TYPE_SYSTEM_CHOICES = answers => {
   if (answers.projectType === 'react') {
@@ -28,10 +31,11 @@ export const PROJECT_TYPE_SYSTEM_CHOICES = answers => {
   return ['Typescript', 'Flow', 'None'];
 };
 export const MANUAL_SELECT_TYPE_SYSTEM_OPTION = 'select different';
-export const PROJECT_TYPE_SYSTEM_DETECTED_CHOICES = ['proceed', MANUAL_SELECT_TYPE_SYSTEM_OPTION];
+export const PROJECT_TYPE_SYSTEM_DETECTED_CHOICES = typeSystem =>
+  getAutoDetectedChoicesWithValue(typeSystem, [MANUAL_SELECT_TYPE_SYSTEM_OPTION]);
 
 export const PROJECT_STYLING_DETECTED_TEMPLATE_Q = '{styling} styling detected';
-export const PROJECT_STYLING_DETECTED_Q = styling => format(PROJECT_STYLING_DETECTED_TEMPLATE_Q, styling);
+export const PROJECT_STYLING_DETECTED_Q = styling => format(PROJECT_STYLING_DETECTED_TEMPLATE_Q, { styling });
 export const PROJECT_STYLING_Q = 'Select styling framework';
 const STYLED_COMPONENTS_CHOICE = { name: 'StyledComponents', value: 'styled-components' };
 const EMOTION_CHOICE = { name: 'Emotion', value: 'emotion' };
@@ -43,7 +47,8 @@ export const PROJECT_STYLING_CHOICES = [
   'None'
 ];
 export const MANUAL_SELECT_STYLING_OPTION = 'select different styling framework';
-export const PROJECT_STYLING_DETECTED_CHOICES = ['proceed', MANUAL_SELECT_STYLING_OPTION];
+export const PROJECT_STYLING_DETECTED_CHOICES = styling =>
+  getAutoDetectedChoicesWithValue(styling, [MANUAL_SELECT_STYLING_OPTION]);
 
 export const PACKAGE_MANAGER_Q = 'Which package manager would you like to use for installing components?';
 export const PACKAGE_MANAGER_CHOICES = ['npm', 'yarn'];
@@ -54,15 +59,26 @@ export const CONFIG_LOCATION_CHOICES = [
   { name: 'In package.json', value: 'packageJson' }
 ];
 
+/**
+ * A function that create an array of choices when the proceed option value is set to specific value
+ * For example when react project detected and we click proceed we want the project type value to be react
+ * @param proceedValue Value to enter in the answers object in case of proceed choosed
+ * @param extraChoices Extra options to show in the list
+ */
+function getAutoDetectedChoicesWithValue(proceedValue: string, extraChoices: string[]) {
+  const proceedOptionLabel = 'proceed';
+  return [{ name: proceedOptionLabel, value: proceedValue }, ...extraChoices];
+}
+
 export function generateAlreadyInitializedQ(alreadyInitialized?: boolean) {
   const message = ALREADY_INITIALIZED_Q;
   const choices = ALREADY_INITIALIZED_CHOICES;
   const when = answers => {
-    alreadyInitialized === true;
+    return alreadyInitialized === true;
   };
   const question = {
     type: 'list',
-    name: 'projectType',
+    name: 'handleAlreadyInitialized',
     message,
     when,
     choices
@@ -72,9 +88,9 @@ export function generateAlreadyInitializedQ(alreadyInitialized?: boolean) {
 
 export function generateProjectTypeQ(detectedType?: string, secondTime: boolean = false) {
   const message = detectedType ? PROJECT_TYPE_DETECTED_Q(detectedType) : PROJECT_TYPE_Q;
-  const choices = detectedType ? PROJECT_TYPE_DETECTED_CHOICES : PROJECT_TYPES_CHOICES;
+  const choices = detectedType ? PROJECT_TYPE_DETECTED_CHOICES(detectedType) : PROJECT_TYPES_CHOICES;
   const filter = defaultFilterFunction;
-  const when = answers => {
+  const specificWhen = answers => {
     // Always show the question first time
     if (!secondTime) {
       return true;
@@ -83,7 +99,9 @@ export function generateProjectTypeQ(detectedType?: string, secondTime: boolean 
     if (answers.projectType === MANUAL_SELECT_FRAMEWORK_OPTION) {
       return true;
     }
+    return false;
   };
+  const when = wrapWhenWithCancelCheck(specificWhen);
   const question = {
     type: 'list',
     name: 'projectType',
@@ -96,10 +114,12 @@ export function generateProjectTypeQ(detectedType?: string, secondTime: boolean 
 }
 
 export function generateProjectTypeSystemQ(detectedTypeSystem?: string, secondTime: boolean = false) {
-  const message = detectedTypeSystem ? PROJECT_STYLING_DETECTED_Q(detectedTypeSystem) : PROJECT_STYLING_Q;
-  const choices = detectedTypeSystem ? PROJECT_STYLING_DETECTED_CHOICES : PROJECT_STYLING_CHOICES;
+  const message = detectedTypeSystem ? PROJECT_TYPE_SYSTEM_DETECTED_Q(detectedTypeSystem) : PROJECT_TYPE_Q;
+  const choices = detectedTypeSystem
+    ? PROJECT_TYPE_SYSTEM_DETECTED_CHOICES(detectedTypeSystem)
+    : PROJECT_TYPE_SYSTEM_CHOICES;
   const filter = defaultFilterFunction;
-  const when = answers => {
+  const specificWhen = answers => {
     // never ask about type system for angular project
     if (answers.projctType === 'angular') {
       return false;
@@ -112,7 +132,10 @@ export function generateProjectTypeSystemQ(detectedTypeSystem?: string, secondTi
     if (answers.typeSystem === MANUAL_SELECT_TYPE_SYSTEM_OPTION) {
       return true;
     }
+    return false;
   };
+  const when = wrapWhenWithCancelCheck(specificWhen);
+
   const question = {
     type: 'list',
     name: 'typeSystem',
@@ -125,9 +148,9 @@ export function generateProjectTypeSystemQ(detectedTypeSystem?: string, secondTi
 }
 
 export function generateProjectStylingQ(detectedStylings?: string, secondTime: boolean = false) {
-  const message = detectedStylings ? PROJECT_TYPE_SYSTEM_DETECTED_Q(detectedStylings) : PROJECT_TYPE_Q;
-  const choices = detectedStylings ? PROJECT_TYPE_SYSTEM_DETECTED_CHOICES : PROJECT_TYPE_SYSTEM_CHOICES;
-  const when = answers => {
+  const message = detectedStylings ? PROJECT_STYLING_DETECTED_Q(detectedStylings) : PROJECT_STYLING_Q;
+  const choices = detectedStylings ? PROJECT_STYLING_DETECTED_CHOICES(detectedStylings) : PROJECT_STYLING_CHOICES;
+  const specificWhen = answers => {
     // Always show the question first time
     if (!secondTime) {
       return true;
@@ -136,7 +159,10 @@ export function generateProjectStylingQ(detectedStylings?: string, secondTime: b
     if (answers.styling === MANUAL_SELECT_STYLING_OPTION) {
       return true;
     }
+    return false;
   };
+  const when = wrapWhenWithCancelCheck(specificWhen);
+
   const question = {
     type: 'list',
     name: 'styling',
@@ -150,10 +176,13 @@ export function generateProjectStylingQ(detectedStylings?: string, secondTime: b
 export function generatePackageManagerQ() {
   const message = PACKAGE_MANAGER_Q;
   const choices = PACKAGE_MANAGER_CHOICES;
+  const when = wrapWhenWithCancelCheck();
+
   const question = {
     type: 'list',
     name: 'pacakgeManager',
     message,
+    when,
     choices
   };
   return question;
@@ -162,10 +191,13 @@ export function generatePackageManagerQ() {
 export function generateConfigurationLocationQ() {
   const message = CONFIG_LOCATION_Q;
   const choices = CONFIG_LOCATION_CHOICES;
+  const when = wrapWhenWithCancelCheck();
+
   const question = {
     type: 'list',
     name: 'configLocation',
     message,
+    when,
     choices
   };
   return question;
@@ -175,6 +207,16 @@ const defaultFilterFunction = val => {
   const lower = val.toLowerCase();
   if (lower === 'none') return undefined;
   return lower;
+};
+
+const wrapWhenWithCancelCheck = (specificWhen?: (answers) => boolean): ((answers) => boolean) => (answers): boolean => {
+  if (answers.handleAlreadyInitialized === ALREADY_INITIALIZED_CANCEL_OPTION) {
+    return false;
+  }
+  if (!specificWhen) {
+    return true;
+  }
+  return specificWhen(answers);
 };
 
 export default function getInitQuestions(
