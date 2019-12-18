@@ -27,6 +27,21 @@ const inputsWithDefaultsNoCompiler = [
   }
 ];
 
+// Should do nothing when user select cancel
+// Should write compiler to config
+// should write overrides to config
+// should write package manager to config
+// Should overwrite to the same location
+// bit.json
+// package.json
+// Should override to another location (delete the old one, and write the new one)
+// bit.json -> package.json
+// package.json -> bit.json
+// should not ask the same question in case user choose proceed
+// should ask the same question in case user choose select different
+// Should identify metadata from package.json
+// Show / hide interactive - init flag, global config, default
+
 describe('run bit init - interactive', function() {
   this.timeout(0);
   const helper = new Helper();
