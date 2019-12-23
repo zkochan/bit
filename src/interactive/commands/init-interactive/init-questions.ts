@@ -1,5 +1,6 @@
 import format from 'string-format';
-import { Framework, StylingFrameworks, TypingsSystem, DepsObject, DepsTypes } from './init-interactive-types';
+import { Framework, StylingFrameworks, TypingsSystem } from '../../../consumer/workspace-metadata-detector';
+import { pascalCase } from '../../../utils';
 
 export const TOP_MESSAGE = `This utility initialize an empty Bit workspace and walks you through creating a bit configuration.
 You can later edit your configuration in your package.json or bit.json.
@@ -12,7 +13,7 @@ export const ALREADY_INITIALIZED_CANCEL_OPTION = 'cancel';
 export const ALREADY_INITIALIZED_CHOICES = ['overwrite', ALREADY_INITIALIZED_CANCEL_OPTION];
 
 export const PROJECT_TYPE_DETECTED_TEMPLATE_Q = '{type} project type detected';
-export const PROJECT_TYPE_DETECTED_Q = type => format(PROJECT_TYPE_DETECTED_TEMPLATE_Q, { type });
+export const PROJECT_TYPE_DETECTED_Q = type => format(PROJECT_TYPE_DETECTED_TEMPLATE_Q, { type: pascalCase(type) });
 export const PROJECT_TYPE_Q = 'Select project framework';
 export const PROJECT_TYPES_CHOICES = ['React', 'Angular', 'Vue', 'Node', 'Abort'];
 export const MANUAL_SELECT_FRAMEWORK_OPTION = 'select different framework';
@@ -21,7 +22,7 @@ export const PROJECT_TYPE_DETECTED_CHOICES = type =>
 
 export const PROJECT_TYPE_SYSTEM_DETECTED_TEMPLATE_Q = '{typeSystem} configuration detected';
 export const PROJECT_TYPE_SYSTEM_DETECTED_Q = typeSystem =>
-  format(PROJECT_TYPE_SYSTEM_DETECTED_TEMPLATE_Q, { typeSystem });
+  format(PROJECT_TYPE_SYSTEM_DETECTED_TEMPLATE_Q, { typeSystem: pascalCase(typeSystem) });
 export const PROJECT_TYPE_SYSTEM_Q = 'Select typing';
 export const PROJECT_TYPE_SYSTEM_CHOICES = answers => {
   if (answers.projectType === 'react') {
@@ -35,7 +36,8 @@ export const PROJECT_TYPE_SYSTEM_DETECTED_CHOICES = typeSystem =>
   getAutoDetectedChoicesWithValue(typeSystem, [MANUAL_SELECT_TYPE_SYSTEM_OPTION]);
 
 export const PROJECT_STYLING_DETECTED_TEMPLATE_Q = '{styling} styling detected';
-export const PROJECT_STYLING_DETECTED_Q = styling => format(PROJECT_STYLING_DETECTED_TEMPLATE_Q, { styling });
+export const PROJECT_STYLING_DETECTED_Q = styling =>
+  format(PROJECT_STYLING_DETECTED_TEMPLATE_Q, { styling: pascalCase(styling) });
 export const PROJECT_STYLING_Q = 'Select styling framework';
 const STYLED_COMPONENTS_CHOICE = { name: 'StyledComponents', value: 'styled-components' };
 const EMOTION_CHOICE = { name: 'Emotion', value: 'emotion' };

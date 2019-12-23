@@ -40,8 +40,10 @@ export default class Init extends Command {
 
   action([path]: [string], flags: Record<string, any>): Promise<{ [key: string]: any }> {
     // @ts-ignore AUTO-ADDED-AFTER-MIGRATION-PLEASE-FIX!
+    if (path) path = pathlib.resolve(path);
+
     if (!_isAnyNotInteractiveFlagUsed(flags) && (flags.interactive || shouldShowInteractive(CFG_INIT_INTERACTIVE))) {
-      return initInteractive();
+      return initInteractive(path);
     }
     const {
       // @ts-ignore AUTO-ADDED-AFTER-MIGRATION-PLEASE-FIX!
@@ -65,7 +67,6 @@ export default class Init extends Command {
       // @ts-ignore AUTO-ADDED-AFTER-MIGRATION-PLEASE-FIX!
       packageManager
     } = flags;
-    if (path) path = pathlib.resolve(path);
     if (bare) {
       if (reset || resetHard) throw new GeneralError('--reset and --reset-hard flags are not available for bare scope');
       // Handle both cases init --bare and init --bare [scopeName]

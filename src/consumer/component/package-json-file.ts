@@ -155,6 +155,50 @@ export default class PackageJsonFile {
     return this.packageJsonObject[propertyName];
   }
 
+  getDependencies(): Record<string, string> | undefined {
+    return this.getProperty('dependencies');
+  }
+
+  getDevDependencies(): Record<string, string> | undefined {
+    return this.getProperty('devDependencies');
+  }
+
+  getPeerDependencies(): Record<string, string> | undefined {
+    return this.getProperty('peerDependencies');
+  }
+
+  getAllDependencies(): Record<string, string> {
+    const deps = this.getDependencies() || {};
+    const devDeps = this.getDevDependencies() || {};
+    const peerDeps = this.getPeerDependencies() || {};
+    return Object.assign(peerDeps, devDeps, deps);
+  }
+
+  /**
+   * Check if the dependnecy exist in regular / dev or peer dependencies.
+   * @param dependency dependency name to check
+   */
+  isDependencyExistInAnyType(dependency: string): boolean {
+    const deps = this.getAllDependencies();
+    return deps[dependency] !== undefined;
+  }
+
+  /**
+   * Check if at least one of the dependencies exist
+   * @param dependencyList list of dependencies names
+   */
+  isAtLeastOneDependencyExistInAnyType(dependencyList: string[]): boolean {
+    const deps = this.getAllDependencies();
+    let found = false;
+    dependencyList.forEach(dependency => {
+      if (deps[dependency] !== undefined) {
+        found = true;
+        return found;
+      }
+    });
+    return found;
+  }
+
   mergePackageJsonObject(packageJsonObject: Record<string, any> | null | undefined): void {
     if (!packageJsonObject || R.isEmpty(packageJsonObject)) return;
     this.packageJsonObject = Object.assign(this.packageJsonObject, packageJsonObject);

@@ -66,6 +66,7 @@ import { pathNormalizeToLinux, pathJoinLinux, pathRelativeLinux, pathResolveToLi
 import getMissingTestFiles from './getMissingTestFiles';
 import identityFile from './ssh/identity-file';
 import camelCase from './string/camel-case';
+import pascalCase from './string/pascal-case';
 import stripTrailingChar from './string/strip-trailing-char';
 import retrieveIgnoreList from './ignore/ignore';
 // @ts-ignore AUTO-ADDED-AFTER-MIGRATION-PLEASE-FIX!
@@ -134,6 +135,7 @@ export {
   removeFromRequireCache,
   outputFile,
   camelCase,
+  pascalCase,
   stripTrailingChar,
   getLatestVersionNumber,
   calculateFileInfo,

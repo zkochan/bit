@@ -119,10 +119,12 @@ const OVERRIDES_MAPPING = {
   },
   emotion: {
     dependencies: {
-      emotion: '-'
+      emotion: '-',
+      '@emotion/core': '-'
     },
     peerDependencies: {
-      emotion: '+'
+      emotion: '+',
+      '@emotion/core': '+'
     }
   }
 };
