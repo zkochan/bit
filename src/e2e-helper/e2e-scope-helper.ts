@@ -67,7 +67,7 @@ export default class ScopeHelper {
 
   async initInteractive(inputs: InteractiveInputs) {
     // @ts-ignore AUTO-ADDED-AFTER-MIGRATION-PLEASE-FIX!
-    return this.command.runInteractiveCmd({ args: ['init', '--interactive'], inputs });
+    return this.command.runInteractiveCmd({ args: ['init', '--setup'], inputs });
   }
 
   initLocalScopeWithOptions(options: Record<string, any>) {

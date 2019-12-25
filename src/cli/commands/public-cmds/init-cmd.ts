@@ -18,7 +18,7 @@ export default class Init extends Command {
   // @ts-ignore AUTO-ADDED-AFTER-MIGRATION-PLEASE-FIX!
   opts = [
     ['b', 'bare [name]', 'initialize an empty bit bare scope'],
-    ['s', 'shared <groupname>', 'add group write permissions to a scope properly'],
+    ['S', 'shared <groupname>', 'add group write permissions to a scope properly'],
     [
       'T',
       'standalone [boolean]',
@@ -35,14 +35,14 @@ export default class Init extends Command {
     ['d', 'default-directory <default-directory>', 'set up default directory to import components into'],
     ['p', 'package-manager <package-manager>', 'set up package manager (npm or yarn)'],
     ['f', 'force', 'force workspace initialization without clearing local objects'],
-    ['I', 'interactive', 'EXPERIMENTAL. start an interactive process']
+    ['s', 'setup', 'EXPERIMENTAL. start an interactive setup process']
   ];
 
   action([path]: [string], flags: Record<string, any>): Promise<{ [key: string]: any }> {
     // @ts-ignore AUTO-ADDED-AFTER-MIGRATION-PLEASE-FIX!
     if (path) path = pathlib.resolve(path);
 
-    if (!_isAnyNotInteractiveFlagUsed(flags) && (flags.interactive || shouldShowInteractive(CFG_INIT_INTERACTIVE))) {
+    if (!_isAnyNotInteractiveFlagUsed(flags) && (flags.setup || shouldShowInteractive(CFG_INIT_INTERACTIVE))) {
       return initInteractive(path);
     }
     const {
@@ -113,7 +113,7 @@ export default class Init extends Command {
 }
 
 function _isAnyNotInteractiveFlagUsed(flags: Record<string, any>) {
-  const withoutInteractive = R.omit(['interactive'], flags);
+  const withoutInteractive = R.omit(['setup'], flags);
   const cleaned = clean(withoutInteractive);
   return !R.isEmpty(cleaned);
 }
