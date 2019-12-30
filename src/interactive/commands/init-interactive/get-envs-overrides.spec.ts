@@ -1,7 +1,7 @@
 import { expect } from 'chai';
 import getCompilerByFrameworkAndTypingSystem, { getOverrides } from './get-envs-overrides';
 
-describe.only('get env and overrides', () => {
+describe('get env and overrides', () => {
   describe('react', () => {
     describe('compiler', () => {
       let compiler;
@@ -34,7 +34,7 @@ describe.only('get env and overrides', () => {
       let overrides;
       describe('react, plain, no styling', () => {
         before(() => {
-          overrides = getOverrides('react', 'plain', undefined);
+          overrides = getOverrides('react', 'plain', undefined)['*'];
         });
         it('should identify overrides correctly', () => {
           expect(overrides.dependencies).to.have.property('react', '-');
@@ -45,7 +45,7 @@ describe.only('get env and overrides', () => {
       });
       describe('react, plain, styled components', () => {
         before(() => {
-          overrides = getOverrides('react', 'plain', 'styled-components');
+          overrides = getOverrides('react', 'plain', 'styled-components')['*'];
         });
         it('should identify overrides correctly', () => {
           expect(overrides.dependencies).to.have.property('react', '-');
@@ -58,7 +58,7 @@ describe.only('get env and overrides', () => {
       });
       describe('react, plain, emotion', () => {
         before(() => {
-          overrides = getOverrides('react', 'plain', 'emotion');
+          overrides = getOverrides('react', 'plain', 'emotion')['*'];
         });
         it('should identify overrides correctly', () => {
           expect(overrides.dependencies).to.have.property('react', '-');
@@ -71,7 +71,7 @@ describe.only('get env and overrides', () => {
       });
       describe('react, flow, no styling', () => {
         before(() => {
-          overrides = getOverrides('react', 'flow', undefined);
+          overrides = getOverrides('react', 'flow', undefined)['*'];
         });
         it('should identify overrides correctly', () => {
           expect(overrides.dependencies).to.have.property('react', '-');
@@ -82,7 +82,7 @@ describe.only('get env and overrides', () => {
       });
       describe('react, flow, styled components', () => {
         before(() => {
-          overrides = getOverrides('react', 'flow', 'styled-components');
+          overrides = getOverrides('react', 'flow', 'styled-components')['*'];
         });
         it('should identify overrides correctly', () => {
           expect(overrides.dependencies).to.have.property('react', '-');
@@ -95,7 +95,7 @@ describe.only('get env and overrides', () => {
       });
       describe('react, flow, emotion', () => {
         before(() => {
-          overrides = getOverrides('react', 'flow', 'emotion');
+          overrides = getOverrides('react', 'flow', 'emotion')['*'];
         });
         it('should identify overrides correctly', () => {
           expect(overrides.dependencies).to.have.property('react', '-');
@@ -110,7 +110,7 @@ describe.only('get env and overrides', () => {
       describe('react, typescript, styled components', () => {});
       describe('react, typescript, emotion', () => {
         before(() => {
-          overrides = getOverrides('react', 'typescript', 'emotion');
+          overrides = getOverrides('react', 'typescript', 'emotion')['*'];
         });
         it('should identify overrides correctly', () => {
           expect(overrides.dependencies).to.have.property('react', '-');
@@ -142,7 +142,7 @@ describe.only('get env and overrides', () => {
       let overrides;
       describe('angular, no styling', () => {
         before(() => {
-          overrides = getOverrides('angular', undefined, undefined);
+          overrides = getOverrides('angular', undefined, undefined)['*'];
         });
         it('should identify overrides correctly', () => {
           expect(overrides.dependencies).to.have.property('@angular/core', '-');
@@ -154,27 +154,27 @@ describe.only('get env and overrides', () => {
       });
       describe('angular, styled components', () => {
         before(() => {
-          overrides = getOverrides('angular', undefined, 'styled-components');
+          overrides = getOverrides('angular', undefined, 'styled-components')['*'];
         });
         it('should identify overrides correctly', () => {
-          expect(overrides.dependencies).to.have.property('react', '-');
-          expect(overrides.dependencies).to.have.property('react-dom', '-');
+          expect(overrides.dependencies).to.have.property('@angular/core', '-');
+          expect(overrides.dependencies).to.have.property('@angular/common', '-');
           expect(overrides.dependencies).to.have.property('styled-components', '-');
-          expect(overrides.peerDependencies).to.have.property('react', '^16.9.0');
-          expect(overrides.peerDependencies).to.have.property('react-dom', '^16.9.0');
+          expect(overrides.peerDependencies).to.have.property('@angular/core', '>=8.0.0');
+          expect(overrides.peerDependencies).to.have.property('@angular/common', '>=8.0.0');
           expect(overrides.peerDependencies).to.have.property('styled-components', '+');
         });
       });
       describe('angular, emotion', () => {
         before(() => {
-          overrides = getOverrides('angular', undefined, 'emotion');
+          overrides = getOverrides('angular', undefined, 'emotion')['*'];
         });
         it('should identify overrides correctly', () => {
-          expect(overrides.dependencies).to.have.property('react', '-');
-          expect(overrides.dependencies).to.have.property('react-dom', '-');
+          expect(overrides.dependencies).to.have.property('@angular/core', '-');
+          expect(overrides.dependencies).to.have.property('@angular/common', '-');
           expect(overrides.dependencies).to.have.property('emotion', '-');
-          expect(overrides.peerDependencies).to.have.property('react', '^16.9.0');
-          expect(overrides.peerDependencies).to.have.property('react-dom', '^16.9.0');
+          expect(overrides.peerDependencies).to.have.property('@angular/core', '>=8.0.0');
+          expect(overrides.peerDependencies).to.have.property('@angular/common', '>=8.0.0');
           expect(overrides.peerDependencies).to.have.property('emotion', '+');
         });
       });

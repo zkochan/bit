@@ -1,5 +1,6 @@
 import R from 'ramda';
-import { Framework, StylingFrameworks, TypingsSystem, DepsObject, DepsTypes } from './init-interactive-types';
+import { DepsObject, DepsTypes, RuledDepsObject } from './init-interactive-types';
+import { Framework, TypingsSystem, StylingFrameworks } from '../../../consumer/workspace-metadata-detector';
 
 const COMPILERS_MAPPING = {
   react: {
@@ -19,7 +20,8 @@ const COMPILERS_MAPPING = {
   angular: {
     plain: 'not relevant',
     flow: 'not relevant',
-    typescript: 'bit.envs/compilers/angular'
+    typescript: 'bit.envs/compilers/angular',
+    default: 'bit.envs/compilers/angular'
   }
 };
 
@@ -130,10 +132,15 @@ const OVERRIDES_MAPPING = {
 };
 
 export default function getCompilerByFrameworkAndTypingSystem(framework: Framework, typing?: TypingsSystem): string {
-  return R.path([framework, typing], COMPILERS_MAPPING);
+  const typeOrDefault = typing || 'default';
+  return R.path([framework, typeOrDefault], COMPILERS_MAPPING);
 }
 
-export function getOverrides(framework: Framework, typing?: TypingsSystem, styling?: StylingFrameworks): DepsObject {
+export function getOverrides(
+  framework: Framework,
+  typing?: TypingsSystem,
+  styling?: StylingFrameworks
+): RuledDepsObject {
   const frameworkDeps = R.path([framework], OVERRIDES_MAPPING);
   const frameworkTypedDeps = R.path([framework, typing], OVERRIDES_MAPPING);
   const stylingDeps = R.path([styling], OVERRIDES_MAPPING);
@@ -150,9 +157,11 @@ export function getOverrides(framework: Framework, typing?: TypingsSystem, styli
   const mergedDevDeps = mergeDepsByType(allDepsObjects, 'devDependencies');
   const mergedPeerDeps = mergeDepsByType(allDepsObjects, 'peerDependencies');
   const res = {
-    dependencies: mergedDeps,
-    devDependencies: mergedDevDeps,
-    peerDependencies: mergedPeerDeps
+    '*': {
+      dependencies: mergedDeps,
+      devDependencies: mergedDevDeps,
+      peerDependencies: mergedPeerDeps
+    }
   };
   return res;
 }
