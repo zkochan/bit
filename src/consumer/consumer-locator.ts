@@ -85,15 +85,15 @@ export async function getConsumerInfo(absPath: string): Promise<ConsumerInfo | n
   async function pathHasScopeDir(path: string): Promise<boolean> {
     return (await fs.pathExists(composeBitHiddenDirPath(path))) || fs.pathExists(composeBitGitHiddenDirPath(path));
   }
+}
 
-  async function getConsumerConfigIfExists(path: string): Promise<WorkspaceConfig | null | undefined> {
-    try {
-      return await WorkspaceConfig.load(path);
-    } catch (err) {
-      if (err instanceof BitConfigNotFound) {
-        return null;
-      }
-      throw err;
+export async function getConsumerConfigIfExists(path: string): Promise<WorkspaceConfig | null | undefined> {
+  try {
+    return await WorkspaceConfig.load(path);
+  } catch (err) {
+    if (err instanceof BitConfigNotFound) {
+      return null;
     }
+    throw err;
   }
 }
