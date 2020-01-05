@@ -24,7 +24,7 @@ export default (async function initInteractive(path: string = process.cwd()) {
   );
   const answers = await inquirer.prompt(questions);
   // answers.compiler = actualCompiler;
-  return init(undefined, false, false, false, false, answers).then(({ created, addedGitHooks, existingGitHooks }) => {
+  return init(path, false, false, false, false, answers).then(({ created, addedGitHooks, existingGitHooks }) => {
     return {
       created,
       addedGitHooks,
