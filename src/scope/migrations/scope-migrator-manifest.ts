@@ -23,5 +23,8 @@ export default {
   },
   '0.12.1': {
     Version: [versionMigrations.removeLatestFromCompiler]
+  },
+  '14.8.0': {
+    Version: [versionMigrations.removeFilesFromCompiler]
   }
 };
