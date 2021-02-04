@@ -1,7 +1,9 @@
 const HtmlWebpackPlugin = require('html-webpack-plugin');
+const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 const html = require('./html');
 
 module.exports = (entries, rootPath) => {
+  console.log('rootPath-----------------', rootPath);
   return {
     mode: 'production',
     // Stop compilation early in production
@@ -56,6 +58,10 @@ module.exports = (entries, rootPath) => {
           }
         )
       ),
+      new BundleAnalyzerPlugin({
+        analyzerMode: 'static',
+        openAnalyzer: false,
+      }),
     ],
   };
 };
