@@ -58,7 +58,8 @@ async function getConfig(cwd = process.cwd()) {
 
   if (consumerInfo) {
     const config = Config.load('workspace.jsonc', configOpts);
-    return attachVersionsFromBitmap(config, consumerInfo);
+    const result = attachVersionsFromBitmap(config, consumerInfo);
+    return result;
   }
 
   if (scopePath && !consumerInfo) {
@@ -80,6 +81,7 @@ function attachVersionsFromBitmap(config: Config, consumerInfo: ConsumerInfo): C
     return config;
   }
   const rawConfig = config.toObject();
+  // console.log("🚀 ~ file: load-bit.ts ~ line 87 ~ attachVersionsFromBitmap ~ rawConfig", rawConfig)
   const rawBitmap = BitMap.loadRawSync(consumerInfo.path);
   let parsedBitMap = {};
   try {
@@ -88,9 +90,18 @@ function attachVersionsFromBitmap(config: Config, consumerInfo: ConsumerInfo): C
     // Do nothing here, invalid bitmaps will be handled later
     // eslint-disable-next-line no-empty
   } catch (e) {}
+
+  // 148ms
+  console.time('bitId');
   const allBitmapIds = Object.keys(parsedBitMap).map((id) => BitMap.getBitIdFromComponentJson(id, parsedBitMap[id]));
+  // console.log("🚀 ~ file: load-bit.ts ~ line 103 ~ attachVersionsFromBitmap ~ Object.keys(parsedBitMap)", Object.keys(parsedBitMap))
+
   const bitMapBitIds = BitIds.fromArray(allBitmapIds);
+  console.timeEnd('bitId');
+  // 112ms
+  console.time('manifest');
   const result = Object.entries(rawConfig).reduce((acc, [aspectId, aspectConfig]) => {
+    // console.time(aspectId);
     let newAspectEntry = aspectId;
     // In case the id already has a version we don't want to get it from the bitmap
     // We also don't want to add versions for core aspects
@@ -100,9 +111,11 @@ function attachVersionsFromBitmap(config: Config, consumerInfo: ConsumerInfo): C
         newAspectEntry = `${aspectId}${VERSION_DELIMITER}${versionFromBitmap}`;
       }
     }
+    // console.timeEnd(aspectId);
     acc[newAspectEntry] = aspectConfig;
     return acc;
   }, {});
+  console.timeEnd('manifest');
   return new Config(result);
 }
 
@@ -116,6 +129,7 @@ function getVersionFromBitMapIds(allBitmapIds: BitIds, aspectId: string): string
   return found && found.hasVersion() ? found.version : undefined;
 }
 
+const allFiles = [];
 export async function requireAspects(aspect: Extension, runtime: RuntimeDefinition) {
   const id = aspect.name;
   if (!id) throw new Error('could not retrieve aspect id');
@@ -124,7 +138,15 @@ export async function requireAspects(aspect: Extension, runtime: RuntimeDefiniti
   const runtimeFile = files.find((file) => file.includes(`.${runtime.name}.runtime.js`));
   if (!runtimeFile) return;
   // eslint-disable-next-line
+  const start = Date.now();
   require(resolve(`${dirPath}/${runtimeFile}`));
+  const end = Date.now() - start;
+  if (end > 0) {
+    allFiles.push([end, runtimeFile]);
+  }
+  allFiles.sort(function (a, b) {
+    return b[0] - a[0];
+  });
 }
 
 function getMainAspect() {
@@ -178,11 +200,16 @@ function shouldLoadInSafeMode() {
   return isSafeModeCommand || hasSafeModeFlag;
 }
 
+// 1200
 export async function loadBit(path = process.cwd()) {
   const loadCLIOnly = shouldLoadInSafeMode();
-  const config = await getConfig(path);
+  console.time('getConfig');
+  const config = await getConfig(path); // 300ms
+  console.timeEnd('getConfig');
   registerCoreExtensions();
-  await loadLegacyConfig(config);
+  console.time('loadLegacyConfig');
+  await loadLegacyConfig(config); // 200ms
+  console.timeEnd('loadLegacyConfig');
   const configMap = config.toObject();
 
   configMap['teambit.harmony/bit'] = {
@@ -195,7 +222,11 @@ export async function loadBit(path = process.cwd()) {
   }
   const harmony = await Harmony.load(aspectsToLoad, MainRuntime.name, configMap);
 
+  // 680ms
+  console.time('harmony.run');
   await harmony.run(async (aspect: Extension, runtime: RuntimeDefinition) => requireAspects(aspect, runtime));
+  console.timeEnd('harmony.run');
+  // console.log('allFiles', allFiles);
   if (loadCLIOnly) return harmony;
   loader.start('loading aspects...');
   const aspectLoader = harmony.get<AspectLoaderMain>('teambit.harmony/aspect-loader');
@@ -206,7 +237,9 @@ export async function loadBit(path = process.cwd()) {
 }
 
 export async function runCLI() {
-  const harmony = await loadBit();
+  console.time('loadBit');
+  const harmony = await loadBit(); //   1.2
+  console.timeEnd('loadBit');
   const cli = harmony.get<CLIMain>('teambit.harmony/cli');
   let hasWorkspace = true;
   try {

@@ -18,19 +18,21 @@ import { getPinoLogger } from './pino-logger';
 import { Profiler } from './profiler';
 
 export { Level as LoggerLevel };
-
+console.time('globalConfig');
 const jsonFormat =
   yn(getSync(CFG_LOG_JSON_FORMAT), { default: false }) || yn(process.env.JSON_LOGS, { default: false });
-
+console.timeEnd('globalConfig');
 const LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace'];
-
+console.time('level');
 const logLevel = getLogLevel();
-
+console.timeEnd('level');
+console.time('winston');
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const { winstonLogger, createExtensionLogger } = getWinstonLogger(logLevel, jsonFormat);
-
+console.timeEnd('winston');
+console.time('pino');
 const { pinoLogger, pinoLoggerConsole } = getPinoLogger(logLevel, jsonFormat);
-
+console.timeEnd('pino');
 export interface IBitLogger {
   trace(message: string, ...meta: any[]): void;
 

@@ -280,6 +280,7 @@ export default class BitMap {
     componentFromJson: Record<string, any>,
     isLegacy = false
   ): BitId {
+    // console.time(componentId);
     // on Harmony, to parse the id, the old format used "exported" prop, the current format
     // uses "scope" and "version" props.
     const newHarmonyFormat = 'scope' in componentFromJson;
@@ -289,6 +290,7 @@ export default class BitMap {
         name: componentId,
         version: componentFromJson.version,
       });
+      // console.timeEnd(componentId);
       // it needs to be parsed for 1) validation 2) adding "latest" to the version if needed.
       return BitId.parse(bitId.toString(), bitId.hasScope());
     }
@@ -311,6 +313,7 @@ export default class BitMap {
       componentFromJson.exported = true;
       return true;
     };
+
     return BitId.parse(componentId, idHasScope());
   }
 

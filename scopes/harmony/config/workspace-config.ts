@@ -125,8 +125,10 @@ export class WorkspaceConfig implements HostConfig {
   }
 
   private loadExtensions() {
+    // console.time('!loadExt');
     const withoutInternalConfig = omit(INTERNAL_CONFIG_PROPS, this.raw);
     this._extensions = ExtensionDataList.fromConfigObject(withoutInternalConfig);
+    // console.timeEnd('!loadExt');
   }
 
   extension(extensionId: string, ignoreVersion: boolean): any {

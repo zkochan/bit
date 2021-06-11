@@ -17,11 +17,12 @@ export type ConfigDeps = [];
 
 export type ConfigConfig = {};
 
+// 187ms
 export default async function provideConfig() {
   LegacyWorkspaceConfig.registerOnWorkspaceConfigIsExist(onLegacyWorkspaceConfigIsExist());
   LegacyWorkspaceConfig.registerOnWorkspaceConfigEnsuring(onLegacyWorkspaceEnsure());
   const consumerInfo = await getConsumerInfo(process.cwd());
-  const config: Config = await tryToGetConfig(consumerInfo?.path || process.cwd());
+  const config: Config = await tryToGetConfig(consumerInfo?.path || process.cwd()); // 177
   LegacyWorkspaceConfig.registerOnWorkspaceConfigLoading(onLegacyWorkspaceLoad(config));
   return config;
 }

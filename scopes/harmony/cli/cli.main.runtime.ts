@@ -110,9 +110,10 @@ export class CLIMain {
   static runtime = MainRuntime;
   static slots = [Slot.withType<CommandList>(), Slot.withType<OnStart>()];
 
+  // 250
   static async provider(deps, config, [commandsSlot, onStartSlot]: [CommandsSlot, OnStartSlot]) {
     const cliMain = new CLIMain(commandsSlot, onStartSlot);
-    const legacyExtensions = await LegacyLoadExtensions();
+    const legacyExtensions = await LegacyLoadExtensions(); // 185
     // Make sure to register all the hooks actions in the global hooks manager
     legacyExtensions.forEach((extension) => {
       extension.registerHookActionsOnHooksManager();
@@ -126,12 +127,13 @@ export class CLIMain {
       return acc;
     }, []);
 
-    const legacyRegistry = buildRegistry(extensionsCommands);
+    const legacyRegistry = buildRegistry(extensionsCommands); // 79
+    // console.time('!!cli');
     const legacyCommands = legacyRegistry.commands.concat(legacyRegistry.extensionsCommands || []);
     const legacyCommandsAdapters = legacyCommands.map((command) => new LegacyCommandAdapter(command, cliMain));
     const cliCmd = new CliCmd(cliMain);
     cliMain.register(...legacyCommandsAdapters, new CompletionCmd(), cliCmd);
-    
+    // console.timeEnd('!!cli');
     return cliMain;
   }
 }

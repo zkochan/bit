@@ -66,7 +66,9 @@ export default async function loadExtensions(): Promise<Extension[]> {
         return null;
       }
     };
+    // console.time('consumer');
     const consumer: Consumer | null | undefined = await getConsumer();
+    // console.timeEnd('consumer');
     let consumerPath = null;
     let scopePath = null;
 

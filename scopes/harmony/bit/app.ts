@@ -1,3 +1,4 @@
+console.time('bootstrap');
 /* eslint-disable import/no-dynamic-require */
 /* eslint-disable import/first */
 process.on('uncaughtException', (err) => {
@@ -18,7 +19,8 @@ initApp();
 
 async function initApp() {
   try {
-    await bootstrap();
+    await bootstrap(); // 100ms
+    console.timeEnd('bootstrap');
     // registerCoreExtensions();
     // const harmony = await Harmony.load([ConfigExt], {});
     await runCLI();

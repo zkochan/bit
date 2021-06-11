@@ -14,6 +14,7 @@ export class CLIParser {
   constructor(private commands: Command[], private groups: GroupsType) {}
 
   async parse() {
+    console.time('cli-parse');
     const args = process.argv.slice(2); // remove the first two arguments, they're not relevant
 
     this.throwForNonExistsCommand(args[0]);
@@ -36,7 +37,7 @@ export class CLIParser {
     yargs
       // .recommendCommands() // don't use it, it brings the global help of yargs, we have a custom one
       .wrap(null);
-
+    console.timeEnd('cli-parse');
     await yargs.parse();
   }
 
@@ -84,9 +85,10 @@ export class CLIParser {
   }
 
   private printHelp() {
-    const help = formatHelp(this.commands, this.groups);
-    // eslint-disable-next-line no-console
-    console.log(help);
+    console.log('HELP');
+    // const help = formatHelp(this.commands, this.groups);
+    // // eslint-disable-next-line no-console
+    // console.log(help);
   }
 
   private configureParser() {
