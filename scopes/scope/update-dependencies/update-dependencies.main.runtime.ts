@@ -127,7 +127,7 @@ export class UpdateDependenciesMain {
   private async importAllMissing(depsUpdateItemsRaw: DepUpdateItemRaw[]) {
     const componentIds = depsUpdateItemsRaw.map((d) => ComponentID.fromString(d.componentId));
     const dependenciesIds = depsUpdateItemsRaw.map((item) =>
-      item.dependencies.map((dep) => ComponentID.fromString(dep)).map((id) => id.changeVersion(LATEST))
+      item.dependencies.map((dep) => ComponentID.fromString(dep)).map((id) => id)
     );
     const idsToImport = [...flatten(dependenciesIds), ...componentIds];
     // do not use cache. for dependencies we must fetch the latest ModelComponent from the remote
@@ -190,6 +190,9 @@ export class UpdateDependenciesMain {
 
   private async getDependencyWithExactVersion(depStr: string): Promise<ComponentID> {
     const compId = ComponentID.fromString(depStr);
+    if (compId.hasVersion() && compId._legacy.isVersionSnap()) {
+      return compId;
+    }
     const range = compId.version || '*'; // if not version specified, assume the latest
     const id = compId.changeVersion(undefined);
     const exactVersion = await this.scope.getExactVersionBySemverRange(id, range);
