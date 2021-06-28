@@ -1,4 +1,6 @@
 import { MemoryFS } from '@teambit/any-fs';
+import { sortBy } from 'lodash';
+import crypto from 'crypto';
 import type { AbstractVinyl } from '@teambit/legacy/dist/consumer/component/sources';
 import { auto } from '@teambit/legacy/dist/utils/eol';
 import path from 'path';
@@ -20,7 +22,8 @@ export default class ComponentFS extends MemoryFS {
    * hash to represent all contents within this filesystem volume.
    */
   get hash() {
-    return '';
+    const hashes = sortBy(this.files, ['relative']).map((file) => this.sha1(file.contents));
+    return this.sha1(`${hashes.join(',')}`);
   }
 
   /**
@@ -45,6 +48,12 @@ export default class ComponentFS extends MemoryFS {
   toObject() {}
 
   toJSON() {}
+
+  private sha1(data: string | Buffer) {
+    const sha = crypto.createHash('sha1');
+    sha.update(data);
+    return sha.digest('hex');
+  }
 
   static fromVinyls(files: AbstractVinyl[]) {
     const fs = new ComponentFS(files);
