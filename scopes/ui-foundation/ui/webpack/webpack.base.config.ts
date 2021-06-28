@@ -102,6 +102,7 @@ export default function createWebpackConfig(
       fallback: {
         module: false,
         path: require.resolve('path-browserify'),
+        crypto: require.resolve('crypto-browserify'),
         dgram: false,
         dns: false,
         fs: false,

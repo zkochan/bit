@@ -1,7 +1,6 @@
 import { readFileSync } from 'fs-extra';
 import minimatch from 'minimatch';
-import { compact, flatten, sortBy } from 'lodash';
-import crypto from 'crypto';
+import { compact, flatten } from 'lodash';
 // import { runCLI } from 'jest';
 import { proxy } from 'comlink';
 import { Logger } from '@teambit/logger';
@@ -43,12 +42,6 @@ export class JestTester implements Tester {
     return this.jestModule.getVersion();
   }
 
-  private sha1(data: string | Buffer) {
-    const sha = crypto.createHash('sha1');
-    sha.update(data);
-    return sha.digest('hex');
-  }
-
   private async shouldRunTest(context: TesterContext, specFile: string): Promise<boolean> {
     const components = context.components.map((component) => context.patterns.get(component));
     const component = components.find((comp) => {
@@ -58,12 +51,9 @@ export class JestTester implements Tester {
     });
     if (!component) return false;
     const [workspaceComponent] = component;
-    const updatedComponent = await this.workspace.get(workspaceComponent.id);
-    if (!updatedComponent) return false;
-    const { files } = updatedComponent.state.filesystem;
-    // TODO: fix hash on component filesystem
-    const hashes = sortBy(files, ['relative']).map((file) => this.sha1(file.contents));
-    const hash = this.sha1(`${hashes.join(',')}_${specFile}`);
+    const hash = `${workspaceComponent.filesystem.hash}_${specFile}`;
+    // const updatedComponent = await this.workspace.get(workspaceComponent.id);
+    // if (!updatedComponent) return false;
     if (this.cacheHash[workspaceComponent.id.toString()] === hash) return false;
     this.cacheHash[workspaceComponent.id.toString()] = hash;
     return true;
