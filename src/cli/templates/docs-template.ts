@@ -4,7 +4,6 @@ import c from 'chalk';
 
 import { Doclet } from '../../jsdoc/types';
 import { paintHeader } from '../chalk-box';
-import { Doclet } from '../../jsdoc/types';
 
 const paintExample = example => {
   return example.raw;
