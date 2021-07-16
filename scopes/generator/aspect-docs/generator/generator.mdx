@@ -130,3 +130,47 @@ Tag and export your generator component so you can use it in any other workspace
 ```
 
 Run `bit templates` to see your templates and then use `bit create` to create your components.
+
+## Workspace Generator
+
+You can generate an entire workspace with custom configuration and components using `bit new` command.
+To list the workspace templates, run `bit templates` outside of a bit-workspace. For now, this lists only the core aspects. Not custom ones.
+
+### bit new
+
+`bit new` command does the following:
+
+- initates a new workspace (similar to `bit init`).
+- initates a new git repo (`git init`) unless `--standalone` flag was entered.
+- adds files from the template, such as `workspace.jsonc`, `.gitignore` and so on.
+- optionally: adds components from the template and if they have dependencies, it adds them to the `workspace.jsonc`
+- runs `bit install`
+- runs `bit compile`
+
+To see all options available, run `bit new -h`.
+
+### Using non-core Workspace templates
+
+Users can create custom templates (see below how), tag and export them into the remote. To use them, run the following:
+
+```bash
+bit new template-name <your-workspace-name> --aspect <remote-component-id>
+```
+
+For example: `bit new angular-workspace my-workspace --aspect teambit.angular/workspace-template`
+Behind the scenes, it imports the remote aspect into the global scope, creates a capsule for it and then load it from the capsule.
+Once loaded, it registered to the Generator slots, so then `bit new` is able to pick it up.
+
+### Creating a Workspace Template
+
+Run `bit create workspace-generator <your-workspace-template-name>`.
+It generates an aspect locally with some dummy content you can change.
+Make sure to update workspace.jsonc to have the `teambit.harmony/aspect` as its env and run `bit compile` once done (or run `bit watch`).
+
+### Using Workspace Template duing development
+
+To test the workspace template during development, run the following from a non-bit-workspace:
+
+```bash
+bit new template-name <your-workspace-name> --aspect <local-component-id> --load-from <path-to-the-workspace>
+```
