@@ -1,5 +1,5 @@
 import { defaults } from 'lodash';
-import { EnvService, ExecutionContext } from '@teambit/envs';
+import { EnvService, ExecutionContext, ServiceDescriptor } from '@teambit/envs';
 import { Formatter, FormatResults } from './formatter';
 import { FormatterContext, FormatterOptions } from './formatter-context';
 import { FormatterConfig } from './formatter.main.runtime';
@@ -8,7 +8,9 @@ export type FormatterServiceOptions = FormatterOptions & {
   check?: boolean;
 };
 
-export class FormatterService implements EnvService<FormatResults> {
+export type FormatterDescriptor = ServiceDescriptor;
+
+export class FormatterService implements EnvService<FormatResults, FormatterDescriptor> {
   name = 'formatter';
 
   constructor(private formatterConfig: FormatterConfig) {}

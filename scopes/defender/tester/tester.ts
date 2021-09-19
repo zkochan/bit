@@ -1,5 +1,5 @@
 import { Component, ComponentID, ComponentMap } from '@teambit/component';
-import { ExecutionContext } from '@teambit/envs';
+import { ExecutionContext, ServiceHandler } from '@teambit/envs';
 import { AbstractVinyl } from '@teambit/legacy/dist/consumer/component/sources';
 import { TestsResult } from '@teambit/tests-results';
 
@@ -77,31 +77,11 @@ export interface TesterContext extends ExecutionContext {
 /**
  * tester interface allows extensions to implement a component tester into bit.
  */
-export interface Tester {
-  /**
-   * display name of the tester.
-   */
-  displayName?: string;
-
-  /**
-   * icon of the tester.
-   */
-  icon?: string;
-
-  /**
-   * serialized config of the tester.
-   */
-  displayConfig?(): string;
-
+export interface Tester extends ServiceHandler {
   /**
    * path to the config in the filesystem.
    */
   configPath?: string;
-
-  /**
-   * id of the tester.
-   */
-  id: string;
 
   /**
    * on test run complete. (applies only during watch)
@@ -118,9 +98,5 @@ export interface Tester {
    * watch tests on all components
    */
   watch?(context: TesterContext): Promise<Tests>;
-  /**
-   * return the tester version.
-   */
-  version(): string;
 }
 export type CallbackFn = (testSuite: Tests) => void;

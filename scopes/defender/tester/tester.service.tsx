@@ -2,7 +2,7 @@ import { Logger } from '@teambit/logger';
 import { resolve } from 'path';
 import React from 'react';
 import { Text, Newline } from 'ink';
-import { EnvService, ExecutionContext, EnvDefinition } from '@teambit/envs';
+import { EnvService, ExecutionContext, EnvDefinition, ServiceDescriptor } from '@teambit/envs';
 import { ComponentMap } from '@teambit/component';
 import { Workspace } from '@teambit/workspace';
 import highlight from 'cli-highlight';
@@ -18,27 +18,7 @@ const chalk = require('chalk');
 
 export const OnTestsChanged = 'OnTestsChanged';
 
-export type TesterDescriptor = {
-  /**
-   * id of the tester (e.g. jest/mocha)
-   */
-  id: string;
-
-  /**
-   * display name of the tester (e.g. Jest / Mocha)
-   */
-  displayName: string;
-
-  /**
-   * icon of the configured tester.
-   */
-  icon: string;
-
-  /**
-   * string containing the config for display.
-   */
-  config: string;
-};
+export type TesterDescriptor = ServiceDescriptor;
 
 export class TesterService implements EnvService<Tests, TesterDescriptor> {
   name = 'tester';

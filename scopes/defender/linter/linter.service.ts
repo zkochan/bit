@@ -1,10 +1,11 @@
 import { defaults } from 'lodash';
-import { EnvService, ExecutionContext } from '@teambit/envs';
+import { EnvService, ExecutionContext, ServiceDescriptor } from '@teambit/envs';
 import { Linter, LintResults } from './linter';
 import { LinterContext, LinterOptions } from './linter-context';
 import { LinterConfig } from './linter.main.runtime';
 
-export class LinterService implements EnvService<LintResults> {
+export type LinterDescriptor = ServiceDescriptor;
+export class LinterService implements EnvService<LintResults, LinterDescriptor> {
   name = 'linter';
 
   constructor(private linterConfig: LinterConfig) {}

@@ -1,4 +1,4 @@
-import { EnvDefinition, EnvService, ExecutionContext } from '@teambit/envs';
+import { EnvDefinition, EnvService, ExecutionContext, ServiceDescriptor } from '@teambit/envs';
 import React from 'react';
 import { ScopeMain } from '@teambit/scope';
 import { Text, Newline } from 'ink';
@@ -22,7 +22,7 @@ export type BuildServiceResults = {
 
 export type BuilderServiceOptions = { seedersOnly?: boolean; tasks?: string[]; skipTests?: boolean };
 
-export type BuilderDescriptor = { tasks: string[] };
+export type BuilderDescriptor = ServiceDescriptor & { tasks: string[] };
 
 export type EnvsBuildContext = { [envId: string]: BuildContext };
 

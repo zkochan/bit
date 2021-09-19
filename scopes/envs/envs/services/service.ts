@@ -1,5 +1,6 @@
 import { Component } from '@teambit/component';
 import { Environment } from '../environment';
+import { ServiceDescriptor } from './service-descriptor';
 
 export type EnvContext = {
   components: Component[];
@@ -19,7 +20,11 @@ export interface ServiceExecutionResult {
  * `TOpts` is the type of options passed to the environment through execution.
  * `TExecResponse` is the execution result of the service.
  */
-export interface Service<TExecResponse extends ServiceExecutionResult, TData = {}, TOpts = {}> {
+export interface Service<
+  TExecResponse extends ServiceExecutionResult,
+  TDescriptor extends ServiceDescriptor,
+  TOpts = {}
+> {
   /**
    * name of the service. (e.g. `compile`, `test`, etc.)
    */
@@ -38,7 +43,7 @@ export interface Service<TExecResponse extends ServiceExecutionResult, TData = {
   /**
    * get service data from an environment.
    */
-  getDescriptor?(environment: Environment): TData | undefined;
+  getDescriptor?(environment: Environment): TDescriptor | undefined;
 
   /**
    * executes a service on a subset of components.

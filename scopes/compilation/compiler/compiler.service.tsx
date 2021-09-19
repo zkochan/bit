@@ -1,13 +1,9 @@
 import React from 'react';
 import { Text, Newline } from 'ink';
-import { EnvService, EnvDefinition } from '@teambit/envs';
+import { EnvService, EnvDefinition, ServiceDescriptor } from '@teambit/envs';
 import highlight from 'cli-highlight';
 
-export type CompilerDescriptor = {
-  id: string;
-  icon?: string;
-  config?: string;
-};
+export type CompilerDescriptor = ServiceDescriptor;
 
 export class CompilerService implements EnvService<{}, CompilerDescriptor> {
   name = 'Compile';
