@@ -178,9 +178,7 @@ export default async function provideWorkspace(
   const workspaceSchema = getWorkspaceSchema(workspace, graphql);
   ui.registerUiRoot(new WorkspaceUIRoot(workspace, bundler));
   graphql.register(workspaceSchema);
-  const capsuleCmd = new CapsuleCmd();
-  capsuleCmd.commands = [new CapsuleListCmd(isolator, workspace), new CapsuleCreateCmd(workspace, isolator)];
-  const commands: CommandList = [new InstallCmd(workspace, logger), new EjectConfCmd(workspace), capsuleCmd];
+  const commands: CommandList = [new InstallCmd(workspace, logger), new EjectConfCmd(workspace)];
   const watcher = new Watcher(workspace, pubsub);
   if (workspace && !workspace.consumer.isLegacy) {
     cli.unregister('watch');

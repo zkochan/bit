@@ -1,9 +1,9 @@
 // eslint-disable-next-line max-classes-per-file
 import { Command, CommandOptions } from '@teambit/cli';
-import { CapsuleList, IsolateComponentsOptions, IsolatorMain } from '@teambit/isolator';
+import { ComponentMain } from '@teambit/component';
 import chalk from 'chalk';
-
-import { Workspace } from '.';
+import CapsuleList from './capsule-list';
+import { IsolateComponentsOptions, IsolatorMain } from './isolator.main.runtime';
 
 type CreateOpts = {
   baseDir?: string;
@@ -28,7 +28,7 @@ export class CapsuleCreateCmd implements Command {
     ['p', 'package-manager <name>', 'npm, yarn or pnpm, default to npm'],
   ] as CommandOptions;
 
-  constructor(private workspace: Workspace, private isolator: IsolatorMain) {}
+  constructor(private componentMain: ComponentMain, private isolator: IsolatorMain) {}
 
   async create(
     [componentIds = []]: [string[]],
@@ -44,7 +44,7 @@ export class CapsuleCreateCmd implements Command {
       includeFromNestedHosts: true,
       name: id,
     };
-    const ids = await this.workspace.resolveMultipleComponentIds(componentIds);
+    const ids = await this.componentMain.getHost().resolveMultipleComponentIds(componentIds);
     const network = await this.isolator.isolateComponents(ids, capsuleOptions);
     const capsules = network.graphCapsules;
     return capsules;
@@ -78,10 +78,11 @@ export class CapsuleListCmd implements Command {
   alias = '';
   options = [['j', 'json', 'json format']] as CommandOptions;
 
-  constructor(private isolator: IsolatorMain, private workspace: Workspace) {}
+  constructor(private isolator: IsolatorMain, private componentMain: ComponentMain) {}
 
   async report() {
-    const list = await this.isolator.list(this.workspace.path);
+    const host = this.componentMain.getHost();
+    const list = await this.isolator.list(host.path);
     const { workspaceCapsulesRootDir, scopeCapsulesRootDir, scopeAspectsCapsulesRootDir } = this.getCapsulesRootDirs();
     // TODO: improve output
     return chalk.green(`found ${chalk.cyan(list.capsules.length.toString())} capsule(s) for workspace:  ${chalk.cyan(

@@ -1,4 +1,4 @@
-import { MainRuntime } from '@teambit/cli';
+import { CLIAspect, CLIMain, MainRuntime } from '@teambit/cli';
 import { compact, pick } from 'lodash';
 import { Component, ComponentMap, ComponentAspect, ComponentID } from '@teambit/component';
 import type { ComponentMain, ComponentFactory } from '@teambit/component';
@@ -37,6 +37,7 @@ import { IsolatorAspect } from './isolator.aspect';
 import { symlinkBitLegacyToCapsules } from './symlink-bit-legacy-to-capsules';
 import { symlinkOnCapsuleRoot, symlinkDependenciesToCapsules } from './symlink-dependencies-to-capsules';
 import { Network } from './network';
+import { CapsuleCmd, CapsuleCreateCmd, CapsuleListCmd } from './capsule.cmd';
 
 const CAPSULES_BASE_DIR = path.join(CACHE_ROOT, 'capsules'); // TODO: move elsewhere
 
@@ -133,18 +134,27 @@ const DEFAULT_ISOLATE_INSTALL_OPTIONS: IsolateComponentsInstallOptions = {
 
 export class IsolatorMain {
   static runtime = MainRuntime;
-  static dependencies = [DependencyResolverAspect, LoggerAspect, ComponentAspect, GraphAspect];
+  static dependencies = [DependencyResolverAspect, LoggerAspect, ComponentAspect, GraphAspect, CLIAspect];
   static defaultConfig = {};
   _componentsPackagesVersionCache: { [idStr: string]: string } = {}; // cache packages versions of components
 
-  static async provider([dependencyResolver, loggerExtension, componentAspect, graphAspect]: [
+  static async provider([dependencyResolver, loggerExtension, componentAspect, graphAspect, cli]: [
     DependencyResolverMain,
     LoggerMain,
     ComponentMain,
-    GraphBuilder
+    GraphBuilder,
+    CLIMain
   ]): Promise<IsolatorMain> {
     const logger = loggerExtension.createLogger(IsolatorAspect.id);
     const isolator = new IsolatorMain(dependencyResolver, logger, componentAspect, graphAspect);
+
+    const capsuleCmd = new CapsuleCmd();
+    capsuleCmd.commands = [
+      new CapsuleListCmd(isolator, componentAspect),
+      new CapsuleCreateCmd(componentAspect, isolator),
+    ];
+    cli.register(capsuleCmd);
+
     return isolator;
   }
   constructor(
