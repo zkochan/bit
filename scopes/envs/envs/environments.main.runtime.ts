@@ -1,3 +1,4 @@
+import { GeneratorAspect, GeneratorMain } from '@teambit/generator';
 import { CLIAspect, CLIMain, MainRuntime } from '@teambit/cli';
 import { Component, ComponentAspect, ComponentMain, ComponentID, AspectData } from '@teambit/component';
 import { GraphqlAspect, GraphqlMain } from '@teambit/graphql';
@@ -15,6 +16,7 @@ import { EnvServiceList } from './env-service-list';
 import { EnvsCmd } from './envs.cmd';
 import { EnvFragment } from './env.fragment';
 import { EnvNotFound, EnvNotConfiguredForComponent } from './exceptions';
+import { emptyEnvTemplate } from './templates/empty-env';
 
 export type EnvsRegistry = SlotRegistry<Environment>;
 
@@ -481,10 +483,16 @@ export class EnvsMain {
 
   static slots = [Slot.withType<Environment>(), Slot.withType<EnvService<any>>()];
 
-  static dependencies = [GraphqlAspect, LoggerAspect, ComponentAspect, CLIAspect];
+  static dependencies = [GraphqlAspect, LoggerAspect, ComponentAspect, CLIAspect, GeneratorAspect];
 
   static async provider(
-    [graphql, loggerAspect, component, cli]: [GraphqlMain, LoggerMain, ComponentMain, CLIMain],
+    [graphql, loggerAspect, component, cli, generator]: [
+      GraphqlMain,
+      LoggerMain,
+      ComponentMain,
+      CLIMain,
+      GeneratorMain
+    ],
     config: EnvsConfig,
     [envSlot, serviceSlot]: [EnvsRegistry, ServiceSlot],
     context: Harmony
@@ -494,6 +502,8 @@ export class EnvsMain {
     component.registerShowFragments([new EnvFragment(envs)]);
     cli.register(new EnvsCmd(envs, component));
     graphql.register(environmentsSchema(envs));
+    generator.registerComponentTemplate([emptyEnvTemplate]);
+
     return envs;
   }
 }
