@@ -2,6 +2,7 @@ import chai, { expect } from 'chai';
 import path from 'path';
 import { Extensions } from '../../src/constants';
 import Helper from '../../src/e2e-helper/e2e-helper';
+import { DEFAULT_OWNER } from '../../src/e2e-helper/e2e-scopes';
 import * as fixtures from '../../src/fixtures/fixtures';
 import { generateRandomStr } from '../../src/utils';
 import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
@@ -122,6 +123,101 @@ describe('dependency-resolver extension', function () {
       describe.skip('conflict between extension and user policies ', function () {
         it.skip('should prefer user config', function () {});
       });
+    });
+  });
+  describe.only('deduplication', function () {
+    let npmCiRegistry: NpmCiRegistry;
+    let randomStr;
+    let barFooOutput;
+    let isTypeOutput;
+
+    before(async () => {
+      helper.scopeHelper.setNewLocalAndRemoteScopesHarmony();
+      helper.bitJsonc.setupDefault();
+
+      npmCiRegistry = new NpmCiRegistry(helper);
+      randomStr = generateRandomStr(4); // to avoid publishing the same package every time the test is running
+      const name = `@ci/${randomStr}.{name}`;
+      npmCiRegistry.configureCustomNameInPackageJsonHarmony(name);
+      await npmCiRegistry.init();
+
+      helper.fixtures.populateComponents(4);
+      ['1', '2', '3'].forEach((compNumber) =>
+        helper.fs.outputFile(
+          `comp${compNumber}/index.js`,
+          `const comp4 = require("@ci/${randomStr}.comp4");
+const get = require("lodash.get");`
+        )
+      );
+      helper.command.install('lodash.get@4.4.0');
+      helper.extensions.addExtensionToVariant('comp1', 'teambit.dependencies/dependency-resolver', {
+        policy: {
+          dependencies: {
+            'lodash.get': '3.7.0',
+          },
+        },
+      });
+      helper.command.tagComponent('comp4', 'initial', '--ver=0.0.1');
+      helper.command.export();
+      helper.extensions.addExtensionToVariant('comp2', 'teambit.dependencies/dependency-resolver', {
+        policy: {
+          dependencies: {
+            [`@ci/${randomStr}.comp4`]: '0.0.1',
+          },
+        },
+      });
+      helper.command.install();
+      helper.command.tagAllComponents('--patch');
+      helper.command.export();
+      const scopeWithoutOwner = helper.scopes.remoteWithoutOwner;
+
+      helper.scopeHelper.reInitLocalScopeHarmony();
+      npmCiRegistry.configureCustomNameInPackageJsonHarmony(name);
+      helper.bitJsonc.addKeyValToWorkspace('defaultScope', scopeWithoutOwner);
+      helper.scopeHelper.addRemoteScope();
+      helper.command.install('lodash.get@^4.4.0');
+      helper.fs.outputFile('comp5/comp5.js', 'const get = require("lodash.get");');
+      helper.command.addComponent('comp5');
+      helper.command.tagComponent('comp5', 'initial', '--ver=0.0.1');
+      helper.command.export();
+
+      helper.scopeHelper.reInitLocalScopeHarmony();
+      npmCiRegistry.configureCustomNameInPackageJsonHarmony(name);
+      helper.bitJsonc.addKeyValToWorkspace('defaultScope', scopeWithoutOwner);
+      helper.scopeHelper.addRemoteScope();
+      helper.command.importComponent(`comp4`);
+      helper.fs.outputFile(`${scopeWithoutOwner}/comp4/foo.js`, '');
+      helper.command.tagComponent('comp4', 'tag2', '--ver=0.0.2');
+      helper.command.export();
+      helper.fs.outputFile(`${scopeWithoutOwner}/comp4/bar.js`, '');
+      helper.command.tagComponent('comp4', 'tag3', '--ver=0.0.3');
+      helper.command.export();
+
+      helper.scopeHelper.reInitLocalScopeHarmony();
+      npmCiRegistry.configureCustomNameInPackageJsonHarmony(name);
+      helper.bitJsonc.addKeyValToWorkspace('defaultScope', scopeWithoutOwner);
+      helper.scopeHelper.addRemoteScope();
+      helper.fs.outputFile('comp6/comp6.js', `const comp = require("@ci/${randomStr}.comp4");`);
+      helper.command.addComponent('comp6');
+      helper.command.install(`@ci/${randomStr}.comp4@0.0.2`);
+      helper.command.tagComponent('comp6', 'initial', '--ver=0.0.1');
+      helper.command.export();
+
+      helper.scopeHelper.reInitLocalScopeHarmony();
+      npmCiRegistry.configureCustomNameInPackageJsonHarmony(name);
+      helper.bitJsonc.addKeyValToWorkspace('defaultScope', scopeWithoutOwner);
+      helper.scopeHelper.addRemoteScope();
+      helper.command.importComponent(`comp1`);
+      helper.command.importComponent(`comp2`);
+      helper.command.importComponent(`comp3`);
+      helper.command.importComponent(`comp5`);
+      helper.command.install(`@ci/${randomStr}.comp4@0.0.3 lodash.get@4.4.2`);
+    });
+    after(() => {
+      npmCiRegistry.destroy();
+    });
+    it('should ..', function () {
+      expect(1).to.equal(1);
     });
   });
   (supportNpmCiRegistryTesting ? describe : describe.skip)('saving dependencies package names', function () {
