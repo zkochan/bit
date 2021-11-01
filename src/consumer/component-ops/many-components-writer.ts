@@ -291,6 +291,7 @@ export default class ManyComponentsWriter {
     };
   }
   async _populateComponentsDependenciesToWrite() {
+    if (!this.isLegacy) return [];
     const allDependenciesP = this.componentsWithDependencies.map((componentWithDeps: ComponentWithDependencies) => {
       const writeDependenciesP = componentWithDeps.allDependencies.map((dep: Component) => {
         const dependencyId = dep.id.toString();
