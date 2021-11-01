@@ -217,7 +217,10 @@ const get = require("lodash.get");`
       npmCiRegistry.destroy();
     });
     it('should ..', function () {
-      expect(1).to.equal(1);
+      expect(helper.fixtures.fs.readJsonFile('node_modules/lodash.get/package.json').version).to.equal('4.4.2');
+      expect(helper.fixtures.fs.readJsonFile(`node_modules/@ci/${randomStr}.comp4/package.json`).version).to.equal(
+        '0.0.3'
+      );
     });
   });
   (supportNpmCiRegistryTesting ? describe : describe.skip)('saving dependencies package names', function () {
