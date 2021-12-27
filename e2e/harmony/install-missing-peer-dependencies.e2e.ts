@@ -1,11 +1,11 @@
 import chai, { expect } from 'chai';
 import path from 'path';
 import Helper from '../../src/e2e-helper/e2e-helper';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 
 chai.use(require('chai-fs'));
 
-(supportNpmCiRegistryTesting ? describe : describe.skip)('install --add-missing-peers', function () {
+describe('install --add-missing-peers', function () {
   let npmCiRegistry: NpmCiRegistry;
   let helper: Helper;
   this.timeout(0);

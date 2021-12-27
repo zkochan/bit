@@ -4,7 +4,7 @@ import * as path from 'path';
 
 import Helper from '../../src/e2e-helper/e2e-helper';
 import * as fixtures from '../../src/fixtures/fixtures';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 
 describe('component that requires another component internal (not main) file', function () {
   this.timeout(0);
@@ -58,7 +58,7 @@ describe('component that requires another component internal (not main) file', f
         expect(result.trim()).to.equal('got is-type and got is-string and got foo');
       });
     });
-    (supportNpmCiRegistryTesting ? describe : describe.skip)('when dependencies are saved as packages', () => {
+    describe('when dependencies are saved as packages', () => {
       before(async () => {
         await npmCiRegistry.init();
         helper.scopeHelper.removeRemoteScope();
@@ -123,7 +123,7 @@ describe('component that requires another component internal (not main) file', f
         expect(result.trim()).to.equal('got is-type and got is-string and got foo');
       });
     });
-    (supportNpmCiRegistryTesting ? describe : describe.skip)('when dependencies are saved as packages', () => {
+    describe('when dependencies are saved as packages', () => {
       before(async () => {
         await npmCiRegistry.init();
         helper.scopeHelper.removeRemoteScope();

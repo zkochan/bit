@@ -3,7 +3,7 @@ import chai, { expect } from 'chai';
 import Helper from '../../src/e2e-helper/e2e-helper';
 import { DEFAULT_OWNER } from '../../src/e2e-helper/e2e-scopes';
 import { generateRandomStr } from '../../src/utils';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 
 chai.use(require('chai-fs'));
 
@@ -39,7 +39,7 @@ describe('publish functionality', function () {
         );
       });
     });
-    (supportNpmCiRegistryTesting ? describe : describe.skip)('publishing the components', () => {
+    describe('publishing the components', () => {
       before(async () => {
         await npmCiRegistry.init();
       });
@@ -103,7 +103,7 @@ describe('publish functionality', function () {
       });
     });
   });
-  (supportNpmCiRegistryTesting ? describe : describe.skip)('with custom package name', function () {
+  describe('with custom package name', function () {
     let randomStr: string;
     let publishOutput: string;
     let pkgName: string;

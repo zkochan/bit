@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 import path from 'path';
 import Helper from '../../src/e2e-helper/e2e-helper';
 import { DEFAULT_OWNER } from '../../src/e2e-helper/e2e-scopes';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 
 chai.use(require('chai-fs'));
 
@@ -26,7 +26,7 @@ describe('import functionality on Harmony', function () {
       npmCiRegistry = new NpmCiRegistry(helper);
       npmCiRegistry.configureCiInPackageJsonHarmony();
     });
-    (supportNpmCiRegistryTesting ? describe : describe.skip)('tag and export', () => {
+    describe('tag and export', () => {
       before(async () => {
         await npmCiRegistry.init();
         helper.command.tagAllComponents();

@@ -3,7 +3,7 @@ import fs from 'fs-extra';
 import * as path from 'path';
 import { IssuesClasses } from '@teambit/component-issues';
 import Helper from '../../src/e2e-helper/e2e-helper';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 
 describe('es6 components with link files', function () {
   this.timeout(0);
@@ -103,48 +103,45 @@ export { isString };`
         const result = helper.command.runCmd('node app.js');
         expect(result.trim()).to.equal('got is-string and got foo');
       });
-      (supportNpmCiRegistryTesting ? describe : describe.skip)(
-        'installing dependencies as packages (not as components)',
-        () => {
-          before(async () => {
-            await npmCiRegistry.init();
-            helper.command.importComponent('is-string/is-string');
-            helper.scopeHelper.removeRemoteScope();
-            npmCiRegistry.publishComponent('is-string/is-string');
-            npmCiRegistry.publishComponent('bar/foo');
+      describe('installing dependencies as packages (not as components)', () => {
+        before(async () => {
+          await npmCiRegistry.init();
+          helper.command.importComponent('is-string/is-string');
+          helper.scopeHelper.removeRemoteScope();
+          npmCiRegistry.publishComponent('is-string/is-string');
+          npmCiRegistry.publishComponent('bar/foo');
+        });
+        after(() => {
+          npmCiRegistry.destroy();
+        });
+        describe('installing a component using NPM', () => {
+          before(() => {
+            helper.scopeHelper.reInitLocalScope();
+            helper.command.runCmd('npm init -y');
+            helper.command.runCmd(`npm install @ci/${helper.scopes.remote}.bar.foo`);
           });
-          after(() => {
-            npmCiRegistry.destroy();
+          it('should be able to create the dependency link correctly and print the result', () => {
+            const appJsFixture = `const barFoo = require('@ci/${helper.scopes.remote}.bar.foo'); console.log(barFoo.default());`;
+            fs.outputFileSync(path.join(helper.scopes.localPath, 'app.js'), appJsFixture);
+            const result = helper.command.runCmd('node app.js');
+            expect(result.trim()).to.equal('got is-string and got foo');
           });
-          describe('installing a component using NPM', () => {
-            before(() => {
-              helper.scopeHelper.reInitLocalScope();
-              helper.command.runCmd('npm init -y');
-              helper.command.runCmd(`npm install @ci/${helper.scopes.remote}.bar.foo`);
-            });
-            it('should be able to create the dependency link correctly and print the result', () => {
-              const appJsFixture = `const barFoo = require('@ci/${helper.scopes.remote}.bar.foo'); console.log(barFoo.default());`;
-              fs.outputFileSync(path.join(helper.scopes.localPath, 'app.js'), appJsFixture);
-              const result = helper.command.runCmd('node app.js');
-              expect(result.trim()).to.equal('got is-string and got foo');
-            });
+        });
+        describe('importing a component using Bit', () => {
+          before(() => {
+            helper.scopeHelper.reInitLocalScope();
+            npmCiRegistry.setCiScopeInBitJson();
+            npmCiRegistry.setResolver();
+            helper.command.importComponent('bar/foo');
           });
-          describe('importing a component using Bit', () => {
-            before(() => {
-              helper.scopeHelper.reInitLocalScope();
-              npmCiRegistry.setCiScopeInBitJson();
-              npmCiRegistry.setResolver();
-              helper.command.importComponent('bar/foo');
-            });
-            it('should be able to create the dependency link correctly and print the result', () => {
-              const appJsFixture = `const barFoo = require('@ci/${helper.scopes.remote}.bar.foo'); console.log(barFoo.default());`;
-              fs.outputFileSync(path.join(helper.scopes.localPath, 'app.js'), appJsFixture);
-              const result = helper.command.runCmd('node app.js');
-              expect(result.trim()).to.equal('got is-string and got foo');
-            });
+          it('should be able to create the dependency link correctly and print the result', () => {
+            const appJsFixture = `const barFoo = require('@ci/${helper.scopes.remote}.bar.foo'); console.log(barFoo.default());`;
+            fs.outputFileSync(path.join(helper.scopes.localPath, 'app.js'), appJsFixture);
+            const result = helper.command.runCmd('node app.js');
+            expect(result.trim()).to.equal('got is-string and got foo');
           });
-        }
-      );
+        });
+      });
     });
   });
 

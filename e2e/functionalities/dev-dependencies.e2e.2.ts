@@ -3,7 +3,7 @@ import * as path from 'path';
 
 import Helper from '../../src/e2e-helper/e2e-helper';
 import * as fixtures from '../../src/fixtures/fixtures';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 
 chai.use(require('chai-fs'));
 
@@ -131,7 +131,7 @@ describe('foo', () => {
         });
       });
 
-      (supportNpmCiRegistryTesting ? describe : describe.skip)('export and import dependencies as packages', () => {
+      describe('export and import dependencies as packages', () => {
         let npmCiRegistry: NpmCiRegistry;
         before(async () => {
           npmCiRegistry = new NpmCiRegistry(helper);

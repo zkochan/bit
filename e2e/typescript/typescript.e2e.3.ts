@@ -7,7 +7,7 @@ import * as path from 'path';
 import { AUTO_GENERATED_STAMP, IS_WINDOWS } from '../../src/constants';
 import Helper from '../../src/e2e-helper/e2e-helper';
 import * as fixtures from '../../src/fixtures/fixtures';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 
 chai.use(require('chai-fs'));
 
@@ -261,40 +261,37 @@ describe('typescript', function () {
           });
         });
 
-        (supportNpmCiRegistryTesting ? describe : describe.skip)(
-          'installing dependencies as packages (not as components)',
-          () => {
-            let npmCiRegistry: NpmCiRegistry;
-            before(async () => {
-              npmCiRegistry = new NpmCiRegistry(helper);
-              helper.scopeHelper.getClonedLocalScope(localScope);
-              helper.scopeHelper.reInitRemoteScope();
-              npmCiRegistry.setCiScopeInBitJson();
-              helper.command.tagAllComponents();
-              helper.command.exportAllComponents();
+        describe('installing dependencies as packages (not as components)', () => {
+          let npmCiRegistry: NpmCiRegistry;
+          before(async () => {
+            npmCiRegistry = new NpmCiRegistry(helper);
+            helper.scopeHelper.getClonedLocalScope(localScope);
+            helper.scopeHelper.reInitRemoteScope();
+            npmCiRegistry.setCiScopeInBitJson();
+            helper.command.tagAllComponents();
+            helper.command.exportAllComponents();
 
-              await npmCiRegistry.init();
-              npmCiRegistry.publishEntireScope();
+            await npmCiRegistry.init();
+            npmCiRegistry.publishEntireScope();
 
-              helper.scopeHelper.reInitLocalScope();
-              npmCiRegistry.setCiScopeInBitJson();
-              npmCiRegistry.setResolver();
-              helper.command.importComponent('utils/is-string');
-            });
-            after(() => {
-              npmCiRegistry.destroy();
-            });
-            it('should be able to require its direct dependency and print results from all dependencies', () => {
-              // this makes sure that when generating npm links with custom-resolved-modules
-              // and there are dist files, it doesn't generate an un-compiled .ts file, but a .js file
-              const appJsFixture =
-                "const isString = require('./components/utils/is-string'); console.log(isString.default());";
-              fs.outputFileSync(path.join(helper.scopes.localPath, 'app.js'), appJsFixture);
-              const result = helper.command.runCmd('node app.js');
-              expect(result.trim()).to.equal('got is-type and got is-string');
-            });
-          }
-        );
+            helper.scopeHelper.reInitLocalScope();
+            npmCiRegistry.setCiScopeInBitJson();
+            npmCiRegistry.setResolver();
+            helper.command.importComponent('utils/is-string');
+          });
+          after(() => {
+            npmCiRegistry.destroy();
+          });
+          it('should be able to require its direct dependency and print results from all dependencies', () => {
+            // this makes sure that when generating npm links with custom-resolved-modules
+            // and there are dist files, it doesn't generate an un-compiled .ts file, but a .js file
+            const appJsFixture =
+              "const isString = require('./components/utils/is-string'); console.log(isString.default());";
+            fs.outputFileSync(path.join(helper.scopes.localPath, 'app.js'), appJsFixture);
+            const result = helper.command.runCmd('node app.js');
+            expect(result.trim()).to.equal('got is-type and got is-string');
+          });
+        });
       });
       describe('using aliases', () => {
         let scopeAfterAdding;
@@ -408,7 +405,7 @@ describe('typescript', function () {
         const result = helper.command.runCmd('node app.js');
         expect(result.trim()).to.equal('got is-type and got is-string and got foo');
       });
-      (supportNpmCiRegistryTesting ? describe : describe.skip)('when dependencies are saved as packages', () => {
+      describe('when dependencies are saved as packages', () => {
         before(async () => {
           helper.scopeHelper.reInitLocalScope();
           helper.scopeHelper.addRemoteScope();
@@ -557,36 +554,33 @@ describe('typescript', function () {
           expect(fileContent).to.have.string(AUTO_GENERATED_STAMP);
         });
       });
-      (supportNpmCiRegistryTesting ? describe : describe.skip)(
-        'installing dependencies as packages (not as components)',
-        () => {
-          let npmCiRegistry: NpmCiRegistry;
-          before(async () => {
-            npmCiRegistry = new NpmCiRegistry(helper);
-            helper.scopeHelper.getClonedLocalScope(localScope);
-            helper.scopeHelper.reInitRemoteScope();
-            npmCiRegistry.setCiScopeInBitJson();
-            helper.command.tagAllComponents();
-            helper.command.exportAllComponents();
+      describe('installing dependencies as packages (not as components)', () => {
+        let npmCiRegistry: NpmCiRegistry;
+        before(async () => {
+          npmCiRegistry = new NpmCiRegistry(helper);
+          helper.scopeHelper.getClonedLocalScope(localScope);
+          helper.scopeHelper.reInitRemoteScope();
+          npmCiRegistry.setCiScopeInBitJson();
+          helper.command.tagAllComponents();
+          helper.command.exportAllComponents();
 
-            await npmCiRegistry.init();
-            npmCiRegistry.publishEntireScope();
+          await npmCiRegistry.init();
+          npmCiRegistry.publishEntireScope();
 
-            helper.scopeHelper.reInitLocalScope();
-            npmCiRegistry.setCiScopeInBitJson();
-            npmCiRegistry.setResolver();
-            helper.command.importComponent('foo');
-          });
-          after(() => {
-            npmCiRegistry.destroy();
-          });
-          it('should create a link to the d.ts file', () => {
-            // a previous bug threw an error here of "failed to generate a symlink".
-            const fileContent = helper.fs.readFile('components/foo/types.d.ts');
-            expect(fileContent).to.have.string(AUTO_GENERATED_STAMP);
-          });
-        }
-      );
+          helper.scopeHelper.reInitLocalScope();
+          npmCiRegistry.setCiScopeInBitJson();
+          npmCiRegistry.setResolver();
+          helper.command.importComponent('foo');
+        });
+        after(() => {
+          npmCiRegistry.destroy();
+        });
+        it('should create a link to the d.ts file', () => {
+          // a previous bug threw an error here of "failed to generate a symlink".
+          const fileContent = helper.fs.readFile('components/foo/types.d.ts');
+          expect(fileContent).to.have.string(AUTO_GENERATED_STAMP);
+        });
+      });
     });
   });
   describe('react style => .tsx extension', () => {

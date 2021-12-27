@@ -9,7 +9,7 @@ import { LANE_KEY } from '../../src/consumer/bit-map/bit-map';
 import Helper from '../../src/e2e-helper/e2e-helper';
 import * as fixtures from '../../src/fixtures/fixtures';
 import { removeChalkCharacters } from '../../src/utils';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 
 chai.use(require('chai-fs'));
 
@@ -885,7 +885,7 @@ describe('bit lane command', function () {
       });
     });
   });
-  (supportNpmCiRegistryTesting ? describe : describe.skip)('import with dependencies as packages', () => {
+  describe('import with dependencies as packages', () => {
     let npmCiRegistry: NpmCiRegistry;
     before(async () => {
       helper = new Helper({ scopesOptions: { remoteScopeWithDot: true } });

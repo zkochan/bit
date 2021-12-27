@@ -4,7 +4,7 @@ import * as path from 'path';
 
 import { failureEjectMessage } from '../../src/cli/templates/eject-template';
 import Helper, { FileStatusWithoutChalk } from '../../src/e2e-helper/e2e-helper';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 
 chai.use(require('chai-fs'));
 // legacy test as it tests lots of the originallySharedDir functionality
@@ -116,7 +116,7 @@ describe('a flow with two components: is-string and pad-left, where is-string is
           expect(output).to.have.string('tests passed');
         });
       });
-      (supportNpmCiRegistryTesting ? describe : describe.skip)('eject components to a registry', () => {
+      describe('eject components to a registry', () => {
         let exportOutput;
         let ejectOutput;
         let npmCiRegistry: NpmCiRegistry;

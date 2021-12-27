@@ -2,7 +2,7 @@ import chai, { expect } from 'chai';
 
 import Helper from '../../src/e2e-helper/e2e-helper';
 import { DEFAULT_OWNER } from '../../src/e2e-helper/e2e-scopes';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 
 chai.use(require('chai-fs'));
 
@@ -16,7 +16,7 @@ describe('update-dependencies command', function () {
   after(() => {
     helper.scopeHelper.destroy();
   });
-  (supportNpmCiRegistryTesting ? describe : describe.skip)('workspace with TS components', () => {
+  describe('workspace with TS components', () => {
     let scopeWithoutOwner: string;
     let secondRemotePath: string;
     let secondRemoteName: string;

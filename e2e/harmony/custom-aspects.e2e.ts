@@ -1,6 +1,6 @@
 import chai, { expect } from 'chai';
 import Helper from '../../src/e2e-helper/e2e-helper';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 
 chai.use(require('chai-fs'));
 
@@ -18,7 +18,7 @@ describe('custom aspects', function () {
   // in the scope, not in the workspace.
   // previously, aspects from workspace were loaded first and as a result, this main-aspect wasn't loaded, causing
   // my-env load to fail.
-  (supportNpmCiRegistryTesting ? describe : describe.skip)('workspace aspects using external aspects', () => {
+  describe('workspace aspects using external aspects', () => {
     let npmCiRegistry: NpmCiRegistry;
     before(async () => {
       helper = new Helper({ scopesOptions: { remoteScopeWithDot: true } });

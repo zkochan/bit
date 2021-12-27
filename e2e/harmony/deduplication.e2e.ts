@@ -1,12 +1,12 @@
 import chai, { expect } from 'chai';
 import path from 'path';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 import Helper from '../../src/e2e-helper/e2e-helper';
 import { generateRandomStr } from '../../src/utils';
 
 chai.use(require('chai-fs'));
 
-(supportNpmCiRegistryTesting ? describe : describe.skip)('deduplication', function () {
+describe('deduplication', function () {
   let npmCiRegistry: NpmCiRegistry;
   let helper: Helper;
   let scopeWithoutOwner: string;

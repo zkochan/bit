@@ -3,7 +3,7 @@ import fs from 'fs-extra';
 import * as path from 'path';
 
 import Helper from '../../src/e2e-helper/e2e-helper';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 
 chai.use(require('chai-fs'));
 
@@ -117,7 +117,7 @@ describe('mainFile of the dist is different than the source', function () {
           expect(result.trim()).to.equal('got is-type from dist and got is-string from dist and got foo from dist');
         });
       });
-      (supportNpmCiRegistryTesting ? describe : describe.skip)('publishing to registry', () => {
+      describe('publishing to registry', () => {
         before(async () => {
           helper.scopeHelper.reInitLocalScope();
           npmCiRegistry.setCiScopeInBitJson();

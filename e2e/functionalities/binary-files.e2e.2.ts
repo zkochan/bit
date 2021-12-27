@@ -5,7 +5,7 @@ import * as path from 'path';
 
 import { AUTO_GENERATED_STAMP } from '../../src/constants';
 import Helper from '../../src/e2e-helper/e2e-helper';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 
 chai.use(require('chai-fs'));
 
@@ -175,7 +175,7 @@ describe('binary files', function () {
     it('bit-status should not show the component as modified', () => {
       helper.command.expectStatusToBeClean();
     });
-    (supportNpmCiRegistryTesting ? describe : describe.skip)('when dependencies are saved as packages', () => {
+    describe('when dependencies are saved as packages', () => {
       let barFooPath;
       let barPngPath;
       before(async () => {
@@ -240,7 +240,7 @@ describe('binary files', function () {
     it('bit-status should not show the component as modified', () => {
       helper.command.expectStatusToBeClean();
     });
-    (supportNpmCiRegistryTesting ? describe : describe.skip)('when dependencies are saved as packages', () => {
+    describe('when dependencies are saved as packages', () => {
       let barFooPath;
       let barPngPath;
       before(async () => {
@@ -326,7 +326,7 @@ describe('binary files', function () {
     it('bit-status should not show the component as modified', () => {
       helper.command.expectStatusToBeClean();
     });
-    (supportNpmCiRegistryTesting ? describe : describe.skip)('when dependencies are saved as packages', () => {
+    describe('when dependencies are saved as packages', () => {
       let barFooPath;
       let barPngPath;
       before(async () => {
@@ -424,7 +424,7 @@ describe('binary files', function () {
     it('bit-status should not show the component as modified', () => {
       helper.command.expectStatusToBeClean();
     });
-    (supportNpmCiRegistryTesting ? describe : describe.skip)('when dependencies are saved as packages', () => {
+    describe('when dependencies are saved as packages', () => {
       let barFooPath;
       let barPngPath;
       before(async () => {

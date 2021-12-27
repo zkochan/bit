@@ -4,7 +4,7 @@ import { Extensions } from '../../src/constants';
 import Helper from '../../src/e2e-helper/e2e-helper';
 import * as fixtures from '../../src/fixtures/fixtures';
 import { generateRandomStr } from '../../src/utils';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 
 chai.use(require('chai-fs'));
 
@@ -124,7 +124,7 @@ describe('dependency-resolver extension', function () {
       });
     });
   });
-  (supportNpmCiRegistryTesting ? describe : describe.skip)('saving dependencies package names', function () {
+  describe('saving dependencies package names', function () {
     let npmCiRegistry: NpmCiRegistry;
     let randomStr;
     before(async () => {

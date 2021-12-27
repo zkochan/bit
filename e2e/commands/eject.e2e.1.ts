@@ -7,7 +7,7 @@ import { failureEjectMessage, successEjectMessage } from '../../src/cli/template
 import { MissingBitMapComponent } from '../../src/consumer/bit-map/exceptions';
 import Helper from '../../src/e2e-helper/e2e-helper';
 import * as fixtures from '../../src/fixtures/fixtures';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 
 chai.use(require('chai-fs'));
 
@@ -56,7 +56,7 @@ describe('bit eject command', function () {
     });
   });
 
-  (supportNpmCiRegistryTesting ? describe : describe.skip)('using a registry', function () {
+  describe('using a registry', function () {
     let npmCiRegistry: NpmCiRegistry;
     before(async () => {
       npmCiRegistry = new NpmCiRegistry(helper);

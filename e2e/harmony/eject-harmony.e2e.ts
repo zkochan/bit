@@ -1,6 +1,6 @@
 import chai, { expect } from 'chai';
 import path from 'path';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 import Helper from '../../src/e2e-helper/e2e-helper';
 import { successEjectMessage } from '../../src/cli/templates/eject-template';
 import { DEFAULT_OWNER } from '../../src/e2e-helper/e2e-scopes';
@@ -17,7 +17,7 @@ describe('eject command on Harmony', function () {
   after(() => {
     helper.scopeHelper.destroy();
   });
-  (supportNpmCiRegistryTesting ? describe : describe.skip)('import with dependencies as packages', () => {
+  describe('import with dependencies as packages', () => {
     let npmCiRegistry: NpmCiRegistry;
     let scopeWithoutOwner: string;
     let scopeBeforeEject: string;

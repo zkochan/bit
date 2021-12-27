@@ -7,9 +7,6 @@ import * as path from 'path';
 
 import Helper from '../src/e2e-helper/e2e-helper';
 
-const skipRegistryTests = process.env.SKIP_REGISTRY_TESTS === 'True' || process.env.SKIP_REGISTRY_TESTS === 'true';
-export const supportNpmCiRegistryTesting = !skipRegistryTests;
-
 /**
  * some features, such as installing dependencies as packages, require npm registry to be set.
  * in order to not rely on bitsrc site for the npm registry, this class provides a way to use npm

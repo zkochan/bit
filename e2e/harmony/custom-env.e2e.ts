@@ -5,7 +5,7 @@ import { IssuesClasses } from '../../scopes/component/component-issues';
 
 import { IS_WINDOWS } from '../../src/constants';
 import Helper from '../../src/e2e-helper/e2e-helper';
-import NpmCiRegistry, { supportNpmCiRegistryTesting } from '../npm-ci-registry';
+import NpmCiRegistry from '../npm-ci-registry';
 import { UNABLE_TO_LOAD_EXTENSION } from '../../scopes/harmony/aspect-loader/constants';
 
 chai.use(require('chai-fs'));
@@ -111,7 +111,7 @@ describe('custom env', function () {
       helper.command.expectStatusToHaveIssue(IssuesClasses.MultipleEnvs.name);
     });
   });
-  (supportNpmCiRegistryTesting ? describe : describe.skip)('custom env installed as a package', () => {
+  describe('custom env installed as a package', () => {
     let envId;
     let envName;
     let npmCiRegistry: NpmCiRegistry;
