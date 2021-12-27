@@ -3,14 +3,12 @@ import { addUser, REGISTRY_MOCK_PORT } from '@pnpm/registry-mock';
 import { ChildProcess } from 'child_process';
 import fetch from 'cross-fetch';
 import execa from 'execa';
-import fs from 'fs-extra';
 import * as path from 'path';
 
 import Helper from '../src/e2e-helper/e2e-helper';
 
-const isAppVeyor = process.env.APPVEYOR === 'True';
 const skipRegistryTests = process.env.SKIP_REGISTRY_TESTS === 'True' || process.env.SKIP_REGISTRY_TESTS === 'true';
-export const supportNpmCiRegistryTesting = !isAppVeyor && !skipRegistryTests;
+export const supportNpmCiRegistryTesting = !skipRegistryTests;
 
 /**
  * some features, such as installing dependencies as packages, require npm registry to be set.
@@ -92,11 +90,6 @@ export default class NpmCiRegistry {
       password: 'secret',
       email: 'ci@ci.com',
     });
-    fs.writeFileSync(
-      '.npmrc',
-      `${this.ciDefaultScope}:registry=${this.ciRegistry}
-${this.ciRegistry}:_authToken=${token}`
-    );
     execa.sync('npm', ['config', 'set', `${this.ciDefaultScope}:registry=${this.ciRegistry}`]);
     execa.sync('npm', ['config', 'set', `${this.ciRegistry.replace('http://', '//')}:_authToken=${token}`]);
     if (this.helper.debugMode) console.log('default user has been added successfully to Verdaccio');
