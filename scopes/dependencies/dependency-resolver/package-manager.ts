@@ -27,6 +27,8 @@ export type PackageManagerInstallOptions = {
   nodeLinker?: 'hoisted' | 'isolated';
 
   packageManagerConfigRootDir?: string;
+
+  rootComponents?: string[];
 };
 
 export type PackageManagerGetPeerDependencyIssuesOptions = PackageManagerInstallOptions;
@@ -69,6 +71,8 @@ export interface PackageManager {
     componentDirectoryMap: ComponentMap<string>,
     options: PackageManagerGetPeerDependencyIssuesOptions
   ): Promise<PeerDependencyIssuesByProjects>;
+
+  getInjectedDirs?(rootDir: string, componentDir: string): Promise<string[]>;
 
   getRegistries?(): Promise<Registries>;
 

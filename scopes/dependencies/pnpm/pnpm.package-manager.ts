@@ -19,6 +19,7 @@ import { Logger } from '@teambit/logger';
 import { memoize, omit } from 'lodash';
 import { PkgMain } from '@teambit/pkg';
 import { PeerDependencyIssuesByProjects } from '@pnpm/core';
+import { read as readModulesState } from '@pnpm/modules-yaml';
 import { ProjectManifest } from '@pnpm/types';
 import { join } from 'path';
 import userHome from 'user-home';
@@ -130,6 +131,7 @@ export class PnpmPackageManager implements PackageManager {
         overrides: installOptions.overrides,
         hoistPattern: config.hoistPattern,
         publicHoistPattern: ['*eslint*', '@prettier/plugin-*', '*prettier-plugin-*'],
+        rootComponents: installOptions.rootComponents,
       },
       this.logger
     );
@@ -248,5 +250,10 @@ export class PnpmPackageManager implements PackageManager {
     }
 
     return new Registries(defaultRegistry, scopesRegistries);
+  }
+
+  async getInjectedDirs(rootDir: string, componentDir: string): Promise<string[]> {
+    const modulesState = await readModulesState(join(rootDir, 'node_modules'));
+    return modulesState?.injectedDeps?.[componentDir] ?? [];
   }
 }
