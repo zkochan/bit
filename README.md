@@ -60,7 +60,7 @@ $ npx @teambit/bvm install
 
 The first step in the Bit journey is to create a component development workspace. Workspaces allow the creation and maintanance of isolated and independent pieces called "components". Since every component is isolated, the workspace is tech agnostic and allows for components, with a different tech stack to co-exist. A single workspace might include React components, general purpose node modules, Angular modules and even backend services.
 
-To create a new workspace with a demo React components, run the following:
+To create a new workspace with demo React components, run the following:
 
 ```
 bit new react my-workspace
@@ -68,7 +68,7 @@ cd my-workspace
 ```
 
 #### Start the Workspace UI console:
-
+  
 ```
 bit start
 ```
