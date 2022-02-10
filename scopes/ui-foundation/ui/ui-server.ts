@@ -9,7 +9,11 @@ import { Server } from 'http';
 import httpProxy from 'http-proxy';
 import { join } from 'path';
 import webpack from 'webpack';
-import WebpackDevServer, { Configuration as WdsConfiguration } from 'webpack-dev-server';
+import WebpackDevServer, {
+  Configuration as WdsConfiguration,
+  ProxyConfigMap,
+  ProxyConfigArray,
+} from 'webpack-dev-server';
 import { createSsrMiddleware } from './ssr-middleware';
 import { StartPlugin } from './start-plugin';
 import { ProxyEntry, UIRoot } from './ui-root';
@@ -222,8 +226,9 @@ export class UIServer {
     gqlPort: number,
     config?: WdsConfiguration
   ): Promise<WdsConfiguration> {
-    const proxy = await this.getProxy(gqlPort);
-    const devServerConf = { ...config, proxy, port: appPort };
+    const pluginProxies = await this.getProxy(gqlPort);
+    const wdsProxies = flattenProxyMap(config?.proxy);
+    const devServerConf = { ...config, proxy: [...pluginProxies, ...wdsProxies], port: appPort };
 
     return devServerConf;
   }
@@ -240,4 +245,15 @@ export class UIServer {
       props.startPlugins
     );
   }
+}
+
+function flattenProxyMap(proxies?: ProxyConfigMap | ProxyConfigArray): ProxyConfigArray {
+  if (!proxies) return [];
+  if (Array.isArray(proxies)) return proxies;
+
+  return Object.entries(proxies).map(([path, value]) => {
+    if (typeof value === 'string') return { path, context: value };
+
+    return { path, ...value };
+  });
 }
