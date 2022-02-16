@@ -579,6 +579,12 @@
         "mainFile": "index.ts",
         "rootDir": "scopes/html/modules/fetch-html-from-url"
     },
+    "modules/flatten-proxy-map": {
+        "scope": "",
+        "version": "",
+        "mainFile": "index.ts",
+        "rootDir": "scopes/ui-foundation/modules/flatten-proxy-map"
+    },
     "modules/generate-expose-loaders": {
         "scope": "teambit.webpack",
         "version": "0.0.2",
