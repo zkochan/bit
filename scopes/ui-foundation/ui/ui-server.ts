@@ -1,19 +1,18 @@
 import { flatten } from 'lodash';
-import { ExpressMain } from '@teambit/express';
-import { GraphqlMain } from '@teambit/graphql';
-import { Logger } from '@teambit/logger';
 import express, { Express } from 'express';
 import fallback from 'express-history-api-fallback';
-import { Port } from '@teambit/toolbox.network.get-port';
 import { Server } from 'http';
 import httpProxy from 'http-proxy';
 import { join } from 'path';
 import webpack from 'webpack';
 import WebpackDevServer, {
   Configuration as WdsConfiguration,
-  ProxyConfigMap,
-  ProxyConfigArray,
 } from 'webpack-dev-server';
+import { ExpressMain } from '@teambit/express';
+import { GraphqlMain } from '@teambit/graphql';
+import { Logger } from '@teambit/logger';
+import { Port } from '@teambit/toolbox.network.get-port';
+import { flattenProxyMap } from '@teambit/ui-foundation.modules.flatten-proxy-map';
 import { createSsrMiddleware } from './ssr-middleware';
 import { StartPlugin } from './start-plugin';
 import { ProxyEntry, UIRoot } from './ui-root';
@@ -247,13 +246,3 @@ export class UIServer {
   }
 }
 
-function flattenProxyMap(proxies?: ProxyConfigMap | ProxyConfigArray): ProxyConfigArray {
-  if (!proxies) return [];
-  if (Array.isArray(proxies)) return proxies;
-
-  return Object.entries(proxies).map(([path, value]) => {
-    if (typeof value === 'string') return { path, context: value };
-
-    return { path, ...value };
-  });
-}
