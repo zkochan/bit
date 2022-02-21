@@ -208,7 +208,7 @@ export interface DependencyResolverWorkspaceConfig {
    * The list of components that should be installed in isolation from the workspace.
    * The component's package names should be used in this list, not their component IDs.
    */
-  rootComponents?: string[];
+  rootComponentTypes?: Record<RootComponentType, boolean>;
 }
 
 export interface DependencyResolverVariantConfig {
@@ -301,7 +301,7 @@ export class DependencyResolverMain {
 
     private postInstallSlot: PostInstallSlot,
 
-    private rootComponentsSlot: RootComponentsSlot,
+    private rootComponentsSlot: RootComponentsSlot
   ) {}
 
   /**
@@ -462,7 +462,6 @@ export class DependencyResolverMain {
     const concreteOpts = {
       ...defaultCreateFromComponentsOptions,
       ...options,
-      hasRootComponents: Boolean(this.config.rootComponents?.length),
     };
     const workspaceManifestFactory = new WorkspaceManifestFactory(this);
     const res = await workspaceManifestFactory.createFromComponents(
@@ -846,9 +845,11 @@ export class DependencyResolverMain {
   }
 
   getRootComponentsByType(rootComponentType: RootComponentType) {
-    const rootComponents = this.rootComponentsSlot.toArray().find(([id, rootComponents]) => rootComponents.type === rootComponentType)
-    if (!rootComponents) return []
-    return rootComponents[1].getIds()
+    const rootComponents = this.rootComponentsSlot
+      .toArray()
+      .find(([id, rootComponents]) => rootComponents.type === rootComponentType);
+    if (!rootComponents?.[1]) return [];
+    return rootComponents[1].getIds();
   }
 
   async getComponentEnvPolicyFromExtension(configuredExtensions: ExtensionDataList): Promise<EnvPolicy> {
@@ -1176,7 +1177,7 @@ export class DependencyResolverMain {
       DependencyFactorySlot,
       PreInstallSlot,
       PostInstallSlot,
-      RootComponentsSlot,
+      RootComponentsSlot
     ]
   ) {
     // const packageManager = new PackageManagerLegacy(config.packageManager, logger);
@@ -1195,16 +1196,14 @@ export class DependencyResolverMain {
       dependencyFactorySlot,
       preInstallSlot,
       postInstallSlot,
-      rootComponentsSlot,
+      rootComponentsSlot
     );
     dependencyResolver.registerRootComponent({
       type: 'envs',
       getIds: () => {
-        return envs
-          .mapEnvs()
-          .flatMap(([id]) => id)
+        return envs.mapEnvs().flatMap(([id]) => id);
       },
-    })
+    });
 
     componentAspect.registerShowFragments([
       new DependenciesFragment(dependencyResolver),

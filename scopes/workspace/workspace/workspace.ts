@@ -1731,17 +1731,24 @@ needed-for: ${neededFor?.toString() || '<unknown>'}`);
 
     const depsFilterFn = await this.generateFilterFnForDepsFromLocalRemote();
 
-    const rootComponentIds = [
-      ...this.dependencyResolver.getRootComponentsByType('envs'),
-      ...this.dependencyResolver.getRootComponentsByType('apps'),
-    ].filter(id => compDirMap.hashMap.has(id)).map((id) => new ComponentID(BitId.parse(id)))
-    const rootComponents = await this.getMany(rootComponentIds)
+    const rootComponents = [
+      ...(this.dependencyResolver.config.rootComponentTypes?.envs
+        ? this.dependencyResolver.getRootComponentsByType('envs')
+        : []),
+      ...(this.dependencyResolver.config.rootComponentTypes?.apps
+        ? this.dependencyResolver.getRootComponentsByType('apps')
+        : []),
+    ]
+      .filter((id) => compDirMap.hashMap.has(id))
+      .map((id) => compDirMap.hashMap.get(id)![0]);
 
-    const rootComponentNames = rootComponents.map((rootComponent) => componentIdToPackageName({
-      withPrefix: true,
-      ...rootComponent.state._consumer,
-      id: rootComponent.id._legacy,
-    }))
+    const rootComponentNames = rootComponents.map((rootComponent) =>
+      componentIdToPackageName({
+        withPrefix: true,
+        ...rootComponent.state._consumer,
+        id: rootComponent.id._legacy,
+      })
+    );
     const hasRootComponents = Boolean(rootComponents?.length);
     if (hasRootComponents && this.dependencyResolver.config.packageManager !== 'teambit.dependencies/pnpm') {
       throw new BitError('rootComponents are only supported by the pnpm package manager');
