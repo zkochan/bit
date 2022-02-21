@@ -82,6 +82,13 @@ export class EnvsMain {
   }
 
   /**
+   * map all envs by component ID.
+   */
+  mapEnvs() {
+    return this.envSlot.toArray();
+  }
+
+  /**
    * get the configured default env.
    */
   getDefaultEnv(): EnvDefinition {

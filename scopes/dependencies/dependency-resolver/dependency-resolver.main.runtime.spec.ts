@@ -29,6 +29,7 @@ describe('DepenendencyResolverMain.getNetworkConfig()', () => {
       packageManagerSlot as any,
       {} as any,
       {} as any,
+      {} as any,
       {} as any
     );
     packageManagerSlot.get.mockReturnValue({});
@@ -57,6 +58,7 @@ describe('DepenendencyResolverMain.getNetworkConfig()', () => {
       {} as any,
       {} as any,
       packageManagerSlot as any,
+      {} as any,
       {} as any,
       {} as any,
       {} as any
@@ -103,6 +105,7 @@ describe('DepenendencyResolverMain.getNetworkConfig()', () => {
       packageManagerSlot as any,
       {} as any,
       {} as any,
+      {} as any,
       {} as any
     );
     expect(await depResolver.getNetworkConfig()).toEqual(config);
@@ -137,6 +140,7 @@ describe('DepenendencyResolverMain.getNetworkConfig()', () => {
       {} as any,
       {} as any,
       packageManagerSlot as any,
+      {} as any,
       {} as any,
       {} as any,
       {} as any
@@ -206,6 +210,7 @@ describe('DepenendencyResolverMain.getOutdatedPkgsFromPolicies()', () => {
     } as any,
     {} as any,
     packageManagerSlot as any,
+    {} as any,
     {} as any,
     {} as any,
     {} as any

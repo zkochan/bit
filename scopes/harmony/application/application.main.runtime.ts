@@ -7,6 +7,7 @@ import { BuilderAspect, BuilderMain } from '@teambit/builder';
 import { Logger, LoggerAspect, LoggerMain } from '@teambit/logger';
 import { EnvsAspect, EnvsMain } from '@teambit/envs';
 import ComponentAspect, { ComponentMain, ComponentID } from '@teambit/component';
+import { DependencyResolverMain, DependencyResolverAspect } from '@teambit/dependency-resolver'
 import { ApplicationType } from './application-type';
 import { Application } from './application';
 import { DeploymentProvider } from './deployment-provider';
@@ -50,7 +51,8 @@ export class ApplicationMain {
     private appService: AppService,
     private aspectLoader: AspectLoaderMain,
     private workspace: Workspace,
-    private logger: Logger
+    private logger: Logger,
+    private dependencyResolver: DependencyResolverMain,
   ) {}
 
   /**
@@ -187,6 +189,7 @@ export class ApplicationMain {
     ComponentAspect,
     AspectLoaderAspect,
     WorkspaceAspect,
+    DependencyResolverAspect,
   ];
 
   static slots = [
@@ -196,14 +199,15 @@ export class ApplicationMain {
   ];
 
   static async provider(
-    [cli, loggerAspect, builder, envs, component, aspectLoader, workspace]: [
+    [cli, loggerAspect, builder, envs, component, aspectLoader, workspace, dependencyResolver]: [
       CLIMain,
       LoggerMain,
       BuilderMain,
       EnvsMain,
       ComponentMain,
       AspectLoaderMain,
-      Workspace
+      Workspace,
+      DependencyResolverMain,
     ],
     config: ApplicationAspectConfig,
     [appTypeSlot, appSlot, deploymentProviderSlot]: [ApplicationTypeSlot, ApplicationSlot, DeploymentProviderSlot]
@@ -219,8 +223,17 @@ export class ApplicationMain {
       appService,
       aspectLoader,
       workspace,
-      logger
+      logger,
+      dependencyResolver,
     );
+    dependencyResolver.registerRootComponent({
+      type: 'apps',
+      getIds: () => {
+        return application
+          .mapApps()
+          .flatMap(([id]) => id)
+      },
+    })
     const appCmd = new AppCmd();
     appCmd.commands = [new AppListCmd(application)];
     aspectLoader.registerPlugins([new AppPlugin(appSlot)]);

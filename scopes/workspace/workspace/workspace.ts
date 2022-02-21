@@ -1731,7 +1731,17 @@ needed-for: ${neededFor?.toString() || '<unknown>'}`);
 
     const depsFilterFn = await this.generateFilterFnForDepsFromLocalRemote();
 
-    const rootComponents = this.dependencyResolver.config.rootComponents;
+    const rootComponentIds = [
+      ...this.dependencyResolver.getRootComponentsByType('envs'),
+      ...this.dependencyResolver.getRootComponentsByType('apps'),
+    ].filter(id => compDirMap.hashMap.has(id)).map((id) => new ComponentID(BitId.parse(id)))
+    const rootComponents = await this.getMany(rootComponentIds)
+
+    const rootComponentNames = rootComponents.map((rootComponent) => componentIdToPackageName({
+      withPrefix: true,
+      ...rootComponent.state._consumer,
+      id: rootComponent.id._legacy,
+    }))
     const hasRootComponents = Boolean(rootComponents?.length);
     if (hasRootComponents && this.dependencyResolver.config.packageManager !== 'teambit.dependencies/pnpm') {
       throw new BitError('rootComponents are only supported by the pnpm package manager');
@@ -1742,7 +1752,7 @@ needed-for: ${neededFor?.toString() || '<unknown>'}`);
       copyPeerToRuntimeOnComponents: options?.copyPeerToRuntimeOnComponents ?? false,
       dependencyFilterFn: depsFilterFn,
       overrides: this.dependencyResolver.config.overrides,
-      rootComponents,
+      rootComponents: rootComponentNames,
     };
     await installer.install(this.path, mergedRootPolicy, compDirMap, { installTeambitBit: false }, pmInstallOptions);
     await this.link({
