@@ -1740,7 +1740,7 @@ needed-for: ${neededFor?.toString() || '<unknown>'}`);
         : []),
     ]
       .filter((id) => compDirMap.hashMap.has(id))
-      .map((id) => compDirMap.hashMap.get(id)![0]);
+      .map((id) => compDirMap.hashMap.get(id)![0]); // eslint-disable-line
 
     const rootComponentNames = rootComponents.map((rootComponent) =>
       componentIdToPackageName({

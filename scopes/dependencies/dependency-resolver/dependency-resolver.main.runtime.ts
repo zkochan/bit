@@ -847,7 +847,7 @@ export class DependencyResolverMain {
   getRootComponentsByType(rootComponentType: RootComponentType) {
     const rootComponents = this.rootComponentsSlot
       .toArray()
-      .find(([id, rootComponents]) => rootComponents.type === rootComponentType);
+      .find(([, rootComponents]) => rootComponents.type === rootComponentType);
     if (!rootComponents?.[1]) return [];
     return rootComponents[1].getIds();
   }
