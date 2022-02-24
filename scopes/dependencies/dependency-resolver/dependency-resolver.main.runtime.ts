@@ -845,11 +845,11 @@ export class DependencyResolverMain {
   }
 
   getRootComponentsByType(rootComponentType: RootComponentType) {
-    const rootComponents = this.rootComponentsSlot
+    const rootComps = this.rootComponentsSlot
       .toArray()
       .find(([, rootComponents]) => rootComponents.type === rootComponentType);
-    if (!rootComponents?.[1]) return [];
-    return rootComponents[1].getIds();
+    if (!rootComps?.[1]) return [];
+    return rootComps[1].getIds();
   }
 
   async getComponentEnvPolicyFromExtension(configuredExtensions: ExtensionDataList): Promise<EnvPolicy> {
