@@ -301,7 +301,10 @@ export class ReactEnv
    * define the package json properties to add to each component.
    */
   getPackageJsonProps() {
-    return this.tsAspect.getPackageJsonProps();
+    return {
+      type: 'module',
+      ...this.tsAspect.getPackageJsonProps(),
+    };
   }
 
   getNpmIgnore() {

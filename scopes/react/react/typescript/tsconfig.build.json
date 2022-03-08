@@ -1,10 +1,10 @@
 {
   "compilerOptions": {
     "lib": [
-      "es2019", "DOM", "ES6" ,"DOM.Iterable"
+      "es2021", "DOM", "ES6" ,"DOM.Iterable", "ESNext.String"
     ],
-    "target": "es2015",
-    "module": "commonjs",
+    "target": "ES2017",
+    "module": "es2020",
     "jsx": "react",
     "allowJs": true,
     "composite": true,
