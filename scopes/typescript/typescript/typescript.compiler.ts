@@ -3,7 +3,7 @@ import { Compiler, TranspileFileParams, TranspileFileOutput } from '@teambit/com
 import { Network } from '@teambit/isolator';
 import { Logger } from '@teambit/logger';
 import fs from 'fs-extra';
-import path from 'path';
+import path, {sep} from 'path';
 import ts from 'typescript';
 import { BitError } from '@teambit/bit-error';
 import PackageJsonFile from '@teambit/legacy/dist/consumer/component/package-json-file';
@@ -235,19 +235,37 @@ export class TypescriptCompiler implements Compiler {
   private async writeTypes(dirs: string[]) {
     await Promise.all(
       this.options.types.map(async (typePath) => {
-        const contents = await fs.readFile(typePath, 'utf8');
-        const filename = path.basename(typePath);
+        let uniqueName = '';
+        const filesToAdd: string[] = [];
+        const isDir = fs.statSync(typePath).isDirectory();
+        if (isDir) {
+          uniqueName = path.basename(typePath).replace(/[@/\\]/, '-');
+          fs.readdirSync(typePath).forEach(file => {
+            if (RegExp(/^.+\.d.ts$/).test(file)) {
+              const insertIndex = file.lastIndexOf(sep);
+              const uniqueFilename = `${file.slice(0, insertIndex)}${uniqueName}${file.slice(insertIndex)}`;
+              filesToAdd.push(uniqueFilename);
+            }
+          });
+        }
+        else (
+          filesToAdd.push(typePath)
+        );
 
         await Promise.all(
           dirs.map(async (dir) => {
-            const filePath = path.join(dir, 'types', filename);
-            if (!(await fs.pathExists(filePath))) {
-              await fs.outputFile(filePath, contents);
-            }
+            filesToAdd.map(async (file) => {
+              const contents = await fs.readFile(file, 'utf8');
+              const filename = path.basename(file);
+              const filePath = path.join(dir, 'types', filename);
+              if (!(await fs.pathExists(filePath))) {
+                await fs.outputFile(filePath, contents);
+              }
+            })
           })
         );
       })
-    );
+    )
   }
 
   /**
