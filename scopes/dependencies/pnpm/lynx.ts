@@ -176,11 +176,38 @@ export async function install(
   if (!rootManifest.manifest.dependenciesMeta) {
     rootManifest.manifest.dependenciesMeta = {};
   }
-  for (const rootComponent of options?.rootComponents ?? []) {
-    const alias = `${rootComponent}__root`;
-    rootManifest.manifest.devDependencies[alias] = `workspace:${rootComponent}@*`;
-    rootManifest.manifest.dependenciesMeta[alias] = { injected: true };
+  const newManifestsByPaths: Record<string, ProjectManifest> = {};
+  for (const manifest of Object.values(manifestsByPaths)) {
+    if (Object.values(manifest['defaultPeerDependencies'] ?? {}).length) {
+      const id = `root_${encodeURIComponent(JSON.stringify(manifest['defaultPeerDependencies']))}`;
+      if (newManifestsByPaths[id]) {
+        (newManifestsByPaths[id].dependencies![manifest.name!.toString()] = `workspace:*`),
+          (newManifestsByPaths[id].dependenciesMeta![manifest.name!.toString()] = { injected: true });
+      } else {
+        const newManifest = {
+          name: id,
+          dependencies: {
+            [manifest.name!.toString()]: `workspace:*`,
+            ...manifest['defaultPeerDependencies'],
+          },
+          dependenciesMeta: {
+            [manifest.name!.toString()]: { injected: true },
+          },
+        };
+        newManifestsByPaths[id] = newManifest;
+      }
+      // console.log(newManifest)
+    }
+    // for (const rootComponent of options?.rootComponents ?? []) {
+    // const alias = `${manifest.name}__root`;
+    // rootManifest.manifest.devDependencies[alias] = `workspace:${manifest.name}@*`;
+    // rootManifest.manifest.dependenciesMeta[alias] = { injected: true };
   }
+  console.log(JSON.stringify(newManifestsByPaths, null, 2));
+  manifestsByPaths = {
+    ...newManifestsByPaths,
+    ...manifestsByPaths,
+  };
   const { packagesToBuild, workspacePackages } = groupPkgs({
     ...manifestsByPaths,
     [rootManifest.rootDir]: rootManifest.manifest,
@@ -313,17 +340,23 @@ function readDependencyPackageHook(rootComponents: string[], pkg: PackageManifes
 function readWorkspacePackageHook(pkg: PackageManifest): PackageManifest {
   const newDeps = {};
   for (const [name, version] of Object.entries(pkg.dependencies ?? {})) {
-    if (!version.startsWith('workspace:')) {
+    if (pkg.name?.startsWith('root_')) {
+      console.log('!!!!!!!!!!', pkg.name);
+    }
+    if (pkg.name?.startsWith('root_') || !version.startsWith('workspace:')) {
       newDeps[name] = version;
     }
   }
-  return {
+  const r = {
     ...pkg,
     dependencies: {
       ...pkg.peerDependencies,
       ...newDeps,
+      // ...pkg['defaultPeerDependencies'],
     },
   };
+  // console.log('12============', r)
+  return r;
 }
 
 /*

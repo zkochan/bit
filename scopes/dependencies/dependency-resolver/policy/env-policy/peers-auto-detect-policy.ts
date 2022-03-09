@@ -6,7 +6,7 @@ export type EnvPolicyEntrySupportedRange = SemverVersion;
 
 export type PeersAutoDetectPolicyEntry = {
   name: string;
-  version: string;
+  version: string; // default peer
   supportedRange: string;
 };
 

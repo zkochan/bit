@@ -6,7 +6,7 @@ import Helper from '../../src/e2e-helper/e2e-helper';
 
 chai.use(require('chai-fs'));
 
-describe('root components', function () {
+describe('app root components', function () {
   let helper: Helper;
   this.timeout(0);
 
@@ -757,6 +757,212 @@ describe('root components', function () {
           ])
         ).to.exist;
       });
+    });
+  });
+});
+
+describe.only('env root components', function () {
+  let helper: Helper;
+  this.timeout(0);
+
+  describe('pnpm isolated linker', function () {
+    let virtualStoreDir!: string;
+    let numberOfFilesInVirtualStore!: number;
+    before(() => {
+      helper = new Helper();
+      helper.scopeHelper.setNewLocalAndRemoteScopesHarmony();
+      helper.bitJsonc.setupDefault();
+      helper.command.create('react-env', 'custom-react/env', '-p custom-react/env');
+      helper.fs.outputFile(
+        `custom-react/env/env.main.runtime.ts`,
+        `
+import { MainRuntime } from '@teambit/cli';
+import { ReactAspect, ReactMain } from '@teambit/react';
+import { EnvsAspect, EnvsMain } from '@teambit/envs';
+import { EnvAspect } from './env.aspect';
+
+export class EnvMain {
+  static slots = [];
+
+  static dependencies = [ReactAspect, EnvsAspect];
+
+  static runtime = MainRuntime;
+
+  static async provider([react, envs]: [ReactMain, EnvsMain]) {
+    const templatesReactEnv = envs.compose(react.reactEnv, [
+      envs.override({
+        getDependencies: () => ({
+          dependencies: {},
+          devDependencies: {
+          },
+          peers: [
+            {
+              name: 'react',
+              supportedRange: '^16.8.0',
+              version: '^16.14.0',
+            },
+          ],
+        })
+      })
+    ]);
+    envs.registerEnv(templatesReactEnv);
+    return new EnvMain();
+  }
+}
+
+EnvAspect.addRuntime(EnvMain);
+`
+      );
+      helper.fixtures.populateComponents(2);
+      helper.extensions.bitJsonc.addKeyValToDependencyResolver('rootComponentTypes', {
+        envs: true,
+      });
+      helper.bitJsonc.addKeyVal(undefined, `${helper.scopes.remote}/comp3`, {});
+      helper.bitJsonc.addKeyVal(undefined, `${helper.scopes.remote}/comp4`, {});
+      helper.fs.outputFile(`comp1/index.js`, `const React = require("react")`);
+      helper.fs.outputFile(
+        `comp2/index.js`,
+        `const React = require("react");const comp1 = require("@${helper.scopes.remote}/comp1");`
+      );
+      helper.extensions.addExtensionToVariant('comp1', `${helper.scopes.remote}/custom-react/env`, {});
+      helper.extensions.addExtensionToVariant('comp2', `${helper.scopes.remote}/custom-react/env`, {});
+      helper.extensions.addExtensionToVariant('custom-react/env', 'teambit.envs/env', {});
+      helper.extensions.addExtensionToVariant('custom-react/env', 'teambit.dependencies/dependency-resolver', {
+        policy: {
+          dependencies: {
+            react: '16.14.0',
+          },
+        },
+      });
+      helper.bitJsonc.addKeyValToDependencyResolver('policy', {
+        dependencies: {
+          react: '17',
+        },
+      });
+      // helper.command.install();
+      // // Only after the second install is bit able to detect apps
+      // helper.command.compile();
+      helper.command.install();
+      virtualStoreDir = path.join(helper.fixtures.scopes.localPath, 'node_modules/.pnpm');
+      numberOfFilesInVirtualStore = fs.readdirSync(virtualStoreDir).length;
+    });
+    after(() => {
+      helper.scopeHelper.destroy();
+    });
+    it('should install root components', () => {
+      expect(
+        path.join(helper.fixtures.scopes.localPath, `node_modules/@${helper.scopes.remote}/comp3__root`)
+      ).to.be.a.path();
+      expect(
+        path.join(helper.fixtures.scopes.localPath, `node_modules/@${helper.scopes.remote}/comp4__root`)
+      ).to.be.a.path();
+    });
+    it('should install the dependencies of the root component that has react 17 in the dependencies with react 17', () => {
+      expect(
+        fs.readJsonSync(
+          resolveFrom(helper.fixtures.scopes.localPath, [
+            `@${helper.scopes.remote}/comp4__root`,
+            `@${helper.scopes.remote}/comp2`,
+            'react/package.json',
+          ])
+        ).version
+      ).to.match(/^17\./);
+      expect(
+        fs.readJsonSync(
+          resolveFrom(helper.fixtures.scopes.localPath, [
+            `@${helper.scopes.remote}/comp4__root`,
+            `@${helper.scopes.remote}/comp2`,
+            `@${helper.scopes.remote}/comp1`,
+            'react/package.json',
+          ])
+        ).version
+      ).to.match(/^17\./);
+    });
+    it('should install the dependencies of the root component that has react 16 in the dependencies with react 16', () => {
+      expect(
+        fs.readJsonSync(
+          resolveFrom(helper.fixtures.scopes.localPath, [
+            `@${helper.scopes.remote}/comp3__root`,
+            `@${helper.scopes.remote}/comp2`,
+            'react/package.json',
+          ])
+        ).version
+      ).to.match(/^16\./);
+      expect(
+        fs.readJsonSync(
+          resolveFrom(helper.fixtures.scopes.localPath, [
+            `@${helper.scopes.remote}/comp3__root`,
+            `@${helper.scopes.remote}/comp2`,
+            `@${helper.scopes.remote}/comp1`,
+            'react/package.json',
+          ])
+        ).version
+      ).to.match(/^16\./);
+    });
+    it('should install the non-root components with their default React versions', () => {
+      expect(
+        fs.readJsonSync(
+          resolveFrom(helper.fixtures.scopes.localPath, [
+            `@${helper.scopes.remote}/comp1/index.js`,
+            'react/package.json',
+          ])
+        ).version
+      ).to.match(/^17\./);
+      expect(
+        fs.readJsonSync(
+          resolveFrom(helper.fixtures.scopes.localPath, [
+            `@${helper.scopes.remote}/comp2/index.js`,
+            'react/package.json',
+          ])
+        ).version
+      ).to.match(/^17\./);
+      expect(
+        fs.readJsonSync(
+          resolveFrom(helper.fixtures.scopes.localPath, [
+            `@${helper.scopes.remote}/comp3/index.js`,
+            'react/package.json',
+          ])
+        ).version
+      ).to.match(/^16\./);
+      expect(
+        fs.readJsonSync(
+          resolveFrom(helper.fixtures.scopes.localPath, [
+            `@${helper.scopes.remote}/comp4/index.js`,
+            'react/package.json',
+          ])
+        ).version
+      ).to.match(/^17\./);
+    });
+    it('should create package.json file in every variation of the component', () => {
+      let pkgJsonLoc = resolveFrom(helper.fixtures.scopes.localPath, [
+        `@${helper.scopes.remote}/comp3__root`,
+        `@${helper.scopes.remote}/comp2/package.json`,
+      ]);
+      expect(pkgJsonLoc).to.contain('.pnpm');
+      expect(fs.readJsonSync(pkgJsonLoc).name).to.eq(`@${helper.scopes.remote}/comp2`);
+
+      pkgJsonLoc = resolveFrom(helper.fixtures.scopes.localPath, [
+        `@${helper.scopes.remote}/comp4__root`,
+        `@${helper.scopes.remote}/comp2/package.json`,
+      ]);
+      expect(pkgJsonLoc).to.contain('.pnpm');
+      expect(fs.readJsonSync(pkgJsonLoc).name).to.eq(`@${helper.scopes.remote}/comp2`);
+
+      pkgJsonLoc = resolveFrom(helper.fixtures.scopes.localPath, [
+        `@${helper.scopes.remote}/comp3__root`,
+        `@${helper.scopes.remote}/comp2`,
+        `@${helper.scopes.remote}/comp1/package.json`,
+      ]);
+      expect(pkgJsonLoc).to.contain('.pnpm');
+      expect(fs.readJsonSync(pkgJsonLoc).name).to.eq(`@${helper.scopes.remote}/comp1`);
+
+      pkgJsonLoc = resolveFrom(helper.fixtures.scopes.localPath, [
+        `@${helper.scopes.remote}/comp4__root`,
+        `@${helper.scopes.remote}/comp2`,
+        `@${helper.scopes.remote}/comp1/package.json`,
+      ]);
+      expect(pkgJsonLoc).to.contain('.pnpm');
+      expect(fs.readJsonSync(pkgJsonLoc).name).to.eq(`@${helper.scopes.remote}/comp1`);
     });
   });
 });
