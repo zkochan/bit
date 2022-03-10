@@ -772,14 +772,14 @@ describe.only('env root components', function () {
       helper = new Helper();
       helper.scopeHelper.setNewLocalAndRemoteScopesHarmony();
       helper.bitJsonc.setupDefault();
-      helper.command.create('react-env', 'custom-react/env', '-p custom-react/env');
+      helper.command.create('react-env', 'custom-react/env1', '-p custom-react/env1');
       helper.fs.outputFile(
-        `custom-react/env/env.main.runtime.ts`,
+        `custom-react/env1/env1.main.runtime.ts`,
         `
 import { MainRuntime } from '@teambit/cli';
 import { ReactAspect, ReactMain } from '@teambit/react';
 import { EnvsAspect, EnvsMain } from '@teambit/envs';
-import { EnvAspect } from './env.aspect';
+import { Env1Aspect } from './env1.aspect';
 
 export class EnvMain {
   static slots = [];
@@ -799,7 +799,7 @@ export class EnvMain {
             {
               name: 'react',
               supportedRange: '^16.8.0',
-              version: '^16.14.0',
+              version: '16.14.0',
             },
           ],
         })
@@ -810,7 +810,48 @@ export class EnvMain {
   }
 }
 
-EnvAspect.addRuntime(EnvMain);
+Env1Aspect.addRuntime(EnvMain);
+`
+      );
+      helper.command.create('react-env', 'custom-react/env2', '-p custom-react/env2');
+      helper.fs.outputFile(
+        `custom-react/env2/env2.main.runtime.ts`,
+        `
+import { MainRuntime } from '@teambit/cli';
+import { ReactAspect, ReactMain } from '@teambit/react';
+import { EnvsAspect, EnvsMain } from '@teambit/envs';
+import { Env2Aspect } from './env2.aspect';
+
+export class EnvMain {
+  static slots = [];
+
+  static dependencies = [ReactAspect, EnvsAspect];
+
+  static runtime = MainRuntime;
+
+  static async provider([react, envs]: [ReactMain, EnvsMain]) {
+    const templatesReactEnv = envs.compose(react.reactEnv, [
+      envs.override({
+        getDependencies: () => ({
+          dependencies: {},
+          devDependencies: {
+          },
+          peers: [
+            {
+              name: 'react',
+              supportedRange: '^16.8.0',
+              version: '16.13.1',
+            },
+          ],
+        })
+      })
+    ]);
+    envs.registerEnv(templatesReactEnv);
+    return new EnvMain();
+  }
+}
+
+Env2Aspect.addRuntime(EnvMain);
 `
       );
       helper.fixtures.populateComponents(2);
@@ -824,16 +865,16 @@ EnvAspect.addRuntime(EnvMain);
         `comp2/index.js`,
         `const React = require("react");const comp1 = require("@${helper.scopes.remote}/comp1");`
       );
-      helper.extensions.addExtensionToVariant('comp1', `${helper.scopes.remote}/custom-react/env`, {});
-      helper.extensions.addExtensionToVariant('comp2', `${helper.scopes.remote}/custom-react/env`, {});
-      helper.extensions.addExtensionToVariant('custom-react/env', 'teambit.envs/env', {});
-      helper.extensions.addExtensionToVariant('custom-react/env', 'teambit.dependencies/dependency-resolver', {
-        policy: {
-          dependencies: {
-            react: '16.14.0',
-          },
-        },
-      });
+      helper.extensions.addExtensionToVariant('comp1', `${helper.scopes.remote}/custom-react/env1`, {});
+      helper.extensions.addExtensionToVariant('comp2', `${helper.scopes.remote}/custom-react/env2`, {});
+      helper.extensions.addExtensionToVariant('custom-react', 'teambit.envs/env', {});
+      // helper.extensions.addExtensionToVariant('custom-react/env', 'teambit.dependencies/dependency-resolver', {
+      // policy: {
+      // dependencies: {
+      // react: '16.14.0',
+      // },
+      // },
+      // });
       helper.bitJsonc.addKeyValToDependencyResolver('policy', {
         dependencies: {
           react: '17',
