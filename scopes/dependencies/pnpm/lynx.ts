@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import fs from 'graceful-fs';
 import path from 'path';
 import semver from 'semver';
@@ -179,7 +180,7 @@ export async function install(
   const newManifestsByPaths: Record<string, ProjectManifest> = {};
   for (const manifest of Object.values(manifestsByPaths)) {
     if (Object.values(manifest['defaultPeerDependencies'] ?? {}).length) {
-      const id = `root_${encodeURIComponent(JSON.stringify(manifest['defaultPeerDependencies']))}`;
+      const id = `.root_components/${createPeersFolder(manifest['defaultPeerDependencies'])}`;
       if (newManifestsByPaths[id]) {
         (newManifestsByPaths[id].dependencies![manifest.name!.toString()] = `workspace:*`),
           (newManifestsByPaths[id].dependenciesMeta![manifest.name!.toString()] = { injected: true });
@@ -267,6 +268,24 @@ export async function install(
   }
 }
 
+function createPeersFolder(peers: Record<string, string>): string {
+  const folderName = Object.entries(peers)
+    .map(([name, version]) => `${name.replace('/', '+')}@${version}`)
+    .sort()
+    .join('+');
+
+  // We don't want the folder name to get too long.
+  // Otherwise, an ENAMETOOLONG error might happen.
+  // see: https://github.com/pnpm/pnpm/issues/977
+  //
+  // A bigger limit might be fine but the md5 hash will be 32 symbols,
+  // so for consistency's sake, we go with 32.
+  if (folderName.length > 32) {
+    return crypto.createHash('md5').update(folderName).digest('hex');
+  }
+  return folderName;
+}
+
 function groupPkgs(manifestsByPaths: Record<string, ProjectManifest>) {
   const pkgs = Object.entries(manifestsByPaths).map(([dir, manifest]) => ({ dir, manifest }));
   const { graph } = pkgsGraph(pkgs);
@@ -338,25 +357,19 @@ function readDependencyPackageHook(rootComponents: string[], pkg: PackageManifes
 }
 
 function readWorkspacePackageHook(pkg: PackageManifest): PackageManifest {
+  if (pkg.name?.startsWith('.root_components/')) {
+    return pkg;
+  }
   const newDeps = {};
   for (const [name, version] of Object.entries(pkg.dependencies ?? {})) {
-    if (pkg.name?.startsWith('root_')) {
-      console.log('!!!!!!!!!!', pkg.name);
-    }
-    if (pkg.name?.startsWith('root_') || !version.startsWith('workspace:')) {
+    if (!version.startsWith('workspace:')) {
       newDeps[name] = version;
     }
   }
-  const r = {
+  return {
     ...pkg,
-    dependencies: {
-      ...pkg.peerDependencies,
-      ...newDeps,
-      // ...pkg['defaultPeerDependencies'],
-    },
+    dependencies: newDeps,
   };
-  // console.log('12============', r)
-  return r;
 }
 
 /*
