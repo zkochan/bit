@@ -157,6 +157,8 @@ export async function getPeerDependencyIssues(
   });
 }
 
+const ROOT_COMPS_DIR = 'node_modules/.root_components';
+
 export async function install(
   rootManifest,
   manifestsByPaths: Record<string, ProjectManifest>,
@@ -178,27 +180,23 @@ export async function install(
   }
   const newManifestsByPaths: Record<string, ProjectManifest> = {};
   for (const manifest of Object.values(manifestsByPaths)) {
-    if (Object.values(manifest['defaultPeerDependencies'] ?? {}).length) {
-      const name = manifest.name!.toString();
-      const id = `node_modules/.root_components/${name}`;
-      if (newManifestsByPaths[id]) {
-        (newManifestsByPaths[id].dependencies![manifest.name!.toString()] = `workspace:*`),
-          (newManifestsByPaths[id].dependenciesMeta![manifest.name!.toString()] = { injected: true });
-      } else {
-        const newManifest = {
-          name: id,
-          dependencies: {
-            [manifest.name!.toString()]: `workspace:*`,
-            ...manifest['defaultPeerDependencies'],
-          },
-          dependenciesMeta: {
-            [manifest.name!.toString()]: { injected: true },
-          },
-        };
-        newManifestsByPaths[id] = newManifest;
-      }
-      // console.log(newManifest)
-    }
+    // if (Object.values(manifest['defaultPeerDependencies'] ?? {}).length) {
+    const name = manifest.name!.toString();
+    const id = `${ROOT_COMPS_DIR}/${name}`;
+    const newManifest = {
+      name: id,
+      dependencies: {
+        [name]: `workspace:*`,
+        ...manifest.peerDependencies,
+        ...manifest['defaultPeerDependencies'],
+      },
+      dependenciesMeta: {
+        [manifest.name!.toString()]: { injected: true },
+      },
+    };
+    newManifestsByPaths[id] = newManifest;
+    // console.log(newManifest)
+    // }
     // for (const rootComponent of options?.rootComponents ?? []) {
     // const alias = `${manifest.name}__root`;
     // rootManifest.manifest.devDependencies[alias] = `workspace:${manifest.name}@*`;
@@ -339,7 +337,7 @@ function readDependencyPackageHook(rootComponents: string[], pkg: PackageManifes
 }
 
 function readWorkspacePackageHook(pkg: PackageManifest): PackageManifest {
-  if (pkg.name?.startsWith('node_modules/.root_components/')) {
+  if (pkg.name?.startsWith(`${ROOT_COMPS_DIR}/`)) {
     return pkg;
   }
   const newDeps = {};

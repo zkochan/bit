@@ -6,7 +6,7 @@ import Helper from '../../src/e2e-helper/e2e-helper';
 
 chai.use(require('chai-fs'));
 
-describe('app root components', function () {
+describe.only('app root components', function () {
   let helper: Helper;
   this.timeout(0);
 
@@ -761,7 +761,7 @@ describe('app root components', function () {
   });
 });
 
-describe.only('env root components', function () {
+describe('env root components', function () {
   let helper: Helper;
   this.timeout(0);
 
