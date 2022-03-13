@@ -239,6 +239,14 @@ export type DependencyFactorySlot = SlotRegistry<DependencyFactory[]>;
 export type PreInstallSlot = SlotRegistry<PreInstallSubscriberList>;
 export type PostInstallSlot = SlotRegistry<PostInstallSubscriberList>;
 
+export type RootComponentType = 'envs' | 'apps';
+
+export interface RootComponentIdsByType {
+  type: RootComponentType;
+  getIds: () => string[];
+}
+export type RootComponentsSlot = SlotRegistry<RootComponentIdsByType>;
+
 export type MergeDependenciesFunc = (configuredExtensions: ExtensionDataList) => Promise<VariantPolicyConfigObject>;
 
 export type GetInstallerOptions = {
