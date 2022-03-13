@@ -6,7 +6,13 @@ import Helper from '../../src/e2e-helper/e2e-helper';
 
 chai.use(require('chai-fs'));
 
-describe.only('app root components', function () {
+const ROOT_COMPS_DIR = 'node_modules/.root_components';
+
+function rootCompDir(scope: string, name: string) {
+  return `${ROOT_COMPS_DIR}/@${scope}/${name}/node_modules/@${scope}/${name}`;
+}
+
+describe('app root components', function () {
   let helper: Helper;
   this.timeout(0);
 
@@ -90,12 +96,8 @@ describe.only('app root components', function () {
       helper.scopeHelper.destroy();
     });
     it('should install root components', () => {
-      expect(
-        path.join(helper.fixtures.scopes.localPath, `node_modules/@${helper.scopes.remote}/comp3__root`)
-      ).to.be.a.path();
-      expect(
-        path.join(helper.fixtures.scopes.localPath, `node_modules/@${helper.scopes.remote}/comp4__root`)
-      ).to.be.a.path();
+      expect(path.join(helper.fixtures.scopes.localPath, rootCompDir(helper.scopes.remote, 'comp3'))).to.be.a.path();
+      expect(path.join(helper.fixtures.scopes.localPath, rootCompDir(helper.scopes.remote, 'comp4'))).to.be.a.path();
     });
     it('should install the dependencies of the root component that has react 17 in the dependencies with react 17', () => {
       expect(
@@ -366,7 +368,7 @@ describe.only('app root components', function () {
     });
   });
 
-  describe('pnpm hoisted linker', function () {
+  describe.only('pnpm hoisted linker', function () {
     before(() => {
       helper = new Helper();
       helper.scopeHelper.setNewLocalAndRemoteScopesHarmony();
@@ -443,36 +445,32 @@ describe.only('app root components', function () {
       helper.scopeHelper.destroy();
     });
     it('should install root components', () => {
-      expect(
-        path.join(helper.fixtures.scopes.localPath, `node_modules/@${helper.scopes.remote}/comp3__root`)
-      ).to.be.a.path();
-      expect(
-        path.join(helper.fixtures.scopes.localPath, `node_modules/@${helper.scopes.remote}/comp4__root`)
-      ).to.be.a.path();
+      expect(path.join(helper.fixtures.scopes.localPath, rootCompDir(helper.scopes.remote, 'comp3'))).to.be.a.path();
+      expect(path.join(helper.fixtures.scopes.localPath, rootCompDir(helper.scopes.remote, 'comp4'))).to.be.a.path();
     });
     it('should use a hoisted layout', () => {
       expect(
         path.join(
           helper.fixtures.scopes.localPath,
-          `node_modules/@${helper.scopes.remote}/comp3__root/node_modules/@${helper.scopes.remote}/comp1`
+          `${ROOT_COMPS_DIR}/@${helper.scopes.remote}/comp3__root/node_modules/@${helper.scopes.remote}/comp1`
         )
       ).to.be.a.path();
       expect(
         path.join(
           helper.fixtures.scopes.localPath,
-          `node_modules/@${helper.scopes.remote}/comp3__root/node_modules/@${helper.scopes.remote}/comp2`
+          `${ROOT_COMPS_DIR}/@${helper.scopes.remote}/comp3__root/node_modules/@${helper.scopes.remote}/comp2`
         )
       ).to.be.a.path();
       expect(
         path.join(
           helper.fixtures.scopes.localPath,
-          `node_modules/@${helper.scopes.remote}/comp4__root/node_modules/@${helper.scopes.remote}/comp1`
+          `${ROOT_COMPS_DIR}/@${helper.scopes.remote}/comp4__root/node_modules/@${helper.scopes.remote}/comp1`
         )
       ).to.be.a.path();
       expect(
         path.join(
           helper.fixtures.scopes.localPath,
-          `node_modules/@${helper.scopes.remote}/comp4__root/node_modules/@${helper.scopes.remote}/comp2`
+          `${ROOT_COMPS_DIR}/@${helper.scopes.remote}/comp4__root/node_modules/@${helper.scopes.remote}/comp2`
         )
       ).to.be.a.path();
     });

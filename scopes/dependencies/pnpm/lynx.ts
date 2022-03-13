@@ -170,7 +170,7 @@ export async function install(
   options?: {
     nodeLinker?: 'hoisted' | 'isolated';
     overrides?: Record<string, string>;
-    rootComponents?: string[];
+    rootComponents?: boolean;
   } & Pick<InstallOptions, 'publicHoistPattern' | 'hoistPattern'>,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   logger?: Logger
@@ -179,30 +179,34 @@ export async function install(
     rootManifest.manifest.dependenciesMeta = {};
   }
   const newManifestsByPaths: Record<string, ProjectManifest> = {};
-  for (const manifest of Object.values(manifestsByPaths)) {
-    // if (Object.values(manifest['defaultPeerDependencies'] ?? {}).length) {
-    const name = manifest.name!.toString();
-    const id = `${ROOT_COMPS_DIR}/${name}`;
-    const newManifest = {
-      name: id,
-      dependencies: {
-        [name]: `workspace:*`,
-        ...manifest.peerDependencies,
-        ...manifest['defaultPeerDependencies'],
-      },
-      dependenciesMeta: {
-        [manifest.name!.toString()]: { injected: true },
-      },
-    };
-    newManifestsByPaths[id] = newManifest;
-    // console.log(newManifest)
-    // }
-    // for (const rootComponent of options?.rootComponents ?? []) {
-    // const alias = `${manifest.name}__root`;
-    // rootManifest.manifest.devDependencies[alias] = `workspace:${manifest.name}@*`;
-    // rootManifest.manifest.dependenciesMeta[alias] = { injected: true };
+  const rootComponents: string[] = [];
+  if (options?.rootComponents) {
+    for (const manifest of Object.values(manifestsByPaths)) {
+      // if (Object.values(manifest['defaultPeerDependencies'] ?? {}).length) {
+      const name = manifest.name!.toString();
+      const id = `${ROOT_COMPS_DIR}/${name}`;
+      rootComponents.push(encodeURIComponent(id));
+      const newManifest = {
+        name: id,
+        dependencies: {
+          [name]: `workspace:*`,
+          ...manifest.peerDependencies,
+          ...manifest['defaultPeerDependencies'],
+        },
+        dependenciesMeta: {
+          [name]: { injected: true },
+        },
+      };
+      newManifestsByPaths[id] = newManifest;
+      // console.log(newManifest)
+      // }
+      // for (const rootComponent of options?.rootComponents ?? []) {
+      // const alias = `${manifest.name}__root`;
+      // rootManifest.manifest.devDependencies[alias] = `workspace:${manifest.name}@*`;
+      // rootManifest.manifest.dependenciesMeta[alias] = { injected: true };
+    }
   }
-  console.log(JSON.stringify(newManifestsByPaths, null, 2));
+  // console.log(JSON.stringify(newManifestsByPaths, null, 2));
   manifestsByPaths = {
     ...newManifestsByPaths,
     ...manifestsByPaths,
@@ -233,12 +237,12 @@ export async function install(
     rawConfig: authConfig,
     ...options,
   };
-  if (options?.rootComponents?.length) {
+  if (rootComponents.length) {
     opts.hooks = {
-      readPackage: readPackageHook.bind(null, options.rootComponents) as any,
+      readPackage: readPackageHook.bind(null, rootComponents) as any,
     };
     opts.hoistingLimits = new Map();
-    opts.hoistingLimits.set('.@', new Set(options.rootComponents.map((name) => `${name}__root`)));
+    opts.hoistingLimits.set('.@', new Set(rootComponents));
   }
 
   const stopReporting = defaultReporter({
@@ -320,16 +324,16 @@ function readDependencyPackageHook(rootComponents: string[], pkg: PackageManifes
       dependenciesMeta[name] = { injected: true };
     }
   }
-  if (rootComponents.includes(pkg.name)) {
-    return {
-      ...pkg,
-      dependencies: {
-        ...pkg.peerDependencies,
-        ...pkg.dependencies,
-      },
-      dependenciesMeta,
-    };
-  }
+  // if (rootComponents.includes(pkg.name)) {
+  // return {
+  // ...pkg,
+  // dependencies: {
+  // ...pkg.peerDependencies,
+  // ...pkg.dependencies,
+  // },
+  // dependenciesMeta,
+  // };
+  // }
   return {
     ...pkg,
     dependenciesMeta,
