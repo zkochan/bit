@@ -20,7 +20,7 @@ function rootCompDir(helper: Helper, rootComponentName: string) {
   return path.join(helper.fixtures.scopes.localPath, `${ROOT_COMPS_DIR}/@${helper.scopes.remote}/${rootComponentName}`);
 }
 
-describe('app root components', function () {
+describe.only('app root components', function () {
   let helper: Helper;
   this.timeout(0);
 
@@ -46,7 +46,11 @@ describe('app root components', function () {
       );
       helper.fs.outputFile(
         `comp3/comp3.node-app.js`,
-        `const React = require("react"); module.exports.default = { name: 'comp3' }`
+        `const React = require("react");
+module.exports.default = {
+  name: 'comp3',
+  entry: require.resolve('./index.js'),
+}`
       );
       helper.fs.outputFile(
         `comp4/index.js`,
@@ -54,7 +58,11 @@ describe('app root components', function () {
       );
       helper.fs.outputFile(
         `comp4/comp4.node-app.js`,
-        `const React = require("react");const comp1 = require("@${helper.scopes.remote}/comp1"); module.exports.default = { name: 'comp4' }`
+        `const React = require("react");
+module.exports.default = {
+  name: 'comp4',
+  entry: require.resolve('./index.js'),
+}`
       );
       helper.extensions.addExtensionToVariant('comp1', 'teambit.dependencies/dependency-resolver', {
         policy: {
@@ -360,6 +368,14 @@ describe('app root components', function () {
             `@${helper.scopes.remote}/comp1/dist/index.js`,
           ])
         ).to.exist;
+      });
+    });
+    describe('build', () => {
+      before(() => {
+        helper.command.build();
+      });
+      it('should create root components for workspace capsules', () => {
+        console.log(helper.command.capsuleListParsed());
       });
     });
   });
