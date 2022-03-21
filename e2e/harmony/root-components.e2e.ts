@@ -20,7 +20,7 @@ function rootCompDir(helper: Helper, rootComponentName: string) {
   return path.join(helper.fixtures.scopes.localPath, `${ROOT_COMPS_DIR}/@${helper.scopes.remote}/${rootComponentName}`);
 }
 
-describe.only('app root components', function () {
+describe('app root components', function () {
   let helper: Helper;
   this.timeout(0);
 
@@ -375,7 +375,24 @@ module.exports.default = {
         helper.command.build();
       });
       it('should create root components for workspace capsules', () => {
-        console.log(helper.command.capsuleListParsed());
+        const { workspaceCapsulesRootDir } = helper.command.capsuleListParsed()
+        expect(
+          fs.readJsonSync(
+            resolveFrom(path.join(workspaceCapsulesRootDir, `${ROOT_COMPS_DIR}/@${helper.scopes.remote}/comp4/node_modules/@${helper.scopes.remote}/comp4`), [
+              `@${helper.scopes.remote}/comp2`,
+              'react/package.json',
+            ])
+          ).version
+        ).to.match(/^17\./);
+        expect(
+          fs.readJsonSync(
+          resolveFrom(path.join(workspaceCapsulesRootDir, `${ROOT_COMPS_DIR}/@${helper.scopes.remote}/comp3/node_modules/@${helper.scopes.remote}/comp3`), [
+              `@${helper.scopes.remote}/comp2`,
+              `@${helper.scopes.remote}/comp1`,
+              'react/package.json',
+            ])
+          ).version
+        ).to.match(/^16\./);
       });
     });
   });

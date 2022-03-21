@@ -219,6 +219,7 @@ export async function install(
   });
   const opts: InstallOptions = {
     storeDir: storeController.dir,
+    strictPeerDependencies: false,
     dir: rootManifest.rootDir,
     storeController: storeController.ctrl,
     workspacePackages,
