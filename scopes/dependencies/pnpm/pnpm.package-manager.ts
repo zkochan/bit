@@ -80,6 +80,7 @@ export class PnpmPackageManager implements PackageManager {
         rootComponents: installOptions.rootComponents,
         rootComponentsForCapsules: installOptions.rootComponentsForCapsules,
         peerDependencyRules: installOptions.peerDependencyRules,
+        resolutionMode: installOptions.resolutionMode,
         sideEffectsCacheRead: installOptions.sideEffectsCache ?? true,
         sideEffectsCacheWrite: installOptions.sideEffectsCache ?? true,
       },

@@ -168,7 +168,7 @@ export async function install(
     rootComponentsForCapsules?: boolean;
   } & Pick<
     InstallOptions,
-    'publicHoistPattern' | 'hoistPattern' | 'nodeVersion' | 'engineStrict' | 'peerDependencyRules'
+    'publicHoistPattern' | 'hoistPattern' | 'nodeVersion' | 'engineStrict' | 'peerDependencyRules' | 'resolutionMode'
   > &
     Pick<CreateStoreControllerOptions, 'packageImportMethod'>,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars

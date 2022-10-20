@@ -76,6 +76,8 @@ export class DependencyInstaller {
 
     private packageImportMethod?: PackageImportMethod,
 
+    private resolutionMode?: 'highest' | 'time-based',
+
     private sideEffectsCache?: boolean,
 
     private nodeVersion?: string,
@@ -139,6 +141,7 @@ export class DependencyInstaller {
       cacheRootDir: this.cacheRootDir,
       nodeLinker: this.nodeLinker,
       packageImportMethod: this.packageImportMethod,
+      resolutionMode: this.resolutionMode,
       sideEffectsCache: this.sideEffectsCache,
       nodeVersion: this.nodeVersion,
       engineStrict: this.engineStrict,

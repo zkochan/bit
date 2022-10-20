@@ -219,6 +219,11 @@ export interface DependencyResolverWorkspaceConfig {
   packageImportMethod?: PackageImportMethod;
 
   /*
+   * Controls the way package ranges are resolved to exact versions
+   */
+  resolutionMode?: 'highest' | 'time-based';
+
+  /*
    * Use and cache the results of (pre/post)install hooks.
    */
   sideEffectsCache?: boolean;
@@ -576,6 +581,7 @@ export class DependencyResolverMain {
       postInstallSubscribers,
       this.config.nodeLinker,
       this.config.packageImportMethod,
+      this.config.resolutionMode,
       this.config.sideEffectsCache,
       this.config.nodeVersion,
       this.config.engineStrict,

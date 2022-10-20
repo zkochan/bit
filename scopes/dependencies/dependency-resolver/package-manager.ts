@@ -32,6 +32,8 @@ export type PackageManagerInstallOptions = {
 
   packageImportMethod?: PackageImportMethod;
 
+  resolutionMode?: 'highest' | 'time-based';
+
   rootComponents?: boolean;
 
   rootComponentsForCapsules?: boolean;
