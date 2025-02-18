@@ -1,6 +1,7 @@
 import pFilter from 'p-filter';
 import fs, { pathExists } from 'fs-extra';
 import path from 'path';
+import { GraphAspect, GraphMain } from '@teambit/graph';
 import { getRootComponentDir, linkPkgsToRootComponents } from '@teambit/workspace.root-components';
 import { CompilerMain, CompilerAspect, CompilationInitiator } from '@teambit/compiler';
 import { CLIMain, CommandList, CLIAspect, MainRuntime } from '@teambit/cli';
@@ -127,6 +128,8 @@ export class InstallMain {
     private wsConfigFiles: WorkspaceConfigFilesMain,
 
     private aspectLoader: AspectLoaderMain,
+
+    private graph: GraphMain,
 
     private app: ApplicationMain,
 
@@ -351,6 +354,30 @@ export class InstallMain {
     let installCycle = 0;
     let hasMissingLocalComponents = true;
     const forceTeambitHarmonyLink = !this.dependencyResolver.hasHarmonyInRootPolicy();
+    // console.log(this.graph);
+    const graph = await this.graph.getGraphIds();
+    const sourceIds = this.workspace.listIds();
+    console.log(sourceIds);
+    for (let i = 0; i < sourceIds.length; i++) {
+      const allPaths = graph.findAllPathsFromSourcesToTargets([sourceIds[i]], sourceIds.filter((target) => target !== sourceIds[i]));
+      console.log('x', allPaths)
+      // this.dependencyResolver.getPackageName(component)
+      // this.workspace.getComponents()
+      // private async getPackageNameByComponentID(id: ComponentID) {
+        // const host = this.componentMain.getHost();
+        // const comp = await host.get(id);
+        // if (!comp) throw new Error(`unable to find a component: "${id.toString()}"`);
+        // return this.pkg.getPackageName(comp);
+      // }
+      // for (let j = 0; j < sourceIds.length; j++) {
+        // if (i !== j) {
+          // const allPaths = graph.findAllPathsFromSourcesToTargets(sourceIds, sourceIds);
+        // }
+      // }
+    }
+    // const allPaths = graph.findAllPathsFromSourcesToTargets([sourceIds[0]], [sourceIds[1]]);
+    const allPaths = graph.findAllPathsFromSourcesToTargets(sourceIds, sourceIds);
+    console.log(allPaths)
     /* eslint-disable no-await-in-loop */
     do {
       // In case there are missing local components,
@@ -1249,6 +1276,7 @@ export class InstallMain {
     GeneratorAspect,
     WorkspaceConfigFilesAspect,
     AspectLoaderAspect,
+    GraphAspect,
   ];
 
   static runtime = MainRuntime;
@@ -1268,6 +1296,7 @@ export class InstallMain {
       generator,
       wsConfigFiles,
       aspectLoader,
+      graph,
     ]: [
       DependencyResolverMain,
       Workspace,
@@ -1282,6 +1311,7 @@ export class InstallMain {
       GeneratorMain,
       WorkspaceConfigFilesMain,
       AspectLoaderMain,
+      GraphMain,
     ],
     _,
     [preLinkSlot, preInstallSlot, postInstallSlot]: [PreLinkSlot, PreInstallSlot, PostInstallSlot],
@@ -1297,6 +1327,7 @@ export class InstallMain {
       envs,
       wsConfigFiles,
       aspectLoader,
+      graph,
       app,
       generator,
       preLinkSlot,
