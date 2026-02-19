@@ -708,7 +708,10 @@
       // https://github.com/garycourt/uri-js/pull/95
       // https://github.com/garycourt/uri-js/issues/97
       "uri-js": "npm:uri-js-replace",
-      "encoding": "-"
+      "encoding": "-",
+      // chai v5 is ESM-only and breaks Mocha tests running in CJS capsules.
+      "chai": "4.3.0",
+      "@types/chai": "4.2.15"
     },
     "nodeVersion": "22.22.0",
     "engineStrict": true,
