@@ -11,6 +11,7 @@ import type { DependencyList, PackageName } from '../dependencies';
 import { ComponentDependency } from '../dependencies';
 import type { WorkspacePolicy, EnvPolicy } from '../policy';
 import { VariantPolicy } from '../policy';
+import { DependencyResolverAspect } from '../dependency-resolver.aspect';
 import type { DependencyResolverMain } from '../dependency-resolver.main.runtime';
 import type { ComponentsManifestsMap } from '../types';
 import { ComponentManifest } from './component-manifest';
@@ -212,11 +213,25 @@ export class WorkspaceManifestFactory {
       });
 
       const defaultPeerDependencies = await this._getDefaultPeerDependencies(component, packageNames);
+      // Also include packages that are explicitly listed in the component's
+      // dep-resolver config (e.g. with version "+").  Without this, a fresh
+      // workspace after `bit new`/`bit fork` hits a chicken-and-egg problem:
+      // "+" can't resolve → package absent from manifest → filter excludes it
+      // → package never installed.
+      const depResolverEntry = component.get(DependencyResolverAspect.id);
+      const explicitPolicy = depResolverEntry?.config?.policy ?? {};
+      const componentExplicitPkgs = new Set([
+        ...Object.keys(explicitPolicy.dependencies ?? {}),
+        ...Object.keys(explicitPolicy.devDependencies ?? {}),
+        ...Object.keys(explicitPolicy.peerDependencies ?? {}),
+      ]);
+
       const usedPeerDependencies = pickBy(defaultPeerDependencies, (_val, pkgName) => {
         return (
           depManifestBeforeFiltering.dependencies[pkgName] ||
           depManifestBeforeFiltering.devDependencies[pkgName] ||
-          depManifestBeforeFiltering.peerDependencies[pkgName]
+          depManifestBeforeFiltering.peerDependencies[pkgName] ||
+          componentExplicitPkgs.has(pkgName)
         );
       });
       // In case the env has peer dependencies on both react and react-dom, we want to make sure to keep the versions

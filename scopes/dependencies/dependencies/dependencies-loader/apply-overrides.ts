@@ -336,6 +336,19 @@ export class ApplyOverrides {
           if (componentData && !componentData.packageName) {
             this.overridesDependencies.missingPackageDependencies.push(dependency);
           }
+        } else if (
+          // The "+" sentinel couldn't be resolved from workspace package.json
+          // (e.g. fresh workspace after bit new/fork), but the package was
+          // already resolved by applyAutoDetectedPeersFromEnvOnEnvItSelf().
+          // Remove it from missingPackageDependencies to avoid a false positive.
+          this.allPackagesDependencies.packageDependencies[dependency] ||
+          this.allPackagesDependencies.devPackageDependencies[dependency] ||
+          this.allPackagesDependencies.peerPackageDependencies[dependency]
+        ) {
+          const idx = this.overridesDependencies.missingPackageDependencies.indexOf(dependency);
+          if (idx !== -1) {
+            this.overridesDependencies.missingPackageDependencies.splice(idx, 1);
+          }
         }
       });
     });
