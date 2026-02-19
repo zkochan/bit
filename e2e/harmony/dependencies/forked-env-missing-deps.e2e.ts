@@ -60,7 +60,7 @@ describe('forked env with "+" dependency markers (PR #10150 regression)', functi
       const bitmap = helper.bitMap.read();
       bitmap[envName] = bitmap[envName] || {};
       bitmap[envName].config = {
-        ...(bitmap[envName].config || {}),
+        ...bitmap[envName].config,
         'teambit.dependencies/dependency-resolver': {
           policy: {
             dependencies: {
