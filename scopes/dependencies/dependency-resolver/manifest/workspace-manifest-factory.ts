@@ -220,10 +220,24 @@ export class WorkspaceManifestFactory {
       // → package never installed.
       const depResolverEntry = component.get(DependencyResolverAspect.id);
       const explicitPolicy = depResolverEntry?.config?.policy ?? {};
-      const componentExplicitPkgs = new Set([
-        ...Object.keys(explicitPolicy.dependencies ?? {}),
-        ...Object.keys(explicitPolicy.devDependencies ?? {}),
-        ...Object.keys(explicitPolicy.peerDependencies ?? {}),
+      const nonRemovedEntryNames = (policySection?: Record<string, unknown>): string[] => {
+        if (!policySection) return [];
+        return Object.entries(policySection)
+          .filter(([, val]) => {
+            // Skip explicit removals expressed as "-" or as removal objects.
+            if (val === '-') return false;
+            if (val && typeof val === 'object') {
+              const v = val as { version?: string; remove?: boolean };
+              if (v.version === '-' || v.remove) return false;
+            }
+            return true;
+          })
+          .map(([name]) => name);
+      };
+      const componentExplicitPkgs = new Set<string>([
+        ...nonRemovedEntryNames(explicitPolicy.dependencies),
+        ...nonRemovedEntryNames(explicitPolicy.devDependencies),
+        ...nonRemovedEntryNames(explicitPolicy.peerDependencies),
       ]);
 
       const usedPeerDependencies = pickBy(defaultPeerDependencies, (_val, pkgName) => {
