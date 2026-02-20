@@ -345,12 +345,11 @@ export class ApplyOverrides {
           this.allPackagesDependencies.devPackageDependencies[dependency] ||
           this.allPackagesDependencies.peerPackageDependencies[dependency]
         ) {
-          const idx = this.overridesDependencies.missingPackageDependencies.indexOf(dependency);
-          if (idx !== -1) {
-            this.overridesDependencies.missingPackageDependencies.splice(idx, 1);
-          }
+          this.overridesDependencies.missingPackageDependencies =
+            this.overridesDependencies.missingPackageDependencies.filter((pkg) => pkg !== dependency);
         }
       });
+    });
     });
     return { components, packages };
   }
