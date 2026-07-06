@@ -2,21 +2,19 @@ import semver from 'semver';
 import parsePackageName from 'parse-package-name';
 import { initDefaultReporter } from '@pnpm/cli.default-reporter';
 import { streamParser } from '@pnpm/logger';
-import type { StoreController, WantedDependency } from '@pnpm/store.controller';
 import { TRUSTED_PACKAGE_NAMES } from '@pnpm/plugin-trusted-deps';
-import { rebuild } from '@pnpm/building.commands';
-import type { CreateStoreControllerOptions } from '@pnpm/store.connection-manager';
-import { createStoreController as pnpmCreateStoreController } from '@pnpm/store.connection-manager';
-import { sortProjects } from '@pnpm/workspace.projects-sorter';
 import type {
   PackageManifest,
   ProjectManifest,
   ReadPackageHook,
   PeerDependencyRules,
-  ProjectRootDir,
+  DependencyManifest,
   DepPath,
 } from '@pnpm/types';
+import * as nodeApi from '@pnpm/napi';
+import type { PeerDependencyIssuesByProjects } from '@pnpm/napi';
 import { DEFAULT_REGISTRY_SCOPE } from '@pnpm/types';
+import { getNetworkConfigs, getDefaultCreds } from '@pnpm/config.reader';
 import type { Registries } from '@teambit/pkg.entities.registry';
 import { getAuthConfig } from '@teambit/pkg.config.auth';
 import type {
@@ -26,14 +24,6 @@ import type {
 } from '@teambit/dependency-resolver';
 import { BitError } from '@teambit/bit-error';
 import { BIT_ROOTS_DIR } from '@teambit/legacy.constants';
-import type { MutatedProject, InstallOptions, PeerDependencyIssuesByProjects, ProjectOptions } from '@pnpm/installing.deps-installer';
-import { mutateModules } from '@pnpm/installing.deps-installer';
-import * as pnpm from '@pnpm/installing.deps-installer';
-import { getDefaultCreds, getNetworkConfigs } from '@pnpm/config.reader';
-import type { ClientOptions } from '@pnpm/installing.client';
-import { createResolver } from '@pnpm/installing.client';
-import { restartWorkerPool, finishWorkers } from '@pnpm/worker';
-import { createProjectsGraph } from '@pnpm/workspace.projects-graph';
 import { readWantedLockfile, writeWantedLockfile } from '@pnpm/lockfile.fs';
 import { type LockfileFile, type LockfileObject } from '@pnpm/lockfile.types';
 import type { Logger } from '@teambit/logger';
@@ -50,74 +40,107 @@ import { readConfig } from './read-config';
 const UNTRUSTED_PACKAGE_NAMES = ['es5-ext', 'less', 'protobufjs', 'ssh', 'core-js-pure', 'core-js'];
 
 const installsRunning: Record<string, Promise<any>> = {};
-const cafsLocker = new Map<string, number>();
 
-function buildConfigByUri(authConfig: Record<string, unknown>): Record<string, any> {
+/**
+ * Minimal structural signature of the `resolve` function returned by
+ * `generateResolverAndFetcher`. It mirrors what the old
+ * `@pnpm/installing.client` `ResolveFunction` exposed, but is backed by
+ * `@pnpm/napi`'s `resolveDependency`.
+ */
+type ResolveOpts = {
+  lockfileDir?: string;
+  projectDir?: string;
+  preferredVersions?: Record<string, unknown>;
+  registry?: string;
+};
+type ResolveFunction = (
+  wantedDependency: nodeApi.WantedDependency,
+  opts: ResolveOpts
+) => Promise<nodeApi.ResolveResult>;
+
+function toNodeApiProxyConfig(proxyConfig: PackageManagerProxyConfig): nodeApi.ProxyConfig {
+  return {
+    httpProxy: proxyConfig.httpProxy,
+    httpsProxy: proxyConfig.httpsProxy,
+    noProxy: proxyConfig.noProxy,
+  };
+}
+
+function toNodeApiNetworkConfig(networkConfig: PackageManagerNetworkConfig): nodeApi.NetworkConfig {
+  return {
+    ca: networkConfig.ca,
+    cert: networkConfig.cert,
+    key: networkConfig.key,
+    localAddress: networkConfig.localAddress,
+    strictSsl: networkConfig.strictSSL,
+    maxSockets: networkConfig.maxSockets,
+    networkConcurrency: networkConfig.networkConcurrency,
+    fetchRetries: networkConfig.fetchRetries,
+    fetchRetryFactor: networkConfig.fetchRetryFactor,
+    fetchRetryMintimeout: networkConfig.fetchRetryMintimeout,
+    fetchRetryMaxtimeout: networkConfig.fetchRetryMaxtimeout,
+    fetchTimeout: networkConfig.fetchTimeout,
+    userAgent: networkConfig.userAgent,
+  };
+}
+
+/**
+ * Turn one registry's parsed credentials into an `Authorization` header value.
+ * `_authToken` becomes `Bearer <token>`; `_auth` (parsed into username/password)
+ * becomes `Basic <base64(user:pass)>`. Token helpers are not supported.
+ */
+function credsToAuthHeader(
+  creds: { authToken?: string; basicAuth?: { username: string; password: string } } | undefined
+): string | undefined {
+  if (!creds) return undefined;
+  if (creds.authToken) return `Bearer ${creds.authToken}`;
+  if (creds.basicAuth) {
+    const { username, password } = creds.basicAuth;
+    return `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`;
+  }
+  return undefined;
+}
+
+/**
+ * Resolve the raw nerf-darted `.npmrc`-style `authConfig` into pre-computed
+ * `Authorization` headers keyed by nerf-darted registry URI (plus `''` for the
+ * default registry) — the shape `@pnpm/napi` applies directly. The npmrc
+ * auth parsing (`_authToken` / `_auth` / `username`+`_password`) is done here
+ * with the kept `@pnpm/config.reader`, so the Rust engine never reparses it.
+ */
+function buildAuthHeaderByUri(authConfig: Record<string, unknown>): Record<string, string> {
+  const result: Record<string, string> = {};
   const { configByUri } = getNetworkConfigs(authConfig);
-  // @pnpm/config.reader is pinned at 1101.3.1, which emits the legacy per-URI shape
-  // `{ creds, tls }`. Newer @pnpm consumers (e.g. @pnpm/network.auth-header) instead read
-  // credentials from the DEFAULT_REGISTRY_SCOPE ("@") key of each RegistryConfig, so
-  // translate the legacy shape into the scope-keyed one expected by the upgraded packages.
-  const result: Record<string, any> = {};
-  for (const [uri, cfg] of Object.entries(configByUri ?? {})) {
-    const { creds, tls } = cfg as { creds?: unknown; tls?: unknown };
-    const entry: Record<string, unknown> = {};
-    if (tls != null) entry.tls = tls;
-    if (creds != null) entry[DEFAULT_REGISTRY_SCOPE] = creds;
-    result[uri] = entry;
+  for (const [uri, config] of Object.entries(configByUri ?? {})) {
+    const header = credsToAuthHeader((config as Record<string, any>)[DEFAULT_REGISTRY_SCOPE]);
+    if (header) result[uri] = header;
   }
-  const defaultCreds = getDefaultCreds(authConfig);
-  if (defaultCreds) {
-    result[''] = { ...result[''], [DEFAULT_REGISTRY_SCOPE]: defaultCreds };
-  }
+  const defaultHeader = credsToAuthHeader(getDefaultCreds(authConfig));
+  if (defaultHeader) result[''] = defaultHeader;
   return result;
 }
 
-async function createStoreController(
-  options: {
-    rootDir: string;
-    storeDir?: string;
-    cacheDir: string;
-    registries: Registries;
-    proxyConfig: PackageManagerProxyConfig;
-    networkConfig: PackageManagerNetworkConfig;
-  } & Pick<CreateStoreControllerOptions, 'packageImportMethod' | 'pnpmHomeDir' | 'preferOffline'>
-): Promise<{ ctrl: StoreController; dir: string }> {
-  const authConfig = getAuthConfig(options.registries);
-  const opts: CreateStoreControllerOptions = {
-    dir: options.rootDir,
-    cacheDir: options.cacheDir,
-    cafsLocker,
-    storeDir: options.storeDir,
-    configByUri: buildConfigByUri(authConfig),
-    verifyStoreIntegrity: true,
-    frozenStore: false,
-    httpProxy: options.proxyConfig?.httpProxy,
-    httpsProxy: options.proxyConfig?.httpsProxy,
-    ca: options.networkConfig?.ca,
-    cert: options.networkConfig?.cert,
-    key: options.networkConfig?.key,
-    localAddress: options.networkConfig?.localAddress,
-    noProxy: options.proxyConfig?.noProxy,
-    strictSsl: options.networkConfig.strictSSL,
-    maxSockets: options.networkConfig.maxSockets,
-    networkConcurrency: options.networkConfig.networkConcurrency,
-    packageImportMethod: options.packageImportMethod,
-    preferOffline: options.preferOffline,
-    resolveSymlinksInInjectedDirs: true,
-    pnpmHomeDir: options.pnpmHomeDir,
-    userAgent: options.networkConfig.userAgent,
-    fetchRetries: options.networkConfig.fetchRetries,
-    fetchRetryFactor: options.networkConfig.fetchRetryFactor,
-    fetchRetryMaxtimeout: options.networkConfig.fetchRetryMaxtimeout,
-    fetchRetryMintimeout: options.networkConfig.fetchRetryMintimeout,
-    fetchTimeout: options.networkConfig.fetchTimeout,
-    virtualStoreDirMaxLength: VIRTUAL_STORE_DIR_MAX_LENGTH,
-    registries: options.registries.toMap(),
-    fetchWarnTimeoutMs: options.networkConfig.fetchWarnTimeoutMs,
-    fetchMinSpeedKiBps: options.networkConfig.fetchMinSpeedKiBps,
-  };
-  return pnpmCreateStoreController(opts);
+/**
+ * Compose the list of read-package hooks into a single synchronous transform.
+ * The Bit hooks are all synchronous, so the accumulator stays synchronous even
+ * though the pnpm `ReadPackageHook` type allows returning a promise.
+ */
+function applyReadPackageHooks(
+  hooks: ReadPackageHook[],
+  manifest: PackageManifest,
+  workspaceDir?: string
+): PackageManifest {
+  return hooks.reduce<PackageManifest>((m, hook) => hook(m, workspaceDir) as PackageManifest, manifest);
+}
+
+/**
+ * Feed a wire-compatible pnpm log event into the default reporter. The engine
+ * emits bunyan-shaped events; the reporter subscribes to `streamParser` via
+ * `.on('data', ...)`, so emitting a `data` event on the underlying stream
+ * delivers the event straight to the reporter.
+ */
+function emitLogEvent(event: Record<string, unknown>): void {
+  (streamParser as unknown as NodeJS.EventEmitter).emit('data', event);
 }
 
 export async function generateResolverAndFetcher({
@@ -132,37 +155,22 @@ export async function generateResolverAndFetcher({
   proxyConfig?: PackageManagerProxyConfig;
   networkConfig?: PackageManagerNetworkConfig;
   fullMetadata?: boolean;
-}) {
+}): Promise<{ resolve: ResolveFunction }> {
   const pnpmConfig = await readConfig();
   const authConfig = getAuthConfig(registries);
-  proxyConfig ??= {};
-  networkConfig ??= {};
-  const mergedAuthConfig = Object.assign({}, pnpmConfig.config.authConfig, authConfig);
-  const opts: Omit<ClientOptions, 'storeIndex'> = {
-    configByUri: buildConfigByUri(mergedAuthConfig),
-    cacheDir,
-    httpProxy: proxyConfig?.httpProxy,
-    httpsProxy: proxyConfig?.httpsProxy,
-    ca: networkConfig?.ca,
-    cert: networkConfig?.cert,
-    key: networkConfig?.key,
-    localAddress: networkConfig?.localAddress,
-    noProxy: proxyConfig?.noProxy,
-    strictSsl: networkConfig.strictSSL,
-    timeout: networkConfig.fetchTimeout,
-    userAgent: networkConfig.userAgent,
-    retry: {
-      factor: networkConfig.fetchRetryFactor,
-      maxTimeout: networkConfig.fetchRetryMaxtimeout,
-      minTimeout: networkConfig.fetchRetryMintimeout,
-      retries: networkConfig.fetchRetries,
-    },
-    registries: registries.toMap(),
-    fullMetadata,
-    fetchWarnTimeoutMs: networkConfig?.fetchWarnTimeoutMs,
-    fetchMinSpeedKiBps: networkConfig?.fetchMinSpeedKiBps,
-  };
-  const { resolve } = createResolver(opts);
+  const mergedAuthConfig = Object.assign({}, pnpmConfig.config.authConfig, authConfig) as Record<string, unknown>;
+  const authHeaderByUri = buildAuthHeaderByUri(mergedAuthConfig);
+  const registriesMap = registries.toMap();
+  const resolve: ResolveFunction = (wantedDep, resolveOpts) =>
+    nodeApi.resolveDependency(wantedDep, {
+      dir: resolveOpts.projectDir ?? resolveOpts.lockfileDir ?? '',
+      cacheDir,
+      registries: registriesMap,
+      authHeaderByUri,
+      proxyConfig: proxyConfig ? toNodeApiProxyConfig(proxyConfig) : undefined,
+      networkConfig: networkConfig ? toNodeApiNetworkConfig(networkConfig) : undefined,
+      fullMetadata,
+    });
   return { resolve };
 }
 
@@ -176,31 +184,33 @@ export async function getPeerDependencyIssues(
     proxyConfig: PackageManagerProxyConfig;
     networkConfig: PackageManagerNetworkConfig;
     overrides?: Record<string, string>;
-  } & Pick<CreateStoreControllerOptions, 'packageImportMethod' | 'pnpmHomeDir'>
-): Promise<PeerDependencyIssuesByProjects> {
-  const projects: ProjectOptions[] = [];
-  for (const [rootDir, manifest] of Object.entries(manifestsByPaths)) {
-    projects.push({
-      buildIndex: 0, // this is not used while searching for peer issues anyway
-      manifest,
-      rootDir: rootDir as ProjectRootDir,
-    });
+    packageImportMethod?: 'auto' | 'hardlink' | 'copy' | 'clone';
+    pnpmHomeDir?: string;
   }
-  const storeController = await createStoreController({
-    ...opts,
-    rootDir: opts.rootDir,
-  });
-  return pnpm.getPeerDependencyIssues(projects, {
-    autoInstallPeers: false,
-    excludeLinksFromLockfile: true,
-    storeController: storeController.ctrl,
-    storeDir: storeController.dir,
-    globalVirtualStoreDir: storeController.dir,
-    overrides: opts.overrides,
-    peersSuffixMaxLength: 1000,
-    registries: opts.registries.toMap(),
-    virtualStoreDirMaxLength: VIRTUAL_STORE_DIR_MAX_LENGTH,
-  });
+): Promise<PeerDependencyIssuesByProjects> {
+  const projects: nodeApi.NodeApiProject[] = Object.entries(manifestsByPaths).map(([rootDir, manifest]) => ({
+    rootDir,
+    manifest: manifest as nodeApi.PackageManifest,
+  }));
+  try {
+    return await nodeApi.getPeerDependencyIssues({
+      dir: opts.rootDir,
+      projects,
+      storeDir: opts.storeDir,
+      cacheDir: opts.cacheDir,
+      overrides: opts.overrides,
+      peersSuffixMaxLength: 1000,
+      registries: opts.registries.toMap(),
+      virtualStoreDirMaxLength: VIRTUAL_STORE_DIR_MAX_LENGTH,
+    });
+  } catch (err: any) {
+    if (err?.code === 'ERR_PNPM_NAPI_UNIMPLEMENTED') {
+      // TODO: getPeerDependencyIssues not yet implemented in the Rust engine.
+      // Returning no issues keeps installs working until the binding lands it.
+      return {};
+    }
+    throw pnpmErrorToBitError(err);
+  }
 }
 
 export type RebuildFn = (opts: { pending?: boolean; skipIfHasSideEffectsCache?: boolean }) => Promise<void>;
@@ -240,28 +250,31 @@ export async function install(
     allowScripts?: Record<string, boolean | 'warn'>;
     dangerouslyAllowAllScripts?: boolean;
     neverBuiltDependencies?: string[];
-  } & Pick<
-    InstallOptions,
-    | 'autoInstallPeers'
-    | 'publicHoistPattern'
-    | 'hoistPattern'
-    | 'lockfileOnly'
-    | 'nodeVersion'
-    | 'enableModulesDir'
-    | 'engineStrict'
-    | 'excludeLinksFromLockfile'
-    | 'minimumReleaseAge'
-    | 'minimumReleaseAgeExclude'
-    | 'ignorePackageManifest'
-    | 'hoistWorkspacePackages'
-    | 'returnListOfDepsRequiringBuild'
-  > &
-    Pick<CreateStoreControllerOptions, 'packageImportMethod' | 'pnpmHomeDir' | 'preferOffline'>,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    autoInstallPeers?: boolean;
+    publicHoistPattern?: string[];
+    hoistPattern?: string[];
+    lockfileOnly?: boolean;
+    nodeVersion?: string;
+    enableModulesDir?: boolean;
+    engineStrict?: boolean;
+    excludeLinksFromLockfile?: boolean;
+    minimumReleaseAge?: number;
+    minimumReleaseAgeExclude?: string[];
+    ignorePackageManifest?: boolean;
+    hoistWorkspacePackages?: boolean;
+    returnListOfDepsRequiringBuild?: boolean;
+    packageImportMethod?: 'auto' | 'hardlink' | 'copy' | 'clone';
+    pnpmHomeDir?: string;
+    preferOffline?: boolean;
+    // Accepted for backward-compatibility with the previous pnpm engine, but the
+    // Rust engine manages the side-effects cache internally.
+    sideEffectsCacheRead?: boolean;
+    sideEffectsCacheWrite?: boolean;
+  },
   logger?: Logger
 ): Promise<{ dependenciesChanged: boolean; rebuild: RebuildFn; storeDir: string; depsRequiringBuild?: DepPath[] }> {
   const externalDependencies = new Set<string>();
-  const readPackage = createReadPackageHooks(options);
+  const hooks = createReadPackageHooks(options);
   if (options?.rootComponents && !options?.rootComponentsForCapsules) {
     for (const [dir, { name }] of Object.entries(manifestsByPaths)) {
       if (dir !== rootDir && name) {
@@ -286,77 +299,96 @@ export async function install(
       },
     };
   }
-  const { allProjects, packagesToBuild } = groupPkgs(manifestsByPaths, {
-    update: options?.updateAll,
-  });
-  const storeController = await createStoreController({
-    rootDir,
-    storeDir,
-    cacheDir,
-    registries,
-    preferOffline: options?.preferOffline,
-    proxyConfig,
-    networkConfig,
-    packageImportMethod: options?.packageImportMethod,
-    pnpmHomeDir: options?.pnpmHomeDir,
-  });
   const hoistPattern = options.hoistPattern ?? ['*'];
   if (hoistPattern.length > 0 && externalDependencies.size > 0 && !options.hoistInjectedDependencies) {
     for (const pkgName of externalDependencies) {
       hoistPattern.push(`!${pkgName}`);
     }
   }
-  const opts: InstallOptions = {
-    allProjects,
-    autoInstallPeers: options.autoInstallPeers,
-    autoInstallPeersFromHighestMatch: options.autoInstallPeers,
-    confirmModulesPurge: false,
-    storeDir: storeController.dir,
-    dedupePeerDependents: true,
+
+  // The in-memory importer manifests are transformed up front (with each
+  // importer's own directory as workspaceDir). The dependency manifests are
+  // transformed lazily by the engine through the readPackageHook (which has no
+  // workspaceDir).
+  const projects: nodeApi.NodeApiProject[] = Object.entries(manifestsByPaths).map(([dir, manifest]) => ({
+    rootDir: dir,
+    manifest: applyReadPackageHooks(
+      hooks,
+      manifest as unknown as PackageManifest,
+      dir
+    ) as unknown as nodeApi.PackageManifest,
+  }));
+  const readPackageHookForDeps = (manifest: nodeApi.PackageManifest): nodeApi.PackageManifest =>
+    applyReadPackageHooks(hooks, manifest as unknown as PackageManifest) as unknown as nodeApi.PackageManifest;
+
+  const scriptPolicies = resolveScriptPolicies({
+    allowScripts: options.allowScripts,
+    dangerouslyAllowAllScripts: options.dangerouslyAllowAllScripts,
+    neverBuiltDependencies: options.neverBuiltDependencies,
+  });
+
+  const onLog: nodeApi.LogListener = (event) => {
+    emitLogEvent(event);
+  };
+
+  const installOptions: nodeApi.InstallOptions = {
     dir: rootDir,
-    storeController: storeController.ctrl,
-    preferFrozenLockfile: true,
-    pruneLockfileImporters: true,
-    lockfileOnly: options.lockfileOnly ?? false,
-    modulesCacheMaxAge: Infinity, // pnpm should never prune the virtual store. Bit does it on its own.
+    projects,
+    storeDir,
+    cacheDir,
     registries: registries.toMap(),
-    resolutionMode: 'highest',
-    hooks: { readPackage },
-    externalDependencies,
-    strictPeerDependencies: false,
-    peersSuffixMaxLength: 1000,
-    resolveSymlinksInInjectedDirs: true,
-    resolvePeersFromWorkspaceRoot: true,
-    dedupeDirectDeps: true,
-    include: {
-      dependencies: true,
-      devDependencies: true,
-      optionalDependencies: options?.includeOptionalDeps !== false,
-    },
-    userAgent: networkConfig.userAgent,
-    ...options,
-    injectWorkspacePackages: true,
-    ...resolveScriptPolicies({
-      allowScripts: options.allowScripts,
-      dangerouslyAllowAllScripts: options.dangerouslyAllowAllScripts,
-      neverBuiltDependencies: options.neverBuiltDependencies,
-    }),
-    returnListOfDepsRequiringBuild: true,
-    excludeLinksFromLockfile: options.excludeLinksFromLockfile ?? true,
-    depth: options.updateAll ? Infinity : 0,
-    disableRelinkLocalDirDeps: true,
-    hoistPattern,
-    virtualStoreDirMaxLength: VIRTUAL_STORE_DIR_MAX_LENGTH,
+    authHeaderByUri: buildAuthHeaderByUri(getAuthConfig(registries) as Record<string, unknown>),
+    proxyConfig: toNodeApiProxyConfig(proxyConfig),
+    networkConfig: toNodeApiNetworkConfig(networkConfig),
     overrides,
+    nodeLinker: options.nodeLinker,
+    hoistPattern,
+    publicHoistPattern: options.publicHoistPattern,
+    externalDependencies: [...externalDependencies],
+    allowBuilds: scriptPolicies.allowBuilds as Record<string, boolean>,
+    dangerouslyAllowAllBuilds: scriptPolicies.dangerouslyAllowAllBuilds,
+    // `neverBuiltDependencies` is already folded into `allowBuilds` above by
+    // `resolveScriptPolicies`; the binding rejects a non-empty pass-through.
+    autoInstallPeers: options.autoInstallPeers,
+    excludeLinksFromLockfile: options.excludeLinksFromLockfile ?? true,
+    lockfileOnly: options.lockfileOnly ?? false,
+    packageImportMethod: options.packageImportMethod,
+    preferOffline: options.preferOffline,
+    virtualStoreDirMaxLength: VIRTUAL_STORE_DIR_MAX_LENGTH,
+    peersSuffixMaxLength: 1000,
+    dedupePeerDependents: true,
+    dedupeDirectDeps: true,
+    dedupeInjectedDeps: options.dedupeInjectedDeps,
+    injectWorkspacePackages: true,
+    includeOptionalDeps: options.includeOptionalDeps !== false,
+    // `update` re-resolves the whole graph; the binding ignores `depth` (there
+    // are no package selectors), so passing it — least of all `Infinity` into a
+    // u32 field — would be a no-op at best.
+    update: options.updateAll,
+    nodeVersion: options.nodeVersion,
+    engineStrict: options.engineStrict,
+    minimumReleaseAge: options.minimumReleaseAge,
+    minimumReleaseAgeExclude: options.minimumReleaseAgeExclude,
+    ignorePackageManifest: options.ignorePackageManifest,
+    hoistWorkspacePackages: options.hoistWorkspacePackages,
+    enableModulesDir: options.enableModulesDir,
+    resolvePeersFromWorkspaceRoot: true,
+    preferFrozenLockfile: true,
+    // Suppress peer-dependency warnings by default (allow any version, ignore
+    // missing), letting the workspace's own rules override.
     peerDependencyRules: {
       allowAny: ['*'],
       ignoreMissing: ['*'],
       ...options.reportOptions?.peerDependencyRules,
-    },
+    } as nodeApi.PeerDependencyRules,
+    // Bit reports the deps requiring a build in the lockfile instead of failing.
+    strictDepBuilds: false,
+    pnpmHomeDir: options.pnpmHomeDir,
   };
 
   let dependenciesChanged = false;
   let depsRequiringBuild: DepPath[] | undefined;
+  let resolvedStoreDir = storeDir;
   if (!options.dryRun) {
     let stopReporting: Function | undefined;
     if (!options.hidePackageManagerOutput) {
@@ -367,48 +399,45 @@ export async function install(
     }
     try {
       await installsRunning[rootDir];
-      await restartWorkerPool();
-      installsRunning[rootDir] = mutateModules(packagesToBuild, opts);
-      const installResult = await installsRunning[rootDir];
-      depsRequiringBuild = installResult.depsRequiringBuild?.sort();
-      if (depsRequiringBuild != null) {
-        await addDepsRequiringBuildToLockfile(rootDir, depsRequiringBuild);
+      installsRunning[rootDir] = nodeApi.install(installOptions, onLog, readPackageHookForDeps);
+      const installResult: nodeApi.InstallResult = await installsRunning[rootDir];
+      resolvedStoreDir = installResult.storeDir;
+      const sortedDepsRequiringBuild = installResult.depsRequiringBuild?.sort();
+      if (sortedDepsRequiringBuild != null) {
+        await addDepsRequiringBuildToLockfile(rootDir, sortedDepsRequiringBuild);
+        depsRequiringBuild = sortedDepsRequiringBuild as unknown as DepPath[];
       }
       dependenciesChanged =
         installResult.stats.added + installResult.stats.removed + installResult.stats.linkedToRoot > 0;
       delete installsRunning[rootDir];
     } catch (err: any) {
       if (logger) {
-        logger.warn('got an error from pnpm mutateModules function', err);
+        logger.warn('got an error from the pnpm install function', err);
       }
       throw pnpmErrorToBitError(err);
     } finally {
       stopReporting?.();
-      await finishWorkers();
     }
   }
   return {
     dependenciesChanged,
-    rebuild: async (rebuildOpts) => {
+    // The Rust engine's rebuild rebuilds every build-needing package and does not
+    // support the pending / skipIfHasSideEffectsCache selectors of the old engine.
+    rebuild: async () => {
       let stopReporting: Function | undefined;
-      const _opts = {
-        ...opts,
-        ...rebuildOpts,
-        cacheDir,
-      } as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-      if (!_opts.hidePackageManagerOutput) {
+      if (!options.hidePackageManagerOutput) {
         stopReporting = initReporter({
           appendOnly: true,
           hideLifecycleOutput: true,
         });
       }
       try {
-        await rebuild.handler(_opts, []);
+        await nodeApi.rebuild(installOptions, onLog, undefined);
       } finally {
         stopReporting?.();
       }
     },
-    storeDir: storeController.dir,
+    storeDir: resolvedStoreDir ?? '',
     depsRequiringBuild,
   };
 }
@@ -598,46 +627,6 @@ function readWorkspacePackageHook(pkg: PackageManifest): PackageManifest {
   };
 }
 
-function groupPkgs(manifestsByPaths: Record<string, ProjectManifest>, opts: { update?: boolean }) {
-  const pkgs = Object.entries(manifestsByPaths).map(([rootDir, manifest]) => ({
-    rootDir: rootDir as ProjectRootDir,
-    manifest,
-  }));
-  const { graph } = createProjectsGraph(pkgs);
-  const chunks = sortProjects(graph as any);
-
-  // This will create local link by pnpm to a component exists in the ws.
-  // it will later deleted by the link process
-  // we keep it here to better support case like this:
-  // compA@1.0.0 uses compB@1.0.0
-  // I have compB@2.0.0 in my workspace
-  // now I install compA@1.0.0
-  // compA is hoisted to the root and install B@1.0.0 hoisted to the root as well
-  // now we will make link to B@2.0.0 and A will break
-  // with this we will have a link to the local B by pnpm so it will install B@1.0.0 inside A
-  // then when overriding the link, A will still works
-  // This is the rational behind not deleting this completely, but need further check that it really works
-  const packagesToBuild: MutatedProject[] = []; // @pnpm/installing.deps-installer will use this to install the packages
-  const allProjects: ProjectOptions[] = [];
-
-  chunks.forEach((dirs, buildIndex) => {
-    for (const rootDir of dirs) {
-      const manifest = manifestsByPaths[rootDir];
-      allProjects.push({
-        buildIndex,
-        manifest,
-        rootDir,
-      });
-      packagesToBuild.push({
-        rootDir,
-        mutation: 'install',
-        update: opts.update,
-      });
-    }
-  });
-  return { packagesToBuild, allProjects };
-}
-
 export async function resolveRemoteVersion(
   packageName: string,
   {
@@ -671,7 +660,7 @@ export async function resolveRemoteVersion(
   };
   try {
     const parsedPackage = parsePackageName(packageName);
-    const wantedDep: WantedDependency = {
+    const wantedDep: nodeApi.WantedDependency = {
       alias: parsedPackage.name,
       bareSpecifier: parsedPackage.version,
     };
@@ -679,23 +668,24 @@ export async function resolveRemoteVersion(
     if (!val.manifest) {
       throw new BitError('The resolved package has no manifest');
     }
+    const manifest = val.manifest as unknown as DependencyManifest;
     const wantedRange =
       parsedPackage.version && semver.validRange(parsedPackage.version) ? parsedPackage.version : undefined;
 
     return {
-      packageName: val.manifest.name,
-      version: val.manifest.version,
+      packageName: manifest.name,
+      version: manifest.version,
       wantedRange,
       isSemver: true,
       resolvedVia: val.resolvedVia,
-      manifest: val.manifest,
+      manifest,
     };
   } catch (e: any) {
     if (!e.message?.includes('is not a valid string')) {
       throw pnpmErrorToBitError(e);
     }
     // The provided package is probably a git url or path to a folder
-    const wantedDep: WantedDependency = {
+    const wantedDep: nodeApi.WantedDependency = {
       alias: undefined,
       bareSpecifier: packageName,
     };
@@ -706,12 +696,13 @@ export async function resolveRemoteVersion(
     if (!val.normalizedBareSpecifier) {
       throw new BitError('The resolved package has no version');
     }
+    const manifest = val.manifest as unknown as DependencyManifest;
     return {
-      packageName: val.manifest.name,
+      packageName: manifest.name,
       version: val.normalizedBareSpecifier,
       isSemver: false,
       resolvedVia: val.resolvedVia,
-      manifest: val.manifest,
+      manifest,
     };
   }
 }

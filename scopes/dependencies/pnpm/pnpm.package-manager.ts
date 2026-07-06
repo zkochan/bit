@@ -17,7 +17,7 @@ import type { Logger } from '@teambit/logger';
 import { type LockfileFile } from '@pnpm/lockfile.types';
 import fs from 'fs';
 import { memoize, omit } from 'lodash';
-import type { PeerDependencyIssuesByProjects } from '@pnpm/installing.deps-installer';
+import type { PeerDependencyIssuesByProjects } from '@pnpm/napi';
 import { filterLockfileByImporters } from '@pnpm/lockfile.filtering';
 import type { Config } from '@pnpm/config.reader';
 import { type ProjectId, type ProjectManifest, type DepPath } from '@pnpm/types';

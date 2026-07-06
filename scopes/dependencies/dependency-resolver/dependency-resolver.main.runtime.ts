@@ -41,7 +41,7 @@ import fs from 'fs-extra';
 import { assign, parse } from 'comment-json';
 import { ComponentID } from '@teambit/component-id';
 import { readCAFileSync } from '@pnpm/network.ca-file';
-import { parseBareSpecifier } from '@pnpm/resolving.npm-resolver';
+import { parseBareSpecifier } from '@pnpm/napi';
 import type { SourceFile } from '@teambit/component.sources';
 import type { ProjectManifest, DependencyManifest } from '@pnpm/types';
 import semver, { SemVer } from 'semver';
@@ -1474,12 +1474,11 @@ as an alternative, you can use "+" to keep the same version installed in the wor
    *   E.g.: https://registry.npmjs.org/is-odd/-/is-odd-0.1.0.tgz)
    */
   isValidVersionSpecifier(spec: string): boolean {
+    // parseBareSpecifier returns null for empty/unparsable input.
     return (
       parseBareSpecifier(
         spec,
-        'pkgname', // This argument is the package but we don't need it
-        'latest',
-        'https://registry.npmjs.org/'
+        'pkgname' // This argument is the package name but we don't need it
       ) != null
     );
   }

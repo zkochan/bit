@@ -1,7 +1,6 @@
 import path from 'path';
 import { type ProjectManifest } from '@pnpm/types';
 import { type LockfileFileProjectResolvedDependencies } from '@pnpm/lockfile.types';
-import { type ResolveFunction } from '@pnpm/installing.client';
 import type * as Dp from '@pnpm/deps.path';
 import type { getLockfileImporterId as GetLockfileImporterId } from '@pnpm/lockfile.fs';
 import { pick, partition } from 'lodash';
@@ -21,6 +20,16 @@ import {
 } from '@teambit/dependency-resolver';
 import normalizePath from 'normalize-path';
 import { type BitLockfileFile } from './lynx';
+
+/**
+ * Minimal structural signature of the `resolve` function returned by
+ * `generateResolverAndFetcher` in `./lynx` (backed by `@pnpm/napi`'s
+ * `resolveDependency`). Only the parts this module consumes are typed.
+ */
+type ResolveFunction = (
+  wantedDependency: { alias?: string; bareSpecifier?: string },
+  opts: { lockfileDir?: string; projectDir?: string; preferredVersions?: Record<string, unknown> }
+) => Promise<{ resolution?: Record<string, unknown> }>;
 
 // @pnpm/deps.path and @pnpm/lockfile.fs are ESM-only; load them through a .cjs
 // shim so the require() chain in the build capsule's mocha runner doesn't trip
@@ -394,7 +403,7 @@ export async function convertGraphToLockfile(
           throw err;
         }
         const { resolution } = resolveResult;
-        if ('integrity' in resolution && resolution.integrity) {
+        if (resolution != null && 'integrity' in resolution && resolution.integrity) {
           lockfile.packages[pkgToResolve.pkgId].resolution = {
             integrity: resolution.integrity as string,
           };
