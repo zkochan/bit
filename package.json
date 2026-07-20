@@ -66,5 +66,11 @@
     "neverBuiltDependencies": [
       "core-js"
     ]
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "bit",
+      "onFail": "error"
+    }
   }
 }
