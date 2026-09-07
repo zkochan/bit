@@ -30,6 +30,8 @@ import { GraphAspect } from '@teambit/graph';
 import { LaneNotFound } from '@teambit/legacy.scope-api';
 import { BitError } from '@teambit/bit-error';
 import { ImportCmd } from './import.cmd';
+import { canImportDuringInstall } from './can-import-during-install';
+import { prepareInstallMetadata } from './prepare-install-metadata';
 import { ImporterAspect } from './importer.aspect';
 import { FetchCmd } from './fetch-cmd';
 import type { ImportOptions, ImportResult } from './import-components';
@@ -443,9 +445,14 @@ export class ImporterMain {
     const importerMain = new ImporterMain(workspace, depResolver, graph, scope, componentWriter, envs, logger, lister);
     install.registerPreInstall(async (opts) => {
       if (!opts?.import) return;
-      logger.setStatusLine('importing missing objects');
-      await importerMain.importCurrentObjects();
-      // logger.consoleSuccess();
+      const importObjects = async () => {
+        logger.setStatusLine('importing missing objects');
+        await importerMain.importCurrentObjects();
+      };
+      const metadataTask = await prepareInstallMetadata(workspace, importObjects);
+      if (metadataTask) return metadataTask;
+      if (await canImportDuringInstall(workspace)) return importObjects;
+      await importObjects();
     });
     install.registerPreLink(async (opts) => {
       if (opts?.fetchObject) await importerMain.importCurrentObjects();

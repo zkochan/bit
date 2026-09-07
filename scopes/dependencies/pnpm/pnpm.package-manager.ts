@@ -68,6 +68,7 @@ function loadNodeApi(): typeof NodeApi {
 }
 
 export class PnpmPackageManager implements PackageManager {
+  readonly supportsInstallFromMetadata = true;
   readonly name = 'pnpm';
   readonly supportsDependencyGraphRestoration = true;
   readonly modulesManifestCache: Map<string, ModulesManifest> = new Map();

@@ -15,8 +15,10 @@ import { LaneNotFound } from './exceptions/lane-not-found';
 
 /**
  * 'component-delta' is not supported anymore in fetchSchema of 0.0.3 and above.
+ * 'component-metadata' returns pinned versions, dependency graphs and env.jsonc without source bodies.
+ * Older servers reject this type, allowing installation to fall back to a complete component fetch.
  */
-export type FETCH_TYPE = 'component' | 'lane' | 'object' | 'component-delta';
+export type FETCH_TYPE = 'component' | 'component-metadata' | 'lane' | 'object' | 'component-delta';
 export type FETCH_OPTIONS = {
   type: FETCH_TYPE;
   /**
@@ -184,6 +186,7 @@ async function fetchByType(
     objectsReadableGenerator.readable.destroy(error);
   };
   switch (fetchOptions.type) {
+    case 'component-metadata':
     case 'component': {
       const bitIds: ComponentIdList = ComponentIdList.fromStringArray(ids);
       const shouldCollectParents = () => {
@@ -275,7 +278,12 @@ async function fetchByType(
       };
       const queue = getQueue();
       queue
-        .add(async () => objectsReadableGenerator.pushObjectsToReadable(componentsWithOptions))
+        .add(async () =>
+          objectsReadableGenerator.pushObjectsToReadable(
+            componentsWithOptions,
+            fetchOptions.type === 'component-metadata'
+          )
+        )
         .catch(catchTimeoutErr);
       break;
     }

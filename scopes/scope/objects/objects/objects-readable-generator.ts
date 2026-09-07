@@ -29,11 +29,11 @@ export class ObjectsReadableGenerator {
   ) {
     this.readable = new Readable({ objectMode: true, read() {} });
   }
-  async pushObjectsToReadable(componentsWithOptions: ComponentWithCollectOptions[]) {
+  async pushObjectsToReadable(componentsWithOptions: ComponentWithCollectOptions[], metadataOnly = false) {
     try {
       await this.pushScopeMeta();
       await pMapSeries(componentsWithOptions, async (componentWithOptions) =>
-        this.pushComponentObjects(componentWithOptions)
+        this.pushComponentObjects(componentWithOptions, metadataOnly)
       );
       this.closeReadableSuccessfully();
     } catch (err: any) {
@@ -114,7 +114,10 @@ export class ObjectsReadableGenerator {
     objects.map((obj) => this.push(obj));
   }
 
-  private async pushComponentObjects(componentWithOptions: ComponentWithCollectOptions): Promise<void> {
+  private async pushComponentObjects(
+    componentWithOptions: ComponentWithCollectOptions,
+    metadataOnly = false
+  ): Promise<void> {
     const { component, collectParents, collectArtifacts, collectParentsUntil, includeVersionHistory } =
       componentWithOptions;
     const version = await component.loadVersion(componentWithOptions.version, this.repo, false);
@@ -123,11 +126,19 @@ export class ObjectsReadableGenerator {
       return;
     }
     const collectVersionObjects = async (ver: Version): Promise<ObjectItem[]> => {
-      const versionRefs = ver.refsWithOptions(false, collectArtifacts);
+      // Installation only needs dependency graphs and declarative environment policies.
+      // Source files, artifacts and history are fetched in the subsequent full import.
+      const versionRefs = metadataOnly
+        ? compact([
+            ver.flattenedEdgesRef,
+            ver.dependenciesGraphRef,
+            ...ver.files.filter((file) => file.relativePath === 'env.jsonc').map((file) => file.file),
+          ])
+        : ver.refsWithOptions(false, collectArtifacts);
       const missingVersionRefs = versionRefs.filter((ref) => !this.pushed.includes(ref.toString()));
       const versionObjects = await ver.collectManyObjects(this.repo, missingVersionRefs);
       const versionData = { ref: ver.hash(), buffer: await ver.asRaw(this.repo), type: ver.getType() };
-      return [...versionObjects, versionData];
+      return metadataOnly ? [versionData, ...versionObjects] : [...versionObjects, versionData];
     };
     if (!this.pushed.includes(component.hash().toString())) {
       const componentData = {
@@ -138,7 +149,7 @@ export class ObjectsReadableGenerator {
       this.push(componentData);
     }
     const allVersions: Version[] = [];
-    if (includeVersionHistory) {
+    if (includeVersionHistory && !metadataOnly) {
       const versionHistory = await component.getAndPopulateVersionHistory(this.repo, version.hash());
       const versionHistoryData = {
         ref: versionHistory.hash(),
@@ -147,7 +158,7 @@ export class ObjectsReadableGenerator {
       };
       this.push(versionHistoryData);
     }
-    if (collectParents) {
+    if (collectParents && !metadataOnly) {
       const allParentsHashes = await getAllVersionHashesMemoized({
         modelComponent: component,
         repo: this.repo,

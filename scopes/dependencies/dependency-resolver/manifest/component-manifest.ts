@@ -10,7 +10,7 @@ export class ComponentManifest extends Manifest {
     public name: string,
     public version: SemVer,
     public dependencies: ManifestDependenciesObject,
-    public component: Component,
+    public component: Component | undefined,
     public envPolicy: EnvPolicy
   ) {
     super(name, version, dependencies);

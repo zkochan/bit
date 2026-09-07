@@ -735,7 +735,7 @@ export class ScopeComponentsImporter {
   /**
    * get components from a remote without saving it locally
    */
-  async getManyRemoteComponents(ids: ComponentID[]): Promise<BitObjectList> {
+  async getManyRemoteComponents(ids: ComponentID[], fetchOptions?: Partial<FETCH_OPTIONS>): Promise<BitObjectList> {
     logger.debug(`getManyRemoteComponents, ids: ${ids.map((id) => id.toString()).join(', ')}`);
     ids.forEach((id) => {
       if (!this.scope.isExported(id)) {
@@ -744,8 +744,14 @@ export class ScopeComponentsImporter {
     });
     const remotes = await getScopeRemotes(this.scope);
     const grouped = groupByScopeName(ids);
-    const streams = await remotes.fetch(grouped);
+    const streams = await remotes.fetch(grouped, fetchOptions);
     return this.multipleStreamsToBitObjects(streams);
+  }
+
+  /** Fetch complete pinned versions even when installation metadata is already available in memory. */
+  async importInstallationObjects(ids: ComponentID[]): Promise<void> {
+    const remotes = await getScopeRemotes(this.scope);
+    await new ObjectFetcher(this.repo, this.scope, remotes, { type: 'component' }, ids).fetchFromRemoteAndWrite();
   }
 
   private async multipleStreamsToBitObjects(remoteStreams: {

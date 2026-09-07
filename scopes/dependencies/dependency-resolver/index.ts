@@ -88,3 +88,6 @@ export {
   selfInstallationRoot,
 } from './hoisted-resolution-bridge';
 export { DependencyResolverAspect as default, DependencyResolverAspect };
+
+export { WorkspaceManifestFactory } from './manifest/workspace-manifest-factory';
+export type { InstallComponentRecord } from './manifest/workspace-manifest-factory';

@@ -2,13 +2,14 @@ import type { AspectLoaderMain } from '@teambit/aspect-loader';
 import { getCoreAspectPackageName } from '@teambit/aspect-loader';
 import { IssuesClasses } from '@teambit/component-issues';
 import type { Component } from '@teambit/component';
+import type { ComponentID } from '@teambit/component-id';
 import { componentIdToPackageName } from '@teambit/pkg.modules.component-package-name';
 import { fromPairs, pickBy, mapValues, uniq, difference } from 'lodash';
 import semver, { SemVer } from 'semver';
 import pMapSeries from 'p-map-series';
 import { snapToSemver } from '@teambit/component-package-version';
 import type { Logger } from '@teambit/logger';
-import type { DependencyList, PackageName } from '../dependencies';
+import type { SerializedDependency, DependencyList, PackageName } from '../dependencies';
 import { ComponentDependency } from '../dependencies';
 import type { WorkspacePolicy, EnvPolicy, VariantPolicyConfigEntryValue, VariantPolicyEntryValue } from '../policy';
 import { VariantPolicy } from '../policy';
@@ -23,6 +24,20 @@ import { dedupeDependencies, getEmptyDedupedDependencies } from './deduping';
 import type { ManifestToJsonOptions, ManifestDependenciesObject, DepObjectValue } from './manifest';
 import { updateDependencyVersion } from './update-dependency-version';
 import { WorkspaceManifest } from './workspace-manifest';
+
+/** Installation inputs independent of component loading, source files and workspace caches. */
+export type InstallComponentRecord = {
+  id: ComponentID;
+  packageName: string;
+  dependencies: SerializedDependency[];
+  policy: VariantPolicy;
+  envPolicy: EnvPolicy;
+  explicitPackages: Set<string>;
+  missingPackages: { devMissings: string[]; runtimeMissings: string[] };
+  // Only the compatibility adapter supplies these. Metadata readers never construct components.
+  component?: Component;
+  pendingId?: ComponentID;
+};
 
 export type DepsFilterFn = (dependencies: DependencyList) => DependencyList;
 
@@ -67,6 +82,32 @@ export class WorkspaceManifestFactory {
     components: Component[],
     options: CreateFromComponentsOptions = DEFAULT_CREATE_OPTIONS
   ): Promise<WorkspaceManifest> {
+    const records = await this.recordsFromComponents(components);
+    return this.createFromRecords(name, version, rootPolicy, rootDir, records, options);
+  }
+
+  async recordsFromComponents(components: Component[]): Promise<InstallComponentRecord[]> {
+    return pMapSeries(components, async (component) => ({
+      id: component.id,
+      pendingId: component.state._consumer.id,
+      packageName: componentIdToPackageName(component.state._consumer),
+      dependencies: this.dependencyResolver.getDependencies(component, { includeHidden: true }).serialize(),
+      policy: await this.dependencyResolver.getPolicy(component),
+      envPolicy: await this.dependencyResolver.getComponentEnvPolicy(component),
+      explicitPackages: this.getComponentExplicitPackages(component),
+      missingPackages: await getMissingPackages(component),
+      component,
+    }));
+  }
+
+  async createFromRecords(
+    name: string,
+    version: SemVer,
+    rootPolicy: WorkspacePolicy,
+    rootDir: string,
+    components: InstallComponentRecord[],
+    options: CreateFromComponentsOptions = DEFAULT_CREATE_OPTIONS
+  ): Promise<WorkspaceManifest> {
     // Make sure to take other default if passed options with only one option
     const optsWithDefaults = Object.assign({}, DEFAULT_CREATE_OPTIONS, options);
     const hasRootComponents = options.hasRootComponents ?? this.dependencyResolver.hasRootComponents();
@@ -107,9 +148,7 @@ export class WorkspaceManifestFactory {
     let envSelfPeers: VariantPolicy;
     let peerOverrides: Record<string, string> = {};
     if (this.resolveEnvPeersFromRoot) {
-      const workspacePackageNames = new Set(
-        components.map((component) => this.dependencyResolver.getPackageName(component))
-      );
+      const workspacePackageNames = new Set(components.map((component) => component.packageName));
       const result = this.mergeEnvPeersToRoot(componentsManifestsMap, workspacePackageNames);
       envSelfPeers = result.rootPolicy;
       peerOverrides = result.peerOverrides;
@@ -382,7 +421,7 @@ export class WorkspaceManifestFactory {
    * @returns
    */
   private async buildComponentDependenciesMap(
-    components: Component[],
+    components: InstallComponentRecord[],
     {
       dependencyFilterFn,
       filterComponentsFromManifests,
@@ -401,10 +440,10 @@ export class WorkspaceManifestFactory {
       rootPolicy?: WorkspacePolicy;
     }
   ): Promise<ComponentDependenciesMap> {
-    const packageNames = components.map((component) => this.dependencyResolver.getPackageName(component));
+    const packageNames = components.map((component) => component.packageName);
     const buildResultsP = components.map(async (component) => {
-      const packageName = componentIdToPackageName(component.state._consumer);
-      let depList = this.dependencyResolver.getDependencies(component, { includeHidden: true });
+      const packageName = component.packageName;
+      let depList = this.dependencyResolver.getDependenciesFromSerializedDependencies(component.dependencies);
       const additionalDeps = {};
       if (referenceLocalPackages) {
         const coreAspectIds = this.aspectLoader.getCoreAspectIds();
@@ -413,7 +452,7 @@ export class WorkspaceManifestFactory {
           if (!comp.isExtension && !coreAspectIds.includes(compIdWithoutVersion)) {
             const componentInWorkspace = components.find((c) => c.id.isEqual(comp.componentId));
             if (componentInWorkspace) {
-              const pkgName = this.dependencyResolver.getPackageName(componentInWorkspace);
+              const pkgName = componentInWorkspace.packageName;
               if (pkgName !== '@teambit/harmony') {
                 additionalDeps[pkgName] = `workspace:*`;
               }
@@ -436,7 +475,7 @@ export class WorkspaceManifestFactory {
       }
       await this.updateDependenciesVersions(component, rootPolicy, depList);
       const depManifest = depList.toDependenciesManifest();
-      const { devMissings, runtimeMissings } = await getMissingPackages(component);
+      const { devMissings, runtimeMissings } = component.missingPackages;
       // Only add missing root deps that are not already in the component manifest
       // We are using depManifestBeforeFiltering to support (rare) cases when a dependency is both:
       // a component in the workspace (bitmap) and a dependency in the workspace.jsonc / package.json
@@ -470,7 +509,7 @@ export class WorkspaceManifestFactory {
         // workspace after `bit new`/`bit fork` hits a chicken-and-egg problem:
         // "+" can't resolve → package absent from manifest → filter excludes it
         // → package never installed.
-        const componentExplicitPkgs = this.getComponentExplicitPackages(component);
+        const componentExplicitPkgs = component.explicitPackages;
         if (includeAllEnvPeers ?? true) {
           peerDepsForManifest = envPeerDependencies;
         } else {
@@ -540,10 +579,10 @@ export class WorkspaceManifestFactory {
   }
 
   private async _getEnvPeerDependencies(
-    component: Component,
+    component: InstallComponentRecord,
     packageNamesFromWorkspace: string[]
   ): Promise<Record<string, string>> {
-    const envPolicy = await this.dependencyResolver.getComponentEnvPolicy(component);
+    const envPolicy = component.envPolicy;
     const selfPolicyWithoutLocal = envPolicy.selfPolicy.filter(
       (dep) => !packageNamesFromWorkspace.includes(dep.dependencyId)
     );
@@ -555,7 +594,7 @@ export class WorkspaceManifestFactory {
       }
       // Resolve "+" version placeholders by looking up the already resolved version that was set in
       // apply-overrides.resolveEnvPeerDepVersion()
-      const currentDeps = this.dependencyResolver.getDependencies(component);
+      const currentDeps = this.dependencyResolver.getDependenciesFromSerializedDependencies(component.dependencies);
       const found = currentDeps.findByPkgNameOrCompId(name);
       // If not found, use '*' as fallback
       // Use snapToSemver to convert raw hash versions to valid semver format (0.0.0-{hash})
@@ -565,13 +604,13 @@ export class WorkspaceManifestFactory {
   }
 
   private async updateDependenciesVersions(
-    component: Component,
+    component: InstallComponentRecord,
     rootPolicy: WorkspacePolicy | undefined,
     dependencyList: DependencyList
   ): Promise<void> {
     // If root policy is not passed, it means that installation happens in a capsule
     // and we only resolve versions from the dependencies, not any policies.
-    const mergedPolicies = rootPolicy && (await this.dependencyResolver.getPolicy(component));
+    const mergedPolicies = rootPolicy && component.policy;
     dependencyList.forEach((dep) => {
       updateDependencyVersion(dep, rootPolicy, mergedPolicies);
     });
@@ -586,14 +625,14 @@ export class WorkspaceManifestFactory {
    */
   async getComponentsManifests(
     dedupedDependencies: DedupedDependencies,
-    components: Component[],
+    components: InstallComponentRecord[],
     createManifestForComponentsWithoutDependencies = true
   ): Promise<ComponentsManifestsMap> {
     const componentsManifests: ComponentsManifestsMap = new Map();
     // don't use Promise.all, along the road this code might import an env from a remote, which can't be done in parallel.
     // otherwise, it may import the same component multiple times, and if fails, the ref (remote-lane) files may be corrupted.
     await pMapSeries(components, async (component) => {
-      const packageName = componentIdToPackageName(component.state._consumer);
+      const packageName = component.packageName;
       if (
         dedupedDependencies.componentDependenciesMap.has(packageName) ||
         createManifestForComponentsWithoutDependencies
@@ -616,8 +655,14 @@ export class WorkspaceManifestFactory {
         };
 
         const version = getVersion();
-        const envPolicy = await this.dependencyResolver.getComponentEnvPolicy(component);
-        const manifest = new ComponentManifest(packageName, new SemVer(version), dependencies, component, envPolicy);
+        const envPolicy = component.envPolicy;
+        const manifest = new ComponentManifest(
+          packageName,
+          new SemVer(version),
+          dependencies,
+          component.component,
+          envPolicy
+        );
         componentsManifests.set(packageName, manifest);
       }
     });
@@ -635,7 +680,10 @@ function filterExtensions(dependencyList: DependencyList): DependencyList {
   return filtered;
 }
 
-function filterComponents(dependencyList: DependencyList, componentsToFilterOut: Component[]): DependencyList {
+function filterComponents(
+  dependencyList: DependencyList,
+  componentsToFilterOut: InstallComponentRecord[]
+): DependencyList {
   const filtered = dependencyList.filter((dep) => {
     if (!(dep instanceof ComponentDependency)) {
       const depPkgName = dep.getPackageName?.();
@@ -643,9 +691,7 @@ function filterComponents(dependencyList: DependencyList, componentsToFilterOut:
       // If the package is already in the workspace as a local component,
       // then we don't want to install that package as a dependency to node_modules.
       // Otherwise, it would rewrite the local component inside the root node_modules that is created by bit link.
-      return !componentsToFilterOut.some(
-        (component) => depPkgName === componentIdToPackageName(component.state._consumer)
-      );
+      return !componentsToFilterOut.some((component) => depPkgName === component.packageName);
     }
     // Remove dependencies which has no version (they are new in the workspace)
     if (!dep.componentId.hasVersion()) return false;
@@ -660,7 +706,7 @@ function filterComponents(dependencyList: DependencyList, componentsToFilterOut:
       // The dependency in some cases is already updated to the upcoming version
       return (
         component.id.isEqualWithoutVersion(dep.componentId) ||
-        component.state._consumer.id.isEqualWithoutVersion(dep.componentId)
+        component.pendingId?.isEqualWithoutVersion(dep.componentId)
       );
     });
     if (existingComponent) return false;

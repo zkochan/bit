@@ -55,6 +55,7 @@ export class YarnPackageManager implements PackageManager {
     { rootDir, manifests, componentDirectoryMap }: InstallationContext,
     installOptions: PackageManagerInstallOptions = {}
   ): Promise<{ dependenciesChanged: boolean }> {
+    if (!componentDirectoryMap) throw new Error('Yarn installation requires a component directory map');
     this.logger.setStatusLine('installing dependencies');
     if (installOptions.useNesting && installOptions.rootComponentsForCapsules) {
       // For some reason Yarn doesn't want to link core aspects to the capsules root directory,

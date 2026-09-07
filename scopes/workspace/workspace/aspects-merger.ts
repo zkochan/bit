@@ -36,7 +36,8 @@ export class AspectsMerger {
   async merge(
     componentId: ComponentID,
     componentFromScope?: Component,
-    excludeOrigins: ExtensionsOrigin[] = []
+    excludeOrigins: ExtensionsOrigin[] = [],
+    modelExtensions?: ExtensionDataList
   ): Promise<{
     extensions: ExtensionDataList;
     beforeMerge: Array<{ extensions: ExtensionDataList; origin: ExtensionsOrigin; extraData: any }>; // useful for debugging
@@ -85,7 +86,10 @@ export class AspectsMerger {
       : undefined;
 
     this.removeAutoDepsFromConfig(componentId, configMergeExtensions);
-    const scopeExtensionsBeforeClone = this.getComponentFromScopeWithoutDuplications(componentFromScope);
+    const scopeExtensionsBeforeClone = this.getComponentFromScopeWithoutDuplications(
+      componentFromScope,
+      modelExtensions
+    );
     const scopeExtensions = ExtensionDataList.fromArray(scopeExtensionsBeforeClone.map((e) => e.clone()));
     // backward compatibility. previously, it was saved as an array into the model (when there was merge-config)
     this.removeAutoDepsFromConfig(componentId, scopeExtensions, true);
@@ -188,9 +192,12 @@ export class AspectsMerger {
   /**
    * before version 0.0.882 it was possible to save Version object with the same extension twice.
    */
-  private getComponentFromScopeWithoutDuplications(componentFromScope?: Component) {
-    if (!componentFromScope) return new ExtensionDataList();
-    const scopeExtensions = componentFromScope.config.extensions;
+  private getComponentFromScopeWithoutDuplications(
+    componentFromScope?: Component,
+    modelExtensions?: ExtensionDataList
+  ) {
+    const scopeExtensions = modelExtensions || componentFromScope?.config.extensions;
+    if (!scopeExtensions) return new ExtensionDataList();
     const scopeExtIds = scopeExtensions.ids;
     const scopeExtHasDuplications = scopeExtIds.length !== uniq(scopeExtIds).length;
     if (!scopeExtHasDuplications) {

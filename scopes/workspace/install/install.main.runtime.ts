@@ -29,7 +29,7 @@ import { createLinks } from '@teambit/dependencies.fs.linked-dependencies';
 import pMapSeries from 'p-map-series';
 import type { Harmony, SlotRegistry } from '@teambit/harmony';
 import { Slot } from '@teambit/harmony';
-import { type DependenciesGraph } from '@teambit/objects';
+import type { DependenciesGraph, Version, Ref } from '@teambit/objects';
 import type { CodemodResult, NodeModulesLinksResult } from '@teambit/workspace.modules.node-modules-linker';
 import { linkToNodeModulesWithCodemod } from '@teambit/workspace.modules.node-modules-linker';
 import type { EnvJsonc, EnvsMain } from '@teambit/envs';
@@ -39,6 +39,7 @@ import { IpcEventsAspect } from '@teambit/ipc-events';
 import { IssuesClasses } from '@teambit/component-issues';
 import type {
   EnvPolicyEnvJsoncConfigObject,
+  InstallComponentRecord,
   GetComponentManifestsOptions,
   WorkspaceDependencyLifecycleType,
   DependencyResolverMain,
@@ -85,6 +86,10 @@ import { LinkCommand } from './link';
 import InstallCmd from './install.cmd';
 import UninstallCmd from './uninstall.cmd';
 import UpdateCmd from './update.cmd';
+import { runInstallTasks } from './run-install-tasks';
+import { prepareInstallRecords, type PreparedInstallRecords } from './prepare-install-records';
+import { createInstallManifests } from './create-install-manifests';
+import { loadInstallDependenciesGraph } from './load-install-dependencies-graph';
 
 export type WorkspaceLinkOptions = LinkingOptions & {
   rootPolicy?: WorkspacePolicy;
@@ -126,7 +131,15 @@ export type WorkspaceInstallOptions = {
 export type ModulesInstallOptions = Omit<WorkspaceInstallOptions, 'updateExisting' | 'lifecycleType' | 'import'>;
 
 type PreLink = (linkOpts?: WorkspaceLinkOptions) => Promise<void>;
-type PreInstall = (installOpts?: WorkspaceInstallOptions) => Promise<void>;
+// A pre-install hook may defer independent work until the package manager runs.
+// Manifest preparation must not depend on the returned task.
+export type InstallMetadata = {
+  getVersion: (id: ComponentID) => Promise<Version | undefined>;
+  getSource: (ref: Ref) => Promise<Buffer | undefined>;
+  load: (ids: ComponentID[]) => Promise<void>;
+};
+export type InstallTask = { run: () => Promise<void>; cleanup: () => Promise<void>; metadata?: InstallMetadata };
+type PreInstall = (installOpts?: WorkspaceInstallOptions) => Promise<void | (() => Promise<void>) | InstallTask>;
 type PostInstall = () => Promise<void>;
 
 type PreLinkSlot = SlotRegistry<PreLink>;
@@ -233,9 +246,25 @@ export class InstallMain {
         this.logger.console('No missing peer dependencies found.');
       }
     }
-    await pMapSeries(this.preInstallSlot.values(), (fn) => fn(options)); // import objects if not disabled in options
-    const res = await this._installModules(options);
-    this.workspace.inInstallContext = false;
+    let res: ComponentMap<string>;
+    const cleanups: Array<() => Promise<void>> = [];
+    try {
+      const concurrentTasks: Array<() => Promise<void>> = [];
+      let metadata: InstallMetadata | undefined;
+      await pMapSeries(this.preInstallSlot.values(), async (fn) => {
+        const task = await fn(options);
+        if (typeof task === 'function') concurrentTasks.push(task);
+        else if (task) {
+          concurrentTasks.push(task.run);
+          metadata = task.metadata || metadata;
+          cleanups.push(task.cleanup);
+        }
+      });
+      res = await this._installModules(options, concurrentTasks, metadata);
+    } finally {
+      this.workspace.inInstallContext = false;
+      await pMapSeries(cleanups, (cleanup) => cleanup());
+    }
 
     await this.ipcEvents.publishIpcEvent('onPostInstall');
 
@@ -361,16 +390,24 @@ export class InstallMain {
     await this.dependencyResolver.persistConfig('install');
   }
 
-  private async _installModules(options?: ModulesInstallOptions): Promise<ComponentMap<string>> {
+  private async _installModules(
+    options?: ModulesInstallOptions,
+    concurrentTasks: Array<() => Promise<void>> = [],
+    metadata?: InstallMetadata
+  ): Promise<ComponentMap<string>> {
     this.logger.profile('install.total');
     try {
-      return await this._installModulesProfiled(options);
+      return await this._installModulesProfiled(options, concurrentTasks, metadata);
     } finally {
       this.logger.profile('install.total');
     }
   }
 
-  private async _installModulesProfiled(options?: ModulesInstallOptions): Promise<ComponentMap<string>> {
+  private async _installModulesProfiled(
+    options?: ModulesInstallOptions,
+    concurrentTasks: Array<() => Promise<void>> = [],
+    metadata?: InstallMetadata
+  ): Promise<ComponentMap<string>> {
     if (options?.allowScripts) {
       this.dependencyResolver.updateAllowedScripts(options.allowScripts);
       await this.dependencyResolver.persistConfig('update allowScripts configuration');
@@ -402,23 +439,52 @@ export class InstallMain {
       linkDepsResolvedFromEnv: !hasRootComponents,
       linkNestedDepsInNM: !this.workspace.isLegacy && !hasRootComponents,
     };
-    const { linkedRootDeps } = await this.logger.profileAsync('install.calculateLinks', () =>
-      this.calculateLinks([], linkOpts)
-    );
-    // eslint-disable-next-line prefer-const
-    let { mergedRootPolicy, componentsAndManifests: current } = await this.logger.profileAsync(
-      'install.getComponentManifests',
-      () =>
-        this._getComponentsManifestsAndRootPolicy(installer, {
-          ...calcManifestsOpts,
-          addMissingDeps: options?.addMissingDeps,
-          skipUnavailable: options?.skipUnavailable,
-          linkedRootDeps,
-        })
-    );
+    const { prepared, metadataRootPolicy } = await this.prepareMetadataInstall(metadata, installer, options);
+    if (metadata && !prepared) {
+      await runInstallTasks(async () => undefined, concurrentTasks);
+      concurrentTasks = [];
+    }
+    let linkedRootDeps: Record<string, string>;
+    let mergedRootPolicy: WorkspacePolicy;
+    let current: Omit<ComponentsAndManifests, 'componentDirectoryMap'> & {
+      componentDirectoryMap?: ComponentMap<string>;
+    };
+    if (prepared && metadataRootPolicy) {
+      await pMapSeries(this.preLinkSlot.values(), (fn) => fn(linkOpts));
+      const linker = this.dependencyResolver.getLinker({ rootDir: this.workspace.path, linkingOptions: linkOpts });
+      ({ linkedRootDeps } = await linker.calculateLinkedDepsFromIds(
+        this.workspace.path,
+        this.workspace.listIds(),
+        linkOpts
+      ));
+      mergedRootPolicy = metadataRootPolicy;
+      const result = await createInstallManifests(prepared, mergedRootPolicy, calcManifestsOpts, {
+        dependencyResolver: this.dependencyResolver,
+        aspectLoader: this.aspectLoader,
+        logger: this.logger,
+        rootDir: this.workspace.path,
+        rootComponentsPath: this.workspace.rootComponentsPath,
+      });
+      await this._updateRootDirs(result.rootDirs);
+      current = result;
+    } else {
+      ({ linkedRootDeps } = await this.logger.profileAsync('install.calculateLinks', () =>
+        this.calculateLinks([], linkOpts)
+      ));
+      ({ mergedRootPolicy, componentsAndManifests: current } = await this.logger.profileAsync(
+        'install.getComponentManifests',
+        () =>
+          this._getComponentsManifestsAndRootPolicy(installer, {
+            ...calcManifestsOpts,
+            addMissingDeps: options?.addMissingDeps,
+            skipUnavailable: options?.skipUnavailable,
+            linkedRootDeps,
+          })
+      ));
+    }
 
     const dependenciesGraph = await this.logger.profileAsync('install.resolveDependenciesGraph', () =>
-      this.resolveDependenciesGraph(options, { hasRootComponents })
+      this.resolveDependenciesGraph(options, { hasRootComponents, metadata: prepared ? metadata : undefined })
     );
     const pmInstallOptions: PackageManagerInstallOptions = {
       ...calcManifestsOpts,
@@ -448,7 +514,7 @@ export class InstallMain {
     const linkedDependencies = {
       [this.workspace.path]: linkedRootDeps,
     };
-    const compDirMap = await this.getComponentsDirectory([]);
+    let compDirMap = current.componentDirectoryMap;
     let installCycle = 0;
     let hasMissingLocalComponents = true;
     const forcedHarmonyVersion = this.dependencyResolver.harmonyVersionInRootPolicy();
@@ -458,31 +524,50 @@ export class InstallMain {
       // we'll need to make another round of installation as on the first round the missing local components
       // are not added to the manifests.
       // This is an issue when installation is done using root components.
-      hasMissingLocalComponents = hasRootComponents && hasComponentsFromWorkspaceInMissingDeps(current);
-      const installResult = await this.logger.profileAsync('install.packageManagerInstall', async () => {
-        try {
-          return await installer.installComponents(
-            this.workspace.path,
-            current.manifests,
-            mergedRootPolicy,
-            current.componentDirectoryMap,
-            {
-              linkedDependencies,
-              installTeambitBit: false,
-              forcedHarmonyVersion,
-            },
-            pmInstallOptions
-          );
-        } catch (err: any) {
-          // when the package manager can't find a version, the culprit is usually a component dependency that
-          // resolves to a snap which was never published (e.g. a hidden lane update-dependent whose Ripple build
-          // failed or hasn't completed). replace the cryptic "No matching version found" with an actionable
-          // message. re-throws the original error otherwise.
-          throw this.enrichUnpublishedSnapDepError(err, current.componentDirectoryMap.components);
-        }
-      });
+      hasMissingLocalComponents =
+        hasRootComponents &&
+        !!current.componentDirectoryMap &&
+        hasComponentsFromWorkspaceInMissingDeps({ ...current, componentDirectoryMap: current.componentDirectoryMap });
+      const installResult = await runInstallTasks(
+        () =>
+          this.logger.profileAsync('install.packageManagerInstall', async () => {
+            try {
+              return await installer.installComponents(
+                this.workspace.path,
+                current.manifests,
+                mergedRootPolicy,
+                current.componentDirectoryMap,
+                {
+                  linkedDependencies,
+                  installTeambitBit: false,
+                  forcedHarmonyVersion,
+                },
+                pmInstallOptions
+              );
+            } catch (err: any) {
+              // when the package manager can't find a version, the culprit is usually a component dependency that
+              // resolves to a snap which was never published (e.g. a hidden lane update-dependent whose Ripple build
+              // failed or hasn't completed). replace the cryptic "No matching version found" with an actionable
+              // message. re-throws the original error otherwise.
+              throw this.enrichUnpublishedSnapDepError(
+                err,
+                current.componentDirectoryMap?.components || [],
+                prepared?.records
+              );
+            }
+          }),
+        concurrentTasks
+      );
+      // Remote refreshes run once, even when changed manifests require another install cycle.
+      concurrentTasks = [];
       const { dependenciesChanged } = installResult;
       this.workspace.inInstallAfterPmContext = true;
+      if (!compDirMap) {
+        compDirMap = await this.logger.profileAsync('install.loadComponentsAfterInstall', () =>
+          this.getComponentsDirectory([])
+        );
+        current.componentDirectoryMap = compDirMap;
+      }
       // the install that switches a workspace onto the global virtual store runs with bootstrap's
       // pre-aspect bridge gate still reflecting the old layout, yet this same process goes on to
       // reload envs and compile from store slots. Re-apply the bridge (idempotent) now that the
@@ -491,9 +576,9 @@ export class InstallMain {
         ensureHoistedDependencyResolution(this.workspace.path);
       }
       let cacheCleared = false;
-      await this.logger.profileAsync('install.linkCodemods', () => this.linkCodemods(compDirMap));
+      await this.logger.profileAsync('install.linkCodemods', () => this.linkCodemods(compDirMap!));
       await this.logger.profileAsync('install.syncCoreAspectLinksForEnvs', () =>
-        this.syncCoreAspectLinksForEnvs(compDirMap)
+        this.syncCoreAspectLinksForEnvs(compDirMap!)
       );
       const oldNonLoadedEnvs = this.setOldNonLoadedEnvs();
       await this.logger.profileAsync('install.reloadMovedEnvs', () => this.reloadMovedEnvs());
@@ -571,7 +656,65 @@ export class InstallMain {
     // disregard the dependencies-cache.
     // await this.workspace.consumer.componentFsCache.deleteAllDependenciesDataCache();
     /* eslint-enable no-await-in-loop */
-    return current.componentDirectoryMap;
+    return current.componentDirectoryMap!;
+  }
+
+  private async prepareMetadataInstall(
+    metadata: InstallMetadata | undefined,
+    installer: DependencyInstaller,
+    options?: ModulesInstallOptions
+  ) {
+    let prepared: PreparedInstallRecords | undefined;
+    let metadataRootPolicy: WorkspacePolicy | undefined;
+    if (
+      metadata &&
+      this.dependencyResolver.hasRootComponents() &&
+      installer.canInstallFromMetadata() &&
+      !options?.addMissingDeps
+    ) {
+      try {
+        prepared = await this.logger.profileAsync('install.prepareRecords', () =>
+          prepareInstallRecords(
+            this.workspace,
+            this.envs,
+            metadata,
+            (reason) => this.logger.debug(`installation metadata fallback: ${reason}`),
+            this.app.getAppPatterns(),
+            (ids) => this.dependencyResolver.hasComponentPolicyProviders(ids)
+          )
+        );
+        if (prepared) metadataRootPolicy = await this.getRootPolicyFromMetadata(metadata);
+        if (!metadataRootPolicy) prepared = undefined;
+      } catch (err: any) {
+        // An environment or configured aspect may live on an older remote than the components.
+        if (!err.message?.includes('type component-metadata was not implemented')) throw err;
+        prepared = undefined;
+      }
+    }
+    return { prepared, metadataRootPolicy };
+  }
+
+  private async getRootPolicyFromMetadata(metadata: InstallMetadata): Promise<WorkspacePolicy | undefined> {
+    const policy = this.dependencyResolver.getWorkspacePolicy();
+    const coreIds = new Set(this.aspectLoader.getCoreAspectIds());
+    const configured = (this.workspace.getWorkspaceConfig()?.extensionsIds || []).filter(
+      (id) => !coreIds.has(id) && !id.startsWith('file:')
+    );
+    const generatorEnvs = this.generator.getConfiguredEnvs().filter((id) => !this.envs.isCoreEnv(id));
+    for (const value of uniq([...configured, ...generatorEnvs])) {
+      const id = await this.workspace.resolveComponentId(value);
+      if (this.workspace.hasId(id)) continue;
+      await metadata.load([id]);
+      const version = await metadata.getVersion(id);
+      const packageName = version?.extensions.findCoreExtension(DependencyResolverAspect.id)?.data?.packageName;
+      if (!packageName) return undefined;
+      const resolved = await this.workspace.resolveEnvIdWithPotentialVersionForConfig(id);
+      policy.add(
+        { dependencyId: packageName, value: { version: resolved.split('@')[1] || '*' }, lifecycleType: 'runtime' },
+        { skipIfExisting: true }
+      );
+    }
+    return policy;
   }
 
   private shouldClearCacheOnInstall(): boolean {
@@ -590,7 +733,7 @@ export class InstallMain {
 
   private async resolveDependenciesGraph(
     options: ModulesInstallOptions | undefined,
-    context: { hasRootComponents: boolean }
+    context: { hasRootComponents: boolean; metadata?: InstallMetadata }
   ): Promise<DependenciesGraph | undefined> {
     if (options?.dependenciesGraph) return options.dependenciesGraph;
     if (!options?.restoreFromDependenciesGraph) return undefined;
@@ -602,9 +745,11 @@ export class InstallMain {
       );
       return undefined;
     }
-    const graph = await this.workspace.scope.getDependenciesGraphByComponentIds(this.workspace.listIds(), {
-      ignoreFeatureToggle: true,
-    });
+    const graph = context.metadata
+      ? await loadInstallDependenciesGraph(this.workspace.listIds(), context.metadata)
+      : await this.workspace.scope.getDependenciesGraphByComponentIds(this.workspace.listIds(), {
+          ignoreFeatureToggle: true,
+        });
     if (!graph) {
       this.logger.console(
         formatWarningSummary(
@@ -630,7 +775,11 @@ export class InstallMain {
    * forking a lane drops it and `reset` moves entries out of it, so a never-published snap can still be pinned
    * while no longer tracked there. The scan reads already-loaded in-memory dep data (no fetch).
    */
-  private enrichUnpublishedSnapDepError(err: Error, components: Component[]): Error {
+  private enrichUnpublishedSnapDepError(
+    err: Error,
+    components: Component[],
+    records: InstallComponentRecord[] = []
+  ): Error {
     // only act on package manager failures that can be produced by an unpublished snap package. other codes
     // (auth, network, FETCH_404, registry outages) can mention the same package but signal a real problem we must
     // not mask. pnpm errors are wrapped by pnpmErrorToBitError, which keeps the original error on `cause`.
@@ -649,8 +798,19 @@ export class InstallMain {
     const workspaceIds = this.workspace.listIds();
 
     const unpublished = new Map<string, UnpublishedSnapDependency>();
-    for (const component of components) {
-      for (const dep of this.dependencyResolver.getComponentDependencies(component)) {
+    const inputs = components.length
+      ? components.map((component) => ({
+          id: component.id,
+          dependencies: this.dependencyResolver.getComponentDependencies(component),
+        }))
+      : records.map((record) => ({
+          id: record.id,
+          dependencies: this.dependencyResolver
+            .getDependenciesFromSerializedDependencies(record.dependencies)
+            .getComponentDependencies(),
+        }));
+    for (const component of inputs) {
+      for (const dep of component.dependencies) {
         const depId = dep.componentId;
         if (!depId.version || !isSnap(depId.version)) continue;
         if (workspaceIds.hasWithoutVersion(depId)) continue;

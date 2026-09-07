@@ -150,6 +150,23 @@ export class DependencyLinker {
     options: LinkingOptions = {}
   ): Promise<{ linkedRootDeps: Record<string, string>; linkResults: LinkResults }> {
     const linkResults = await this._calculateLinks(rootDir, componentDirectoryMap, options);
+    return this.linkResultsToDependencies(rootDir, linkResults);
+  }
+
+  /** Core and registered package links need component IDs, not loaded components. */
+  async calculateLinkedDepsFromIds(rootDir: string, ids: ComponentID[], options: LinkingOptions = {}) {
+    if (options.linkDepsResolvedFromEnv || options.linkNestedDepsInNM || options.linkToDir) {
+      throw new Error('component-dependent links require loaded components');
+    }
+    const linkingOpts = { ...DEFAULT_LINKING_OPTIONS, ...this.linkingOptions, ...options };
+    const linkResults = await this.linkCoreAspectsAndLegacy(rootDir, ids, linkingOpts);
+    linkResults.slotOriginatedLinks = (this.linkingOptions?.additionalPackagesToLink || []).map((pkgName) =>
+      this.linkNonCorePackages(rootDir, pkgName)
+    );
+    return this.linkResultsToDependencies(rootDir, linkResults);
+  }
+
+  private async linkResultsToDependencies(rootDir: string | undefined, linkResults: LinkResults) {
     const localLinks: Array<[string, string]> = [];
     if (linkResults.teambitBitLink) {
       localLinks.push(this.linkDetailToLocalDepEntry(linkResults.teambitBitLink.linkDetail));

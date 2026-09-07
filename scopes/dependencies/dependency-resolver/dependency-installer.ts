@@ -288,22 +288,36 @@ export class DependencyInstaller {
     );
   }
 
+  /** Legacy subscribers require full components; do not give them metadata-only inputs. */
+  canInstallFromMetadata(): boolean {
+    return (
+      this.packageManager.supportsInstallFromMetadata === true &&
+      !this.preInstallSubscriberList?.length &&
+      !this.postInstallSubscriberList?.length
+    );
+  }
+
   async installComponents(
     rootDir: string | undefined,
     manifests: Record<string, ProjectManifest>,
     rootPolicy: WorkspacePolicy,
-    componentDirectoryMap: ComponentMap<string>,
+    componentDirectoryMap: ComponentMap<string> | undefined,
     options: InstallOptions = DEFAULT_INSTALL_OPTIONS,
     packageManagerOptions: PackageManagerInstallOptions = DEFAULT_PM_INSTALL_OPTIONS
   ): Promise<{ dependenciesChanged: boolean }> {
-    const args = {
-      componentDirectoryMap,
-      options,
-      packageManagerOptions,
-      rootDir,
-      rootPolicy,
-    };
-    await this.runPrePostSubscribers(this.preInstallSubscriberList, 'pre', args);
+    if (!componentDirectoryMap && !this.canInstallFromMetadata()) {
+      throw new Error('this package manager or install subscriber requires loaded components');
+    }
+    const args: InstallArgs | undefined = componentDirectoryMap
+      ? {
+          componentDirectoryMap,
+          options,
+          packageManagerOptions,
+          rootDir,
+          rootPolicy,
+        }
+      : undefined;
+    if (args) await this.runPrePostSubscribers(this.preInstallSubscriberList, 'pre', args);
     const mainAspect: MainAspect = this.aspectLoader.mainAspect;
     const finalRootDir = rootDir || this.rootDir;
     if (!finalRootDir) {
@@ -312,10 +326,7 @@ export class DependencyInstaller {
     // guard here rather than in `install()`: workspace installs enter through this method
     // directly (InstallMain._installModules), so `install()` is not a choke point.
     if (!this.installingContext?.inCapsule) {
-      await this.assertSafeVirtualStoreTransition(
-        finalRootDir,
-        this.dependencyResolver.enableGlobalVirtualStore()
-      );
+      await this.assertSafeVirtualStoreTransition(finalRootDir, this.dependencyResolver.enableGlobalVirtualStore());
     }
     if (options.linkedDependencies) {
       manifests = JSON.parse(JSON.stringify(manifests));
@@ -415,7 +426,11 @@ export class DependencyInstaller {
       });
     }
 
-    if (!packageManagerOptions.rootComponents && !packageManagerOptions.keepExistingModulesDir) {
+    if (
+      componentDirectoryMap &&
+      !packageManagerOptions.rootComponents &&
+      !packageManagerOptions.keepExistingModulesDir
+    ) {
       try {
         // Remove node modules dir for all components dirs, since it might contain left overs from previous install.
         //
@@ -451,7 +466,7 @@ export class DependencyInstaller {
     if (!hidePackageManagerOutput) {
       this.logger.consoleSuccess(`done ${message}`, startTime);
     }
-    await this.runPrePostSubscribers(this.postInstallSubscriberList, 'post', args);
+    if (args) await this.runPrePostSubscribers(this.postInstallSubscriberList, 'post', args);
     return installResult;
   }
 

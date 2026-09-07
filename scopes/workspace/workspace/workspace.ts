@@ -1679,6 +1679,11 @@ the following envs are used in this workspace: ${uniq(availableEnvs).join(', ')}
    * defaults extensions from workspace config
    * extensions from the model.
    */
+  /** Merge installation configuration without constructing or loading a scope component. */
+  async componentExtensionsFromMetadata(id: ComponentID, extensions: ExtensionDataList) {
+    return this.aspectsMerger.merge(id, undefined, [], extensions);
+  }
+
   async componentExtensions(
     componentId: ComponentID,
     componentFromScope?: Component,

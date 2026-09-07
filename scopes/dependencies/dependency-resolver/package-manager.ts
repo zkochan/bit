@@ -222,10 +222,12 @@ export type PackageManagerResolveRemoteVersionOptions = {
 export interface InstallationContext {
   rootDir: string;
   manifests: Record<string, ProjectManifest>;
-  componentDirectoryMap: ComponentMap<string>;
+  componentDirectoryMap?: ComponentMap<string>;
 }
 
 export interface PackageManager {
+  /** Installs complete manifests without loading workspace Components. */
+  readonly supportsInstallFromMetadata?: boolean;
   /**
    * Name of the package manager
    */

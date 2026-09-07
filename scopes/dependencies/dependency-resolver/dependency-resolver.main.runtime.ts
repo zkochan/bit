@@ -1366,6 +1366,12 @@ export class DependencyResolverMain {
    * 3. props defined by the user (they are the strongest one)
    * @param configuredExtensions
    */
+  hasComponentPolicyProviders(extensionIds: string[]): boolean {
+    return this.policiesRegistry
+      .toArray()
+      .some(([registrar, policy]) => policy && extensionIds.some((id) => registrar === id || registrar.includes(id)));
+  }
+
   async mergeVariantPolicies(
     configuredExtensions: ExtensionDataList,
     id: ComponentID,
