@@ -27,7 +27,8 @@ assert.equal(
   cp.execFileSync(process.execPath, [cli, '--version'], { cwd: cliRoot, encoding: 'utf8' }).trim(),
   provenance.version
 );
-const cache = path.join(cliRoot, '.git/bit/cache/components/deps');
+const workspace = require('./command-workspace.cjs').commandWorkspace(cliRoot, provenance);
+const cache = workspace.cache;
 assert.equal(fs.realpathSync(path.dirname(cache)), path.dirname(cache));
 if (fs.existsSync(cache)) assert.equal(fs.realpathSync(cache), cache, 'cache leaf cannot be a symlink');
 const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'bit-command-memory-'));
@@ -36,8 +37,11 @@ const warm = path.join(temporary, 'warm');
 if (fs.existsSync(cache)) fs.cpSync(cache, original, { recursive: true, preserveTimestamps: true });
 const states = (process.env.BIT_COMMAND_MEMORY_STATES || 'cold,warm').split(',');
 assert.ok(states.length > 0 && states.every((state) => ['cold', 'warm'].includes(state)));
+const commands = (process.env.BIT_COMMAND_MEMORY_COMMANDS || 'status').split(',');
+assert.ok(commands.length > 0 && commands.every((command) => ['status', 'graph', 'list'].includes(command)));
 const report = {
   provenance,
+  fixture: workspace.fixture,
   node: process.version,
   platform: `${process.platform}/${process.arch}`,
   cpu: os.cpus()[0].model,
@@ -77,17 +81,19 @@ function interrupt() {
 }
 process.once('SIGINT', interrupt);
 process.once('SIGTERM', interrupt);
-async function execute(variant) {
+async function execute(variant, command = 'status') {
   if (interrupted) throw new Error('memory benchmark interrupted');
   const cacheEntriesBefore = cacheEntries();
   const traceFile = path.join(temporary, 'trace.json');
   fs.rmSync(traceFile, { force: true });
   const env = {
     ...process.env,
+    BIT_GLOBALS_DIR: require('./command-workspace.cjs').benchmarkGlobals(temporary),
     NODE_COMPILE_CACHE: path.join(temporary, 'compile-cache'),
     BIT_COMMAND_BENCH_TRACE: traceFile,
   };
   delete env.BIT_NO_COMPILE_CACHE;
+  delete env.BIT_COMMAND_BENCH_TRACE_OWNER;
   if (variant === 'native') env.BIT_RUST_DEPENDENCY_SCANNER = native;
   else delete env.BIT_RUST_DEPENDENCY_SCANNER;
   const started = performance.now();
@@ -100,10 +106,10 @@ async function execute(variant) {
       '--require',
       path.join(__dirname, 'command-trace.cjs'),
       cli,
-      'status',
+      command,
       '--json',
     ],
-    { cwd: cliRoot, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] }
+    { cwd: workspace.root, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] }
   );
   const control = createBenchmarkProcessControl(child);
   activeControl = control;
@@ -172,43 +178,51 @@ const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.l
 async function main() {
   try {
     restore('cold');
-    const reference = (await execute('legacy')).value;
+    await execute('legacy');
     fs.cpSync(cache, warm, { recursive: true, preserveTimestamps: true });
-    for (const state of states) {
-      for (const variant of ['legacy', 'native']) {
-        restore(state);
-        assert.deepEqual((await execute(variant)).value, reference, `${state}/${variant} warmup JSON parity`);
-      }
-      const runs = [];
-      for (let iteration = 0; iteration < 9; iteration++) {
-        for (const variant of iteration % 2 ? ['native', 'legacy'] : ['legacy', 'native']) {
+    for (const command of commands) {
+      restore('warm');
+      const reference = (await execute('legacy', command)).value;
+      for (const state of command === 'list' ? ['warm'] : states) {
+        for (const variant of ['legacy', 'native']) {
           restore(state);
-          const { value, ...metrics } = await execute(variant);
-          assert.deepEqual(value, reference, `${state}/${variant} JSON parity`);
-          assert.equal(metrics.cacheEntriesBefore, state === 'cold' ? 0 : provenance.componentCount);
-          assert.equal(metrics.cacheEntriesAfter, provenance.componentCount);
-          runs.push({ iteration, variant, ...metrics });
+          assert.deepEqual(
+            (await execute(variant, command)).value,
+            reference,
+            `${command}/${state}/${variant} warmup JSON parity`
+          );
         }
+        const runs = [];
+        for (let iteration = 0; iteration < 9; iteration++) {
+          for (const variant of iteration % 2 ? ['native', 'legacy'] : ['legacy', 'native']) {
+            restore(state);
+            const { value, ...metrics } = await execute(variant, command);
+            assert.deepEqual(value, reference, `${state}/${variant} JSON parity`);
+            assert.equal(metrics.cacheEntriesBefore, state === 'cold' ? 0 : workspace.componentCount);
+            assert.equal(metrics.cacheEntriesAfter, workspace.componentCount);
+            runs.push({ iteration, variant, ...metrics });
+          }
+        }
+        const summary = Object.fromEntries(
+          ['legacy', 'native'].map((variant) => {
+            const rows = runs.filter((run) => run.variant === variant);
+            return [
+              variant,
+              {
+                medianElapsedMs: median(rows.map((run) => run.elapsedMs)),
+                medianPeakSampledRssKiB: median(rows.map((run) => run.memory.peakSampledRssKiB)),
+                minPeakSampledRssKiB: Math.min(...rows.map((run) => run.memory.peakSampledRssKiB)),
+                maxPeakSampledRssKiB: Math.max(...rows.map((run) => run.memory.peakSampledRssKiB)),
+                maxConcurrentProcesses: Math.max(...rows.map((run) => run.memory.maxConcurrentProcesses)),
+                failedProcReads: rows.reduce((sum, run) => sum + run.memory.failedProcReads, 0),
+              },
+            ];
+          })
+        );
+        report.workloads[`${command}-${state}`] = { summary, referenceSha256: hash(JSON.stringify(reference)), runs };
+        fs.writeFileSync(destination, JSON.stringify(report, null, 2) + '\n');
+        console.error(`${command}-${state}: ${JSON.stringify(summary)}`);
       }
-      const summary = Object.fromEntries(
-        ['legacy', 'native'].map((variant) => {
-          const rows = runs.filter((run) => run.variant === variant);
-          return [
-            variant,
-            {
-              medianElapsedMs: median(rows.map((run) => run.elapsedMs)),
-              medianPeakSampledRssKiB: median(rows.map((run) => run.memory.peakSampledRssKiB)),
-              minPeakSampledRssKiB: Math.min(...rows.map((run) => run.memory.peakSampledRssKiB)),
-              maxPeakSampledRssKiB: Math.max(...rows.map((run) => run.memory.peakSampledRssKiB)),
-              maxConcurrentProcesses: Math.max(...rows.map((run) => run.memory.maxConcurrentProcesses)),
-              failedProcReads: rows.reduce((sum, run) => sum + run.memory.failedProcReads, 0),
-            },
-          ];
-        })
-      );
-      report.workloads[`status-${state}`] = { summary, referenceSha256: hash(JSON.stringify(reference)), runs };
-      fs.writeFileSync(destination, JSON.stringify(report, null, 2) + '\n');
-      console.error(`status-${state}: ${JSON.stringify(summary)}`);
     }
   } finally {
     fs.rmSync(cache, { recursive: true, force: true });
