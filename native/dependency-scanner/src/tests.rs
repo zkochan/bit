@@ -72,3 +72,35 @@ fn failed_files_do_not_return_partial_dependencies() {
     assert_eq!(scan(&fixture("css", "body {}"), false).status, "unsupported");
     assert_eq!(scan(&fixture("js", "import 'x'"), true).status, "unsupported");
 }
+
+#[test]
+fn javascript_classification_matches_first_recognized_module_node() {
+    for source in [
+        "require.resolve('./resolved');",
+        "import.meta.resolve('./resolved');",
+        "import('./dynamic');",
+    ] {
+        let result = scan(&fixture("js", source), false);
+        assert_eq!(result.status, "ok");
+        assert_eq!(result.dependencies.len(), 0);
+    }
+    for source in [
+        "import './marker'; require.resolve('./resolved');",
+        "require.resolve('./resolved'); import './marker';",
+        "require(variable); import.meta.resolve('./resolved');",
+    ] {
+        let result = scan(&fixture("js", source), false);
+        assert_eq!(result.status, "ok");
+        dbg!(serde_json::to_value(&result.dependencies).unwrap());
+        assert!(result.dependencies.contains_key("./resolved"));
+    }
+    for source in [
+        "module.exports = {}; require.resolve('./resolved');",
+        "require(['./amd'], function () {});",
+        "define([], function () {}); import './marker';",
+    ] {
+        assert_eq!(scan(&fixture("js", source), false).status, "unsupported");
+    }
+    let result = scan(&fixture("ts", "require.resolve('./resolved'); import('./dynamic');"), false);
+    assert_eq!(result.dependencies.len(), 2);
+}

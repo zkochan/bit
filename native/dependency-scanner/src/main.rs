@@ -1,5 +1,8 @@
 #![cfg_attr(dylint_lib = "perfectionist", feature(register_tool))]
 #![cfg_attr(dylint_lib = "perfectionist", register_tool(perfectionist))]
+mod classification;
+
+use crate::classification::classification_outcome;
 use indexmap::IndexMap;
 use oxc_allocator::Allocator;
 use oxc_ast::ast::{
@@ -288,6 +291,9 @@ fn parse_source(file: &File, source: &str, source_type: SourceType, ts: bool) ->
                 .map(ToString::to_string)
                 .collect(),
         };
+    }
+    if !ts && let Some(result) = classification_outcome(file, &parsed.program) {
+        return result;
     }
     let mut scanner = scanner_for_source(source, ts, &parsed.program.comments);
     scanner.visit_program(&parsed.program);
