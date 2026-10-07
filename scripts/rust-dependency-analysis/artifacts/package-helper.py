@@ -12,6 +12,7 @@ import re
 import subprocess
 import tarfile
 import tempfile
+import sys
 import tomllib
 from notices import notices
 
@@ -240,6 +241,8 @@ def smoke(artifact):
 
 
 def main():
+    # Windows redirected stdout defaults to a legacy code page; paths are Unicode.
+    sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=["package", "smoke"])
     parser.add_argument("--directory", type=Path, default=ROOT / "native" / "dist")

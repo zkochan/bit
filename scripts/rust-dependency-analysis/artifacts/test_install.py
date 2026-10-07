@@ -15,7 +15,7 @@ class InstallTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="bit install tests ")
         self.addCleanup(self.temporary.cleanup)
-        self.root = Path(self.temporary.name)
+        self.root = Path(self.temporary.name).resolve()
         self.module = self.root / "distribution" / "node_modules" / "@teambit" / "dependencies" / "dist" / "files-dependency-builder" / "rust-scanner"
         self.module.mkdir(parents=True)
         (self.module / "discovery.js").write_text("compiled discovery fixture")

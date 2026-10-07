@@ -8,6 +8,7 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
+import sys
 
 spec = importlib.util.spec_from_file_location("artifact", Path(__file__).with_name("package-helper.py"))
 artifact = importlib.util.module_from_spec(spec)
@@ -149,6 +150,8 @@ def assemble(distribution, archive, target):
 
 
 def main():
+    # Windows redirected stdout defaults to a legacy code page; paths are Unicode.
+    sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("operation", choices=["install", "rollback", "assemble"])
     parser.add_argument("--module-directory", type=Path)
