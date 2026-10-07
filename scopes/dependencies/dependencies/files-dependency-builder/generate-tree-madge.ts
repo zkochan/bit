@@ -1,3 +1,4 @@
+import { resolveRustDependencyScannerExecutable } from './rust-scanner/discovery';
 // most of the functions in this file were taken from the Madge project: https://github.com/pahen/madge
 // reasons for not using Madge directly: 1) it has issues with TypeScript on Windows. 2) it has issues with tsx files
 
@@ -128,12 +129,10 @@ export default async function generateTree(files: string[] = [], config): Promis
   const pathMap = [];
   const errors = {};
 
-  const executable = process.env.BIT_RUST_DEPENDENCY_SCANNER;
-  const lease = executable && path.isAbsolute(executable) ? acquireRustDependencyScannerSession(executable) : undefined;
+  const executable = resolveRustDependencyScannerExecutable();
+  const lease = executable ? acquireRustDependencyScannerSession(executable) : undefined;
   const rustScannerSession = lease?.session;
-  if (executable && !path.isAbsolute(executable)) {
-    require('debug')('precinct')('Rust extraction fallback: BIT_RUST_DEPENDENCY_SCANNER must be absolute');
-  }
+
   try {
     if (rustScannerSession) {
       await rustScannerSession.prefetch(

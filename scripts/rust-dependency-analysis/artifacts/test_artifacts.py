@@ -18,12 +18,13 @@ class ArtifactTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory(prefix="bit artifact tests ")
         self.addCleanup(self.directory.cleanup)
-        self.binary = b"deterministic binary contents"
+        self.binary = b"\x7fELF\x02\x01" + b"\x00" * 12 + b"\x3e\x00" + b"deterministic binary contents"
         self.license = b"repository license"
         self.manifest = {
-            "artifactFormat": 1, "protocolVersion": 1, "name": "bit-dependency-scanner",
+            "scannerSourceSha256": artifact.scanner_source_identity(), "minimumGlibc": "2.0", "artifactFormat": 2, "protocolVersion": 1, "name": "bit-dependency-scanner",
             "target": "x86_64-unknown-linux-gnu", "platform": artifact.TARGETS["x86_64-unknown-linux-gnu"],
             "binary": {"name": "bit-dependency-scanner", "sha256": artifact.sha256(self.binary), "bytes": len(self.binary)},
+            "notices": {"name": "THIRD-PARTY-NOTICES.txt", "sha256": artifact.sha256(b"")},
             "license": {"name": "LICENSE", "sha256": artifact.sha256(self.license)},
         }
         self.path = Path(self.directory.name) / "test.tar.gz"
