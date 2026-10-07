@@ -22,5 +22,9 @@
     "stylus-lookup": "3.0.2",
     "typescript": "5.9.2",
     "postcss": "8.4.45"
+  },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": "8.39.0",
+    "@babel/parser": "7.29.8"
   }
 }

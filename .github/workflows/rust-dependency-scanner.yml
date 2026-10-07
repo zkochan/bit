@@ -62,8 +62,10 @@ jobs:
           cp scripts/rust-dependency-analysis/ci/package.json scripts/rust-dependency-analysis/ci/package-lock.json "$RUNNER_TEMP/rust-scanner-integration-tools/"
           npm ci --prefix "$RUNNER_TEMP/rust-scanner-integration-tools" --ignore-scripts --legacy-peer-deps --no-audit --no-fund
           node scripts/rust-dependency-analysis/ci/prepare.cjs "$RUNNER_TEMP/rust-scanner-integration-tools"
-      - name: Cache Rust build dependencies
-        uses: actions/cache@v4
+      # Restore only: this job builds just the binary and finishes first, so saving under the
+      # shared key would leave the Rust test job a cache without its test artifacts.
+      - name: Restore Rust build cache from the Rust test job
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.cargo/registry

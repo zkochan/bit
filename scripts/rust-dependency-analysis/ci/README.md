@@ -1,6 +1,6 @@
 # Isolated dependency-analysis CI tools
 
-This directory is a standalone locked npm installation for real source extraction, resolution, traversal, and helper-pool validation. It does not install the Bit monorepo or mutate its package manifest or lockfile. It has 19 pinned direct dependencies and 94 installed npm packages (approximately 41 MiB in the local reproduction).
+This directory is a standalone locked npm installation for real source extraction, resolution, traversal, and helper-pool validation. It does not install the Bit monorepo or mutate its package manifest or lockfile. It has 19 pinned direct dependencies and 105 installed npm packages.
 
 Reproduce in a separate temporary directory:
 
@@ -22,7 +22,7 @@ The Linux workflow builds the actual checked-out Rust source and requires a nati
 
 The facade intentionally exports only the implementation needed by this pipeline. It refuses to overwrite an installed dependency-resolver package. It is generated after `npm ci`; rerunning `npm ci` removes it, then preparation recreates it. Use `BIT_SCANNER_INTEGRATION_ROOT` during preparation and test execution when targeting another source checkout.
 
-`--legacy-peer-deps` is required because the published TypeScript detective declares an exact TypeScript 5.5.3 peer while the existing test compiler is 5.9.2. The used PostCSS peer is installed explicitly. The lock fixes all transitive package versions and integrity values. Installation scripts and automatic unused peer installation are disabled; runtime behavior is validated by the real differential and pipeline checks rather than assuming the broader peer graph is available.
+`--legacy-peer-deps` is required because the published TypeScript detective declares an exact TypeScript 5.5.3 peer while the existing test compiler is 5.9.2. The used PostCSS peer is installed explicitly. The lock fixes all transitive package versions and integrity values. `overrides` pin the parsers the legacy reference actually runs to the versions Bit resolves: `@typescript-eslint/typescript-estree` 8.39.0 (pinned in `workspace.jsonc`) and `@babel/parser` 7.29.8. Without them the detectives' semver ranges float to newer parsers, and CI parity would be measured against a reference Bit does not ship. Update both when Bit's versions change. Installation scripts and automatic unused peer installation are disabled; runtime behavior is validated by the real differential and pipeline checks rather than assuming the broader peer graph is available.
 
 ## Remaining full-dependency boundary
 
