@@ -15,6 +15,15 @@ const source = path.join(root, 'scopes/toolbox/string/capitalize/index.ts');
 const cache = path.join(root, '.git/bit/cache/components/deps');
 assert.equal(fs.realpathSync(path.dirname(cache)), path.dirname(cache));
 if (fs.existsSync(cache)) assert.equal(fs.realpathSync(cache), cache);
+const adapterSource = path.join(root, 'scopes/dependencies/dependencies/files-dependency-builder/precinct/index.ts');
+const adapterCompiled = path.join(
+  root,
+  'node_modules/@teambit/dependencies/dist/files-dependency-builder/precinct/index.js'
+);
+assert.ok(
+  fs.readFileSync(adapterCompiled, 'utf8').includes('enrichParseError'),
+  'compile the diagnostic adapter before proof'
+);
 const bytes = fs.readFileSync(source);
 const stat = fs.statSync(source);
 const directoryStat = fs.statSync(path.dirname(source));
@@ -47,6 +56,10 @@ try {
   assert.ok(raw.includes('Type expected. (line: 1, column: 13)'), 'canonical message and location must reach CLI');
   const report = {
     comparison: 'complete CLI JSON, no normalization',
+    diagnosticOverlay: {
+      sourceSha256: createHash('sha256').update(fs.readFileSync(adapterSource)).digest('hex'),
+      compiledSha256: createHash('sha256').update(fs.readFileSync(adapterCompiled)).digest('hex'),
+    },
     nativeSha256: createHash('sha256').update(fs.readFileSync(nativeArg)).digest('hex'),
     syntax: 'const value: = invalid;',
     source: path.relative(root, source),
