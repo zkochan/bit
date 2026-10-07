@@ -14,7 +14,8 @@ permissions:
 
 concurrency:
   group: rust-scanner-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Superseded PR pushes are cancelled; every commit on `rust` keeps its result.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   lint:
@@ -43,6 +44,8 @@ jobs:
             ~/.cache/pnpm/rustfmt
             native/target/debug
           key: rust-scanner-lint-${{ runner.os }}-${{ hashFiles('native/rust-toolchain.toml', 'native/Cargo.lock', 'native/Cargo.toml', 'scripts/rust/rustfmt.json') }}-dylint-6.0.4
+          # Keeps the installed Dylint binaries and registry when only the lockfile changes.
+          restore-keys: rust-scanner-lint-${{ runner.os }}-
       - name: Cache pinned perfectionist library
         uses: actions/cache@v4
         with:
@@ -93,6 +96,7 @@ jobs:
             ~/.cargo/git
             native/target/debug
           key: rust-scanner-test-${{ runner.os }}-${{ hashFiles('native/rust-toolchain.toml', 'native/Cargo.lock') }}
+          restore-keys: rust-scanner-test-${{ runner.os }}-
       - name: Install pinned Rust
         run: rustup show
       - name: Test scanner
