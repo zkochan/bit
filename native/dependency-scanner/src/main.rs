@@ -68,31 +68,42 @@ struct Specifier {
     #[serde(skip_serializing_if = "Option::is_none")]
     exported: Option<bool>,
 }
-struct Scanner<'s> {
-    source: &'s str,
+struct Scanner {
+    line_starts: Vec<u32>,
     ts: bool,
     no_check: bool,
     comments: Vec<(usize, String)>,
     deps: IndexMap<String, Dependency>,
     unsupported: bool,
 }
-fn line(source: &str, offset: u32) -> usize {
-    source[..offset as usize]
-        .bytes()
-        .filter(|byte| *byte == b'\n')
-        .count()
-        + 1
+fn line_starts(source: &str) -> Vec<u32> {
+    std::iter::once(0)
+        .chain(
+            source
+                .bytes()
+                .enumerate()
+                .filter(|(_, byte)| *byte == b'\n')
+                .map(|(index, _)| u32::try_from(index + 1).unwrap_or(u32::MAX)),
+        )
+        .collect()
 }
-impl Scanner<'_> {
+/// One-based line number of a byte offset.
+fn line(line_starts: &[u32], offset: u32) -> usize {
+    line_starts.partition_point(|start| *start <= offset)
+}
+impl Scanner {
+    fn ignored(&self, span: Span) -> bool {
+        if self.no_check {
+            return true;
+        }
+        let node_line = line(&self.line_starts, span.start);
+        self.comments
+            .iter()
+            .find(|(l, _)| *l + 1 == node_line)
+            .is_some_and(|(_, c)| c.contains("@bit-ignore"))
+    }
     fn add(&mut self, name: &str, span: Span) -> Option<&mut Dependency> {
-        if name.is_empty()
-            || (self.ts
-                && (self.no_check
-                    || self.comments
-                        .iter()
-                        .find(|(l, _)| *l + 1 == line(self.source, span.start))
-                        .is_some_and(|(_, c)| c.contains("@bit-ignore"))))
-        {
+        if name.is_empty() || (self.ts && self.ignored(span)) {
             return None;
         }
         Some(self.deps.entry(name.to_owned()).or_default())
@@ -134,7 +145,7 @@ fn import_specifier(spec: &ImportDeclarationSpecifier<'_>) -> Specifier {
     };
     Specifier { is_default, name, exported: None }
 }
-impl<'a> Visit<'a> for Scanner<'_> {
+impl<'a> Visit<'a> for Scanner {
     fn visit_import_declaration(&mut self, node: &ImportDeclaration<'a>) {
         let ts = self.ts;
         if node.phase.is_some() || node.with_clause.is_some() {
@@ -255,8 +266,8 @@ fn scan(file: &File, unsupported_options: bool) -> Outcome {
         .unwrap_or("");
     let ts = matches!(kind, "ts" | "tsx" | "mts" | "cts");
     let source_type = match kind {
-        "js" | "mjs" | "cjs" => SourceType::mjs(),
-        "jsx" => SourceType::jsx(),
+        // Babel parses every JS extension as a module with the jsx plugin enabled.
+        "js" | "mjs" | "cjs" | "jsx" => SourceType::mjs().with_jsx(true),
         "ts" | "mts" | "cts" => SourceType::ts(),
         "tsx" => SourceType::tsx(),
         _ => return outcome(file, "unsupported", "unsupported file kind".into()),
@@ -284,7 +295,8 @@ fn parse_source(file: &File, source: &str, source_type: SourceType, ts: bool) ->
     if !parsed.diagnostics.is_empty() || parsed.fatal_error {
         return Outcome {
             path: file.path.clone(),
-            status: "parse_error",
+            // Babel also accepts Flow and proposal plugins Oxc rejects, so JS defers to legacy parsing.
+            status: if ts { "parse_error" } else { "unsupported" },
             dependencies: IndexMap::new(),
             diagnostics: parsed.diagnostics
                 .iter()
@@ -312,16 +324,18 @@ fn parse_source(file: &File, source: &str, source_type: SourceType, ts: bool) ->
         diagnostics: vec![],
     }
 }
-fn scanner_for_source<'source>(
-    source: &'source str,
+fn scanner_for_source(
+    source: &str,
     ts: bool,
     source_comments: &[oxc_ast::ast::Comment],
-) -> Scanner<'source> {
+) -> Scanner {
+    let line_starts = if ts { line_starts(source) } else { vec![] };
     let comments: Vec<_> = source_comments
         .iter()
+        .filter(|_| ts)
         .map(|comment| {
             (
-                line(source, comment.span.start),
+                line(&line_starts, comment.span.start),
                 comment
                     .content_span()
                     .source_text(source)
@@ -330,7 +344,7 @@ fn scanner_for_source<'source>(
         })
         .collect();
     Scanner {
-        source,
+        line_starts,
         ts,
         no_check: comments
             .iter()

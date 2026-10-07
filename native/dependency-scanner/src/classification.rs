@@ -26,7 +26,9 @@ impl<'ast> Visit<'ast> for Classifier {
             | AstKind::ExportNamedDeclaration(_)
             | AstKind::ExportFromDeclaration(_)
             | AstKind::ExportDefaultDeclaration(_)
-            | AstKind::ExportAllDeclaration(_) => Classification::Supported,
+            | AstKind::ExportAllDeclaration(_)
+            // Babel's `Import` callee makes module-definition classify dynamic imports as ES6.
+            | AstKind::ImportExpression(_) => Classification::Supported,
             AstKind::CallExpression(call) => classify_call(&call.callee, &call.arguments),
             // Assignment-based exports need exact legacy AST matching before native dispatch.
             AstKind::AssignmentExpression(_) => Classification::Fallback,

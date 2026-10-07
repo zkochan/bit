@@ -75,11 +75,7 @@ fn failed_files_do_not_return_partial_dependencies() {
 
 #[test]
 fn javascript_classification_matches_first_recognized_module_node() {
-    for source in [
-        "require.resolve('./resolved');",
-        "import.meta.resolve('./resolved');",
-        "import('./dynamic');",
-    ] {
+    for source in ["require.resolve('./resolved');", "import.meta.resolve('./resolved');"] {
         let result = scan(&fixture("js", source), false);
         assert_eq!(result.status, "ok");
         assert_eq!(result.dependencies.len(), 0);
@@ -88,10 +84,10 @@ fn javascript_classification_matches_first_recognized_module_node() {
         "import './marker'; require.resolve('./resolved');",
         "require.resolve('./resolved'); import './marker';",
         "require(variable); import.meta.resolve('./resolved');",
+        "import('./dynamic'); require.resolve('./resolved');",
     ] {
         let result = scan(&fixture("js", source), false);
         assert_eq!(result.status, "ok");
-        dbg!(serde_json::to_value(&result.dependencies).unwrap());
         assert!(result.dependencies.contains_key("./resolved"));
     }
     for source in [
@@ -103,4 +99,34 @@ fn javascript_classification_matches_first_recognized_module_node() {
     }
     let result = scan(&fixture("ts", "require.resolve('./resolved'); import('./dynamic');"), false);
     assert_eq!(result.dependencies.len(), 2);
+}
+
+#[test]
+fn javascript_accepts_jsx_and_defers_babel_only_syntax() {
+    let result = scan(&fixture("js", "import React from 'react'; const view = <div />;"), false);
+    assert_eq!(result.status, "ok");
+    assert!(result.dependencies.contains_key("react"));
+    for source in ["// @flow\nconst value: number = 1; import 'x';", "import 'ok'; const = ;"] {
+        let result = scan(&fixture("js", source), false);
+        assert_eq!(result.status, "unsupported");
+        assert_eq!(result.dependencies.len(), 0);
+    }
+}
+
+#[test]
+fn bit_ignore_uses_the_line_of_the_dependency_node() {
+    let result = scan(
+        &fixture(
+            "ts",
+            "/* a */\n// @bit-ignore\nimport A from 'ignored';\n\n// @bit-ignore\n\nimport B from 'kept';",
+        ),
+        false,
+    );
+    assert_eq!(
+        result.dependencies
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        vec!["kept"],
+    );
 }
