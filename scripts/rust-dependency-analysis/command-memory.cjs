@@ -40,7 +40,9 @@ assert.ok(states.length > 0 && states.every((state) => ['cold', 'warm'].includes
 const commands = (process.env.BIT_COMMAND_MEMORY_COMMANDS || 'status').split(',');
 assert.ok(commands.length > 0 && commands.every((command) => ['status', 'graph', 'list'].includes(command)));
 const variants = (process.env.BIT_COMMAND_MEMORY_VARIANTS || 'legacy,native').split(',');
-assert.ok(variants.length > 1 && variants.every((variant) => ['legacy', 'control', 'native'].includes(variant)));
+assert.equal(new Set(variants).size, variants.length, 'variants must be unique');
+assert.ok(variants.includes('legacy') && variants.includes('native'));
+assert.ok(variants.every((variant) => ['legacy', 'control', 'native'].includes(variant)));
 const report = {
   provenance,
   driverRevision: cp.execFileSync('git', ['rev-parse', 'HEAD'], { cwd: __dirname, encoding: 'utf8' }).trim(),
@@ -91,6 +93,7 @@ async function execute(variant, command = 'status') {
   const traceFile = path.join(temporary, 'trace.json');
   const controlTraceFile = path.join(temporary, 'control.json');
   fs.rmSync(traceFile, { force: true });
+  fs.rmSync(controlTraceFile, { force: true });
   const env = {
     ...process.env,
     BIT_GLOBALS_DIR: require('./command-workspace.cjs').benchmarkGlobals(temporary),
