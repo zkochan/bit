@@ -9,14 +9,16 @@ const { createRequire } = require('node:module');
 const { createHash } = require('node:crypto');
 const { isDeepStrictEqual } = require('node:util');
 assert.equal(
-  process.argv.length,
-  5,
-  'usage: install-validation.cjs <trusted-private-cli> <native-executable> <report.json>'
+  [5, 7].includes(process.argv.length),
+  true,
+  'usage: install-validation.cjs <trusted-private-cli> <native-executable> <report.json> [--legacy-umbrella /existing/package]'
 );
 assert.equal(process.platform, 'linux', 'network namespace validation requires Linux');
 const source = path.resolve(process.argv[2]);
 const native = path.resolve(process.argv[3]);
 const destination = path.resolve(process.argv[4]);
+if (process.argv.length === 7) assert.equal(process.argv[5], '--legacy-umbrella');
+const legacyUmbrella = process.argv[6] ? fs.realpathSync(process.argv[6]) : undefined;
 const marker = '.bit-rust-private-build.json';
 assert.ok(
   [os.tmpdir(), '/tmp'].some((root) => source.startsWith(root + path.sep)),
@@ -42,7 +44,16 @@ const report = {
   platform: `${process.platform}/${process.arch}`,
   networkIsolation: 'unshare -Urn: child and descendants have no external network interface',
   command,
+  sourceChange:
+    'append identical nonfunctional comment to scopes/dependencies/dependencies/files-dependency-builder/generate-tree-madge.ts to attempt invalidating model dependency reuse',
   startingState: 'each variant receives a physical/reflink copy of the same baseline with cold dependency cache',
+  legacyUmbrella: legacyUmbrella
+    ? {
+        source: legacyUmbrella,
+        version: JSON.parse(fs.readFileSync(path.join(legacyUmbrella, 'package.json'))).version,
+        files: {},
+      }
+    : undefined,
   runs: [],
   acceptance: false,
 };
@@ -93,6 +104,19 @@ async function cacheResults() {
 async function execute(variant) {
   fs.rmSync(workspace, { recursive: true, force: true });
   clone(baseline, workspace);
+  fs.appendFileSync(
+    path.join(workspace, '.npmrc'),
+    `\nstore-dir=${path.join(workspace, '.install-validation-store')}\ncache-dir=${path.join(workspace, '.install-validation-cache')}\nenable-global-virtual-store=false\nfetch-retries=0\nfetch-timeout=3000\n`
+  );
+  fs.appendFileSync(
+    path.join(workspace, 'pnpm-workspace.yaml'),
+    `\nstoreDir: ${JSON.stringify(path.join(workspace, '.install-validation-store'))}\ncacheDir: ${JSON.stringify(path.join(workspace, '.install-validation-cache'))}\nenableGlobalVirtualStore: false\nfetchRetries: 0\nfetchTimeout: 3000\n`
+  );
+  const editedSource = path.join(
+    workspace,
+    'scopes/dependencies/dependencies/files-dependency-builder/generate-tree-madge.ts'
+  );
+  fs.appendFileSync(editedSource, '\n// Isolated install validation: change source bytes without changing imports.\n');
   fs.rmSync(path.join(workspace, '.git/bit/cache/components/deps'), { recursive: true, force: true });
   assert.equal(Object.keys(await cacheResults()).length, 0, 'owned dependency cache must be cold');
   const trace = path.join(temporary, `${variant}-helper.json`);
@@ -123,7 +147,10 @@ async function execute(variant) {
     }
   );
   const helper = fs.existsSync(trace) ? JSON.parse(fs.readFileSync(trace)) : undefined;
-  const packageManagerCalls = fs.existsSync(installTrace) ? JSON.parse(fs.readFileSync(installTrace)) : [];
+  const observed = fs.existsSync(installTrace)
+    ? JSON.parse(fs.readFileSync(installTrace))
+    : { calls: [], treeCalls: 0 };
+  const packageManagerCalls = observed.calls;
   const dependencies = await cacheResults();
   const lockfile = path.join(workspace, 'pnpm-lock.yaml');
   return {
@@ -133,6 +160,7 @@ async function execute(variant) {
     signal: run.signal,
     timedOut: run.error?.code === 'ETIMEDOUT',
     helper,
+    treeCalls: observed.treeCalls,
     packageManagerCalls,
     dependencies,
     lockfileSha256: fs.existsSync(lockfile) ? hash(fs.readFileSync(lockfile)) : undefined,
@@ -143,6 +171,25 @@ async function execute(variant) {
 (async () => {
   try {
     clone(source, baseline);
+    if (legacyUmbrella) {
+      const installed = path.join(baseline, 'node_modules/@teambit/legacy');
+      fs.rmSync(installed, { recursive: true, force: true });
+      clone(legacyUmbrella, installed);
+      function record(directory) {
+        for (const entry of fs
+          .readdirSync(directory, { withFileTypes: true })
+          .sort((a, b) => a.name.localeCompare(b.name))) {
+          const filename = path.join(directory, entry.name);
+          if (entry.isDirectory()) record(filename);
+          else if (entry.isFile())
+            report.legacyUmbrella.files[path.relative(installed, filename)] = hash(fs.readFileSync(filename));
+          else if (entry.isSymbolicLink())
+            report.legacyUmbrella.files[path.relative(installed, filename)] = `symlink:${fs.readlinkSync(filename)}`;
+          else throw new Error(`unsupported umbrella member: ${filename}`);
+        }
+      }
+      record(installed);
+    }
     const legacy = await execute('legacy');
     report.runs.push(legacy);
     const nativeResult = await execute('native');

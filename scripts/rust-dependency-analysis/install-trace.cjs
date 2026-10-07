@@ -7,6 +7,27 @@ const load = createRequire(path.join(process.cwd(), 'package.json'));
 const api = load('@pnpm/napi');
 const install = api.install;
 const calls = [];
+let treeCalls = 0;
+const Module = require('node:module');
+const originalLoad = Module._load;
+const wrappedTrees = new WeakSet();
+Module._load = function (...args) {
+  const exports = originalLoad.apply(this, args);
+  if (
+    typeof args[0] === 'string' &&
+    args[0].endsWith('/generate-tree-madge') &&
+    typeof exports?.default === 'function' &&
+    !wrappedTrees.has(exports)
+  ) {
+    const generateTree = exports.default;
+    exports.default = function (...parameters) {
+      treeCalls++;
+      return generateTree.apply(this, parameters);
+    };
+    wrappedTrees.add(exports);
+  }
+  return exports;
+};
 api.install = function (options, ...rest) {
   for (const key of ['storeDir', 'cacheDir']) {
     const root = process.env.BIT_INSTALL_VALIDATION_ROOT;
@@ -25,5 +46,5 @@ api.install = function (options, ...rest) {
 };
 process.on('exit', () => {
   if (process.env.BIT_INSTALL_VALIDATION_TRACE)
-    fs.writeFileSync(process.env.BIT_INSTALL_VALIDATION_TRACE, JSON.stringify(calls));
+    fs.writeFileSync(process.env.BIT_INSTALL_VALIDATION_TRACE, JSON.stringify({ calls, treeCalls }));
 });
