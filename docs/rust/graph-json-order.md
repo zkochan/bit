@@ -8,13 +8,6 @@ The cold command benchmark recorded two legacy `graph --json` results with 334 n
 
 Remote JSON uses graphlib's different schema, including options, labels, compound graph parents, and named multigraph edges. It remains unchanged; the recorded blocker concerns the local command.
 
-Run focused checks against installed Bit dependencies:
-
-```bash
-BIT_LEGACY_ROOT=/path/to/installed/bit \
-  node --test scripts/rust-dependency-analysis/graph-json.test.cjs
-```
-
-The tests execute the checkout's actual `GraphCmd` and installed cleargraph implementation. Only host acquisition is supplied by a test fixture. They check shuffled discovery order produces identical bytes, full edge data, unchanged internal graph serialization, local-only membership, explicit component resolution, and the remote graphlib contract. This runner needs the installed linked Bit graph and is not part of the small detective/resolver CI sandbox.
+`scopes/component/graph/graph-cmd.spec.ts` covers this at the component level and runs with `bit test`. It executes the actual `GraphCmd` and cleargraph with a fixture host and checks that shuffled discovery order produces identical bytes, full edge data, unchanged internal graph serialization, local-only membership, explicit component resolution, and the remote graphlib contract.
 
 The benchmark must continue comparing whole command JSON directly. It must not sort or normalize captured output to pass parity; ordering belongs to the production command boundary.
