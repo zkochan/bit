@@ -217,3 +217,34 @@ test(
     assert.equal(r.resolveRustDependencyScannerExecutable(), undefined);
   }
 );
+
+test(
+  'repeated component discovery reuses bounded binary and runtime hash validation',
+  { skip: !archive },
+  (context) => {
+    const r = runtime(context);
+    install(r.directory);
+    process.env.BIT_RUST_DEPENDENCY_SCANNER = 'packaged';
+    const original = fs.readFileSync;
+    const hashedReads = [];
+    fs.readFileSync = function (filename, ...args) {
+      if (
+        typeof filename === 'string' &&
+        (filename.endsWith('.js') || path.basename(filename).startsWith('bit-dependency-scanner'))
+      )
+        hashedReads.push(filename);
+      return original.call(this, filename, ...args);
+    };
+    try {
+      const executable = r.resolveRustDependencyScannerExecutable();
+      assert.ok(executable);
+      assert.ok(hashedReads.includes(executable));
+      assert.ok(hashedReads.includes(path.join(r.directory, 'session.js')));
+      hashedReads.length = 0;
+      for (let index = 0; index < 334; index++) assert.equal(r.resolveRustDependencyScannerExecutable(), executable);
+      assert.deepEqual(hashedReads, []);
+    } finally {
+      fs.readFileSync = original;
+    }
+  }
+);
