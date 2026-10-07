@@ -30,8 +30,8 @@ class ArtifactTests(unittest.TestCase):
 
     def write(self, data):
         self.path.write_bytes(data)
-        self.path.with_name(self.path.name + ".sha256").write_text(f"{artifact.sha256(data)}  {self.path.name}\n")
-        self.path.with_name(self.path.name + ".manifest.json").write_text(json.dumps(self.manifest, indent=2) + "\n")
+        self.path.with_name(self.path.name + ".sha256").write_bytes(f"{artifact.sha256(data)}  {self.path.name}\n".encode("ascii"))
+        self.path.with_name(self.path.name + ".manifest.json").write_bytes((json.dumps(self.manifest, indent=2) + "\n").encode("utf-8"))
 
     def test_same_inputs_produce_identical_archive_bytes(self):
         first = artifact.archive_bytes(self.binary, self.manifest, self.license)

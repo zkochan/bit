@@ -92,8 +92,8 @@ def package(output_directory, binary_path=None):
         raise ValueError("compressed artifact exceeds size limit")
     artifact = output_directory / filename
     artifact.write_bytes(archive)
-    artifact.with_name(filename + ".sha256").write_text(f"{sha256(archive)}  {filename}\n", encoding="ascii")
-    artifact.with_name(filename + ".manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    artifact.with_name(filename + ".sha256").write_bytes(f"{sha256(archive)}  {filename}\n".encode("ascii"))
+    artifact.with_name(filename + ".manifest.json").write_bytes((json.dumps(manifest, indent=2) + "\n").encode("utf-8"))
     return artifact
 
 
