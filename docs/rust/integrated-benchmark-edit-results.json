@@ -47,7 +47,7 @@
     }
   ],
   "sourceWorktreeStatus": "M components/legacy/consumer-component/component-loader.ts\n M scopes/dependencies/dependencies/dependencies.main.runtime.ts\n M scopes/dependencies/dependencies/files-dependency-builder/generate-tree-madge.ts\n M scopes/dependencies/dependencies/files-dependency-builder/rust-scanner/session.ts\n?? docs/rust/dependency-scanner-operation-scope.md\n?? scopes/dependencies/dependencies/files-dependency-builder/rust-scanner/scope.ts\n?? scripts/rust-dependency-analysis/command-scope.test.cjs",
-  "sourceRoot": "/tmp/bit-rust-command-scope",
+  "sourceRoot": "<external checkout>",
   "sourceRevision": "0a5d989b250bc5cbac79ee156dd54040ba3c4b50",
   "revision": "0a5d989b250bc5cbac79ee156dd54040ba3c4b50",
   "node": "v24.21.0",
@@ -55,7 +55,7 @@
   "cpu": "AMD Ryzen 9 9950X3D2 16-Core Processor",
   "logicalCpus": 32,
   "executableSha256": "23525b6a895a6e566c4273d73bbfd9a3d5492daf2b1107ae09eb9745c5e797d0",
-  "installedRoot": "/var/home/zoltan/src/bit/bit",
+  "installedRoot": "<external checkout>",
   "files": [
     {
       "path": "components/legacy/consumer-component/component-loader.ts",

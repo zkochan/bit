@@ -29,6 +29,12 @@ const { DetectorHook } = installed('@teambit/dependency-resolver');
 const clockTicks = Number(cp.execFileSync('getconf', ['CLK_TCK'], { encoding: 'utf8' }).trim());
 assert.ok(Number.isFinite(clockTicks) && clockTicks > 0);
 const hash = (buffer) => createHash('sha256').update(buffer).digest('hex');
+// Reports are committed, so record directories relative to this checkout and never as host paths.
+const location = (directory) => {
+  const relative = path.relative(root, directory);
+  if (!relative) return '.';
+  return relative.startsWith('..') || path.isAbsolute(relative) ? '<external checkout>' : relative;
+};
 function comparable(result) {
   return {
     ...result,
@@ -284,7 +290,7 @@ async function main() {
     sourceWorktreeStatus: cp
       .execFileSync('git', ['status', '--porcelain'], { cwd: sourceRoot, encoding: 'utf8' })
       .trim(),
-    sourceRoot,
+    sourceRoot: location(sourceRoot),
     sourceRevision: cp.execFileSync('git', ['rev-parse', 'HEAD'], { cwd: sourceRoot, encoding: 'utf8' }).trim(),
     revision: cp.execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
     node: process.version,
@@ -292,7 +298,7 @@ async function main() {
     cpu: os.cpus()[0].model,
     logicalCpus: os.cpus().length,
     executableSha256: hash(fs.readFileSync(executable)),
-    installedRoot,
+    installedRoot: location(installedRoot),
     files: production.map((file) => ({
       path: file,
       bytes: fs.statSync(path.join(root, file)).size,

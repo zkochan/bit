@@ -5,7 +5,7 @@
   "cpu": "AMD Ryzen 9 9950X3D2 16-Core Processor",
   "logicalCpus": 32,
   "executableSha256": "23525b6a895a6e566c4273d73bbfd9a3d5492daf2b1107ae09eb9745c5e797d0",
-  "installedRoot": "/var/home/zoltan/src/bit/bit",
+  "installedRoot": "<external checkout>",
   "files": [
     {
       "path": "components/legacy/consumer-component/component-loader.ts",
@@ -5756,7 +5756,7 @@
     }
   },
   "clockTicks": 100,
-  "sourceRoot": "/tmp/bit-rust-integrated-bench",
+  "sourceRoot": "<external checkout>",
   "sourceRevision": "0a5d989b250bc5cbac79ee156dd54040ba3c4b50",
   "sourceWorktreeStatus": "?? docs/rust/integrated-benchmark-edit-results.json\n?? docs/rust/integrated-benchmark-pooled-results.json\n?? docs/rust/integrated-benchmark-results.json\n?? scripts/rust-dependency-analysis/integrated-benchmark.cjs",
   "sourceFiles": [
