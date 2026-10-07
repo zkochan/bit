@@ -70,3 +70,19 @@ Native parse failures recover the canonical built-in detective error on the rare
 Tests compare every own error property except the stack (which naturally contains different call sites), plus inherited name, lineNumber and column. The malformed TS fixture preserves `TSError`, `Type expected.`, location/fileName, line 1 and column 13, and the final `PARSING_ERROR` category. Prototype-key fallback tests compare full actual pipeline results, including legacy omissions and RangeError diagnostics, rather than comparing only error codes.
 
 The actual private CLI compiled the changed dependencies component with zero errors. Two uncached `status --json` commands on an actual malformed component produce exactly equal complete JSON without normalization, including `ParseErrors` and the canonical `Type expected. (line: 1, column: 13)` message. [Raw whole-CLI syntax proof](command-syntax-proof.json) records both complete results and source/compiled overlay hashes. Its complete JSON SHA256 is `9d9a75db80d94c75d31fafa7ab13431cf05ccb34c3df9035f80a2f59f84c3e30`.
+
+## Many-edit process-tree memory
+
+[The raw many16 memory report](command-many-memory-results.json) repeats the 16-component missing-import edit workload with the existing strict Linux 20ms process-tree sampler and process-group cleanup controller. Nine interleaved pairs preserve exact complete CLI JSON, all 16 issue markers and actual analysis entry paths, plus uncached legacy freshness proof. The final diagnostic adapter is compiled into the private CLI; source/compiled hashes bind the overlay.
+
+Median sampled summed RSS is **1,159,828 KiB legacy / 1,162,864 KiB native**, an increase of **0.26%**, within issue #4's **10%** memory gate for this workload. Native launches four helpers and observes four concurrently; maximum sampled process count is six (command, time wrapper, four helpers). Peak RSS ranges are 1,141,412–1,360,084 KiB legacy and 1,143,668–1,214,472 KiB native. Every measured run has zero failed procfs reads and zero PID-identity races. The raw report preserves each run's sampling span, maximum sampling gap and peak process identities/RSS.
+
+These are near-simultaneous sums of observed process VmRSS, including shared pages in each process. A 20ms sampler can miss short-lived peaks; this is not unique physical memory or an allocation bound. The result applies to this actual edit workload, not all Bit commands or platforms. End-to-end medians are 7.412s legacy / 7.398s native and do not establish a speed improvement.
+
+Reproduce on an owned private CLI with the changed adapter compiled:
+
+```sh
+node scripts/rust-dependency-analysis/command-many-memory.cjs /tmp/owned-private-cli /absolute/path/to/native /tmp/many16-memory.json
+```
+
+The driver backs up and restores source bytes, file/directory timestamps and persistent cache. It checks whole JSON and actual analysis entry paths rather than requiring unsafe missing-result cache timestamps to refresh.

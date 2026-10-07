@@ -1,5 +1,13 @@
 {
   "comparison": "complete CLI JSON, no normalization",
+  "diagnosticOverlay": {
+    "sourceSha256": "7b187e4f78ee8920992b55784e7a42a7c43dcace6b7e66fab415f23e90bce2bc",
+    "compiledSha256": "5768a22b7433feaf12c5a659b31c621710ea43cc0d34dda5d46777aa77e2553c",
+    "sourceCommit": "bccdbd770",
+    "baseRevision": "a72e7cb66",
+    "compiledComponent": "teambit.dependencies/dependencies@1.0.1208",
+    "compileErrors": 0
+  },
   "nativeSha256": "a5b4e2f5a77447e26d30c616850db456bfd918040a2ffce5dad60a4a74edd455",
   "syntax": "const value: = invalid;",
   "source": "scopes/toolbox/string/capitalize/index.ts",
@@ -2897,13 +2905,5 @@
     "currentLaneId": "bit-local-a40b3cd2/main",
     "workspaceIssues": [],
     "pendingUpdateDependents": []
-  },
-  "diagnosticOverlay": {
-    "sourceCommit": "067477ad3",
-    "baseRevision": "a72e7cb66",
-    "compiledComponent": "teambit.dependencies/dependencies@1.0.1208",
-    "compileErrors": 0,
-    "sourceSha256": "250cad21f549300735e142cad33e35164a45d25528ae3295057650abeeb8be60",
-    "compiledSha256": "a9d139802fe9b80dfc7c5eec2dc7534a767f47d97b8bc31f67c61d4d1bdfcdc9"
   }
 }
