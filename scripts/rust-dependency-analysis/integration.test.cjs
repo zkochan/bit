@@ -298,12 +298,16 @@ test('visited graph cache skips native extraction completely', { skip: !native }
   assert.equal(trace.disposed.length, 1);
 });
 
-test('native TS parse errors preserve PARSING_ERROR issues and final disposal', { skip: !native }, async (context) => {
+test('native TS parse errors preserve canonical diagnostics and final disposal', { skip: !native }, async (context) => {
   hooks(context, []);
-  const { directory, file } = workspace(context, { 'invalid.ts': 'const value: = invalid;' });
-  const baseline = await enabled(undefined, () => generateTree([file('invalid.ts')], config(directory)));
+  const { directory, file } = workspace(context, {
+    'invalid.ts': 'const value: = invalid;',
+    'unicode.ts': 'const café = "😀";\nconst value: = invalid;',
+  });
+  const files = [file('invalid.ts'), file('unicode.ts')];
+  const baseline = await enabled(undefined, () => generateTree(files, config(directory)));
   const trace = traceSessions(context);
-  const accelerated = await enabled(native, () => generateTree([file('invalid.ts')], config(directory)));
+  const accelerated = await enabled(native, () => generateTree(files, config(directory)));
   assert.deepEqual(comparison(accelerated), comparison(baseline));
   const fields = (error) =>
     Object.fromEntries(
@@ -311,11 +315,16 @@ test('native TS parse errors preserve PARSING_ERROR issues and final disposal', 
         .filter((key) => key !== 'stack')
         .map((key) => [key, error[key]])
     );
-  assert.deepEqual(fields(accelerated.errors['invalid.ts']), fields(baseline.errors['invalid.ts']));
-  for (const key of ['name', 'lineNumber', 'column']) {
-    assert.equal(accelerated.errors['invalid.ts'][key], baseline.errors['invalid.ts'][key]);
+  for (const name of ['invalid.ts', 'unicode.ts']) {
+    const actual = accelerated.errors[name];
+    const reference = baseline.errors[name];
+    assert.deepEqual(fields(actual), fields(reference));
+    for (const key of ['name', 'lineNumber', 'column']) assert.equal(actual[key], reference[key]);
+    assert.equal(actual.name, 'TSError');
+    assert.equal(actual.code, 'PARSING_ERROR');
+    assert.equal(actual.lineNumber, name === 'unicode.ts' ? 2 : 1);
+    assert.equal(actual.column, 13);
   }
-  assert.equal(accelerated.errors['invalid.ts'].code, 'PARSING_ERROR');
   assert.equal(trace.disposed.length, 1);
 });
 
