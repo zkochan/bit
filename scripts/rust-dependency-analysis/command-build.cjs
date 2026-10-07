@@ -65,18 +65,27 @@ try {
     }
   };
   visit(path.join(target, 'node_modules'));
+  let prunedBrokenExternalLinks = 0;
   const checkLinks = (directory) => {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       const filename = path.join(directory, entry.name);
       if (entry.isSymbolicLink()) {
         let resolved;
+        let missing = false;
         try {
           resolved = fs.realpathSync(filename);
         } catch (error) {
           if (error.code !== 'ENOENT') throw error;
+          missing = true;
           resolved = path.resolve(path.dirname(filename), fs.readlinkSync(filename));
         }
-        assert.ok(resolved.startsWith(target + path.sep), `external private-build link: ${filename}`);
+        if (resolved !== target && !resolved.startsWith(target + path.sep)) {
+          // A copied obsolete BVM alias can already be dangling outside this
+          // snapshot. Remove that private alias; never follow a live external link.
+          assert.ok(missing, `external private-build link: ${filename}`);
+          fs.unlinkSync(filename);
+          prunedBrokenExternalLinks++;
+        }
       } else if (entry.isDirectory()) checkLinks(filename);
     }
   };
@@ -140,6 +149,7 @@ try {
     componentCount: compiled.length,
     outputCount: compiled.reduce((n, component) => n + component.buildResults.length, 0),
     reroutedLinks: rerouted,
+    prunedBrokenExternalLinks,
     compileResultSha256: hash(path.join(target, '.bit-rust-compile-all.json')),
     compiledModules: modules.map((file) => ({
       path: file,
