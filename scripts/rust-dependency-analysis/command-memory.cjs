@@ -41,6 +41,8 @@ const commands = (process.env.BIT_COMMAND_MEMORY_COMMANDS || 'status').split(','
 assert.ok(commands.length > 0 && commands.every((command) => ['status', 'graph', 'list'].includes(command)));
 const report = {
   provenance,
+  driverRevision: cp.execFileSync('git', ['rev-parse', 'HEAD'], { cwd: __dirname, encoding: 'utf8' }).trim(),
+  driverSha256: hash(fs.readFileSync(__filename)),
   fixture: workspace.fixture,
   node: process.version,
   platform: `${process.platform}/${process.arch}`,

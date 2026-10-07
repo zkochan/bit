@@ -25,8 +25,14 @@ const warm = path.join(temp, 'warm');
 if (fs.existsSync(cache)) fs.cpSync(cache, original, { recursive: true, preserveTimestamps: true });
 const report = {
   provenance,
+  driverRevision: cp.execFileSync('git', ['rev-parse', 'HEAD'], { cwd: __dirname, encoding: 'utf8' }).trim(),
+  driverSha256: hash(fs.readFileSync(__filename)),
   fixture: workspace.fixture,
   node: process.version,
+  platform: `${process.platform}/${process.arch}`,
+  cpu: os.cpus()[0].model,
+  kernel: os.release(),
+  traceSha256: hash(fs.readFileSync(path.join(__dirname, 'command-profile-trace.cjs'))),
   nativeSha256: hash(fs.readFileSync(executable)),
   method:
     'V8 1ms CPU sampling of CLI process; helper CPU excluded; asynchronous stage spans are not critical-path shares',
