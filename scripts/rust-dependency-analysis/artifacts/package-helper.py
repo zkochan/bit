@@ -65,6 +65,10 @@ def package(output_directory, binary_path=None):
     binary = binary_path.read_bytes()
     cargo = tomllib.loads((ROOT / "native" / "dependency-scanner" / "Cargo.toml").read_text())
     revision = command("git", "rev-parse", "HEAD")
+    # Pull-request CI builds GitHub's transient merge commit; its parents name the base and PR head.
+    # Read the raw commit object: a shallow checkout's history reports no parents.
+    commit = command("git", "cat-file", "commit", "HEAD").split("\n\n", 1)[0]
+    parents = [line.removeprefix("parent ") for line in commit.splitlines() if line.startswith("parent ")]
     license_bytes = (ROOT / "LICENSE").read_bytes()
     manifest = {
         "artifactFormat": 1,
@@ -72,6 +76,7 @@ def package(output_directory, binary_path=None):
         "name": "bit-dependency-scanner",
         "version": cargo["package"]["version"],
         "gitRevision": revision,
+        "gitParents": parents,
         "provenance": {
             "revisionScope": "source checkout HEAD",
             "rustcScope": "packaging environment",

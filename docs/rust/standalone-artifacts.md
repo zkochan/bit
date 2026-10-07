@@ -16,7 +16,7 @@ bit-dependency-scanner-0.1.0-<rust-target>-<revision-prefix>.tar.gz.sha256
 bit-dependency-scanner-0.1.0-<rust-target>-<revision-prefix>.tar.gz.manifest.json
 ```
 
-Version comes from the scanner's Cargo manifest. The revision prefix is the first twelve Git SHA characters; the manifest carries the full source-checkout SHA, protocol version `1`, artifact format `1`, target/OS/architecture/ABI, complete `rustc -vV`, Cargo.lock SHA-256, build platform, binary filename/size/SHA-256, and repository license checksum.
+Version comes from the scanner's Cargo manifest. On pull requests, CI checks out GitHub's transient merge commit, so the revision (and the workflow artifact name) is that merge commit rather than the PR head; `gitParents` records the base and PR-head SHAs that identify the source. The revision prefix is the first twelve Git SHA characters; the manifest carries the full source-checkout SHA and its parent SHAs, protocol version `1`, artifact format `1`, target/OS/architecture/ABI, complete `rustc -vV`, Cargo.lock SHA-256, build platform, binary filename/size/SHA-256, and repository license checksum.
 
 The archive contains only `bit-dependency-scanner` (or `.exe`), `manifest.json`, and `LICENSE`, in sorted flat-member order. Tar metadata has zero timestamps/UID/GID and fixed modes; gzip embeds neither a filename nor a current timestamp. Identical binary and manifest inputs produce identical archive bytes. This guarantees deterministic packaging, not independently reproducible compiler output across machines or toolchains. The checksums detect mismatches; they are not signatures or publisher authentication.
 
