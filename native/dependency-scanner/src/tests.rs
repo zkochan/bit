@@ -187,3 +187,37 @@ fn disk_source_limit_and_invalid_encoding_have_distinct_outcomes() {
     std::fs::remove_file(&path).unwrap();
     assert_eq!(scan(&file, false).status, "read_error");
 }
+
+fn keys(kind: &str, source: &str) -> (&'static str, Vec<String>) {
+    let result = scan(&fixture(kind, source), false);
+    (result.status, result.dependencies.into_keys().collect())
+}
+
+#[test]
+fn parentheses_and_optional_chains_follow_legacy_ast_shapes() {
+    assert_eq!(keys("js", "import 'm'; (require)('./p');"), ("ok", vec!["m".into(), "./p".into()]));
+    assert_eq!(keys("ts", "(require.resolve)(('./p'));"), ("ok", vec!["./p".into()]));
+    // Babel's OptionalCallExpression covers every call after the first `?.`.
+    assert_eq!(keys("js", "import 'm'; require?.resolve('./x');"), ("ok", vec!["m".into()]));
+    assert_eq!(keys("ts", "require?.resolve('./x');"), ("ok", vec!["./x".into()]));
+    assert_eq!(
+        keys("js", "require('x')?.foo; require.resolve('./r');"),
+        ("ok", vec!["x".into(), "./r".into()]),
+    );
+    // An optional require does not classify the file as CommonJS.
+    assert_eq!(keys("js", "require?.('x'); require.resolve('./y');"), ("ok", vec![]));
+}
+
+#[test]
+fn coerced_and_integer_like_specifiers_fall_back() {
+    for (kind, source) in [
+        ("ts", "import(5);"),
+        ("js", "import 'm'; import(true);"),
+        ("ts", "require(/re/);"),
+        ("ts", "require(1n);"),
+        ("js", "import 'm'; require('123');"),
+    ] {
+        assert_eq!(keys(kind, source), ("unsupported", vec![]), "{source}");
+    }
+    assert_eq!(keys("js", "import 'm'; require('01');").0, "ok");
+}

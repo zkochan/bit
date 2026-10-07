@@ -16,7 +16,7 @@ use oxc_ast::ast::{
     TSExternalModuleReference,
 };
 use oxc_ast_visit::{Visit, walk};
-use oxc_parser::Parser;
+use oxc_parser::{ParseOptions, Parser};
 use oxc_span::{SourceType, Span};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -220,6 +220,15 @@ impl<'a> Visit<'a> for Scanner {
         walk::walk_export_default_declaration(self, node);
     }
     fn visit_import_expression(&mut self, node: &ImportExpression<'a>) {
+        if matches!(
+            &node.source,
+            Expression::NumericLiteral(_)
+                | Expression::BooleanLiteral(_)
+                | Expression::BigIntLiteral(_)
+                | Expression::RegExpLiteral(_),
+        ) {
+            self.unsupported = true;
+        }
         if let Expression::StringLiteral(s) = &node.source {
             self.add(s.value.as_str(), node.span);
         }
@@ -230,14 +239,7 @@ impl<'a> Visit<'a> for Scanner {
             self.unsupported = true;
         }
         let accepted = calls::accepted(node, self.ts);
-        if accepted
-            && self.ts
-            && node.arguments
-                .first()
-                .is_some_and(|argument| {
-                    matches!(argument, Argument::NumericLiteral(_) | Argument::BooleanLiteral(_))
-                })
-        {
+        if accepted && self.ts && calls::nonstring_literal(node.arguments.first()) {
             self.unsupported = true;
         }
         if accepted && let Some(name) = node.arguments.first().and_then(argument) {
@@ -307,7 +309,9 @@ fn scan(file: &File, unsupported_options: bool) -> Outcome {
 }
 fn parse_source(file: &File, source: &str, source_type: SourceType, ts: bool) -> Outcome {
     let allocator = Allocator::default();
-    let parsed = Parser::new(&allocator, source, source_type).parse();
+    // Babel and TypeScript ESTree drop parentheses, so `(require)('x')` is a plain require call.
+    let options = ParseOptions { preserve_parens: false, ..ParseOptions::default() };
+    let parsed = Parser::new(&allocator, source, source_type).with_options(options).parse();
     if !parsed.diagnostics.is_empty() || parsed.fatal_error {
         return Outcome {
             path: file.path.clone(),
@@ -325,11 +329,12 @@ fn parse_source(file: &File, source: &str, source_type: SourceType, ts: bool) ->
     }
     let mut scanner = scanner_for_source(source, ts, &parsed.program.comments);
     scanner.visit_program(&parsed.program);
-    if scanner.unsupported {
+    // Legacy results are JS objects, which enumerate integer-like keys before all others.
+    if scanner.unsupported || scanner.deps.keys().any(|name| is_array_index(name)) {
         return outcome(
             file,
             "unsupported",
-            "decorators, import attributes/phases, or namespace reexports require legacy fallback"
+            "decorators, import attributes/phases, namespace reexports, coerced or integer-like specifiers require legacy fallback"
                 .into(),
         );
     }
@@ -339,6 +344,12 @@ fn parse_source(file: &File, source: &str, source_type: SourceType, ts: bool) ->
         dependencies: scanner.deps,
         diagnostics: vec![],
     }
+}
+fn is_array_index(name: &str) -> bool {
+    (name == "0" || (!name.starts_with('0') && name.bytes().all(|byte| byte.is_ascii_digit())))
+        && name
+            .parse::<u32>()
+            .is_ok_and(|index| index != u32::MAX)
 }
 fn scanner_for_source(
     source: &str,
