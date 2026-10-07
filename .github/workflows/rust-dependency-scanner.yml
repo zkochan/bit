@@ -19,6 +19,7 @@ on:
       - 'scripts/rust-dependency-analysis/legacy-session-control*'
       - 'scripts/rust-dependency-analysis/command-workspace*'
       - 'scripts/rust-dependency-analysis/command-control-trace.cjs'
+      - 'scripts/rust-dependency-analysis/command-profile*'
       - 'scopes/dependencies/dependencies/files-dependency-builder/rust-scanner/**'
       - 'scopes/dependencies/dependencies/files-dependency-builder/**'
       - 'scopes/dependencies/dependency-resolver/detector-hook.ts'
@@ -41,6 +42,7 @@ on:
       - 'scripts/rust-dependency-analysis/legacy-session-control*'
       - 'scripts/rust-dependency-analysis/command-workspace*'
       - 'scripts/rust-dependency-analysis/command-control-trace.cjs'
+      - 'scripts/rust-dependency-analysis/command-profile*'
       - 'scopes/dependencies/dependencies/files-dependency-builder/rust-scanner/**'
       - 'scopes/dependencies/dependencies/files-dependency-builder/**'
       - 'scopes/dependencies/dependency-resolver/detector-hook.ts'
@@ -77,7 +79,7 @@ jobs:
       - name: Validate batching-only control and isolated workspace guards
         env:
           BIT_LEGACY_ROOT: ${{ runner.temp }}/rust-scanner-integration-tools
-        run: node --test scripts/rust-dependency-analysis/legacy-session-control.test.cjs scripts/rust-dependency-analysis/command-workspace.test.cjs
+        run: node --test scripts/rust-dependency-analysis/legacy-session-control.test.cjs scripts/rust-dependency-analysis/command-workspace.test.cjs scripts/rust-dependency-analysis/command-profile-trace.test.cjs
       # Restore only: this job builds just the binary and finishes first, so saving under the
       # shared key would leave the Rust test job a cache without its test artifacts.
       - name: Restore Rust build cache from the Rust test job
