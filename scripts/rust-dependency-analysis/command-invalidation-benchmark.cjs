@@ -43,10 +43,12 @@ const warmSnapshot = path.join(temporary, 'warm-deps');
 const tracer = path.join(__dirname, 'command-invalidation-trace.cjs');
 const originalCache = path.join(temporary, 'original-deps');
 if (fs.existsSync(cache)) fs.cpSync(cache, originalCache, { recursive: true, preserveTimestamps: true });
-const commands = (process.env.BIT_COMMAND_BENCH_MUTATIONS || 'one-source,multiple-sources,workspace-package').split(
-  ','
+const commands = (
+  process.env.BIT_COMMAND_BENCH_MUTATIONS || 'one-source,multiple-sources,large-source,workspace-package'
+).split(',');
+assert.ok(
+  commands.every((command) => ['one-source', 'multiple-sources', 'large-source', 'workspace-package'].includes(command))
 );
-assert.ok(commands.every((command) => ['one-source', 'multiple-sources', 'workspace-package'].includes(command)));
 const report = {
   provenance,
   node: process.version,
@@ -175,8 +177,11 @@ function restore(state) {
 const sourceFiles = ['scopes/toolbox/string/capitalize/index.ts', 'scopes/toolbox/string/ellipsis/index.ts'].map(
   (file) => path.join(cliRoot, file)
 );
+// The small components above have a single source file; this one has ~70, so its edit
+// shows how a typical aspect-sized component behaves after a source change.
+const largeSourceFile = path.join(cliRoot, 'scopes/workspace/workspace/workspace.ts');
 const packageFile = path.join(cliRoot, 'package.json');
-const originals = [...sourceFiles, packageFile].map((file) => ({
+const originals = [...sourceFiles, largeSourceFile, packageFile].map((file) => ({
   file,
   data: fs.readFileSync(file),
   stat: fs.statSync(file),
@@ -194,8 +199,12 @@ try {
   fs.cpSync(cache, warmSnapshot, { recursive: true, preserveTimestamps: true });
   for (const mutation of commands) {
     resetFiles();
-    const sourceCount = mutation === 'one-source' ? 1 : mutation === 'multiple-sources' ? 2 : 0;
-    for (const file of sourceFiles.slice(0, sourceCount))
+    const editedFiles =
+      mutation === 'large-source'
+        ? [largeSourceFile]
+        : sourceFiles.slice(0, mutation === 'one-source' ? 1 : mutation === 'multiple-sources' ? 2 : 0);
+    const sourceCount = editedFiles.length;
+    for (const file of editedFiles)
       fs.appendFileSync(file, `\nimport 'bit-rust-benchmark-missing-${path.basename(path.dirname(file))}';\n`);
     if (mutation === 'workspace-package') {
       const value = JSON.parse(fs.readFileSync(packageFile));
@@ -215,7 +224,7 @@ try {
       verify(execute(command, 'legacy').value, reference, `${mutation}/legacy warm vs uncached`);
       if (sourceCount) {
         assert.notDeepEqual(reference, baseline, 'source dependency mutation must change status JSON');
-        for (const file of sourceFiles.slice(0, sourceCount))
+        for (const file of editedFiles)
           assert.ok(
             JSON.stringify(reference).includes(`bit-rust-benchmark-missing-${path.basename(path.dirname(file))}`),
             'changed missing dependency must appear in status'
