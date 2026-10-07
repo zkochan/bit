@@ -1,6 +1,10 @@
 #![cfg_attr(dylint_lib = "perfectionist", feature(register_tool))]
 #![cfg_attr(dylint_lib = "perfectionist", register_tool(perfectionist))]
+mod calls;
 mod classification;
+mod limits;
+mod protocol;
+mod transport;
 
 use crate::classification::classification_outcome;
 use indexmap::IndexMap;
@@ -14,12 +18,11 @@ use oxc_ast::ast::{
 use oxc_ast_visit::{Visit, walk};
 use oxc_parser::Parser;
 use oxc_span::{SourceType, Span};
-use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
     collections::BTreeMap,
-    io::{self, BufRead, Write},
+    io::{self},
 };
 
 #[derive(Deserialize)]
@@ -64,7 +67,8 @@ struct Dependency {
 #[serde(rename_all = "camelCase")]
 struct Specifier {
     is_default: bool,
-    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     exported: Option<bool>,
 }
@@ -112,7 +116,7 @@ impl Scanner {
         for dep in self.deps.values_mut() {
             if let Some(spec) = dep.import_specifiers
                 .iter_mut()
-                .find(|specifier| specifier.name == name)
+                .find(|specifier| specifier.name.as_deref() == Some(name))
             {
                 spec.exported = Some(true);
             }
@@ -131,16 +135,23 @@ fn string(expr: &Expression<'_>) -> Option<String> {
 fn argument(arg: &Argument<'_>) -> Option<String> {
     arg.as_expression().and_then(string)
 }
+fn identifier_name(name: &oxc_ast::ast::ModuleExportName<'_>) -> Option<String> {
+    if matches!(name, oxc_ast::ast::ModuleExportName::StringLiteral(_)) {
+        None
+    } else {
+        Some(name.name().to_string())
+    }
+}
 fn import_specifier(spec: &ImportDeclarationSpecifier<'_>) -> Specifier {
     let (is_default, name) = match spec {
         ImportDeclarationSpecifier::ImportSpecifier(specifier) => {
-            (false, specifier.imported.name().to_string())
+            (false, identifier_name(&specifier.imported))
         }
         ImportDeclarationSpecifier::ImportDefaultSpecifier(specifier) => {
-            (true, specifier.local.name.to_string())
+            (true, Some(specifier.local.name.to_string()))
         }
         ImportDeclarationSpecifier::ImportNamespaceSpecifier(specifier) => {
-            (false, specifier.local.name.to_string())
+            (false, Some(specifier.local.name.to_string()))
         }
     };
     Specifier { is_default, name, exported: None }
@@ -176,7 +187,7 @@ impl<'a> Visit<'a> for Scanner {
                 for s in &node.specifiers {
                     dep.import_specifiers.push(Specifier {
                         is_default: s.local.name() == "default",
-                        name: s.exported.name().to_string(),
+                        name: identifier_name(&s.exported),
                         exported: Some(true),
                     });
                 }
@@ -218,22 +229,17 @@ impl<'a> Visit<'a> for Scanner {
         if matches!(&node.callee, Expression::Identifier(id) if id.name=="define") {
             self.unsupported = true;
         }
-        let accepted = match &node.callee {
-            Expression::Identifier(id) => id.name == "require",
-            Expression::StaticMemberExpression(m) => {
-                m.property.name == "resolve"
-                    && match &m.object {
-                        Expression::Identifier(id) => id.name == "require",
-                        Expression::ImportMeta(_) => true,
-                        _ => false,
-                    }
-            }
-            Expression::ComputedMemberExpression(m) => {
-                matches!(&m.expression,Expression::Identifier(id) if id.name=="resolve")
-                    && matches!(&m.object,Expression::Identifier(id) if id.name=="require")
-            }
-            _ => false,
-        };
+        let accepted = calls::accepted(node, self.ts);
+        if accepted
+            && self.ts
+            && node.arguments
+                .first()
+                .is_some_and(|argument| {
+                    matches!(argument, Argument::NumericLiteral(_) | Argument::BooleanLiteral(_))
+                })
+        {
+            self.unsupported = true;
+        }
         if accepted && let Some(name) = node.arguments.first().and_then(argument) {
             self.add(&name, node.span);
         }
@@ -257,8 +263,16 @@ fn outcome(file: &File, status: &'static str, message: String) -> Outcome {
     }
 }
 fn scan(file: &File, unsupported_options: bool) -> Outcome {
-    if unsupported_options {
-        return outcome(file, "unsupported", "options require legacy fallback".into());
+    if unsupported_options
+        || file.source
+            .as_ref()
+            .is_some_and(|source| source.len() > limits::SOURCE_BYTES)
+    {
+        return outcome(
+            file,
+            "unsupported",
+            "options or source size require legacy fallback".into(),
+        );
     }
     let kind = file.kind
         .as_deref()
@@ -272,12 +286,12 @@ fn scan(file: &File, unsupported_options: bool) -> Outcome {
         "tsx" => SourceType::tsx(),
         _ => return outcome(file, "unsupported", "unsupported file kind".into()),
     };
-    let source = match &file.source {
-        Some(s) => s.clone(),
-        None => match std::fs::read_to_string(&file.path) {
-            Ok(s) => s,
-            Err(e) => return outcome(file, "read_error", e.to_string()),
-        },
+    let source = match limits::source(file.source.as_deref(), std::path::Path::new(&file.path)) {
+        Ok(source) => source,
+        Err(error) if error.kind() == io::ErrorKind::FileTooLarge => {
+            return outcome(file, "unsupported", error.to_string());
+        }
+        Err(error) => return outcome(file, "read_error", error.to_string()),
     };
     if source.starts_with("// @bit-no-check") || source.starts_with("/* @bit-no-check") {
         return Outcome {
@@ -354,26 +368,6 @@ fn scanner_for_source(
         unsupported: false,
     }
 }
-fn process_request(input: &str, pool: &rayon::ThreadPool) -> Result<Value, serde_json::Error> {
-    match serde_json::from_str::<Request>(input) {
-        Ok(req) if req.version == 1 => serde_json::to_value(Response {
-            version: 1,
-            id: req.id,
-            files: pool.install(|| {
-                req.files
-                    .par_iter()
-                    .map(|file| scan(file, !req.options.is_empty()))
-                    .collect()
-            }),
-        }),
-        Ok(_) => Ok(
-            serde_json::json!({"version":1,"status":"invalid_request","diagnostics":["unsupported protocol version"]}),
-        ),
-        Err(error) => Ok(
-            serde_json::json!({"version":1,"status":"invalid_request","diagnostics":[error.to_string()]}),
-        ),
-    }
-}
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let threads = if args.is_empty() {
@@ -389,13 +383,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build()?;
     let stdin = io::stdin();
     let mut stdout = io::BufWriter::new(io::stdout().lock());
-    for input in stdin.lock().lines() {
-        let input = input?;
-        let response = process_request(&input, &pool)?;
-        serde_json::to_writer(&mut stdout, &response)?;
-        writeln!(stdout)?;
-        stdout.flush()?;
-    }
+    transport::serve(&mut stdin.lock(), &mut stdout, |input| {
+        protocol::process_request(input, &pool)
+    })?;
     Ok(())
 }
 

@@ -130,3 +130,58 @@ fn bit_ignore_uses_the_line_of_the_dependency_node() {
         vec!["kept"],
     );
 }
+
+#[test]
+fn source_limit_requests_fallback_without_partial_dependencies() {
+    let source = " ".repeat(crate::limits::SOURCE_BYTES + 1);
+    assert_eq!(scan(&fixture("ts", &source), false).status, "unsupported");
+    let source = " ".repeat(crate::limits::SOURCE_BYTES);
+    assert_eq!(scan(&fixture("ts", &source), false).status, "ok");
+    assert_eq!(scan(&fixture("ts", "require(123); require(true);"), false).status, "unsupported");
+}
+
+#[test]
+fn wire_metadata_preserves_legacy_string_names_and_optional_calls() {
+    let result = scan(
+        &fixture(
+            "js",
+            "import { 'some-name' as named } from 'pkg'; export { named as 'export-name' } from 'other'; require?.('./optional'); import.meta[resolve]('./computed');",
+        ),
+        false,
+    );
+    assert_eq!(
+        serde_json::to_value(result.dependencies).unwrap(),
+        json!({"pkg":{"importSpecifiers":[{"isDefault":false}]},"other":{"importSpecifiers":[{"isDefault":false,"exported":true}]},"./computed":{}}),
+    );
+}
+
+#[test]
+fn oversized_batch_preserves_session_protocol_error() {
+    let files: Vec<_> = (0..=crate::limits::BATCH_FILES)
+        .map(|_| json!({"path":"empty.ts","source":""}))
+        .collect();
+    let request = json!({"version":1,"files":files}).to_string();
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(1)
+        .build()
+        .unwrap();
+    let response = crate::protocol::process_request(&request, &pool).unwrap();
+    assert_eq!(response["status"], "invalid_request");
+    let response =
+        crate::protocol::process_request(r#"{"version":1,"files":[],"id":"next"}"#, &pool).unwrap();
+    assert_eq!(response["id"], "next");
+}
+
+#[test]
+fn disk_source_limit_and_invalid_encoding_have_distinct_outcomes() {
+    let path = std::env::temp_dir().join(format!("bit-source-limit-{}", std::process::id()));
+    let disk = std::fs::File::create(&path).unwrap();
+    disk.set_len((crate::limits::SOURCE_BYTES + 1) as u64)
+        .unwrap();
+    let file = File { path: path.to_str().unwrap().into(), source: None, kind: Some("ts".into()) };
+    assert_eq!(scan(&file, false).status, "unsupported");
+    std::fs::write(&path, [0xff]).unwrap();
+    assert_eq!(scan(&file, false).status, "read_error");
+    std::fs::remove_file(&path).unwrap();
+    assert_eq!(scan(&file, false).status, "read_error");
+}
