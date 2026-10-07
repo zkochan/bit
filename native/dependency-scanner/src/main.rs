@@ -288,7 +288,9 @@ fn scan(file: &File, unsupported_options: bool) -> Outcome {
     };
     let source = match limits::source(file.source.as_deref(), std::path::Path::new(&file.path)) {
         Ok(source) => source,
-        Err(error) if error.kind() == io::ErrorKind::FileTooLarge => {
+        Err(error)
+            if matches!(error.kind(), io::ErrorKind::FileTooLarge | io::ErrorKind::InvalidData) =>
+        {
             return outcome(file, "unsupported", error.to_string());
         }
         Err(error) => return outcome(file, "read_error", error.to_string()),

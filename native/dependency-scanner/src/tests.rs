@@ -180,8 +180,10 @@ fn disk_source_limit_and_invalid_encoding_have_distinct_outcomes() {
         .unwrap();
     let file = File { path: path.to_str().unwrap().into(), source: None, kind: Some("ts".into()) };
     assert_eq!(scan(&file, false).status, "unsupported");
-    std::fs::write(&path, [0xff]).unwrap();
-    assert_eq!(scan(&file, false).status, "read_error");
+    std::fs::write(&path, b"import './valid'; // invalid encoding: \xff").unwrap();
+    let result = scan(&file, false);
+    assert_eq!(result.status, "unsupported");
+    assert_eq!(result.dependencies.len(), 0);
     std::fs::remove_file(&path).unwrap();
     assert_eq!(scan(&file, false).status, "read_error");
 }
