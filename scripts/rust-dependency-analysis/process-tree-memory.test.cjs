@@ -92,6 +92,12 @@ test('vanished processes are reported and cannot contribute stale RSS', (context
   assert.ok(report.missingProcessReads > 0);
 });
 
+test('missing task children lists fail instead of silently measuring only the root', (context) => {
+  const fixture = proc(context);
+  fixture.process(10, 1, 100, '10', {});
+  assert.throws(() => createProcessTreeMemorySampler(10, { procRoot: fixture.root }), /CONFIG_PROC_CHILDREN/);
+});
+
 test('invalid root and interval fail explicitly', (context) => {
   const fixture = proc(context);
   assert.throws(() => createProcessTreeMemorySampler(0), /positive integer/);

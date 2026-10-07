@@ -88,6 +88,13 @@ function createProcessTreeMemorySampler(rootPid, options = {}) {
   }
   const root = processInfo(rootPid);
   if (!root) throw new Error('cannot inspect command process in procfs');
+  // Descendants are discovered only through task children lists. Kernels without
+  // CONFIG_PROC_CHILDREN lack them, which would silently measure the root process alone.
+  try {
+    readFileSync(path.join(procRoot, String(rootPid), 'task', String(rootPid), 'children'), 'utf8');
+  } catch (error) {
+    throw new Error(`procfs task children lists are unavailable (CONFIG_PROC_CHILDREN): ${error.code}`);
+  }
   known.set(rootPid, root.startTime);
   identities.add(`${rootPid}:${root.startTime}`);
 
