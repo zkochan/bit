@@ -5,6 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { createRequire } = require('node:module');
 const { setTimeout: delay } = require('node:timers/promises');
+const { spawnSync } = require('node:child_process');
 const installed = createRequire(
   path.resolve(process.env.BIT_LEGACY_ROOT || path.join(__dirname, '../..'), 'package.json')
 );
@@ -375,4 +376,25 @@ test('inline cache copies preserve parse and fallback semantics after caller mut
   }
   assert.equal(logs().filter(({ event }) => event === 'request').length, 4);
   assert.equal(session.unavailableReason, undefined);
+});
+
+test('an undisposed idle session does not keep the parent process alive', (context) => {
+  const { directory } = fixture(context);
+  const executable = path.join(directory, 'scanner');
+  // A separate Node process loads the session exactly as this harness does, then returns without dispose.
+  const script = `
+    const Module = require('node:module');
+    const fs = require('node:fs');
+    const ts = Module.createRequire(${JSON.stringify(installed.resolve('typescript'))})('typescript');
+    require.extensions['.ts'] = (target, filename) => target._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, esModuleInterop: true },
+    }).outputText, filename);
+    const { RustDependencyScannerSession } = require(${JSON.stringify(source)});
+    const session = new RustDependencyScannerSession({ executable: ${JSON.stringify(executable)}, cwd: ${JSON.stringify(directory)} });
+    session.prefetch(['a.ts']).then(() => console.log(session.get('a.ts').status));
+  `;
+  const run = spawnSync(process.execPath, ['-e', script], { encoding: 'utf8', timeout: 10_000 });
+  assert.equal(run.error, undefined, 'parent process must exit while the helper is idle');
+  assert.equal(run.status, 0, run.stderr);
+  assert.equal(run.stdout.trim(), 'ok');
 });
