@@ -145,7 +145,7 @@ test('exclusive leases are bounded and nested scopes retain the outer owner', as
   assert.equal(new Set(events.disposed).size, 4);
 });
 
-test('detached asynchronous work cannot reopen its closed owner context', async (context) => {
+test('detached asynchronous work cannot reopen its closed owner context but owns a new operation', async (context) => {
   const events = observe(context);
   const executable = path.join(os.tmpdir(), 'bit-unused-scanner');
   let unblock;
@@ -159,14 +159,26 @@ test('detached asynchronous work cannot reopen its closed owner context', async 
       lease.release();
       detached = (async () => {
         await gate;
-        return withRustDependencyScannerScope(async () => acquireRustDependencyScannerSession(executable));
+        const stale = acquireRustDependencyScannerSession(executable);
+        let fresh;
+        await withRustDependencyScannerScope(async () => {
+          fresh = acquireRustDependencyScannerSession(executable);
+          fresh.release();
+        });
+        return { stale, fresh, disposedAfterFreshOperation: events.disposed.length };
       })();
     })
   );
-  unblock();
-  assert.equal(await detached, undefined);
+  const { stale, fresh, disposedAfterFreshOperation } = await enabled(executable, () => {
+    unblock();
+    return detached;
+  });
+  assert.equal(stale, undefined);
+  assert.ok(fresh);
   assert.equal(events.children.length, 0);
-  assert.equal(events.disposed.length, 1);
+  // The original owner disposed its helper; the later operation disposed its own on exit.
+  assert.equal(disposedAfterFreshOperation, 2);
+  assert.ok(events.disposed.includes(fresh.session));
 });
 
 test('dependency aspect explicitly registers the component-load scope adapter', async (context) => {

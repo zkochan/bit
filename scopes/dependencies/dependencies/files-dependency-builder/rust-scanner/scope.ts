@@ -13,7 +13,7 @@ class ScannerScope {
   private readonly slots = new Map<string, Slot[]>();
   private readonly failed = new Set<string>();
   private helpers = 0;
-  private closed = false;
+  closed = false;
 
   acquire(executable: string, cwd: string): RustScannerLease | undefined {
     if (this.closed) return undefined;
@@ -66,9 +66,10 @@ const scopes = new AsyncLocalStorage<ScannerScope>();
 
 /** The outer component-load operation owns helper lifetimes, including nested loads. */
 export async function withRustDependencyScannerScope<T>(operation: () => Promise<T>): Promise<T> {
-  // Reentrant loads retain their original owner. A late task retaining a closed
-  // context must also retain it, rather than opening helpers after owner cleanup.
-  if (scopes.getStore()) return operation();
+  // Reentrant loads retain their original owner. A context can outlive its owner
+  // (e.g. a callback scheduled during loading), so a closed store does not count:
+  // the new operation owns a fresh scope and disposes it in its own finally.
+  if (scopes.getStore()?.closed === false) return operation();
   const executable = process.env.BIT_RUST_DEPENDENCY_SCANNER;
   if (!executable || !path.isAbsolute(executable)) return operation();
   const scope = new ScannerScope();
