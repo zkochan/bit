@@ -5,6 +5,15 @@ module.exports = [
   { name: 'reexports-js', path: 'exports.mjs', source: `export { default as renamed, value as alias } from './one'; export * from './two';` },
   { name: 'calls', path: 'calls.cjs', source: `const a = require('pkg'); require.resolve('./resolved'); import('./dynamic'); require(variable); import(variable);` },
   { name: 'unclassified-js', path: 'resolve-only.js', source: `const target = require.resolve('./resolved');` },
+  { name: 'optional-call-js', path: 'optional.js', source: `import './base'; require?.('./optional');` },
+  { name: 'optional-call-ts', path: 'optional.ts', source: `import './base'; require?.('./optional');` },
+  { name: 'computed-import-meta', path: 'computed.js', source: `import './base'; import.meta[resolve]('./computed');` },
+  { name: 'string-import-name', path: 'strings.js', source: `import { 'some-name' as named } from 'pkg';` },
+  { name: 'string-import-name-ts', path: 'strings.ts', source: `import { 'some-name' as named } from 'pkg';` },
+  { name: 'string-export-name', path: 'strings-export.js', source: `import './base'; export { 'str-name' as 'other-name' } from './export';` },
+  { name: 'first-module-node', path: 'mixed.js', source: `require('pkg'); define(['amd'], function() {});`, expectFallback: 'AMD call requires conservative fallback even after CommonJS classification' },
+  { name: 'numeric-call-esm', path: 'numeric.js', source: `import './base'; require(123); require(true);` },
+  { name: 'numeric-call-ts', path: 'numeric.ts', source: `require(123); require(true);`, expectFallback: 'Legacy TS coerces nonstring literals into dependency keys' },
   { name: 'duplicates', path: 'duplicates.js', source: `import { a } from 'pkg'; import { b } from 'pkg'; require('pkg');` },
   { name: 'comments-strings', path: 'comments.js', source: `// require('fake')\nconst text = "import x from 'fake'"; import './real';` },
   { name: 'jsx', path: 'view.jsx', source: `import React from 'react'; import View from './view'; const x = <View />;` },
@@ -21,9 +30,27 @@ module.exports = [
   { name: 'literal-templates', path: 'templates.ts', source: 'require(`./template`); import(`./dynamic`); require(`./${variable}`);' },
   { name: 'core-filter', path: 'core.js', source: `import fs from 'fs'; import path from 'node:path'; import x from 'pkg';`, options: { includeCore: false }, expectFallback: 'Nonempty options retain legacy filtering' },
   { name: 'angular', path: 'angular.ts', source: `@Component({ templateUrl: 'view.html', styleUrl: './view.css', styleUrls: ['one.css', '../two.css'] }) class View {}`, expectFallback: 'Decorator asset extraction retains the legacy detector' },
-  { name: 'invalid-js', path: 'invalid.js', source: `import { from 'pkg';` },
+  { name: 'invalid-js', path: 'invalid.js', source: `import { from 'pkg';`, expectFallback: 'JS parse failures retain the Babel/Flow legacy parser' },
   { name: 'invalid-ts', path: 'invalid.ts', source: `const value: = 1;` },
   { name: 'amd', path: 'amd.js', source: `define(['pkg'], function(pkg) {});`, fallback: 'AMD dispatch remains on the legacy detector' },
   { name: 'custom-detector', path: 'custom.js', source: `import x from 'pkg';`, options: { customDetector: true }, fallback: 'Environment and global detectors take precedence' },
   { name: 'unsupported-css', path: 'style.css', source: `@import './other.css';`, fallback: 'Non-JS/TS detectors remain on the legacy path' },
 ];
+
+// Existing precinct fixtures mostly disable extraction with a leading no-check.
+// Test their real sources plus an explicitly named variant with that directive removed.
+const fs = require('node:fs');
+const path = require('node:path');
+const precinctDirectory = path.resolve(__dirname, '../../scopes/dependencies/dependencies/files-dependency-builder/fixtures/precinct');
+const classificationFallback = new Set(['Gruntfile.js', 'amd.js', 'cjsExportLazy.js', 'exampleAST.js']);
+for (const filename of fs.readdirSync(precinctDirectory).filter((filename) => filename.endsWith('.js')).sort()) {
+  const source = fs.readFileSync(path.join(precinctDirectory, filename), 'utf8');
+  module.exports.push({ name: `precinct-original-${filename}`, path: filename, source,
+    ...(classificationFallback.has(filename) && !source.startsWith('// @bit-no-check') ? { expectFallback: 'Assignment-based or AMD classification retains legacy dispatch' } : {}),
+  });
+  if (source.startsWith('// @bit-no-check')) {
+    module.exports.push({ name: `precinct-enabled-${filename}`, path: filename, source: source.replace(/^\/\/ @bit-no-check\r?\n/, ''),
+      ...(classificationFallback.has(filename) ? { expectFallback: 'Assignment-based or AMD classification retains legacy dispatch' } : {}),
+    });
+  }
+}
