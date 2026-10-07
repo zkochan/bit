@@ -49,7 +49,8 @@ const report = {
   startingState: 'each variant receives a physical/reflink copy of the same baseline with cold dependency cache',
   legacyUmbrella: legacyUmbrella
     ? {
-        source: legacyUmbrella,
+        // Reports are committed: never record the host's home directory.
+        source: legacyUmbrella.replace(os.homedir(), '~'),
         version: JSON.parse(fs.readFileSync(path.join(legacyUmbrella, 'package.json'))).version,
         files: {},
       }

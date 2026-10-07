@@ -1,5 +1,5 @@
 // Install validation only: observe the real engine call without replacing it or logging credentials.
-require('./command-trace.cjs');
+const { isTraceOwner } = require('./command-trace.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const { createRequire } = require('node:module');
@@ -45,6 +45,6 @@ api.install = function (options, ...rest) {
   return install.call(this, options, ...rest);
 };
 process.on('exit', () => {
-  if (process.env.BIT_INSTALL_VALIDATION_TRACE)
+  if (process.env.BIT_INSTALL_VALIDATION_TRACE && isTraceOwner)
     fs.writeFileSync(process.env.BIT_INSTALL_VALIDATION_TRACE, JSON.stringify({ calls, treeCalls }));
 });
