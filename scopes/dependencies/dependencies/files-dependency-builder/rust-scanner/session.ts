@@ -180,6 +180,20 @@ export class RustDependencyScannerSession {
       // Keep a bounded diagnostic tail even when the child emits continuously.
       this.stderr = Buffer.concat([this.stderr, chunk.subarray(-16_384)]).subarray(-16_384);
     });
+    this.keepAlive(false);
+  }
+
+  /**
+   * An idle helper must not keep the Node process alive when a caller never disposes the session;
+   * on exit the helper sees stdin EOF and stops. Only an in-flight request holds the event loop.
+   */
+  private keepAlive(active: boolean): void {
+    const child = this.child;
+    if (!child) return;
+    for (const handle of [child, child.stdin, child.stdout, child.stderr] as Array<{ ref(): void; unref(): void }>) {
+      if (active) handle.ref();
+      else handle.unref();
+    }
   }
 
   private receive(chunk: Buffer): void {
@@ -203,6 +217,7 @@ export class RustDependencyScannerSession {
       this.output = Buffer.alloc(0);
       this.pending = undefined;
       clearTimeout(pending.timer);
+      this.keepAlive(false);
       pending.resolve(files);
     } catch (error) {
       this.fail(`Rust scanner protocol error: ${String(error)}`);
@@ -227,6 +242,7 @@ export class RustDependencyScannerSession {
     return new Promise((resolve) => {
       const timer = setTimeout(() => this.fail('Rust scanner response timed out'), this.limits.timeoutMs);
       this.pending = { id, paths, timer, resolve };
+      this.keepAlive(true);
       this.child!.stdin.write(`${input}\n`, (error) => {
         if (error) this.fail(`Rust scanner write failed: ${error.message}`);
       });
