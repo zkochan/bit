@@ -8,6 +8,8 @@ const cp = require('node:child_process');
 const { createRequire } = require('node:module');
 const { createHash } = require('node:crypto');
 const { performance } = require('node:perf_hooks');
+const { createProcessTreeMemorySampler } = require('./process-tree-memory.cjs');
+const { createBenchmarkProcessControl } = require('./process-tree-memory-control.cjs');
 assert.equal(process.argv.length, 6, 'usage: install-benchmark.cjs <private-cli> <fixture> <helper> <report.json>');
 const [cli, fixture, native, destination] = process.argv.slice(2).map((value) => path.resolve(value));
 const provenance = JSON.parse(fs.readFileSync(path.join(cli, '.bit-rust-private-build.json')));
@@ -45,6 +47,14 @@ const report = {
   acceptance: false,
   runs: [],
 };
+let activeControl;
+let interrupted = false;
+function interrupt() {
+  interrupted = true;
+  activeControl?.terminate(new Error('install benchmark interrupted'));
+}
+process.once('SIGINT', interrupt);
+process.once('SIGTERM', interrupt);
 function copy(from, to) {
   fs.cpSync(from, to, { recursive: true, preserveTimestamps: true, verbatimSymlinks: true });
   function visit(directory) {
@@ -93,15 +103,68 @@ async function execute(variant, measured) {
     BIT_INSTALL_VALIDATION_ROOT: workspace,
   };
   delete env.BIT_COMMAND_BENCH_TRACE_OWNER;
+  if (interrupted) throw new Error('install benchmark interrupted');
   if (variant === 'native') env.BIT_RUST_DEPENDENCY_SCANNER = native;
   else delete env.BIT_RUST_DEPENDENCY_SCANNER;
   const start = performance.now();
-  const run = cp.spawnSync(
-    'unshare',
-    ['-Urn', process.execPath, '--require', tracer, path.join(cli, 'bin/bit.js'), ...command],
-    { cwd: workspace, env, encoding: 'utf8', timeout: 30_000, maxBuffer: 8 * 1024 * 1024 }
+  const child = cp.spawn(
+    '/usr/bin/time',
+    [
+      '-f',
+      '\nBIT_INSTALL_RESOURCE %U %S %M',
+      'unshare',
+      '-Urn',
+      process.execPath,
+      '--require',
+      tracer,
+      path.join(cli, 'bin/bit.js'),
+      ...command,
+    ],
+    { cwd: workspace, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] }
   );
+  const control = createBenchmarkProcessControl(child, { timeoutMs: 30_000 });
+  activeControl = control;
+  let stdout = '';
+  let stderr = '';
+  let outputBytes = 0;
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  function collect(stream, chunk) {
+    outputBytes += Buffer.byteLength(chunk);
+    if (outputBytes > 8 * 1024 * 1024) {
+      control.terminate(new Error('install output exceeds benchmark limit'));
+      return;
+    }
+    if (stream === 'stdout') stdout += chunk;
+    else stderr += chunk;
+  }
+  child.stdout.on('data', (chunk) => collect('stdout', chunk));
+  child.stderr.on('data', (chunk) => collect('stderr', chunk));
+  const closing = new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', (code, signal) => resolve({ status: code, signal }));
+  });
+  let sampler;
+  let run;
+  let memory;
+  try {
+    if (!child.pid) await closing;
+    sampler = createProcessTreeMemorySampler(child.pid);
+    sampler.start();
+    run = { ...(await closing), stdout, stderr };
+    memory = sampler.stop();
+    if (control.failure) throw control.failure;
+    if (interrupted) throw new Error('install benchmark interrupted');
+    assert.equal(memory.failedProcReads, 0, 'procfs failures cannot pass');
+    assert.equal(memory.racedProcessReads, 0, 'PID reuse cannot pass');
+  } finally {
+    sampler?.stop();
+    control.dispose();
+    activeControl = undefined;
+  }
   const elapsedMs = performance.now() - start;
+  const resource = stderr.match(/BIT_INSTALL_RESOURCE ([\d.]+) ([\d.]+) (\d+)/);
+  assert.ok(resource, stderr);
   const helper = fs.existsSync(trace) ? JSON.parse(fs.readFileSync(trace)) : {};
   const pm = fs.existsSync(pmTrace) ? JSON.parse(fs.readFileSync(pmTrace)) : { calls: [], treeCalls: 0 };
   report.lastAttempt = {
@@ -127,6 +190,9 @@ async function execute(variant, measured) {
     variant,
     measured,
     elapsedMs,
+    totalTreeCpuMs: (Number(resource[1]) + Number(resource[2])) * 1000,
+    maxSingleProcessRssKiB: Number(resource[3]),
+    memory,
     cacheEntriesBefore: 0,
     dependencies,
     projects: pm.calls.map((call) => call.projects),
@@ -184,6 +250,18 @@ function summarize(run) {
     report.legacyMedianMs = median(report.runs.filter((run) => run.variant === 'legacy').map((run) => run.elapsedMs));
     report.nativeMedianMs = median(report.runs.filter((run) => run.variant === 'native').map((run) => run.elapsedMs));
     report.nativeToLegacyRatio = report.nativeMedianMs / report.legacyMedianMs;
+    report.memoryMethod =
+      'near-simultaneous 20ms Linux process-tree RSS sum, GNU time/unshare wrappers and observed CLI descendants included; driver excluded';
+    report.memoryCaveats = [
+      'shared pages count once perprocess',
+      'short-lived processes and between-sample peaks may be missed',
+      'sampler CPU is reported separately and excluded from GNU time command-tree CPU',
+    ];
+    for (const variant of ['legacy', 'native']) {
+      const runs = report.runs.filter((run) => run.variant === variant);
+      report[`${variant}MedianTreeCpuMs`] = median(runs.map((run) => run.totalTreeCpuMs));
+      report[`${variant}MedianSampledTreeRssKiB`] = median(runs.map((run) => run.memory.peakSampledRssKiB));
+    }
     report.acceptance = true;
   } catch (error) {
     report.failure = error.message;
