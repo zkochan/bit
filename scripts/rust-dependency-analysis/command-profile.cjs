@@ -93,7 +93,8 @@ function run(command, variant, profiled) {
     }
     const urls = frames.map((frame) => frame.url).join('\n');
     let category = 'other';
-    if (frames[0].functionName === '(garbage collector)') category = 'garbageCollection';
+    if (frames[0].functionName === '(idle)') category = 'idle';
+    else if (frames[0].functionName === '(garbage collector)') category = 'garbageCollection';
     else if (/typescript-estree|babel.*parser|acorn|detective-|node-source-walk/.test(urls))
       category = 'legacyParsingAndExtraction';
     else if (/rust-scanner/.test(urls)) category = 'nativeCoordination';
