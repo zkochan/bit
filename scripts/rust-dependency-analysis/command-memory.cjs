@@ -39,6 +39,8 @@ const states = (process.env.BIT_COMMAND_MEMORY_STATES || 'cold,warm').split(',')
 assert.ok(states.length > 0 && states.every((state) => ['cold', 'warm'].includes(state)));
 const commands = (process.env.BIT_COMMAND_MEMORY_COMMANDS || 'status').split(',');
 assert.ok(commands.length > 0 && commands.every((command) => ['status', 'graph', 'list'].includes(command)));
+const variants = (process.env.BIT_COMMAND_MEMORY_VARIANTS || 'legacy,native').split(',');
+assert.ok(variants.length > 1 && variants.every((variant) => ['legacy', 'control', 'native'].includes(variant)));
 const report = {
   provenance,
   driverRevision: cp.execFileSync('git', ['rev-parse', 'HEAD'], { cwd: __dirname, encoding: 'utf8' }).trim(),
@@ -87,16 +89,19 @@ async function execute(variant, command = 'status') {
   if (interrupted) throw new Error('memory benchmark interrupted');
   const cacheEntriesBefore = cacheEntries();
   const traceFile = path.join(temporary, 'trace.json');
+  const controlTraceFile = path.join(temporary, 'control.json');
   fs.rmSync(traceFile, { force: true });
   const env = {
     ...process.env,
     BIT_GLOBALS_DIR: require('./command-workspace.cjs').benchmarkGlobals(temporary),
     NODE_COMPILE_CACHE: path.join(temporary, 'compile-cache'),
     BIT_COMMAND_BENCH_TRACE: traceFile,
+    BIT_COMMAND_CONTROL_TRACE: controlTraceFile,
+    BIT_LEGACY_ROOT: cliRoot,
   };
   delete env.BIT_NO_COMPILE_CACHE;
   delete env.BIT_COMMAND_BENCH_TRACE_OWNER;
-  if (variant === 'native') env.BIT_RUST_DEPENDENCY_SCANNER = native;
+  if (variant !== 'legacy') env.BIT_RUST_DEPENDENCY_SCANNER = native;
   else delete env.BIT_RUST_DEPENDENCY_SCANNER;
   const started = performance.now();
   const child = cp.spawn(
@@ -106,7 +111,7 @@ async function execute(variant, command = 'status') {
       '\nBIT_MEMORY_RESOURCE %U %S %M',
       process.execPath,
       '--require',
-      path.join(__dirname, 'command-trace.cjs'),
+      path.join(__dirname, variant === 'control' ? 'command-control-trace.cjs' : 'command-trace.cjs'),
       cli,
       command,
       '--json',
@@ -154,6 +159,7 @@ async function execute(variant, command = 'status') {
     const resources = stderr.match(/BIT_MEMORY_RESOURCE ([\d.]+) ([\d.]+) (\d+)/);
     assert.ok(resources, stderr);
     const trace = JSON.parse(fs.readFileSync(traceFile, 'utf8'));
+    const controlMetrics = variant === 'control' ? JSON.parse(fs.readFileSync(controlTraceFile, 'utf8')) : undefined;
     return {
       value: JSON.parse(stdout),
       cacheEntriesBefore,
@@ -162,6 +168,7 @@ async function execute(variant, command = 'status') {
       totalTreeCpuMs: (Number(resources[1]) + Number(resources[2])) * 1000,
       maxIndividualProcessRssKiB: Number(resources[3]),
       ...trace,
+      controlMetrics,
       memory,
     };
   } catch (error) {
@@ -186,7 +193,7 @@ async function main() {
       restore('warm');
       const reference = (await execute('legacy', command)).value;
       for (const state of command === 'list' ? ['warm'] : states) {
-        for (const variant of ['legacy', 'native']) {
+        for (const variant of variants) {
           restore(state);
           assert.deepEqual(
             (await execute(variant, command)).value,
@@ -196,7 +203,8 @@ async function main() {
         }
         const runs = [];
         for (let iteration = 0; iteration < 9; iteration++) {
-          for (const variant of iteration % 2 ? ['native', 'legacy'] : ['legacy', 'native']) {
+          for (let offset = 0; offset < variants.length; offset++) {
+            const variant = variants[(iteration + offset) % variants.length];
             restore(state);
             const { value, ...metrics } = await execute(variant, command);
             assert.deepEqual(value, reference, `${state}/${variant} JSON parity`);
@@ -210,17 +218,24 @@ async function main() {
               );
             } else {
               assert.equal(metrics.helperStarts, 0, 'legacy and warm/startup controls must not start helpers');
+              if (variant === 'control') {
+                if (state === 'cold' && command !== 'list') assert.ok(metrics.controlMetrics.controlParses > 0);
+                else assert.equal(metrics.controlMetrics.controlParses, 0);
+              }
             }
             runs.push({ iteration, variant, ...metrics });
           }
         }
         const summary = Object.fromEntries(
-          ['legacy', 'native'].map((variant) => {
+          variants.map((variant) => {
             const rows = runs.filter((run) => run.variant === variant);
             return [
               variant,
               {
                 medianElapsedMs: median(rows.map((run) => run.elapsedMs)),
+                minElapsedMs: Math.min(...rows.map((run) => run.elapsedMs)),
+                maxElapsedMs: Math.max(...rows.map((run) => run.elapsedMs)),
+                medianTreeCpuMs: median(rows.map((run) => run.totalTreeCpuMs)),
                 medianPeakSampledRssKiB: median(rows.map((run) => run.memory.peakSampledRssKiB)),
                 minPeakSampledRssKiB: Math.min(...rows.map((run) => run.memory.peakSampledRssKiB)),
                 maxPeakSampledRssKiB: Math.max(...rows.map((run) => run.memory.peakSampledRssKiB)),
