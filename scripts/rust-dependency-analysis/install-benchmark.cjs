@@ -267,7 +267,9 @@ function summarize(run) {
     report.failure = error.message;
     process.exitCode = 1;
   } finally {
-    fs.writeFileSync(destination, JSON.stringify(report, null, 2) + '\n');
+    // Reports are committed: replace the disposable root (often under the user's home) with a placeholder.
+    const json = JSON.stringify(report, null, 2).split(JSON.stringify(root).slice(1, -1)).join('<benchmark-root>');
+    fs.writeFileSync(destination, json + '\n');
     fs.rmSync(root, { recursive: true, force: true });
   }
 })();

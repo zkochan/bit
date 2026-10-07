@@ -131,8 +131,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -190,8 +190,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -251,8 +251,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -312,8 +312,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -371,8 +371,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -430,8 +430,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -491,8 +491,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -552,8 +552,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -611,8 +611,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -670,8 +670,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -731,8 +731,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -792,8 +792,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -851,8 +851,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -910,8 +910,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -971,8 +971,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -1032,8 +1032,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -1091,8 +1091,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -1150,8 +1150,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -1192,7 +1192,7 @@
         {
           "projects": [
             {
-              "rootDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/source-0",
+              "rootDir": "<benchmark-root>/workspace/source-0",
               "manifest": {
                 "name": "@validation/local.source-0",
                 "version": "0.0.1-new",
@@ -1204,7 +1204,7 @@
               }
             },
             {
-              "rootDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/source-1",
+              "rootDir": "<benchmark-root>/workspace/source-1",
               "manifest": {
                 "name": "@validation/local.source-1",
                 "version": "0.0.1-new",
@@ -1216,7 +1216,7 @@
               }
             },
             {
-              "rootDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/source-2",
+              "rootDir": "<benchmark-root>/workspace/source-2",
               "manifest": {
                 "name": "@validation/local.source-2",
                 "version": "0.0.1-new",
@@ -1228,7 +1228,7 @@
               }
             },
             {
-              "rootDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/source-3",
+              "rootDir": "<benchmark-root>/workspace/source-3",
               "manifest": {
                 "name": "@validation/local.source-3",
                 "version": "0.0.1-new",
@@ -1240,7 +1240,7 @@
               }
             },
             {
-              "rootDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace",
+              "rootDir": "<benchmark-root>/workspace",
               "manifest": {
                 "name": "workspace",
                 "version": "1.0.0",
@@ -1372,7 +1372,7 @@
               }
             },
             {
-              "rootDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/node_modules/.bit_roots/teambit.harmony_node",
+              "rootDir": "<benchmark-root>/workspace/node_modules/.bit_roots/teambit.harmony_node",
               "manifest": {
                 "dependencies": {
                   "react": "^19.0.0",
@@ -1388,9 +1388,9 @@
               }
             }
           ],
-          "dir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace",
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "dir": "<benchmark-root>/workspace",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "offline": false
         }
@@ -1440,8 +1440,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
@@ -1498,8 +1498,8 @@
       "cacheEntriesBefore": 0,
       "installerCalls": [
         {
-          "storeDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.store/v11",
-          "cacheDir": "/var/home/zoltan/.cache/claude-tmp/session.wjTMdM4J3r/bit-install-benchmark-3HxAzR/workspace/.cache",
+          "storeDir": "<benchmark-root>/workspace/.store/v11",
+          "cacheDir": "<benchmark-root>/workspace/.cache",
           "lockfileOnly": true,
           "projectCount": 6
         }
