@@ -104,8 +104,8 @@ export function resolveRustDependencyScannerExecutable(): string | undefined {
         return fallback('packaged scanner license or notices checksum mismatch');
       }
     }
-    validated = { directory, fingerprint, executable };
-    return executable;
+    validated = { directory, fingerprint, executable: path.toNamespacedPath(executable) };
+    return validated.executable;
   } catch (error) {
     return fallback(`packaged scanner unavailable: ${(error as Error).message}`);
   }
