@@ -586,3 +586,14 @@ test('inline parse diagnostics use the original snapshot without repeating custo
   assert.equal(predicates, 1);
   assert.equal(session.calls.source[0].source, 'const value: = invalid;');
 });
+
+test('disappearing prefetched source retains its established native parse failure', async (context) => {
+  hooks(context, []);
+  const { file } = workspace(context, { 'entry.ts': 'const value: = invalid;' });
+  const session = controlledSession(outcome('parse_error', {}, ['original native parse failure']));
+  session.prefetch = async () => fs.unlinkSync(file('entry.ts'));
+  await assert.rejects(
+    precinct.paperwork(file('entry.ts'), { rustScannerSession: session }),
+    (error) => error.message === 'original native parse failure' && error.code !== 'ENOENT'
+  );
+});

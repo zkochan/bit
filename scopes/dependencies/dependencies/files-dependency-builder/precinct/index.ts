@@ -247,7 +247,17 @@ const enrichParseError = async (
   selectedDetector?: Detective
 ): Promise<void> => {
   if (outcome?.status !== 'parse_error') return;
-  const info = fileInfo || getFileInfo(filename);
+  const nativeError = new Error(outcome.diagnostics.join('\n') || `could not parse ${filename}`);
+  let info = fileInfo;
+  if (!info) {
+    try {
+      info = getFileInfo(filename);
+    } catch {
+      // The source may disappear after prefetch. Diagnostic enrichment must not
+      // replace an established parse failure with a new file-read failure.
+      throw nativeError;
+    }
+  }
   // Prefetch is restricted to built-in contexts. Inline dispatch has already
   // selected its detector; never repeat custom predicates or read the file again.
   const detective = fileInfo
@@ -260,7 +270,7 @@ const enrichParseError = async (
     }
     await detective(info.ast, options[info.type]);
   }
-  throw new Error(outcome.diagnostics.join('\n') || `could not parse ${filename}`);
+  throw nativeError;
 };
 
 const getDepsFromFile = async (filename: string, options?: Options): Promise<string[]> => {
