@@ -200,6 +200,15 @@ async function main() {
             assert.deepEqual(value, reference, `${state}/${variant} JSON parity`);
             assert.equal(metrics.cacheEntriesBefore, state === 'cold' ? 0 : workspace.componentCount);
             assert.equal(metrics.cacheEntriesAfter, workspace.componentCount);
+            if (variant === 'native' && state === 'cold' && command !== 'list') {
+              assert.ok(metrics.helperStarts > 0, 'cold command must actually start the native helper');
+              assert.ok(
+                metrics.submittedFiles > 0 && metrics.outcomes.ok > 0,
+                'native extraction must actually execute'
+              );
+            } else {
+              assert.equal(metrics.helperStarts, 0, 'legacy and warm/startup controls must not start helpers');
+            }
             runs.push({ iteration, variant, ...metrics });
           }
         }
