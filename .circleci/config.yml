@@ -63,15 +63,15 @@ parameters:
     default: false
   release_version:
     type: string
-    default: ''
+    default: ""
   release_stable:
     type: enum
-    enum: ['true', 'false']
-    default: 'true'
+    enum: ["true", "false"]
+    default: "true"
   release_test_mode:
     type: enum
-    enum: ['true', 'false']
-    default: 'false'
+    enum: ["true", "false"]
+    default: "false"
 
 # ========================================
 # ORBS
@@ -112,18 +112,18 @@ commands:
     parameters:
       os:
         type: string
-        default: 'linux'
+        default: "linux"
       cpu:
         type: string
-        default: 'x64'
+        default: "x64"
       # The bundle is always built on Linux, so bin entries are symlinks unless this is turned off.
       # Windows bundles need real executables.
       prefer_symlinked_executables:
         type: string
-        default: 'true'
+        default: "true"
       directory:
         type: string
-        default: 'bit-${BIT_VERSION}'
+        default: "bit-${BIT_VERSION}"
     steps:
       - run:
           name: install bit bundle for <<parameters.os>> <<parameters.cpu>>
@@ -166,7 +166,7 @@ commands:
         type: string
       directory:
         type: string
-        default: 'bit-${BIT_VERSION}'
+        default: "bit-${BIT_VERSION}"
     steps:
       - run:
           name: verify @pnpm/<<parameters.package>> native binary
@@ -298,8 +298,8 @@ commands:
       - run: bvm upgrade
       - run: bvm link --verbose
       - bit_config:
-          env: 'hub'
-          bin_name: 'bbit'
+          env: "hub"
+          bin_name: "bbit"
       - run: bbit
       - run: bbit -v
       - save_cache:
@@ -415,15 +415,15 @@ commands:
         type: string
     steps:
       - docker_build_internal:
-          image_name: '<<parameters.image_name>>'
-          docker_file_name: '<<parameters.docker_file_name>>'
-          docker_tag_suffix: '<<parameters.docker_tag_suffix>>'
-          bit_version_arg_name: '<<parameters.bit_version_arg_name>>'
-          docker_build_base_image_arg_name: '<<parameters.docker_build_base_image_arg_name>>'
-          docker_build_base_image_arg_value: '<<parameters.docker_build_base_image_arg_value>>'
+          image_name: "<<parameters.image_name>>"
+          docker_file_name: "<<parameters.docker_file_name>>"
+          docker_tag_suffix: "<<parameters.docker_tag_suffix>>"
+          bit_version_arg_name: "<<parameters.bit_version_arg_name>>"
+          docker_build_base_image_arg_name: "<<parameters.docker_build_base_image_arg_name>>"
+          docker_build_base_image_arg_value: "<<parameters.docker_build_base_image_arg_value>>"
       - docker_push:
-          image_name: '<<parameters.image_name>>'
-          docker_tag_suffix: '<<parameters.docker_tag_suffix>>'
+          image_name: "<<parameters.image_name>>"
+          docker_tag_suffix: "<<parameters.docker_tag_suffix>>"
 
   docker_build_internal:
     parameters:
@@ -440,7 +440,7 @@ commands:
         default: 'Dockerfile-bit'
         type: string
       docker_tag_suffix:
-        default: ''
+        default: ""
         type: string
       bit_version_arg_name:
         default: 'BIT_VERSION'
@@ -497,16 +497,16 @@ commands:
   setup_bit_environment:
     parameters:
       env:
-        default: 'hub'
+        default: "hub"
         type: string
       token_env_var:
-        default: 'BIT_CLOUD_PROD_TOKEN'
+        default: "BIT_CLOUD_PROD_TOKEN"
         type: string
     steps:
       - bit_global_for_npm
       - set_custom_origin
       - bit_config:
-          env: '<<parameters.env>>'
+          env: "<<parameters.env>>"
       - restore_cache:
           key: bitsrc-ssh-key3
       - restore_common_caches
@@ -516,13 +516,13 @@ commands:
   store_test_results_and_artifacts:
     parameters:
       test_results_path:
-        default: 'junit'
+        default: "junit"
         type: string
       artifacts_path:
-        default: 'junit'
+        default: "junit"
         type: string
       logs_path:
-        default: '~/Library/Caches/Bit/logs'
+        default: "~/Library/Caches/Bit/logs"
         type: string
     steps:
       - store_test_results:
@@ -550,19 +550,19 @@ commands:
       - restore_cache:
           key: windows_bitsrc-registry-v1
       - bit_config:
-          token: 'fake-token'
+          token: "fake-token"
 
   # E2E test command
   e2e_test_cmd:
     parameters:
       bit_bin:
         type: string
-        default: ''
+        default: ""
       # comma-separated e2e directories to skip because they run on GitHub Actions instead
       # (see .github/workflows/e2e-tests.yml). Pass "" to run the full suite.
       exclude_dirs:
         type: string
-        default: 'e2e/commands,e2e/doctor,e2e/flows'
+        default: "e2e/commands,e2e/doctor,e2e/flows"
       # when true, the job halts (successfully) if the PR diff contains only doc files
       # (*.md / *.mdx). enabled only for the per-PR e2e_test job — the nightly/bbit/bundle
       # jobs always run the full suite (on master the check is a no-op anyway).
@@ -1043,7 +1043,7 @@ jobs:
       BITSRC_ENV: stg
       BIT_FEATURES: cloud-importer-v2
       # gate for released-binary-only e2e tests (see e2e/harmony/released-bit-core-exports.e2e.ts)
-      E2E_RELEASED_BINARY: 'true'
+      E2E_RELEASED_BINARY: "true"
     parallelism: 32
     steps:
       - attach_workspace:
@@ -1066,14 +1066,14 @@ jobs:
       # the released binary is not covered by the GitHub Actions e2e workflow (it tests the
       # repo binary), so this job keeps running the full suite, with no excluded directories.
       - e2e_test_cmd:
-          bit_bin: '--bit_bin=bbit'
-          exclude_dirs: ''
+         bit_bin: "--bit_bin=bbit"
+         exclude_dirs: ""
 
   # setup job: creates cleaned bit bundle and persists to workspace (runs once)
   setup_bundle_simulation:
     <<: *defaults
     environment:
-      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
     steps:
       - attach_workspace:
           at: ./
@@ -1082,7 +1082,7 @@ jobs:
       - setup_pnpm
       - run: mkdir bit-bundle-test
       - install_bit_bundle:
-          directory: 'bit-bundle-test'
+          directory: "bit-bundle-test"
       - run:
           name: apply cleanup script to bundled installation with UI deps removal
           command: >
@@ -1121,8 +1121,8 @@ jobs:
       # the cleaned bundle is not covered by the GitHub Actions e2e workflow, so this job
       # keeps running the full suite, with no excluded directories.
       - e2e_test_cmd:
-          bit_bin: '--bit_bin=bit-cleaned'
-          exclude_dirs: ''
+          bit_bin: "--bit_bin=bit-cleaned"
+          exclude_dirs: ""
 
   # Regenerates the e2e timings manifest (scripts/e2e-test-timings.json) from recent CI runs
   # and opens a PR when the weights drifted meaningfully. Scheduled biweekly by the
@@ -1179,16 +1179,16 @@ jobs:
     <<: *defaults
     environment:
       # do not download chromium when installing puppeteer
-      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
     steps:
       - attach_workspace:
-          at: ./
+            at: ./
       - set_bit_cloud_registry
       - setup_bit_version
       - setup_pnpm
       - install_bit_bundle
       - verify_pnpm_napi_bundle:
-          package: 'napi.linux-x64'
+          package: "napi.linux-x64"
       - optimize_node_modules
       - run:
           name: copy lockfile
@@ -1202,9 +1202,9 @@ jobs:
           name: reset bundle directory for Linux arm64
           command: rm -rf bit-${BIT_VERSION} && mkdir bit-${BIT_VERSION}
       - install_bit_bundle:
-          cpu: 'arm64'
+          cpu: "arm64"
       - verify_pnpm_napi_bundle:
-          package: 'napi.linux-arm64'
+          package: "napi.linux-arm64"
       - optimize_node_modules:
           platform: arm64
       - compress_bit:
@@ -1229,17 +1229,17 @@ jobs:
     <<: *defaults
     environment:
       # do not download chromium when installing puppeteer
-      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
     steps:
       - attach_workspace:
-          at: ./
+            at: ./
       - set_bit_cloud_registry
       - setup_bit_version
       - setup_pnpm
       - install_bit_bundle:
-          os: 'darwin'
+          os: "darwin"
       - verify_pnpm_napi_bundle:
-          package: 'napi.darwin-x64'
+          package: "napi.darwin-x64"
       - optimize_node_modules
       - compress_bit:
           scanner_target: x86_64-apple-darwin
@@ -1250,10 +1250,10 @@ jobs:
           name: reset bundle directory for macOS arm64
           command: rm -rf bit-${BIT_VERSION} && mkdir bit-${BIT_VERSION}
       - install_bit_bundle:
-          os: 'darwin'
-          cpu: 'arm64'
+          os: "darwin"
+          cpu: "arm64"
       - verify_pnpm_napi_bundle:
-          package: 'napi.darwin-arm64'
+          package: "napi.darwin-arm64"
       - optimize_node_modules:
           platform: arm64
       - compress_bit:
@@ -1275,18 +1275,18 @@ jobs:
     <<: *defaults
     environment:
       # do not download chromium when installing puppeteer
-      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: 'true'
+      PUPPETEER_SKIP_CHROMIUM_DOWNLOAD: "true"
     steps:
       - attach_workspace:
-          at: ./
+            at: ./
       - set_bit_cloud_registry
       - setup_bit_version
       - setup_pnpm
       - install_bit_bundle:
-          os: 'win32'
-          prefer_symlinked_executables: 'false'
+          os: "win32"
+          prefer_symlinked_executables: "false"
       - verify_pnpm_napi_bundle:
-          package: 'napi.win32-x64'
+          package: "napi.win32-x64"
       - optimize_node_modules
       - compress_bit:
           scanner_target: x86_64-pc-windows-msvc
@@ -1353,9 +1353,9 @@ jobs:
       - run:
           name: Update stable flag in index.json
           environment:
-            RELEASE_VERSION: '<< pipeline.parameters.release_version >>'
-            RELEASE_STABLE: '<< pipeline.parameters.release_stable >>'
-            RELEASE_TEST_MODE: '<< pipeline.parameters.release_test_mode >>'
+            RELEASE_VERSION: "<< pipeline.parameters.release_version >>"
+            RELEASE_STABLE: "<< pipeline.parameters.release_stable >>"
+            RELEASE_TEST_MODE: "<< pipeline.parameters.release_test_mode >>"
           command: node scripts/update-bit-stable-flag.js
       - run:
           name: Upload index.json
@@ -1378,8 +1378,8 @@ jobs:
       - attach_workspace:
           at: ./
       - docker_build_and_push:
-          docker_build_base_image_arg_value: 'node:22.22.0'
-          docker_tag_suffix: '-node-22.22.0'
+          docker_build_base_image_arg_value: "node:22.22.0"
+          docker_tag_suffix: "-node-22.22.0"
 
   docker_non_root_build_node_22:
     machine:
@@ -1388,10 +1388,10 @@ jobs:
       - attach_workspace:
           at: ./
       - docker_build_and_push:
-          docker_build_base_image_arg_value: 'node:22.22.0'
-          image_name: 'bitcli/bit-non-root'
-          docker_file_name: 'Dockerfile-bit-non-root'
-          docker_tag_suffix: '-node-22.22.0'
+          docker_build_base_image_arg_value: "node:22.22.0"
+          image_name: "bitcli/bit-non-root"
+          docker_file_name: "Dockerfile-bit-non-root"
+          docker_tag_suffix: "-node-22.22.0"
 
   docker_build_alpine:
     machine:
@@ -1400,10 +1400,10 @@ jobs:
       - attach_workspace:
           at: ./
       - docker_build_and_push:
-          docker_build_base_image_arg_value: 'node:22.22.0-alpine'
+          docker_build_base_image_arg_value: "node:22.22.0-alpine"
           # image_name: "bitcli/bit-alpine"
-          docker_file_name: 'Dockerfile-bit-alpine'
-          docker_tag_suffix: '-alpine-node-22.22.0'
+          docker_file_name: "Dockerfile-bit-alpine"
+          docker_tag_suffix: "-alpine-node-22.22.0"
 
   server_docker_build_node_22:
     machine:
@@ -1412,10 +1412,10 @@ jobs:
       - attach_workspace:
           at: ./
       - docker_build_and_push:
-          docker_build_base_image_arg_value: '`npm show @teambit/bit version`-node-22.22.0'
-          image_name: 'bitcli/bit-server'
-          docker_file_name: 'Dockerfile-bit-server'
-          docker_tag_suffix: '-node-22.22.0'
+          docker_build_base_image_arg_value: "`npm show @teambit/bit version`-node-22.22.0"
+          image_name: "bitcli/bit-server"
+          docker_file_name: "Dockerfile-bit-server"
+          docker_tag_suffix: "-node-22.22.0"
 
   # ========== Windows Jobs ==========
   windows_checkout_code:
@@ -1479,8 +1479,8 @@ jobs:
     <<: *windows_defaults
     environment:
       BITSRC_ENV: stg
-      SKIP_REGISTRY_TESTS: 'true'
-      SKIP_BIT_DEV_TESTS: 'true'
+      SKIP_REGISTRY_TESTS: "true"
+      SKIP_BIT_DEV_TESTS: "true"
       BIT_FEATURES: cloud-importer-v2
     steps:
       # We can't use Node.js newer than 16.13.2 due to this issue with npm: https://github.com/npm/cli/issues/4234
@@ -1508,8 +1508,8 @@ jobs:
     <<: *windows_defaults
     environment:
       BITSRC_ENV: stg
-      SKIP_REGISTRY_TESTS: 'true'
-      SKIP_BIT_DEV_TESTS: 'true'
+      SKIP_REGISTRY_TESTS: "true"
+      SKIP_BIT_DEV_TESTS: "true"
     parallelism: 25
     steps:
       # We can't use Node.js newer than 16.13.2 due to this issue with npm: https://github.com/npm/cli/issues/4234
@@ -1530,7 +1530,7 @@ jobs:
       #   run: 'ssh-add ~/.ssh/id_rsa'
       - run: 'cd bit\bit; mkdir junit'
       - bit_config:
-          token: 'fake-token'
+          token: "fake-token"
       - run:
           name: 'write e2e files'
           command: 'cd bit\bit; circleci tests glob "e2e\*\*.e2e*.ts" | circleci tests split --split-by=timings --timings-type=classname | Out-File -FilePath .\spec-files.txt'
@@ -1556,16 +1556,16 @@ jobs:
   # # this is to check what version of node you get when you update the windows orb
   # # as it's missing in their docs
   # windows_print_node_version:
-  # <<: *windows_defaults
-  # steps:
-  # # - checkout
-  # - run: node -v
-  # - run: npm -v
-  # - run: yarn -v
-  # # - run: choco install nodejs --version 22.22.0
-  # # - run: node -v
-  # - run: cinst nodejs --version 22.22.0
-  # - run: node -v
+    # <<: *windows_defaults
+    # steps:
+      # # - checkout
+      # - run: node -v
+      # - run: npm -v
+      # - run: yarn -v
+      # # - run: choco install nodejs --version 22.22.0
+      # # - run: node -v
+      # - run: cinst nodejs --version 22.22.0
+      # - run: node -v
 
 # ========================================
 # WORKFLOWS
@@ -1653,7 +1653,7 @@ workflows:
           filters:
             branches:
               only: master
-          serial-group: 'bit-merge-operations'
+          serial-group: "bit-merge-operations"
           post-steps:
             - slack/notify:
                 event: fail
@@ -1741,31 +1741,31 @@ workflows:
 
   # Windows nightly workflow
   # windows-nightly:
-  # triggers:
-  #   - schedule: # every day at 5AM UTC (= 1AM EST = 8AM IST)
-  #       cron: '0 5 * * *'
-  #       filters:
-  #         branches:
-  #           only:
-  #             - master
-  # jobs:
-  #   - windows_checkout_code
-  #   - windows_set_ssh_key
-  #   - windows_bvm_install:
-  #       <<: *master_only_filter
-  #       requires:
-  #         - windows_checkout_code
-  #   - windows_build_bvm:
-  #       <<: *master_only_filter
-  #       requires:
-  #         - windows_bvm_install
-  #   - windows_e2e_test_bvm:
-  #       <<: *master_only_filter
-  #       requires:
-  #         - windows_checkout_code
-  #         - windows_set_ssh_key
-  #         - windows_bvm_install
-  #         - windows_build_bvm
+    # triggers:
+    #   - schedule: # every day at 5AM UTC (= 1AM EST = 8AM IST)
+    #       cron: '0 5 * * *'
+    #       filters:
+    #         branches:
+    #           only:
+    #             - master
+    # jobs:
+    #   - windows_checkout_code
+    #   - windows_set_ssh_key
+    #   - windows_bvm_install:
+    #       <<: *master_only_filter
+    #       requires:
+    #         - windows_checkout_code
+    #   - windows_build_bvm:
+    #       <<: *master_only_filter
+    #       requires:
+    #         - windows_bvm_install
+    #   - windows_e2e_test_bvm:
+    #       <<: *master_only_filter
+    #       requires:
+    #         - windows_checkout_code
+    #         - windows_set_ssh_key
+    #         - windows_bvm_install
+    #         - windows_build_bvm
 
   # TODO: check if we can combine it with the regular nightly somehow
   harmony_deploy:

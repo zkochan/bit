@@ -1,4 +1,3 @@
-import { resolveRustDependencyScannerExecutable } from './rust-scanner/discovery';
 // most of the functions in this file were taken from the Madge project: https://github.com/pahen/madge
 // reasons for not using Madge directly: 1) it has issues with TypeScript on Windows. 2) it has issues with tsx files
 
@@ -7,6 +6,7 @@ import path from 'path';
 
 import dependencyTree from './dependency-tree';
 import { isRustEligible } from './precinct';
+import { resolveRustDependencyScannerExecutable } from './rust-scanner/discovery';
 import { acquireRustDependencyScannerSession } from './rust-scanner/scope';
 import type { PathLinuxRelative } from '@teambit/toolbox.path.path';
 
