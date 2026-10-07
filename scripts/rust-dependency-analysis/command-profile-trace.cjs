@@ -26,6 +26,9 @@ fs.readFileSync = function (filename, ...rest) {
   }
   return value;
 };
+const detectorSources = new Set();
+const detectorAstInputs = new WeakSet();
+let uniqueDetectorInputs = 0;
 const load = Module._load;
 const wrapped = new WeakSet();
 Module._load = function (request, parent, isMain) {
@@ -60,6 +63,15 @@ Module._load = function (request, parent, isMain) {
   ) {
     const replacement = function (...args) {
       stages.detectorCalls++;
+      const input = args[0];
+      if (typeof input === 'string') {
+        const digest = createHash('sha256').update(input).digest('hex');
+        if (!detectorSources.has(digest)) uniqueDetectorInputs++;
+        detectorSources.add(digest);
+      } else if (input && typeof input === 'object' && !detectorAstInputs.has(input)) {
+        uniqueDetectorInputs++;
+        detectorAstInputs.add(input);
+      }
       const start = performance.now();
       try {
         return detector.apply(this, args);
@@ -86,6 +98,9 @@ process.on('exit', () => {
       pid: process.pid,
       cliCpu: process.cpuUsage(),
       ...stages,
+      uniqueDetectorInputs,
+      repeatedDetectorInputs: stages.detectorCalls - uniqueDetectorInputs,
+      detectorIdentity: 'TS source SHA256 and JS AST object identity; not a logical file count',
       uniqueSourceReads: reads.size,
       sourceReadCalls: [...reads.values()].reduce((sum, item) => sum + item.calls, 0),
       sourceBytesRead: [...reads.values()].reduce((sum, item) => sum + item.bytes, 0),
