@@ -9,9 +9,8 @@ const owner = base.isTraceOwner;
 const root = process.cwd() + path.sep;
 const reads = new Map();
 const stages = { treeCalls: 0, treeElapsedMs: 0, detectorCalls: 0, detectorElapsedMs: 0 };
-const originalRead = fs.readFileSync;
-fs.readFileSync = function (filename, ...rest) {
-  const value = originalRead.call(this, filename, ...rest);
+const sourceReadTypes = { sync: 0, callback: 0, promise: 0 };
+function recordRead(filename, value, kind) {
   if (
     owner &&
     typeof filename === 'string' &&
@@ -23,8 +22,33 @@ fs.readFileSync = function (filename, ...rest) {
     record.calls++;
     record.bytes += Buffer.byteLength(value);
     reads.set(filename, record);
+    sourceReadTypes[kind]++;
   }
+}
+const originalRead = fs.readFileSync;
+fs.readFileSync = function (filename, ...rest) {
+  const value = originalRead.call(this, filename, ...rest);
+  recordRead(filename, value, 'sync');
   return value;
+};
+const originalAsyncRead = fs.readFile;
+fs.readFile = function (filename, ...rest) {
+  const callback = rest[rest.length - 1];
+  if (typeof callback !== 'function') return originalAsyncRead.call(this, filename, ...rest);
+  rest[rest.length - 1] = function (error, value) {
+    if (!error) recordRead(filename, value, 'callback');
+    return callback.apply(this, arguments);
+  };
+  return originalAsyncRead.call(this, filename, ...rest);
+};
+const originalPromiseRead = fs.promises.readFile;
+fs.promises.readFile = function (filename, ...rest) {
+  const result = originalPromiseRead.call(this, filename, ...rest);
+  result.then(
+    (value) => recordRead(filename, value, 'promise'),
+    () => {}
+  );
+  return result;
 };
 const detectorSources = new Set();
 const detectorAstInputs = new WeakSet();
@@ -101,6 +125,7 @@ process.on('exit', () => {
       uniqueDetectorInputs,
       repeatedDetectorInputs: stages.detectorCalls - uniqueDetectorInputs,
       detectorIdentity: 'TS source SHA256 and JS AST object identity; not a logical file count',
+      sourceReadTypes,
       uniqueSourceReads: reads.size,
       sourceReadCalls: [...reads.values()].reduce((sum, item) => sum + item.calls, 0),
       sourceBytesRead: [...reads.values()].reduce((sum, item) => sum + item.bytes, 0),
