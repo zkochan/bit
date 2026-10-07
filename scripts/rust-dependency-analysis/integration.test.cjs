@@ -319,6 +319,7 @@ test('native TS parse errors preserve canonical diagnostics and final disposal',
     const actual = accelerated.errors[name];
     const reference = baseline.errors[name];
     assert.deepEqual(fields(actual), fields(reference));
+    assert.equal(Object.getPrototypeOf(actual), Object.getPrototypeOf(reference));
     for (const key of ['name', 'lineNumber', 'column']) assert.equal(actual[key], reference[key]);
     assert.equal(actual.name, 'TSError');
     assert.equal(actual.code, 'PARSING_ERROR');
