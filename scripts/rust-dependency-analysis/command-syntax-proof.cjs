@@ -8,7 +8,7 @@ const { createHash } = require('node:crypto');
 const [rootArg, nativeArg, output] = process.argv.slice(2);
 assert.ok(rootArg && nativeArg && output, 'usage: command-syntax-proof.cjs <owned-private-cli> <native> <output.json>');
 const root = path.resolve(rootArg);
-assert.ok(root.startsWith(os.tmpdir() + path.sep));
+assert.ok([os.tmpdir(), '/tmp'].some((directory) => root.startsWith(directory + path.sep)));
 assert.equal(fs.realpathSync(root), root);
 assert.ok(fs.existsSync(path.join(root, '.bit-rust-private-build.json')));
 const source = path.join(root, 'scopes/toolbox/string/capitalize/index.ts');
