@@ -80,7 +80,7 @@ try {
           resolved = path.resolve(path.dirname(filename), fs.readlinkSync(filename));
         }
         if (resolved !== target && !resolved.startsWith(target + path.sep)) {
-          // A copied obsolete BVM alias can already be dangling outside this
+          // A copied relative BVM alias can already be dangling outside this
           // snapshot. Remove that private alias; never follow a live external link.
           assert.ok(missing, `external private-build link: ${filename}`);
           fs.unlinkSync(filename);

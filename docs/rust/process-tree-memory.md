@@ -15,7 +15,7 @@ This is a near-simultaneous RSS sum assembled from sequential procfs reads, not 
 
 Eleven tests cover thread-child discovery, descendant deduplication, simultaneous versus independent peaks, orphan tracking, stale/PID-reused children, identity changes during a read, missing and unreadable processes, input validation, a real resident allocation, and timeout/cancellation of SIGTERM-resistant commands. They run in the existing Linux pipeline CI job. The command runner uses a two-minute deadline and kills its own detached process group after a one-second termination grace period; source/cache cleanup then runs in `finally`. No packages beyond Node built-ins are required by the sampler tests.
 
-The private builder also removes already-dangling external aliases from its copied dependencies, recording their count. An obsolete `@teambit/legacy` BVM alias exposed this case when copying the benchmark CLI. Live external links still fail the safety guard, and internal dangling links remain for later compilation. This cleanup affects only the disposable copy, never the installed dependency tree.
+The private builder also removes already-dangling external aliases from its copied dependencies, recording their count. A relative `@teambit/legacy` BVM alias exposed this case when copying the benchmark CLI. Install validation needs that package materialized separately in its private snapshot. Live external links still fail the safety guard, and internal dangling links remain for later compilation. This cleanup affects only the disposable copy, never the installed dependency tree.
 
 ## Recorded results
 
