@@ -92,12 +92,19 @@ function main() {
   }
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'bit-extraction-bench-'));
   const load = createRequire(path.join(process.env.BIT_LEGACY_ROOT || root, 'package.json'));
+  const version = (requireFrom, name) => requireFrom(`${name}/package.json`).version;
   const detectorLoad = createRequire(fs.realpathSync(load.resolve('@teambit/typescript.deps-detectors.detective-typescript')));
-  const packageVersions = Object.fromEntries(['@teambit/typescript.deps-detectors.detective-typescript', '@typescript-eslint/typescript-estree', 'node-source-walk'].map(name => [name, detectorLoad(`${name}/package.json`).version]));
+  // The packages compare.cjs loads from the legacy root, plus the TS detective's own parser.
+  const packageVersions = Object.fromEntries([
+    ...['@teambit/node.deps-detectors.detective-es6', '@teambit/typescript.deps-detectors.detective-typescript', 'module-definition', 'node-source-walk'].map(name => [name, version(load, name)]),
+    ['@typescript-eslint/typescript-estree', version(detectorLoad, '@typescript-eslint/typescript-estree')],
+  ]);
+  // Paths are recorded relative to the checkout so results carry no machine-specific locations.
   const report = { fallbackPaths, packageVersions, executableSha256: createHash('sha256').update(fs.readFileSync(executable)).digest('hex'), revision: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
-    node: process.version, rust: execFileSync('rustc', ['--version'], { encoding: 'utf8' }).trim(), platform: `${os.platform()}/${os.arch()}`, cpu: os.cpus()[0].model,
-    logicalCpus: os.cpus().length, threads: Number(threads), executable, legacyRoot: process.env.BIT_LEGACY_ROOT || root,
-    files: files.map(({ expected, ...file }) => file), uniqueSourceBytes: files.reduce((n,file) => n + file.bytes, 0), workloads: {} };
+    // rust-toolchain.toml applies only inside native/, where the release build runs.
+    node: process.version, rust: execFileSync('rustc', ['--version'], { cwd: path.join(root, 'native'), encoding: 'utf8' }).trim(), platform: `${os.platform()}/${os.arch()}`, cpu: os.cpus()[0].model,
+    logicalCpus: os.cpus().length, threads: Number(threads), executable: path.relative(root, executable), externalLegacyRoot: Boolean(process.env.BIT_LEGACY_ROOT),
+    files: files.map(({ expected, path: _absolute, ...file }) => file), uniqueSourceBytes: files.reduce((n,file) => n + file.bytes, 0), workloads: {} };
   try {
     for (const [workload, repeats] of [['unique', 1], ['duplicate-3x', 3]]) {
       const manifestPath = path.join(temp, `${workload}.json`);

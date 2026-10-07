@@ -8,14 +8,14 @@ The standalone Rust prototype passes exact legacy metadata and ordered source-ke
 
 | Workload and variant | Median extraction, ms | Median including startup and validation, ms | Range including startup, ms | Median process-tree CPU, ms | Peak summed RSS upper bound, MiB |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Unique: current legacy semantics | 528.9 | 690.3 | 664.1–732.7 | 1370 | 437.2 |
-| Unique: TS batch/dedup control | 551.1 | 714.1 | 677.9–722.4 | 1410 | 437.9 |
-| Unique: Rust + legacy fallback | 17.0 | 170.8 | 161.4–176.9 | 240 | 134.0 |
-| Duplicate 3x: current legacy semantics | 1343.9 | 1505.9 | 1456.6–1556.7 | 2870 | 563.9 |
-| Duplicate 3x: TS batch/dedup control | 523.8 | 687.8 | 666.8–733.2 | 1350 | 437.9 |
-| Duplicate 3x: Rust + legacy fallback | 17.1 | 171.3 | 166.7–174.7 | 240 | 136.4 |
+| Unique: current legacy semantics | 500.0 | 654.6 | 646.0–682.7 | 1300 | 436.6 |
+| Unique: TS batch/dedup control | 506.4 | 660.8 | 641.1–679.6 | 1290 | 438.1 |
+| Unique: Rust + legacy fallback | 17.9 | 162.6 | 158.9–165.7 | 220 | 134.9 |
+| Duplicate 3x: current legacy semantics | 1263.3 | 1431.9 | 1401.7–1458.7 | 2700 | 563.5 |
+| Duplicate 3x: TS batch/dedup control | 500.3 | 661.2 | 650.1–666.1 | 1310 | 437.6 |
+| Duplicate 3x: Rust + legacy fallback | 16.4 | 162.5 | 156.3–163.7 | 220 | 135.2 |
 
-On unique inputs Rust takes about 4x less startup-inclusive elapsed time than the control, and about 33x less time inside the extraction interval. Use the **4x** figure when discussing this cold-helper transport experiment: the internal number excludes Node startup, detector loading and result validation. All variants pay Node startup and detector loading; Rust additionally pays helper startup, request JSON serialization, source reads, response transfer/deserialization and fallback. A persistent helper or lazy legacy loading may change those costs and needs separate evidence.
+On unique inputs Rust takes about 4x less startup-inclusive elapsed time than the control, and about 28x less time inside the extraction interval. Use the **4x** figure when discussing this cold-helper transport experiment: the internal number excludes Node startup, detector loading and result validation. All variants pay Node startup and detector loading; Rust additionally pays helper startup, request JSON serialization, source reads, response transfer/deserialization and fallback. A persistent helper or lazy legacy loading may change those costs and needs separate evidence.
 
 The artificial duplicate workload shows that deduplication alone removes substantial work. It submits each of the same 240 files three times, totaling 720 requests. It is not evidence that the real traversal parses every file three times: current visited caching already suppresses much repeated work. The TypeScript control is a local serial extraction coordinator model with one result per unique logical path and request fan-out, not an integrated Bit batching implementation.
 
