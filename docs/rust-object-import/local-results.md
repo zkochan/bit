@@ -44,4 +44,4 @@ The tests exercise Source content/readback parity, Unicode/binary/empty/large co
 
 Keep the prototype opt-in. Before rollout: full cold `bit import` and representative commands against real scopes, mutable-heavy and multi-remote loads, warm reuse/rehydration, network/merge/queue breakdowns, slower storage, additional platform execution and packaged distribution. The JS control may be the first broadly useful optimization even where native startup/IPC is not worthwhile.
 
-Raw JSON evidence is stored outside Git in `/var/home/zoltan/bit-object-import-evidence-2026-10-08/` on the development machine. Drivers regenerate disposable fixtures/results; no large result files or profiles are committed.
+Raw JSON evidence is stored outside Git on the development machine. Drivers regenerate disposable fixtures/results; no large result files or profiles are committed.
