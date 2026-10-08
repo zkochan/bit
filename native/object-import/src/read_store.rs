@@ -17,7 +17,7 @@ const HEADER_BYTES: usize = 256;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Header {
+pub(crate) struct Header {
     #[serde(rename = "type")]
     object_type: String,
     size: u64,
@@ -83,7 +83,7 @@ fn read_raw(path: &Path) -> Option<Vec<u8>> {
     (output.len() as u64 <= MAX_RAW_BYTES).then_some(output)
 }
 
-fn classify(path: &Path) -> Option<Header> {
+pub(crate) fn classify(path: &Path) -> Option<Header> {
     // Match the canonical stat-before-open ordering rather than promise an atomic snapshot.
     let metadata = fs::metadata(path).ok()?;
     if !metadata.is_file() {

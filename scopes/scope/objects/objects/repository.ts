@@ -29,6 +29,7 @@ import type { ObjectItem, RawObjectsMap, CompressedObject } from './object-list'
 import { ObjectList } from './object-list';
 import BitRawObject from './raw-object';
 import Ref from './ref';
+import { nativeObjectDirectory, nativeTraversalEnabled } from './rust-object-directory';
 import { nativeInventoryEnabled, nativeObjectExists } from './rust-object-inventory';
 import {
   nativeObjectBuffers,
@@ -330,14 +331,23 @@ export default class Repository {
    * to the whole buffer, so in that case the file is read in full.
    */
   async listObjectsWithType(): Promise<ObjectsWithType> {
-    const refs = await this.listRefs();
-    const concurrency = concurrentIOLimit();
-    logger.debug(`Repository.listObjectsWithType, classifying ${refs.length} objects`);
-    const headers =
-      nativeHeadersEnabled(refs.length) &&
+    const directory =
+      nativeTraversalEnabled() &&
       this.canReadNatively() &&
+      this.listRefs === Repository.prototype.listRefs &&
       this.readObjectType === Repository.prototype.readObjectType &&
       this.getObjectTypeGracefully === Repository.prototype.getObjectTypeGracefully
+        ? await nativeObjectDirectory(path.resolve(this.getPath()), true)
+        : undefined;
+    const refs = directory ? directory.map(({ hash }) => new Ref(hash)) : await this.listRefs();
+    const concurrency = concurrentIOLimit();
+    logger.debug(`Repository.listObjectsWithType, classifying ${refs.length} objects`);
+    const headers = directory
+      ? directory.map(({ header }) => header)
+      : nativeHeadersEnabled(refs.length) &&
+          this.canReadNatively() &&
+          this.readObjectType === Repository.prototype.readObjectType &&
+          this.getObjectTypeGracefully === Repository.prototype.getObjectTypeGracefully
         ? await nativeObjectHeaders(
             path.resolve(this.getPath()),
             refs.map((ref) => ref.toString())
@@ -463,6 +473,8 @@ export default class Repository {
   }
 
   async listRefs(cwd = this.getPath()): Promise<Array<Ref>> {
+    const directory = nativeTraversalEnabled() ? await nativeObjectDirectory(path.resolve(cwd)) : undefined;
+    if (directory) return directory.map(({ hash }) => new Ref(hash));
     const matches = await glob(path.join('*', '*'), { cwd });
     const refs = matches.map((str) => {
       const hash = str.replace(path.sep, '');

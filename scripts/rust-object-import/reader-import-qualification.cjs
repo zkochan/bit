@@ -23,7 +23,14 @@ const { benchmarkGlobals } = require('../rust-dependency-analysis/command-worksp
   const load = createRequire(path.join(cli, 'package.json'));
   const { Ref, Repository } = load('@teambit/objects');
   const reader = load(path.join(cli, 'node_modules/@teambit/objects/dist/objects/rust-object-reader.js'));
-  const stages = { reads: [], headers: [] };
+  const stages = { reads: [], headers: [], directories: [] };
+  const directory = load(path.join(cli, 'node_modules/@teambit/objects/dist/objects/rust-object-directory.js'));
+  const originalDirectory = directory.nativeObjectDirectory;
+  directory.nativeObjectDirectory = async (...args) => {
+    const result = await originalDirectory(...args);
+    if (result) stages.directories.push({ headers: args[1] === true, native: result.length });
+    return result;
+  };
   for (const [name, stage] of [
     ['nativeObjectBuffers', 'reads'],
     ['nativeObjectHeaders', 'headers'],
@@ -63,7 +70,10 @@ const { benchmarkGlobals } = require('../rust-dependency-analysis/command-worksp
   });
   assert.deepEqual(normalize(await remote.listObjectsWithType()), normalize(canonicalHeaders));
   assert.ok(stages.reads.some((stage) => stage.native === 2048));
-  assert.ok(stages.headers.some((stage) => stage.native === Object.keys(manifest.hashes).length));
+  assert.ok(
+    stages.headers.some((stage) => stage.native === Object.keys(manifest.hashes).length) ||
+      stages.directories.some((stage) => stage.headers && stage.native === Object.keys(manifest.hashes).length)
+  );
   const scope = await destination(cli, path.join(temporary, 'destination'), manifest);
   await scope.scopeImporter.importManyObjects({ [remoteName]: hashes }, 'batched read qualification');
   assert.deepEqual(await scope.objects.loadManyRaw(refs), expected);
