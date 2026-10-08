@@ -216,7 +216,7 @@ fn serve_read_only(
     pool: &ThreadPool,
     store: Option<&Store>,
 ) -> io::Result<bool> {
-    if !matches!(&magic, b"BEX1" | b"BHD1" | b"BRD1" | b"BWR1" | b"BWD1") {
+    if !matches!(&magic, b"BEX1" | b"BHD1" | b"BRD1" | b"BRC1" | b"BWR1" | b"BWD1") {
         return Ok(false);
     }
     let store = store.ok_or_else(|| invalid("missing read-only store"))?;
