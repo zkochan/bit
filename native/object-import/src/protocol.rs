@@ -71,13 +71,7 @@ pub(crate) fn serve_with_store(
             return Ok(());
         }
         reader.read_exact(&mut magic[1..])?;
-        if magic == *b"BEX1" {
-            crate::inventory::serve(
-                reader,
-                writer,
-                pool,
-                store.ok_or_else(|| invalid("missing inventory store"))?,
-            )?;
+        if serve_read_only(magic, reader, writer, pool, store)? {
             continue;
         }
         let version = frame_version(magic, store)?;
@@ -209,4 +203,23 @@ fn outcomes(inputs: &[Input], pool: &ThreadPool, version: u8) -> Vec<Outcome> {
             })
             .collect()
     })
+}
+
+fn serve_read_only(
+    magic: [u8; 4],
+    reader: &mut impl Read,
+    writer: &mut impl Write,
+    pool: &ThreadPool,
+    store: Option<&Store>,
+) -> io::Result<bool> {
+    if magic != *b"BEX1" && magic != *b"BHD1" && magic != *b"BRD1" {
+        return Ok(false);
+    }
+    let store = store.ok_or_else(|| invalid("missing read-only store"))?;
+    if magic == *b"BEX1" {
+        crate::inventory::serve(reader, writer, pool, store)?;
+    } else {
+        crate::read_store::serve(reader, writer, pool, store, magic)?;
+    }
+    Ok(true)
 }

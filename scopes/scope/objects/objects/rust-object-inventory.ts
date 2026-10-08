@@ -5,16 +5,14 @@ const MAX_HASHES = 4096;
 const MIN_HASHES = 1024;
 let batchTail: Promise<unknown> = Promise.resolve();
 
+export function nativeObjectHelperEnabled(count: number, minimum: number): boolean {
+  const executable = process.env.BIT_RUST_OBJECT_IMPORT;
+  return Boolean(executable && path.isAbsolute(executable) && process.platform !== 'win32' && count >= minimum);
+}
+
 /** Avoid mapping/allocating hashes on the default path and for batches below the crossover. */
 export function nativeInventoryEnabled(count: number): boolean {
-  const executable = process.env.BIT_RUST_OBJECT_IMPORT;
-  return Boolean(
-    executable &&
-      path.isAbsolute(executable) &&
-      process.env.BIT_RUST_OBJECT_INVENTORY !== 'off' &&
-      process.platform !== 'win32' &&
-      count >= MIN_HASHES
-  );
+  return process.env.BIT_RUST_OBJECT_INVENTORY !== 'off' && nativeObjectHelperEnabled(count, MIN_HASHES);
 }
 
 /** Stateless filesystem checks only; pending objects and model caches are not filesystem existence. */
@@ -38,16 +36,47 @@ export async function nativeObjectExists(directory: string, hashes: string[]): P
   return result;
 }
 
-function checkBatch(executable: string, directory: string, hashes: string[]): Promise<boolean[] | undefined> {
-  // Concurrent remotes share one bounded helper slot instead of spawning a process per caller.
-  const operation = batchTail.then(() => runBatch(executable, directory, hashes));
+async function checkBatch(executable: string, directory: string, hashes: string[]): Promise<boolean[] | undefined> {
+  const buffer = await requestObjectBatch(executable, directory, hashes, 'BEX1', 65536);
+  if (!buffer) return undefined;
+  try {
+    const response = JSON.parse(buffer.toString('utf8'));
+    if (
+      response.version !== 1 ||
+      response.id !== 1 ||
+      !Array.isArray(response.exists) ||
+      response.exists.length !== hashes.length ||
+      !response.exists.every((value: unknown) => typeof value === 'boolean')
+    )
+      return undefined;
+    return response.exists;
+  } catch {
+    return undefined;
+  }
+}
+
+export function requestObjectBatch(
+  executable: string,
+  directory: string,
+  hashes: string[],
+  magic: string,
+  maxBuffer: number
+): Promise<Buffer | undefined> {
+  // Concurrent read-only operations share one bounded helper slot.
+  const operation = batchTail.then(() => runBatch(executable, directory, hashes, magic, maxBuffer));
   batchTail = operation.catch(() => undefined);
   return operation.catch(() => undefined);
 }
 
-function runBatch(executable: string, directory: string, hashes: string[]): Promise<boolean[] | undefined> {
+function runBatch(
+  executable: string,
+  directory: string,
+  hashes: string[],
+  magic: string,
+  maxBuffer: number
+): Promise<Buffer | undefined> {
   const frame = Buffer.alloc(12 + hashes.length * 20);
-  frame.write('BEX1');
+  frame.write(magic);
   frame.writeUInt32BE(1, 4);
   frame.writeUInt32BE(hashes.length, 8);
   hashes.forEach((hash, index) => Buffer.from(hash, 'hex').copy(frame, 12 + index * 20));
@@ -55,25 +84,8 @@ function runBatch(executable: string, directory: string, hashes: string[]): Prom
     const child = execFile(
       executable,
       ['--objects-dir', directory],
-      { timeout: 30000, maxBuffer: 65536, encoding: 'utf8' },
-      (error, stdout) => {
-        if (error) return resolve(undefined);
-        try {
-          const response = JSON.parse(stdout);
-          if (
-            response.version !== 1 ||
-            response.id !== 1 ||
-            !Array.isArray(response.exists) ||
-            response.exists.length !== hashes.length ||
-            !response.exists.every((value: unknown) => typeof value === 'boolean')
-          ) {
-            return resolve(undefined);
-          }
-          resolve(response.exists);
-        } catch {
-          resolve(undefined);
-        }
-      }
+      { timeout: 30000, maxBuffer, encoding: 'buffer' },
+      (error, stdout) => resolve(error ? undefined : stdout)
     );
     // An old/crashing helper can close stdin before accepting the frame.
     child.stdin?.on('error', () => {});

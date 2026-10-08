@@ -20,6 +20,7 @@ import {
   UnknownObjectType,
   UnmergedComponents,
   RemoteLanes,
+  typesObj,
 } from '@teambit/legacy.scope';
 import type { IndexType, IndexItem } from './scope-index';
 import { ScopeIndex } from './scope-index';
@@ -29,6 +30,13 @@ import { ObjectList } from './object-list';
 import BitRawObject from './raw-object';
 import Ref from './ref';
 import { nativeInventoryEnabled, nativeObjectExists } from './rust-object-inventory';
+import {
+  nativeObjectBuffers,
+  nativeObjectHeaders,
+  nativeReadsEnabled,
+  nativeHeadersEnabled,
+} from './rust-object-reader';
+import type { NativeObjectHeader } from './rust-object-reader';
 import { LiveObjects } from './live-objects';
 import type { InMemoryCache } from '@teambit/harmony.modules.in-memory-cache';
 import { getCacheOptionsForObjects, createInMemoryCache } from '@teambit/harmony.modules.in-memory-cache';
@@ -325,7 +333,23 @@ export default class Repository {
     const refs = await this.listRefs();
     const concurrency = concurrentIOLimit();
     logger.debug(`Repository.listObjectsWithType, classifying ${refs.length} objects`);
-    const results = await pMapPool(refs, (ref) => this.getObjectTypeGracefully(ref), { concurrency });
+    const headers =
+      nativeHeadersEnabled(refs.length) &&
+      this.canReadNatively() &&
+      this.readObjectType === Repository.prototype.readObjectType &&
+      this.getObjectTypeGracefully === Repository.prototype.getObjectTypeGracefully
+        ? await nativeObjectHeaders(
+            path.resolve(this.getPath()),
+            refs.map((ref) => ref.toString())
+          )
+        : undefined;
+    const results = headers
+      ? await pMapPool(
+          refs.map((ref, index) => ({ ref, header: headers[index] })),
+          ({ ref, header }) => this.classifyObject(ref, header),
+          { concurrency }
+        )
+      : await pMapPool(refs, (ref) => this.getObjectTypeGracefully(ref), { concurrency });
     const objects = compact(results.map((result) => result.object));
     const unreadable = compact(results.map((result) => result.unreadable));
     if (unreadable.length) {
@@ -339,6 +363,23 @@ export default class Repository {
    * this inventory (the garbage collector) has to know that it's incomplete, because an object it
    * can't see is one it can't reason about.
    */
+  private async classifyObject(
+    ref: Ref,
+    header?: NativeObjectHeader
+  ): Promise<{ object?: ObjectWithType; unreadable?: Ref }> {
+    if (header && typesObj[header.type]) return { object: { ref, ...header } };
+    return this.getObjectTypeGracefully(ref);
+  }
+
+  private canReadNatively(): boolean {
+    return (
+      this.onRead === this.defaultOnRead &&
+      !this.isContentTransformed() &&
+      this.objectPath === Repository.prototype.objectPath &&
+      this.hashPath === Repository.prototype.hashPath
+    );
+  }
+
   private async getObjectTypeGracefully(ref: Ref): Promise<{ object?: ObjectWithType; unreadable?: Ref }> {
     const objectPath = this.objectPath(ref);
     try {
@@ -545,24 +586,43 @@ export default class Repository {
   async loadManyRaw(refs: Ref[]): Promise<ObjectItem[]> {
     const concurrency = concurrentIOLimit();
     const uniqRefs = uniqBy(refs, 'hash');
-    return pMapPool(uniqRefs, async (ref) => ({ ref, buffer: await this.loadRaw(ref) }), { concurrency });
+    const buffers = await this.readRawBatch(uniqRefs);
+    if (!buffers) return pMapPool(uniqRefs, async (ref) => ({ ref, buffer: await this.loadRaw(ref) }), { concurrency });
+    return pMapPool(
+      uniqRefs.map((ref, index) => ({ ref, buffer: buffers[index] })),
+      async ({ ref, buffer }) => ({ ref, buffer: buffer ?? (await this.loadRaw(ref)) }),
+      { concurrency }
+    );
+  }
+
+  private async readRawBatch(refs: Ref[]): Promise<(Buffer | undefined)[] | undefined> {
+    if (!nativeReadsEnabled(refs.length) || !this.canReadNatively() || this.loadRaw !== Repository.prototype.loadRaw)
+      return undefined;
+    return nativeObjectBuffers(
+      path.resolve(this.getPath()),
+      refs.map((ref) => ref.toString())
+    );
   }
 
   async loadManyRawIgnoreMissing(refs: Ref[]): Promise<ObjectItem[]> {
     const concurrency = concurrentIOLimit();
-    const results = await pMapPool(
-      refs,
-      async (ref) => {
-        try {
-          const buffer = await this.loadRaw(ref);
-          return { ref, buffer };
-        } catch (err: any) {
-          if (err.code === 'ENOENT') return null;
-          throw err;
-        }
-      },
-      { concurrency }
-    );
+    const buffers = await this.readRawBatch(refs);
+    const read = async (ref: Ref, existing?: Buffer) => {
+      try {
+        const buffer = existing ?? (await this.loadRaw(ref));
+        return { ref, buffer };
+      } catch (err: any) {
+        if (err.code === 'ENOENT') return null;
+        throw err;
+      }
+    };
+    const results = buffers
+      ? await pMapPool(
+          refs.map((ref, index) => ({ ref, buffer: buffers[index] })),
+          ({ ref, buffer }) => read(ref, buffer),
+          { concurrency }
+        )
+      : await pMapPool(refs, (ref) => read(ref), { concurrency });
     return compact(results);
   }
 

@@ -1,6 +1,7 @@
 mod inventory;
 mod metadata;
 mod protocol;
+mod read_store;
 mod store;
 mod validate;
 

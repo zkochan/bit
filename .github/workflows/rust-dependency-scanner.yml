@@ -9,6 +9,7 @@ on:
       - 'scopes/scope/objects/objects/repository.ts'
       - 'scopes/scope/objects/objects/object.ts'
       - 'scopes/scope/objects/objects/rust-object-inventory.ts'
+      - 'scopes/scope/objects/objects/rust-object-reader.ts'
       - 'components/legacy/scope/component-ops/scope-components-importer.ts'
       - 'scopes/scope/scope/scope.main.runtime.ts'
       - 'scripts/rust-object-import/**'
@@ -42,6 +43,7 @@ on:
       - 'scopes/scope/objects/objects/repository.ts'
       - 'scopes/scope/objects/objects/object.ts'
       - 'scopes/scope/objects/objects/rust-object-inventory.ts'
+      - 'scopes/scope/objects/objects/rust-object-reader.ts'
       - 'components/legacy/scope/component-ops/scope-components-importer.ts'
       - 'scopes/scope/scope/scope.main.runtime.ts'
       - 'scripts/rust-object-import/**'
@@ -148,7 +150,7 @@ jobs:
       - name: Check object-import coordinator types
         shell: bash
         run: |
-          node "$RUNNER_TEMP/rust-scanner-test-tools/node_modules/typescript/bin/tsc" --noEmit --strict --skipLibCheck --target ES2022 --module commonjs --esModuleInterop --types node --typeRoots "$RUNNER_TEMP/rust-scanner-test-tools/node_modules/@types" components/legacy/scope/objects-fetcher/rust-source-validator.ts components/legacy/scope/objects-fetcher/rust-object-importer.ts scopes/scope/objects/objects/rust-object-inventory.ts
+          node "$RUNNER_TEMP/rust-scanner-test-tools/node_modules/typescript/bin/tsc" --noEmit --strict --skipLibCheck --target ES2022 --module commonjs --esModuleInterop --types node --typeRoots "$RUNNER_TEMP/rust-scanner-test-tools/node_modules/@types" components/legacy/scope/objects-fetcher/rust-source-validator.ts components/legacy/scope/objects-fetcher/rust-object-importer.ts scopes/scope/objects/objects/rust-object-inventory.ts scopes/scope/objects/objects/rust-object-reader.ts
       - name: Build real scanner for transport tests
         working-directory: native
         run: cargo build --locked --workspace
@@ -160,7 +162,7 @@ jobs:
       - name: Test object-import helper protocol and fallback
         env:
           BIT_LEGACY_ROOT: ${{ runner.temp }}/rust-scanner-test-tools
-        run: node --test scripts/rust-object-import/validator.test.cjs scripts/rust-object-import/importer.test.cjs scripts/rust-object-import/import-trace.test.cjs scripts/rust-object-import/inventory.test.cjs
+        run: node --test scripts/rust-object-import/validator.test.cjs scripts/rust-object-import/importer.test.cjs scripts/rust-object-import/import-trace.test.cjs scripts/rust-object-import/inventory.test.cjs scripts/rust-object-import/reader.test.cjs
 
   lint:
     name: pnpm Rust formatting and lints
