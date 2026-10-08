@@ -55,6 +55,7 @@ const files = [
   'scopes/scope/objects/objects/repository.ts',
   'scopes/scope/objects/objects/object.ts',
   'scopes/scope/objects/objects/rust-object-inventory.ts',
+  'scopes/scope/objects/objects/rust-object-reader.ts',
   'components/legacy/scope/component-ops/scope-components-importer.ts',
   'scopes/scope/scope/scope.main.runtime.ts',
 ];
@@ -91,6 +92,7 @@ const modules = [
   'objects/dist/objects/repository.js',
   'objects/dist/objects/object.js',
   'objects/dist/objects/rust-object-inventory.js',
+  'objects/dist/objects/rust-object-reader.js',
   'legacy.scope/dist/component-ops/scope-components-importer.js',
   'scope/dist/scope.main.runtime.js',
 ];
