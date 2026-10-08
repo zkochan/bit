@@ -33,7 +33,7 @@ async function command(directory, ids, mode, allHistory, traceFile) {
   const env = {
     ...process.env,
     BIT_RUST_OBJECT_IMPORT:
-      mode === 'native' || mode === 'validate'
+      mode === 'native' || mode === 'validate' || mode === 'store'
         ? helper
         : mode === 'control'
           ? 'control'
@@ -42,6 +42,7 @@ async function command(directory, ids, mode, allHistory, traceFile) {
             : mode === 'crash'
               ? path.join(directory, 'crashing-helper')
               : 'off',
+    BIT_RUST_OBJECT_IMPORT_METADATA: mode === 'store' ? 'off' : 'on',
     BIT_RUST_OBJECT_IMPORT_MODE: mode === 'validate' ? 'validate' : 'store',
     CI: '1',
   };
@@ -205,7 +206,7 @@ async function workspace(directory, manifest) {
         );
       }
       for (let round = -1; round < rounds; round++) {
-        const modes = ['legacy', 'control', 'validate', 'native'];
+        const modes = ['legacy', 'control', 'validate', 'store', 'native'];
         for (let offset = 0; offset < modes.length; offset++) {
           const mode = modes[(offset + Math.max(round, 0)) % modes.length];
           const destination = path.join(directory, `${round}-${mode}`);
@@ -222,7 +223,7 @@ async function workspace(directory, manifest) {
           await fs.rm(destination, { recursive: true, force: true });
         }
       }
-      for (const mode of ['legacy', 'control', 'validate', 'native', ...(smoke ? ['missing', 'crash'] : [])]) {
+      for (const mode of ['legacy', 'control', 'validate', 'store', 'native', ...(smoke ? ['missing', 'crash'] : [])]) {
         const destination = path.join(directory, `diagnostic-${mode}`);
         await workspace(destination, manifest);
         const cold = await command(destination, manifest.ids, mode, true, path.join(destination, 'cold-trace.json'));
@@ -233,13 +234,14 @@ async function workspace(directory, manifest) {
         checkModels(warm.verification);
         await new Promise((resolve) => setImmediate(resolve));
         global.gc?.();
-        if (mode === 'native' || mode === 'validate') {
+        if (mode === 'native' || mode === 'validate' || mode === 'store') {
           const expectedSources = Object.values(manifest.hashes).filter((obj) => obj.type === 'Source').length;
           assert.equal(cold.trace.native.sources, expectedSources, 'native cold Source coverage must be real');
-          if (mode === 'native') {
+          if (mode === 'native' || mode === 'store') {
             assert.equal(cold.trace.native.persisted, expectedSources, 'Sources must be committed by Rust');
             assert.equal(cold.trace.stages.nativeAtomicPersistence?.calls || 0, 0, 'no per-Source Node atomic writes');
             assert.equal(cold.trace.native.writeFallbacks, 0);
+            if (mode === 'native') assert.ok(cold.trace.native.metadata, 'metadata must be inflated natively');
           }
           assert.equal(warm.trace.native.sources, 0, 'ordinary repeated import should not reprocess Sources');
           assert.ok(cold.trace.stages.componentMergeAndIndex?.calls, 'actual mutable component merge required');

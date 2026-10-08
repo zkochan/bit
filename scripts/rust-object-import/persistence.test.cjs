@@ -269,3 +269,27 @@ test('Rust commits keep the first duplicate buffer, preserve mode, and invalidat
   assert.deepEqual((await repo.load(obj.ref)).contents, Buffer.alloc(1024, 97));
   if (process.platform !== 'win32') assert.equal((await fs.stat(repo.objectPath(obj.ref))).mode & 0o777, 0o640);
 });
+
+test('native metadata preserves the canonical parser and malformed-JSON error', async (t) => {
+  const { installed } = require('./load-source.cjs');
+  const { BitObject, VersionHistory } = installed('@teambit/objects');
+  const history = new VersionHistory({ name: 'unicode-日本語', scope: 'test.remote', versions: [] });
+  const bytes = history.serialize();
+  const direct = BitObject.parseInflatedObjectWithSize(bytes);
+  const legacy = await BitObject.parseObjectWithSize(await history.compress());
+  assert.equal(direct.object.constructor, legacy.object.constructor);
+  assert.deepEqual(direct.object.toObject(), legacy.object.toObject());
+  assert.equal(direct.inflatedSize, legacy.inflatedSize);
+  const zlib = require('node:zlib');
+  const malformed = Buffer.from(`Version ${'a'.repeat(40)} 0\0{invalid`);
+  let expected;
+  try {
+    await BitObject.parseObjectWithSize(zlib.deflateSync(malformed));
+  } catch (error) {
+    expected = error;
+  }
+  assert.throws(
+    () => BitObject.parseInflatedObjectWithSize(malformed),
+    (error) => error.constructor === expected.constructor && error.message === expected.message
+  );
+});

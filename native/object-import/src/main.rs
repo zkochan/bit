@@ -1,3 +1,4 @@
+mod metadata;
 mod protocol;
 mod store;
 mod validate;

@@ -80,12 +80,13 @@ test('corrupt and mutable records stay in the canonical JavaScript path', async 
     async (values) => {
       assert.ok(values[0]);
       assert.equal(values[1], undefined);
-      assert.equal(values[2], undefined);
+      assert.equal(values[2].metadata, zlib.inflateSync(mutable.buffer).toString('utf8'));
       return [0];
     },
     async (_, persisted) => assert.deepEqual([...persisted], [0])
   );
-  assert.equal(value.stats.legacy, 2);
+  assert.equal(value.stats.legacy, 1);
+  assert.equal(value.stats.metadata, 1);
 });
 
 test('native write failures are acknowledged for JavaScript retry', async (t) => {
@@ -173,5 +174,34 @@ test('selection errors propagate unchanged, abort the held batch, and permit fal
       return [];
     },
     async () => {}
+  );
+});
+
+test('metadata inflation is bounded, lossless, and never authorizes Source commits', async (t) => {
+  const { value } = await importer(t);
+  const hash = 'a'.repeat(40);
+  const encode = (body) => ({ ref: { toString: () => hash }, buffer: zlib.deflateSync(body) });
+  const text = `Version ${hash} 0\0{"unicode":"🚀日本語","invalidJSON":`;
+  const normal = encode(Buffer.from(text));
+  const invalidUtf8 = encode(Buffer.concat([Buffer.from(`Version ${hash} 1\0`), Buffer.from([255])]));
+  const tooLarge = encode(Buffer.from(`Version ${hash} 0\0` + 'a'.repeat(256 * 1024)));
+  const truncated = { ...normal, buffer: normal.buffer.subarray(0, normal.buffer.length - 1) };
+  const trailing = { ...normal, buffer: Buffer.concat([normal.buffer, Buffer.from('extra')]) };
+  await value.importBatch(
+    [normal, invalidUtf8, tooLarge, truncated, trailing],
+    async (values) => {
+      assert.deepEqual(values[0], { metadata: text, inflatedBytes: Buffer.byteLength(text) });
+      assert.ok(values.slice(1).every((x) => x === undefined));
+      return [];
+    },
+    async (_, persisted) => assert.equal(persisted.size, 0)
+  );
+  await assert.rejects(
+    value.importBatch(
+      [normal],
+      async () => [0],
+      async () => {}
+    ),
+    /invalid native Source selection/
   );
 });

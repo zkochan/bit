@@ -158,13 +158,19 @@ fn persistent_protocol_requires_explicit_verified_source_selection_before_writin
 fn invalid_commit_indices_are_rejected_before_any_write() {
     use super::selection;
     use crate::validate::Outcome;
-    let source =
-        Outcome { status: "source", hash: "a".repeat(40), inflated_bytes: 12, reason: None };
+    let source = Outcome {
+        status: "source",
+        hash: "a".repeat(40),
+        inflated_bytes: 12,
+        reason: None,
+        metadata: None,
+    };
     let legacy = Outcome {
         status: "legacy",
         hash: "b".repeat(40),
         inflated_bytes: 0,
         reason: Some("mutable"),
+        metadata: None,
     };
     for indices in [vec![1_u32], vec![0, 0], vec![0, 2]] {
         let mut input = b"BOC2".to_vec();
@@ -173,10 +179,12 @@ fn invalid_commit_indices_are_rejected_before_any_write() {
         for index in indices {
             input.extend(index.to_be_bytes());
         }
-        assert!(selection(&mut Cursor::new(input), 7, &[source.clone(), legacy.clone()]).is_err());
+        assert!(
+            selection(&mut Cursor::new(input), 7, &[source.clone(), legacy.clone()], 2).is_err(),
+        );
     }
     let mut wrong_id = b"BOC2".to_vec();
     wrong_id.extend(8_u32.to_be_bytes());
     wrong_id.extend(0_u32.to_be_bytes());
-    assert!(selection(&mut Cursor::new(wrong_id), 7, &[source]).is_err());
+    assert!(selection(&mut Cursor::new(wrong_id), 7, &[source], 2).is_err());
 }

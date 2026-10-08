@@ -140,6 +140,11 @@ path: ${err.path}`);
     return { object: parse(buffer), inflatedSize: buffer.byteLength };
   }
 
+  /** Internal import path for native, losslessly decoded, completely inflated metadata. */
+  static parseInflatedObjectWithSize(buffer: Buffer): { object: BitObject; inflatedSize: number } {
+    return { object: parse(buffer), inflatedSize: buffer.byteLength };
+  }
+
   /**
    * same as `parseObject`, however, if the type is not one of the given "typeNames", it returns null.
    * the performance improvement is huge compare to "parseObject", as it doesn't parse the object if not needed.

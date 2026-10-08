@@ -5,7 +5,7 @@ use serde::Serialize;
 
 use crate::{
     store::Store,
-    validate::{Outcome, validate},
+    validate::{Outcome, validate, validate_with_metadata},
 };
 
 pub(crate) const MAX_BATCH_BYTES: usize = 128 * 1024 * 1024;
@@ -71,27 +71,19 @@ pub(crate) fn serve_with_store(
             return Ok(());
         }
         reader.read_exact(&mut magic[1..])?;
-        let persistent = persistent_frame(magic, store)?;
+        let version = frame_version(magic, store)?;
         let id = word(reader)?;
         let count = word(reader)?;
         let inputs = batch(reader, count)?;
-        let files: Vec<Outcome> = pool.install(|| {
-            inputs
-                .par_iter()
-                .map(|input| validate(&input.compressed, input.expected))
-                .collect()
-        });
-        respond(
-            writer,
-            &Response { version: if persistent { 2 } else { 1 }, id, files: files.clone() },
-        )?;
-        if persistent {
+        let files = outcomes(&inputs, pool, version);
+        respond(writer, &Response { version, id, files: files.clone() })?;
+        if version > 1 {
             commit(
                 reader,
                 writer,
                 pool,
                 store.ok_or_else(|| invalid("missing native store"))?,
-                id,
+                (version, id),
                 &inputs,
                 &files,
             )?;
@@ -115,11 +107,12 @@ fn commit(
     writer: &mut impl Write,
     pool: &ThreadPool,
     store: &Store,
-    id: u32,
+    identity: (u8, u32),
     inputs: &[Input],
     files: &[Outcome],
 ) -> io::Result<()> {
-    let indices = selection(reader, id, files)?;
+    let (version, id) = identity;
+    let indices = selection(reader, id, files, version)?;
     let outcomes: Vec<_> = pool.install(|| {
         indices
             .par_iter()
@@ -136,7 +129,7 @@ fn commit(
     });
     store.finish_batch()?;
     let response = CommitResponse {
-        version: 2,
+        version,
         id,
         persisted: outcomes
             .iter()
@@ -150,10 +143,15 @@ fn commit(
     respond(writer, &response)
 }
 
-fn selection(reader: &mut impl Read, id: u32, files: &[Outcome]) -> io::Result<Vec<u32>> {
+fn selection(
+    reader: &mut impl Read,
+    id: u32,
+    files: &[Outcome],
+    version: u8,
+) -> io::Result<Vec<u32>> {
     let mut magic = [0; 4];
     reader.read_exact(&mut magic)?;
-    if magic != *b"BOC2" || word(reader)? != id {
+    if magic != (if version == 3 { *b"BOC3" } else { *b"BOC2" }) || word(reader)? != id {
         return Err(invalid("invalid Source commit identity"));
     }
     let count = word(reader)?;
@@ -174,16 +172,32 @@ fn selection(reader: &mut impl Read, id: u32, files: &[Outcome]) -> io::Result<V
     Ok(indices)
 }
 
-fn persistent_frame(magic: [u8; 4], store: Option<&Store>) -> io::Result<bool> {
-    let persistent = magic == *b"BOI2";
-    if magic != *b"BOI1" && (!persistent || store.is_none()) {
-        return Err(invalid("unsupported object-import protocol"));
+fn frame_version(magic: [u8; 4], store: Option<&Store>) -> io::Result<u8> {
+    match (&magic, store) {
+        (b"BOI1", _) => Ok(1),
+        (b"BOI2", Some(_)) => Ok(2),
+        (b"BOI3", Some(_)) => Ok(3),
+        _ => Err(invalid("unsupported object-import protocol")),
     }
-    Ok(persistent)
 }
 
 fn respond(writer: &mut impl Write, response: &impl Serialize) -> io::Result<()> {
     serde_json::to_writer(&mut *writer, response)?;
     writer.write_all(b"\n")?;
     writer.flush()
+}
+
+fn outcomes(inputs: &[Input], pool: &ThreadPool, version: u8) -> Vec<Outcome> {
+    pool.install(|| {
+        inputs
+            .par_iter()
+            .map(|input| {
+                if version == 3 {
+                    validate_with_metadata(&input.compressed, input.expected)
+                } else {
+                    validate(&input.compressed, input.expected)
+                }
+            })
+            .collect()
+    })
 }
