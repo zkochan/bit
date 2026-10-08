@@ -39,3 +39,29 @@ Validation: 41 Node transport/persistence/hook/cache/fetcher/diagnostic tests pa
 The original measurement attempt retained verified scopes in the harness parent’s global cache. Its results were discarded. This run clears only that private readback cache, with exposed GC between commands; production CLI processes use normal caches and GC. Raw JSON and logs remain outside Git on the development machine; the accepted file-remote report is `native-store-real-import-bounded-verification.json`. Earlier PR #34 writer-only results retain their original scope in [local-results.md](./local-results.md).
 
 HTTP/tar qualification uses the compiled FetchRoute and original tar encoder/decoder on loopback. It exercises the real HTTP client path but excludes authentication, WAN latency and server-process CPU/memory. Native helper distribution, Windows metadata behavior, varied storage and default rollout remain separate work.
+
+## Loopback HTTP/tar commands
+
+The same nine-round, four-mode protocol was repeated for three representative workloads through Bit’s real HTTP client, compiled FetchRoute and original tar encoder/decoder. The server is a separate, unmeasured process; client wall time includes loopback transfer/waiting, and client CPU/RSS includes its Rust helper. Every cold/warm repository passed the same complete readback.
+
+| Workload           | JS control ms | Validation / Node writes ms | Native persistence ms | Native improvement vs control | Control CPU seconds | Native CPU seconds |
+| ------------------ | ------------: | --------------------------: | --------------------: | ----------------------------: | ------------------: | -----------------: |
+| many-small         |         568.4 |                       563.6 |                 461.5 |                         18.8% |                0.80 |               0.66 |
+| large-compressible |         549.1 |                       351.3 |                 343.6 |                         37.4% |                0.80 |               0.53 |
+| multi-remote       |         492.3 |                       336.8 |                 355.8 |                         27.7% |                0.82 |               0.55 |
+
+Many-small client filesystem callbacks fall from 16,220 to 2,952 (81.8%); diagnostic Promise callbacks fall from 72,164 to 23,185 (67.9%). Source commits no longer create Node filesystem requests. For the large multi-remote case, validation-only beats native persistence by about 19 ms in this run: moving the writer into Rust has its largest measured benefit when object counts are high. Do not claim that every extra native stage always wins.
+
+Missing/crashing-helper HTTP smoke imports also preserve complete repository contents; ordinary repeated imports process zero native Sources. These tests do not cover production authentication, WAN conditions, HTTP retry/failure injection or checkout/dependency installation. Raw reports remain outside Git on the development machine (`native-store-http-import-bounded-verification.json` and `native-store-http-smoke.json`).
+
+## Ordinary local disk
+
+Nine interleaved rounds per mode were repeated on Btrfs (`statfs` type `0x9123683e`) for many-small, large-compressible and mutable-heavy file-remote imports. Remote fixtures and destination workspaces both use that filesystem. All readback, repeated-command and native commit coverage checks pass. This uses normal OS caching, without dropping caches or making durability/fsync claims.
+
+| Workload           | JS control ms | Validation / Node writes ms | Native persistence ms | Native improvement vs control | Control CPU seconds | Native CPU seconds |
+| ------------------ | ------------: | --------------------------: | --------------------: | ----------------------------: | ------------------: | -----------------: |
+| many-small         |         972.9 |                       829.3 |                 646.5 |                         33.6% |                1.23 |               0.96 |
+| large-compressible |         590.3 |                       351.7 |                 340.3 |                         42.3% |                0.90 |               0.53 |
+| mutable-heavy      |        1413.2 |                      1703.5 |                1397.6 |                          1.1% |                2.17 |               2.17 |
+
+Raw evidence is outside Git on the development machine (`native-store-btrfs-import-bounded-verification.json`). These results establish gains on two local filesystem types; they do not establish behavior on deployment network filesystems or full checkout/package-install commands. Metadata-heavy workloads remain a separate optimization target.

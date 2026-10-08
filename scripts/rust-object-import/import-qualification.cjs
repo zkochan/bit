@@ -123,11 +123,19 @@ async function workspace(directory, manifest) {
         .digest('hex'),
       file.sha256
     );
-  const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-real-import-'));
+  const scratch = path.resolve(process.env.BIT_IMPORT_QUALIFICATION_TMPDIR || os.tmpdir());
+  const repository = path.resolve(__dirname, '../..');
+  assert.ok(
+    scratch !== repository && !scratch.startsWith(repository + path.sep),
+    'fixtures must stay outside the repository'
+  );
+  await fs.mkdir(scratch, { recursive: true });
+  const temporary = await fs.mkdtemp(path.join(scratch, 'bit-real-import-'));
   process.env.BIT_GLOBALS_DIR = benchmarkGlobals(temporary);
   const report = {
     schemaVersion: 1,
     temporary,
+    filesystemType: (await fs.statfs(temporary)).type,
     node: process.version,
     cliProvenance: provenance,
     helperSha256: createHash('sha256')
