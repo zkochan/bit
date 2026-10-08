@@ -4,7 +4,8 @@ import type { ObjectItem, Repository } from '@teambit/objects';
 import { BitObject, Lane, LaneHistory, ModelComponent, Version, VersionHistory } from '@teambit/objects';
 import type { WriteObjectsQueue } from './write-objects-queue';
 import type { ComponentsPerRemote } from '../component-ops/multiple-component-merger';
-import type { RustSourceValidator } from './rust-source-validator';
+import type { RustObjectImporter } from './rust-object-importer';
+import type { RustSourceValidator, SourceValidation } from './rust-source-validator';
 
 const TIMEOUT_MINUTES_WARNING = 3;
 const TIMEOUT_MINUTES_EXIT = 30;
@@ -26,7 +27,8 @@ export class ObjectsWritable extends Writable {
     private remoteName: string,
     private objectsQueue: WriteObjectsQueue,
     private componentsPerRemote: ComponentsPerRemote,
-    private sourceValidator?: RustSourceValidator
+    private sourceValidator?: RustSourceValidator,
+    private nativeImporter?: RustObjectImporter
   ) {
     super({ objectMode: true });
     if (!this.componentsPerRemote[remoteName]) this.componentsPerRemote[remoteName] = [];
@@ -50,12 +52,79 @@ export class ObjectsWritable extends Writable {
       return callback(new Error('objectItem expected to have "ref" and "buffer" props'));
     }
     try {
-      await this.writeObjectToFs(obj);
+      if (this.nativeImporter) await this.writeNativeBatch([obj]);
+      else await this.writeObjectToFs(obj);
       return callback();
     } catch (err: any) {
       logger.error(`found an issue during write of ${obj.ref.toString()}`, err);
       return callback(err);
     }
+  }
+
+  async _writev(chunks: { chunk: ObjectItem }[], callback: (error?: Error) => void) {
+    try {
+      // Validate buffered input together, but retain the existing ordered parse/write/merge behavior.
+      for (let offset = 0; offset < chunks.length; offset += 16) {
+        const objects = chunks.slice(offset, offset + 16).map(({ chunk }) => chunk);
+        for (const object of objects) {
+          if (!object.ref || !object.buffer) throw new Error('objectItem expected to have "ref" and "buffer" props');
+        }
+        if (this.nativeImporter) {
+          await this.writeNativeBatch(objects);
+          continue;
+        }
+        const validator = this.sourceValidator;
+        const validations = validator
+          ? await Promise.all(objects.map((object) => validator.validate(object.ref.toString(), object.buffer)))
+          : undefined;
+        for (let index = 0; index < objects.length; index += 1) {
+          await this.writeObjectToFs(objects[index], validations ? { result: validations[index] } : undefined);
+        }
+      }
+      callback();
+    } catch (error: any) {
+      logger.error(`found an issue during buffered write from ${this.remoteName}`, error);
+      callback(error);
+    }
+  }
+
+  private async writeNativeBatch(objects: ObjectItem[]) {
+    let legacyError: unknown;
+    const importer = this.nativeImporter;
+    if (!importer) throw new Error('native importer unavailable');
+    await importer.importBatch(
+      objects,
+      async (values) => {
+        const selected: number[] = [];
+        for (let index = 0; index < objects.length; index += 1) {
+          try {
+            if (values[index]) {
+              if (this.objectsQueue.reserveNativeSource(objects[index].ref.toString())) selected.push(index);
+            } else {
+              await this.writeObjectToFs(objects[index], { result: undefined });
+            }
+          } catch (error) {
+            legacyError = error;
+            break;
+          }
+        }
+        return selected;
+      },
+      async (selected, persisted) => {
+        for (const index of selected) {
+          const object = objects[index];
+          if (persisted?.has(index)) this.repo.removeFromCache(object.ref);
+          else {
+            const { object: parsed, inflatedSize } = await BitObject.parseObjectWithSize(object.buffer);
+            await this.repo.writeObjectsToTheFS(
+              [parsed],
+              new Map([[parsed, { buffer: object.buffer, inflatedSize, ref: object.ref }]])
+            );
+          }
+        }
+      }
+    );
+    if (legacyError) throw legacyError;
   }
 
   async _final(callback) {
@@ -68,9 +137,11 @@ export class ObjectsWritable extends Writable {
     callback(error);
   }
 
-  private async writeObjectToFs(obj: ObjectItem) {
+  private async writeObjectToFs(obj: ObjectItem, validation?: { result?: SourceValidation }) {
     if (this.sourceValidator) {
-      const validated = await this.sourceValidator.validate(obj.ref.toString(), obj.buffer);
+      const validated = validation
+        ? validation.result
+        : await this.sourceValidator.validate(obj.ref.toString(), obj.buffer);
       if (validated) {
         await this.objectsQueue.addImmutableObject(obj.ref.toString(), () =>
           this.repo.writeValidatedSourceToFS(obj.ref, obj.buffer)

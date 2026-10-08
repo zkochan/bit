@@ -58,6 +58,8 @@ export default class Repository {
   scopeJson: ScopeJson;
   onRead: ContentTransformer;
   onPersist: ContentTransformer;
+  private defaultOnPersist: ContentTransformer;
+  private defaultOnRead: ContentTransformer;
   scopePath: string;
   scopeIndex: ScopeIndex;
   protected cache: InMemoryCache<BitObject>;
@@ -70,6 +72,8 @@ export default class Repository {
     this.scopeJson = scopeJson;
     this.onRead = (content: Buffer) => Repository.onPostObjectRead?.(content) || content;
     this.onPersist = (content: Buffer) => Repository.onPreObjectPersist?.(content) || content;
+    this.defaultOnPersist = this.onPersist;
+    this.defaultOnRead = this.onRead;
     this.cache = createInMemoryCache(getCacheOptionsForObjects());
   }
 
@@ -118,6 +122,9 @@ export default class Repository {
    * which needs to maintain sync behavior for compatibility with existing code.
    */
   static onPreObjectPersist?: (content: Buffer) => Buffer;
+
+  /** Live check for the scope aspect's usually empty persist-transformer slot. */
+  static hasPreObjectPersistTransformer?: () => boolean;
 
   /**
    * Hook for transforming content after objects are read from the filesystem.
@@ -803,6 +810,21 @@ export default class Repository {
 
     const added = this.scopeIndex.addMany(objects);
     if (added) await this.scopeIndex.write();
+  }
+
+  async getNativeSourceStoreOptions(): Promise<{ objectsDirectory: string; owner: ObjectChownOptions } | undefined> {
+    // Custom transforms stay in JavaScript. Native writes are currently qualified on Unix hosts.
+    if (
+      (process.platform !== 'linux' && process.platform !== 'darwin') ||
+      this.onPersist !== this.defaultOnPersist ||
+      this.onRead !== this.defaultOnRead ||
+      (Repository.hasPreObjectPersistTransformer
+        ? Repository.hasPreObjectPersistTransformer()
+        : Boolean(Repository.onPreObjectPersist)) ||
+      this.isContentTransformed()
+    )
+      return undefined;
+    return { objectsDirectory: path.resolve(this.getPath()), owner: await this.getChownOptions() };
   }
 
   /** Internal import fast path: only content-validated immutable Sources, never indexed/mutable objects. */

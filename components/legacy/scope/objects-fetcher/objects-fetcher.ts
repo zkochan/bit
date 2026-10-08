@@ -16,6 +16,7 @@ import { WriteObjectsQueue } from './write-objects-queue';
 import { groupByScopeName } from '../component-ops/scope-components-importer';
 import { pMapPool } from '@teambit/toolbox.promise.map-pool';
 import { concurrentFetchLimit } from '@teambit/harmony.modules.concurrency';
+import { RustObjectImporter } from './rust-object-importer';
 import { createRustSourceValidator } from './rust-source-validator';
 import type { RustSourceValidator } from './rust-source-validator';
 import type { Remotes, Remote } from '@teambit/scope.remotes';
@@ -51,14 +52,20 @@ export class ObjectFetcher {
 
   public async fetchFromRemoteAndWrite(): Promise<string[]> {
     const validator = createRustSourceValidator();
+    const options =
+      validator && process.env.BIT_RUST_OBJECT_IMPORT_MODE !== 'validate'
+        ? await this.repo.getNativeSourceStoreOptions()
+        : undefined;
+    const importer = options ? new RustObjectImporter(process.env.BIT_RUST_OBJECT_IMPORT!, options) : undefined;
     try {
-      return await this.fetchAndWrite(validator);
+      return await this.fetchAndWrite(importer ? undefined : validator, importer);
     } finally {
       validator?.dispose();
+      importer?.dispose();
     }
   }
 
-  private async fetchAndWrite(validator?: RustSourceValidator): Promise<string[]> {
+  private async fetchAndWrite(validator?: RustSourceValidator, importer?: RustObjectImporter): Promise<string[]> {
     this.fetchOptions = {
       type: 'component',
       withoutDependencies: true, // backward compatibility. not needed for remotes > 0.0.900
@@ -85,7 +92,14 @@ export class ObjectFetcher {
       async (scopeName) => {
         const readableStream = await this.fetchFromSingleRemote(scopeName, idsGrouped[scopeName]);
         if (!readableStream) return;
-        await this.writeFromSingleRemote(readableStream, scopeName, objectsQueue, componentsPerRemote, validator);
+        await this.writeFromSingleRemote(
+          readableStream,
+          scopeName,
+          objectsQueue,
+          componentsPerRemote,
+          validator,
+          importer
+        );
       },
       { concurrency: concurrentFetchLimit() }
     );
@@ -234,9 +248,10 @@ the remote scope "${scopeName}" was not found`);
     scopeName: string,
     objectsQueue: WriteObjectsQueue,
     componentsPerRemote: ComponentsPerRemote,
-    validator?: RustSourceValidator
+    validator?: RustSourceValidator,
+    importer?: RustObjectImporter
   ) {
-    const writable = new ObjectsWritable(this.repo, scopeName, objectsQueue, componentsPerRemote, validator);
+    const writable = new ObjectsWritable(this.repo, scopeName, objectsQueue, componentsPerRemote, validator, importer);
     // add an error listener for the ObjectList to differentiate between errors coming from the
     // remote and errors happening inside the Writable.
     let readableError: Error | undefined;

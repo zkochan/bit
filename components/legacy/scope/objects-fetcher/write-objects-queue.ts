@@ -10,12 +10,20 @@ export class WriteObjectsQueue {
     this.queue = new PQueue({ concurrency, autoStart: true });
   }
   addImmutableObject<T>(hash: string, fn: () => Promise<T | null>) {
-    if (this.seenHashes.has(hash)) {
-      return null;
-    }
+    if (!this.reserve(hash)) return null;
+    return this.add(fn);
+  }
+  reserveNativeSource(hash: string): boolean {
+    if (!this.reserve(hash)) return false;
+    this.added += 1;
+    this.queue.emit('add');
+    return true;
+  }
+  private reserve(hash: string): boolean {
+    if (this.seenHashes.has(hash)) return false;
     this.seenHashes.add(hash);
     this.addedHashes.push(hash);
-    return this.add(fn);
+    return true;
   }
   getQueue() {
     return this.queue;

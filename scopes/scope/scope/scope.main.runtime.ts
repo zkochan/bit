@@ -1515,6 +1515,7 @@ export class ScopeMain implements ComponentFactory {
     Scope.onPostExport = onPostExportHook;
     Repository.onPostObjectsPersist = onPostObjectsPersistHook;
     Repository.onPreObjectPersist = onPreObjectPersistHook;
+    Repository.hasPreObjectPersistTransformer = () => preObjectPersistSlot.values().length > 0;
     Repository.onPostObjectRead = onPostObjectReadHook;
     // the hook above is installed whether or not anything registered a transformer, so it can't be
     // used to answer "is content transformed?". the slot is filled by other aspects' providers, so
