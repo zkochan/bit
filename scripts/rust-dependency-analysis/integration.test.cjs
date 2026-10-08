@@ -199,18 +199,17 @@ test('nonmatching predicates execute once and lazy native receives the exact sou
   assert.equal(fs.readFileSync(file('entry.js'), 'utf8'), changed);
 });
 
-test('unsupported and unavailable native outcomes execute legacy extraction; parse_error stays an error', async (context) => {
+test('unsupported, unavailable and legacy-accepted parse_error outcomes return legacy extraction', async (context) => {
   hooks(context, []);
   const { file } = workspace(context, { 'entry.ts': `import './legacy';` });
   for (const status of ['unsupported', 'read_error', undefined]) {
     const session = controlledSession(status ? outcome(status, {}, ['fallback reason']) : undefined);
     assert.deepEqual(await precinct.paperwork(file('entry.ts'), { rustScannerSession: session }), ['./legacy']);
   }
+  // Oxc is stricter than the legacy parsers: a native parse_error on source legacy accepts must not
+  // surface as a parsing issue Bit never reported before.
   const session = controlledSession(outcome('parse_error', {}, ['native syntax diagnostic']));
-  await assert.rejects(
-    precinct.paperwork(file('entry.ts'), { rustScannerSession: session }),
-    /native syntax diagnostic/
-  );
+  assert.deepEqual(await precinct.paperwork(file('entry.ts'), { rustScannerSession: session }), ['./legacy']);
 });
 
 test('core filtering stays in precinct and unsupported parser options retain legacy behavior', async (context) => {

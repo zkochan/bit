@@ -236,17 +236,17 @@ const nativeDependencies = (
   return undefined;
 };
 
-// Native diagnostics do not carry the legacy parser's error class and locations.
-// On this rare error path only, recover its canonical error from the same built-in
-// detective. A successful legacy parse must never erase a native parse failure.
-const enrichParseError = async (
-  outcome: RustScannerOutcome | undefined,
+// Native diagnostics do not carry the legacy parser's error class and locations, and Oxc is stricter
+// than the legacy parsers. On this rare path only, rerun the same built-in detective on the same source:
+// its canonical error is thrown, and if it accepts the source, its result is returned, so the native
+// backend never reports a parse failure legacy extraction would not.
+const legacyResultForParseError = async (
+  outcome: RustScannerOutcome,
   filename: string,
   options: Options,
   fileInfo?: FileInfo,
   selectedDetector?: Detective
-): Promise<void> => {
-  if (outcome?.status !== 'parse_error') return;
+): Promise<string[]> => {
   const nativeError = new Error(outcome.diagnostics.join('\n') || `could not parse ${filename}`);
   let info = fileInfo;
   if (!info) {
@@ -263,14 +263,14 @@ const enrichParseError = async (
   const detective = fileInfo
     ? selectedDetector || getJsDetector(info, options)
     : typeToDetective[extToType[info.ext]] || getJsDetector(info, options);
-  if (detective) {
-    if (!fileInfo) {
-      info.type = extToType[info.ext] || info.type;
-      if (info.ext === '.tsx') options.ts = { ...options.ts, jsx: true };
-    }
-    await detective(info.ast, options[info.type]);
+  if (!detective) throw nativeError;
+  if (!fileInfo) {
+    info.type = extToType[info.ext] || info.type;
+    if (info.ext === '.tsx') options.ts = { ...options.ts, jsx: true };
   }
-  throw nativeError;
+  const deps = await detective(info.ast, options[info.type]);
+  debug(`Rust parse_error for ${filename} accepted by legacy parsing; using the legacy result`);
+  return normalizeDeps(deps, options.includeCore);
 };
 
 const getDepsFromFile = async (filename: string, options?: Options): Promise<string[]> => {
@@ -280,7 +280,7 @@ const getDepsFromFile = async (filename: string, options?: Options): Promise<str
   if (prefetchedContext) {
     await session.prefetch([filename]);
     const outcome = session.get(filename);
-    if (outcome?.status === 'parse_error') await enrichParseError(outcome, filename, normalizedOptions);
+    if (outcome?.status === 'parse_error') return legacyResultForParseError(outcome, filename, normalizedOptions);
     const deps = nativeDependencies(filename, outcome, normalizedOptions);
     if (deps !== undefined) return deps;
   }
@@ -304,7 +304,7 @@ const getDepsFromFile = async (filename: string, options?: Options): Promise<str
     // above, so native extraction neither reruns predicates nor reads another source snapshot.
     const outcome = await session.scanSource(filename, fileInfo.content as string);
     if (outcome?.status === 'parse_error') {
-      await enrichParseError(outcome, filename, normalizedOptions, fileInfo, selectedDetector);
+      return legacyResultForParseError(outcome, filename, normalizedOptions, fileInfo, selectedDetector);
     }
     const deps = nativeDependencies(filename, outcome, normalizedOptions);
     if (deps !== undefined) return deps;

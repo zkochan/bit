@@ -65,7 +65,7 @@ The many-edit case verifies all 16 unique issue markers and all 16 actual depend
 
 ## Parser diagnostics
 
-Native parse failures recover the canonical built-in detective error on the rare error path. Supported successful native scans retain their fast path. Inline scans reuse the exact already-read source and selected detector, so enrichment does not repeat custom predicates or read changed disk content. If the legacy detective accepts a native-rejected source, the native error remains an error; no successful legacy dependencies replace it.
+Native parse failures recover the canonical built-in detective error on the rare error path. Supported successful native scans retain their fast path. Inline scans reuse the exact already-read source and selected detector, so enrichment does not repeat custom predicates or read changed disk content. Oxc is stricter than the legacy parsers, so if the legacy detective accepts a native-rejected source, its dependencies are returned: the native backend never reports a parsing issue legacy extraction would not.
 
 Tests compare every own error property except the stack (which naturally contains different call sites), plus inherited name, lineNumber and column. The malformed TS fixture preserves `TSError`, `Type expected.`, location/fileName, line 1 and column 13, and the final `PARSING_ERROR` category. Prototype-key fallback tests compare full actual pipeline results, including legacy omissions and RangeError diagnostics, rather than comparing only error codes.
 
