@@ -11,7 +11,8 @@ test('hasMultiple preserves duplicate Ref identity, disk-only semantics and cust
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-inventory-repository-'));
   const previous = process.env.BIT_RUST_OBJECT_IMPORT;
   process.env.BIT_RUST_OBJECT_IMPORT =
-    process.env.BIT_TEST_OBJECT_IMPORT || path.join(root, 'native/target/debug/bit-object-import');
+    process.env.BIT_TEST_OBJECT_IMPORT ||
+    path.join(root, 'native/target/debug/bit-object-import' + (process.platform === 'win32' ? '.exe' : ''));
   t.after(async () => {
     if (previous === undefined) delete process.env.BIT_RUST_OBJECT_IMPORT;
     else process.env.BIT_RUST_OBJECT_IMPORT = previous;

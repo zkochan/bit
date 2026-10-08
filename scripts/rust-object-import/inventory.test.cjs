@@ -6,7 +6,9 @@ const path = require('node:path');
 const cp = require('node:child_process');
 const { root, source } = require('./load-source.cjs');
 const { nativeObjectExists } = source('scopes/scope/objects/objects/rust-object-inventory.ts');
-const native = process.env.BIT_TEST_OBJECT_IMPORT || path.join(root, 'native/target/debug/bit-object-import');
+const native =
+  process.env.BIT_TEST_OBJECT_IMPORT ||
+  path.join(root, 'native/target/debug/bit-object-import' + (process.platform === 'win32' ? '.exe' : ''));
 const hashes = Array.from({ length: 8500 }, (_, i) => i.toString(16).padStart(40, '0'));
 
 async function setup(t) {
@@ -41,6 +43,14 @@ test('ordered inventory spans bounded frames and sees creation/deletion without 
   const link = path.join(dir, '00', hashes[5].slice(2));
   await fs.symlink(path.join(dir, 'absent'), link);
   assert.equal((await nativeObjectExists(dir, hashes.slice(0, 1024)))[5], false, 'dangling symlink');
+  if (process.getuid?.() !== 0) {
+    await fs.chmod(path.join(dir, '00'), 0);
+    try {
+      assert.equal((await nativeObjectExists(dir, hashes.slice(0, 1024)))[4], false, 'inaccessible parent');
+    } finally {
+      await fs.chmod(path.join(dir, '00'), 0o755);
+    }
+  }
 });
 
 test('small/invalid hashes, disabled and unavailable helpers retain canonical fallback', async (t) => {
@@ -81,7 +91,7 @@ test('malformed identities, short/nonboolean responses and crashed helpers disca
   ]) {
     await fs.writeFile(
       executable,
-      '#!/bin/sh\nprintf %s ' + JSON.stringify(JSON.stringify(response)).replace(/'/g, "'\\''") + '\n',
+      "#!/bin/sh\nprintf '%s' '" + JSON.stringify(response).replace(/'/g, "'\\''") + "'\n",
       { mode: 0o755 }
     );
     assert.equal(await nativeObjectExists(dir, hashes.slice(0, 1024)), undefined);
