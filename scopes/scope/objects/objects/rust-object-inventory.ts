@@ -5,16 +5,25 @@ const MAX_HASHES = 4096;
 const MIN_HASHES = 1024;
 let batchTail: Promise<unknown> = Promise.resolve();
 
+/** Avoid mapping/allocating hashes on the default path and for batches below the crossover. */
+export function nativeInventoryEnabled(count: number): boolean {
+  const executable = process.env.BIT_RUST_OBJECT_IMPORT;
+  return Boolean(
+    executable &&
+      path.isAbsolute(executable) &&
+      process.env.BIT_RUST_OBJECT_INVENTORY !== 'off' &&
+      process.platform !== 'win32' &&
+      count >= MIN_HASHES
+  );
+}
+
 /** Stateless filesystem checks only; pending objects and model caches are not filesystem existence. */
 export async function nativeObjectExists(directory: string, hashes: string[]): Promise<boolean[] | undefined> {
   const executable = process.env.BIT_RUST_OBJECT_IMPORT;
   if (
     !executable ||
-    !path.isAbsolute(executable) ||
+    !nativeInventoryEnabled(hashes.length) ||
     !path.isAbsolute(directory) ||
-    process.env.BIT_RUST_OBJECT_INVENTORY === 'off' ||
-    process.platform === 'win32' ||
-    hashes.length < MIN_HASHES ||
     !hashes.every((hash) => /^[a-f0-9]{40}$/.test(hash))
   ) {
     return undefined;
