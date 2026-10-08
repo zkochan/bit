@@ -70,7 +70,7 @@ const { benchmarkGlobals } = require('../rust-dependency-analysis/command-worksp
   });
   const expected = await remote.loadManyRaw(refs);
   const canonicalHeaders = await remote.listObjectsWithType();
-  process.env.BIT_RUST_OBJECT_IMPORT = helper;
+  process.env.BIT_RUST_OBJECT_IMPORT = process.env.BIT_READ_QUALIFICATION_PACKAGED === '1' ? 'packaged' : helper;
   assert.deepEqual(await remote.loadManyRaw(refs), expected);
   // Glob traversal order can differ between calls; per-request ordering is covered separately.
   const normalize = (inventory) => ({

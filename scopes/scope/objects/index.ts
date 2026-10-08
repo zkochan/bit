@@ -1,3 +1,4 @@
+export { resolveRustObjectImportExecutable } from './objects/rust-object-discovery';
 export {
   ModelComponent,
   ScopeMeta,

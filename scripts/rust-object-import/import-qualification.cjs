@@ -14,6 +14,7 @@ const cliRoot = path.resolve(process.argv[2] || '');
 const helper = path.resolve(process.argv[3] || '');
 const rounds = Number(process.env.BIT_IMPORT_QUALIFICATION_ROUNDS || 9);
 const smoke = process.env.BIT_IMPORT_QUALIFICATION_SMOKE === '1';
+const packaged = process.env.BIT_IMPORT_QUALIFICATION_PACKAGED === '1';
 const transport = process.env.BIT_IMPORT_QUALIFICATION_TRANSPORT || 'file';
 assert.ok(['file', 'http'].includes(transport));
 const selectedCases = process.env.BIT_IMPORT_QUALIFICATION_CASES?.split(',');
@@ -26,7 +27,9 @@ const modes = process.env.BIT_IMPORT_QUALIFICATION_MODES?.split(',') || [
 ];
 assert.ok(
   modes.length &&
-    modes.every((mode) => ['legacy', 'control', 'validate', 'store', 'native', 'mutable-control'].includes(mode))
+    modes.every((mode) =>
+      ['legacy', 'control', 'validate', 'store', 'native', 'mutable-control', 'packaged-fallback'].includes(mode)
+    )
 );
 async function command(directory, ids, mode, allHistory, traceFile) {
   const cpuFile = path.join(directory, 'cpu.txt');
@@ -45,14 +48,18 @@ async function command(directory, ids, mode, allHistory, traceFile) {
     ...process.env,
     BIT_RUST_OBJECT_IMPORT:
       mode === 'native' || mode === 'validate' || mode === 'store' || mode === 'mutable-control'
-        ? helper
-        : mode === 'control'
-          ? 'control'
-          : mode === 'missing'
-            ? path.join(directory, 'nonexistent-helper')
-            : mode === 'crash'
-              ? path.join(directory, 'crashing-helper')
-              : 'off',
+        ? packaged
+          ? 'packaged'
+          : helper
+        : mode === 'packaged-fallback'
+          ? 'packaged'
+          : mode === 'control'
+            ? 'control'
+            : mode === 'missing'
+              ? path.join(directory, 'nonexistent-helper')
+              : mode === 'crash'
+                ? path.join(directory, 'crashing-helper')
+                : 'off',
     BIT_RUST_OBJECT_IMPORT_METADATA: mode === 'store' ? 'off' : 'on',
     BIT_RUST_OBJECT_IMPORT_MODE: mode === 'validate' ? 'validate' : 'store',
     BIT_RUST_OBJECT_IMPORT_MUTABLE: mode === 'store' || mode === 'mutable-control' ? 'off' : 'on',
@@ -157,6 +164,7 @@ async function workspace(directory, manifest) {
     rounds,
     smoke,
     transport,
+    packaged,
     serverCpuAndMemoryIncluded: false,
     command: 'bit import <ids> --objects --skip-dependency-installation --json --safe-mode [--all-history for cold]',
     cases: {},
@@ -269,7 +277,8 @@ async function workspace(directory, manifest) {
           assert.equal(warm.trace.native.sources, 0, 'ordinary repeated import should not reprocess Sources');
           assert.ok(cold.trace.stages.componentMergeAndIndex?.calls, 'actual mutable component merge required');
         }
-        if (mode === 'missing' || mode === 'crash') assert.equal(cold.trace.native.sources, 0);
+        if (mode === 'missing' || mode === 'crash' || mode === 'packaged-fallback')
+          assert.equal(cold.trace.native.sources, 0);
         data.diagnostics.push({ mode, cold, warm });
         await fs.rm(destination, { recursive: true, force: true });
       }

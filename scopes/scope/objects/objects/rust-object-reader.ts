@@ -1,4 +1,5 @@
 import path from 'path';
+import { resolveRustObjectImportExecutable } from './rust-object-discovery';
 import { nativeObjectHelperEnabled, nativeReadOperationSize, requestObjectBatch } from './rust-object-inventory';
 
 const MAX_RAW_BYTES = 256 * 1024;
@@ -21,7 +22,8 @@ export async function nativeObjectHeaders(
   hashes: string[]
 ): Promise<(NativeObjectHeader | undefined)[] | undefined> {
   if (!nativeHeadersEnabled(hashes.length) || !validHashes(directory, hashes)) return undefined;
-  const executable = process.env.BIT_RUST_OBJECT_IMPORT!;
+  const executable = resolveRustObjectImportExecutable();
+  if (!executable) return undefined;
   const results: (NativeObjectHeader | undefined)[] = [];
   const groupSize = nativeReadOperationSize();
   for (let offset = 0; offset < hashes.length; offset += groupSize) {
@@ -88,7 +90,8 @@ export async function nativeObjectBuffers(
   hashes: string[]
 ): Promise<(Buffer | undefined)[] | undefined> {
   if (!nativeReadsEnabled(hashes.length) || !validHashes(directory, hashes)) return undefined;
-  const executable = process.env.BIT_RUST_OBJECT_IMPORT!;
+  const executable = resolveRustObjectImportExecutable();
+  if (!executable) return undefined;
   const results: (Buffer | undefined)[] = [];
   for (let offset = 0; offset < hashes.length; offset += 4096) {
     const batch = hashes.slice(offset, offset + 4096);

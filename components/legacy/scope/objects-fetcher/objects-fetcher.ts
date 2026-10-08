@@ -11,6 +11,7 @@ import { ScopeNotFound } from '../exceptions';
 import { ErrorFromRemote } from '../exceptions/error-from-remote';
 import { UnexpectedNetworkError } from '@teambit/scope.network';
 import type { Repository, ObjectItemsStream, Lane } from '@teambit/objects';
+import { resolveRustObjectImportExecutable } from '@teambit/objects';
 import { ObjectsWritable } from './objects-writable-stream';
 import { WriteObjectsQueue } from './write-objects-queue';
 import { groupByScopeName } from '../component-ops/scope-components-importer';
@@ -51,15 +52,16 @@ export class ObjectFetcher {
   ) {}
 
   public async fetchFromRemoteAndWrite(): Promise<string[]> {
-    const validator = createRustSourceValidator();
+    const executable = resolveRustObjectImportExecutable('import');
+    const validator = createRustSourceValidator(executable);
     const options =
       validator && process.env.BIT_RUST_OBJECT_IMPORT_MODE !== 'validate'
         ? await this.repo.getNativeSourceStoreOptions()
         : undefined;
-    const importer = options ? new RustObjectImporter(process.env.BIT_RUST_OBJECT_IMPORT!, options) : undefined;
+    const importer = options ? new RustObjectImporter(executable!, options) : undefined;
     const mutableWriter =
       options && process.env.BIT_RUST_OBJECT_IMPORT_MUTABLE !== 'off'
-        ? new RustObjectImporter(process.env.BIT_RUST_OBJECT_IMPORT!, options)
+        ? new RustObjectImporter(executable!, options)
         : undefined;
     try {
       return await this.fetchAndWrite(importer ? undefined : validator, importer, mutableWriter);

@@ -1,5 +1,6 @@
 import { execFile } from 'child_process';
 import path from 'path';
+import { resolveRustObjectImportExecutable } from './rust-object-discovery';
 
 const MAX_HASHES = 4096;
 
@@ -11,8 +12,7 @@ export function nativeReadOperationSize(): number {
 }
 
 export function nativeObjectHelperEnabled(count: number, minimum: number): boolean {
-  const executable = process.env.BIT_RUST_OBJECT_IMPORT;
-  return Boolean(executable && path.isAbsolute(executable) && process.platform !== 'win32' && count >= minimum);
+  return count >= minimum && process.platform !== 'win32' && Boolean(resolveRustObjectImportExecutable());
 }
 
 /** Avoid mapping/allocating hashes on the default path and for batches below the crossover. */
@@ -22,7 +22,7 @@ export function nativeInventoryEnabled(count: number): boolean {
 
 /** Stateless filesystem checks only; pending objects and model caches are not filesystem existence. */
 export async function nativeObjectExists(directory: string, hashes: string[]): Promise<boolean[] | undefined> {
-  const executable = process.env.BIT_RUST_OBJECT_IMPORT;
+  const executable = resolveRustObjectImportExecutable();
   if (
     !executable ||
     !nativeInventoryEnabled(hashes.length) ||
