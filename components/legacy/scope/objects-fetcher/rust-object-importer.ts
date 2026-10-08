@@ -13,10 +13,22 @@ type Pending = {
 };
 const MAX_BYTES = 128 * 1024 * 1024;
 const MAX_OUTSTANDING = 256 * 1024 * 1024;
+const MAX_MUTABLE_BYTES = 512 * 1024;
 
 /** One validation and one commit response per batch; Source bytes never return to JavaScript. */
 export class RustObjectImporter {
-  readonly stats = { submitted: 0, sources: 0, legacy: 0, batches: 0, metadata: 0, persisted: 0, writeFallbacks: 0 };
+  readonly stats = {
+    submitted: 0,
+    sources: 0,
+    legacy: 0,
+    batches: 0,
+    metadata: 0,
+    persisted: 0,
+    writeFallbacks: 0,
+    mutableSubmitted: 0,
+    mutablePersisted: 0,
+    mutableFallbacks: 0,
+  };
   unavailableReason?: string;
   private child?: ChildProcessWithoutNullStreams;
   private pending?: Pending;
@@ -26,12 +38,78 @@ export class RustObjectImporter {
   private bytes = 0;
   private count = 0;
   private id = 0;
+  private stopped: Promise<void> = Promise.resolve();
   constructor(
     private executable: string,
     private options: NativeSourceStoreOptions,
     private timeoutMs = 120000,
     private args: string[] = []
   ) {}
+
+  /** Use a separate operation session: a validation session may be awaiting its Source commit. */
+  async persistMetadata(objects: NativeObjectInput[]): Promise<(number | null)[] | undefined> {
+    if (
+      !objects.length ||
+      objects.length > 16 ||
+      this.count + objects.length > 64 ||
+      this.unavailableReason ||
+      new Set(objects.map((object) => object.ref.toString())).size !== objects.length ||
+      objects.some(
+        (object) =>
+          !/^[a-f0-9]{40}$/.test(object.ref.toString()) ||
+          !object.buffer.length ||
+          object.buffer.length > MAX_MUTABLE_BYTES
+      )
+    )
+      return undefined;
+    this.count += objects.length;
+    const operation = this.tail.then(async () => {
+      const id = ++this.id;
+      if (id > 0xffffffff) this.fail('request ID exhausted');
+      const header = Buffer.alloc(12);
+      header.write('BMP1');
+      header.writeUInt32BE(id, 4);
+      header.writeUInt32BE(objects.length, 8);
+      const vectors: Buffer[] = [header];
+      for (const object of objects) {
+        const entry = Buffer.alloc(24);
+        Buffer.from(object.ref.toString(), 'hex').copy(entry);
+        entry.writeUInt32BE(object.buffer.length, 20);
+        vectors.push(entry, object.buffer);
+      }
+      const result = await this.request(vectors, (response) => {
+        if (
+          response.version !== 1 ||
+          response.id !== id ||
+          !Array.isArray(response.sizes) ||
+          response.sizes.length !== objects.length ||
+          response.sizes.some(
+            (size: unknown) =>
+              size !== null &&
+              (!Number.isSafeInteger(size) || Number(size) <= 0 || Number(size) > MAX_MUTABLE_BYTES + 1024)
+          )
+        )
+          throw new Error('invalid mutable write response');
+        return response.sizes as (number | null)[];
+      });
+      // Never race a timed-out native rename with a canonical mutable-object retry.
+      if (!result) await this.stopped;
+      this.stats.mutableSubmitted += objects.length;
+      const persisted = (result as (number | null)[] | undefined)?.filter((size) => size !== null).length || 0;
+      this.stats.mutablePersisted += persisted;
+      this.stats.mutableFallbacks += objects.length - persisted;
+      return result as (number | null)[] | undefined;
+    });
+    this.tail = operation.then(
+      () => undefined,
+      () => this.fail('mutable batch processing failed')
+    );
+    try {
+      return await operation;
+    } finally {
+      this.count -= objects.length;
+    }
+  }
 
   async importBatch(
     objects: NativeObjectInput[],
@@ -165,12 +243,21 @@ export class RustObjectImporter {
     this.fail('native importer disposed');
   }
 
+  async disposeAndWait() {
+    this.dispose();
+    await this.stopped;
+  }
+
   private start() {
     if (this.child) return this.child;
     const args = [...this.args, '--objects-dir', this.options.objectsDirectory];
     if (this.options.owner) args.push('--owner', `${this.options.owner.uid}:${this.options.owner.gid}`);
     const child = spawn(this.executable, args, { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     this.child = child;
+    this.stopped = new Promise((resolve) => {
+      child.once('exit', () => resolve());
+      child.once('error', () => resolve());
+    });
     child.on('error', (error) => this.fail(`spawn error: ${error.message}`));
     child.on('exit', () => this.fail('native importer exited'));
     for (const stream of [child.stdin, child.stdout, child.stderr])

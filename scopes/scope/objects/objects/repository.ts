@@ -901,6 +901,25 @@ export default class Repository {
     return { objectsDirectory: path.resolve(this.getPath()), owner: await this.getChownOptions() };
   }
 
+  canWriteMutableObjectsNatively(): boolean {
+    return (
+      this.writeObjectsToTheFS === Repository.prototype.writeObjectsToTheFS &&
+      this._writeOne === Repository.prototype._writeOne &&
+      this.scopeIndex.addMany === ScopeIndex.prototype.addMany &&
+      this.scopeIndex.addOne === ScopeIndex.prototype.addOne &&
+      this.objectPath === Repository.prototype.objectPath &&
+      this.writeObjectFile === Repository.prototype.writeObjectFile &&
+      this.hashPath === Repository.prototype.hashPath
+    );
+  }
+
+  /** Acknowledged native writes retain the canonical hydrated instance and cache size policy. */
+  recordNativeObjectWrite(object: BitObject, inflatedSize: number, compressedSize: number) {
+    const hash = object.hash().toString();
+    if (this.cache.has(hash)) this.cache.set(hash, object, inflatedSize);
+    this.liveObjects.set(hash, object, inflatedSize, compressedSize < MAX_COMPRESSED_SIZE_TO_CACHE);
+  }
+
   /** Internal import fast path: only content-validated immutable Sources, never indexed/mutable objects. */
   async writeValidatedSourceToFS(ref: Ref, compressed: Buffer): Promise<void> {
     if (!isSnap(ref.toString())) throw new BitError('invalid validated Source ref');
