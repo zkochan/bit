@@ -60,10 +60,11 @@ export function requestObjectBatch(
   directory: string,
   hashes: string[],
   magic: string,
-  maxBuffer: number
+  maxBuffer: number,
+  frameSize = hashes.length
 ): Promise<Buffer | undefined> {
   // Concurrent read-only operations share one bounded helper slot.
-  const operation = batchTail.then(() => runBatch(executable, directory, hashes, magic, maxBuffer));
+  const operation = batchTail.then(() => runBatch(executable, directory, hashes, magic, maxBuffer, frameSize));
   batchTail = operation.catch(() => undefined);
   return operation.catch(() => undefined);
 }
@@ -73,13 +74,20 @@ function runBatch(
   directory: string,
   hashes: string[],
   magic: string,
-  maxBuffer: number
+  maxBuffer: number,
+  frameSize: number
 ): Promise<Buffer | undefined> {
-  const frame = Buffer.alloc(12 + hashes.length * 20);
-  frame.write(magic);
-  frame.writeUInt32BE(1, 4);
-  frame.writeUInt32BE(hashes.length, 8);
-  hashes.forEach((hash, index) => Buffer.from(hash, 'hex').copy(frame, 12 + index * 20));
+  const frames: Buffer[] = [];
+  for (let offset = 0; offset < hashes.length; offset += frameSize) {
+    const batch = hashes.slice(offset, offset + frameSize);
+    const frame = Buffer.alloc(12 + batch.length * 20);
+    frame.write(magic);
+    frame.writeUInt32BE(offset / frameSize + 1, 4);
+    frame.writeUInt32BE(batch.length, 8);
+    batch.forEach((hash, index) => Buffer.from(hash, 'hex').copy(frame, 12 + index * 20));
+    frames.push(frame);
+  }
+  const frame = Buffer.concat(frames);
   return new Promise((resolve) => {
     const child = execFile(
       executable,

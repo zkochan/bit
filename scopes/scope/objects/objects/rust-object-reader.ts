@@ -77,9 +77,9 @@ export async function nativeObjectBuffers(
   if (!nativeReadsEnabled(hashes.length) || !validHashes(directory, hashes)) return undefined;
   const executable = process.env.BIT_RUST_OBJECT_IMPORT!;
   const results: (Buffer | undefined)[] = [];
-  for (let offset = 0; offset < hashes.length; offset += 128) {
-    const batch = hashes.slice(offset, offset + 128);
-    const response = await requestObjectBatch(executable, directory, batch, 'BRD1', 128 * MAX_RAW_BYTES + 1024);
+  for (let offset = 0; offset < hashes.length; offset += 4096) {
+    const batch = hashes.slice(offset, offset + 4096);
+    const response = await requestObjectBatch(executable, directory, batch, 'BRD1', 32 * 1024 * 1024 + 131072, 128);
     if (!response) return undefined;
     const values = parseBuffers(response, batch.length);
     if (!values) return undefined;
@@ -89,28 +89,32 @@ export async function nativeObjectBuffers(
 }
 
 function parseBuffers(buffer: Buffer, count: number): (Buffer | undefined)[] | undefined {
-  if (
-    buffer.length < 12 ||
-    buffer.toString('ascii', 0, 4) !== 'BRD1' ||
-    buffer.readUInt32BE(4) !== 1 ||
-    buffer.readUInt32BE(8) !== count
-  )
-    return undefined;
   const results: (Buffer | undefined)[] = [];
-  let offset = 12;
-  for (let index = 0; index < count; index++) {
-    if (offset >= buffer.length) return undefined;
-    const status = buffer[offset++];
-    if (status === 0) {
-      results.push(undefined);
-      continue;
+  let offset = 0;
+  for (let start = 0; start < count; start += 128) {
+    const frameCount = Math.min(128, count - start);
+    if (
+      offset + 12 > buffer.length ||
+      buffer.toString('ascii', offset, offset + 4) !== 'BRD1' ||
+      buffer.readUInt32BE(offset + 4) !== start / 128 + 1 ||
+      buffer.readUInt32BE(offset + 8) !== frameCount
+    )
+      return undefined;
+    offset += 12;
+    for (let index = 0; index < frameCount; index++) {
+      if (offset >= buffer.length) return undefined;
+      const status = buffer[offset++];
+      if (status === 0) {
+        results.push(undefined);
+        continue;
+      }
+      if (status !== 1 || offset + 4 > buffer.length) return undefined;
+      const length = buffer.readUInt32BE(offset);
+      offset += 4;
+      if (length > MAX_RAW_BYTES || offset + length > buffer.length) return undefined;
+      results.push(buffer.subarray(offset, offset + length));
+      offset += length;
     }
-    if (status !== 1 || offset + 4 > buffer.length) return undefined;
-    const length = buffer.readUInt32BE(offset);
-    offset += 4;
-    if (length > MAX_RAW_BYTES || offset + length > buffer.length) return undefined;
-    results.push(buffer.subarray(offset, offset + length));
-    offset += length;
   }
   return offset === buffer.length ? results : undefined;
 }

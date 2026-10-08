@@ -106,3 +106,72 @@ test('native header success agrees with Node partial inflation across truncation
   });
   assert.ok(nativeSuccesses > 100, 'exercise native successes as well as fallback');
 });
+
+test('oversized total transfer discards the complete group and leaves later requests usable', async (t) => {
+  const dir = await setup(t);
+  if (process.platform === 'win32') return;
+  await fs.writeFile(file(dir, 0), Buffer.alloc(256 * 1024, 17));
+  assert.equal(await nativeObjectBuffers(dir, Array(1024).fill(hashes[0])), undefined);
+  assert.equal((await nativeObjectHeaders(dir, hashes))[0], undefined);
+});
+
+test('malformed binary boundaries/identities and header records never expose an accepted prefix', async (t) => {
+  const dir = await setup(t);
+  if (process.platform === 'win32') return;
+  const executable = path.join(dir, 'fake-helper');
+  process.env.BIT_RUST_OBJECT_IMPORT = executable;
+  const raw = [];
+  for (let start = 0; start < 1024; start += 128) {
+    const frame = Buffer.alloc(12 + 128 * 6);
+    frame.write('BRD1');
+    frame.writeUInt32BE(start / 128 + 1, 4);
+    frame.writeUInt32BE(128, 8);
+    for (let index = 0; index < 128; index++) {
+      const offset = 12 + index * 6;
+      frame[offset] = 1;
+      frame.writeUInt32BE(1, offset + 1);
+      frame[offset + 5] = 17;
+    }
+    raw.push(frame);
+  }
+  const valid = Buffer.concat(raw);
+  const wrongLastId = Buffer.from(valid);
+  wrongLastId.writeUInt32BE(999, valid.length - raw.at(-1).length + 4);
+  const oversized = Buffer.from(valid);
+  oversized.writeUInt32BE(256 * 1024 + 1, 13);
+  const invalidStatus = Buffer.from(valid);
+  invalidStatus[12] = 2;
+  const respond = async (buffer) => {
+    await fs.writeFile(
+      executable,
+      '#!' +
+        process.execPath +
+        '\nprocess.stdin.resume();process.stdin.once("end",()=>process.stdout.write(Buffer.from(' +
+        JSON.stringify(buffer.toString('hex')) +
+        ',"hex")));\n',
+      { mode: 0o755 }
+    );
+  };
+  for (const response of [
+    wrongLastId,
+    oversized,
+    invalidStatus,
+    valid.subarray(0, -1),
+    Buffer.concat([valid, Buffer.from([0])]),
+  ]) {
+    await respond(response);
+    assert.equal(await nativeObjectBuffers(dir, hashes), undefined);
+  }
+  await respond(valid);
+  const result = await nativeObjectBuffers(dir, hashes);
+  assert.equal(result.length, 1024);
+  assert.ok(result.every((buffer) => buffer.equals(Buffer.from([17]))));
+  for (const header of [
+    { type: 'Source', size: -1, mtimeMs: 1 },
+    { type: 'Source ', size: 1, mtimeMs: 1 },
+    { type: 'Source', size: 1, mtimeMs: 'now' },
+  ]) {
+    await respond(Buffer.from(JSON.stringify({ version: 1, id: 1, objects: Array(256).fill(header) })));
+    assert.equal(await nativeObjectHeaders(dir, hashes.slice(0, 256)), undefined);
+  }
+});
