@@ -4,7 +4,7 @@ import type { ObjectItem, Repository } from '@teambit/objects';
 import { BitObject, Lane, LaneHistory, ModelComponent, Version, VersionHistory } from '@teambit/objects';
 import type { WriteObjectsQueue } from './write-objects-queue';
 import type { ComponentsPerRemote } from '../component-ops/multiple-component-merger';
-import type { RustObjectImporter } from './rust-object-importer';
+import type { RustObjectImporter, MetadataValidation } from './rust-object-importer';
 import type { RustSourceValidator, SourceValidation } from './rust-source-validator';
 
 const TIMEOUT_MINUTES_WARNING = 3;
@@ -98,10 +98,15 @@ export class ObjectsWritable extends Writable {
         const selected: number[] = [];
         for (let index = 0; index < objects.length; index += 1) {
           try {
-            if (values[index]) {
+            const value = values[index];
+            if (value && !('metadata' in value)) {
               if (this.objectsQueue.reserveNativeSource(objects[index].ref.toString())) selected.push(index);
             } else {
-              await this.writeObjectToFs(objects[index], { result: undefined });
+              await this.writeObjectToFs(
+                objects[index],
+                { result: undefined },
+                value && 'metadata' in value ? value : undefined
+              );
             }
           } catch (error) {
             legacyError = error;
@@ -137,7 +142,11 @@ export class ObjectsWritable extends Writable {
     callback(error);
   }
 
-  private async writeObjectToFs(obj: ObjectItem, validation?: { result?: SourceValidation }) {
+  private async writeObjectToFs(
+    obj: ObjectItem,
+    validation?: { result?: SourceValidation },
+    metadata?: MetadataValidation
+  ) {
     if (this.sourceValidator) {
       const validated = validation
         ? validation.result
@@ -150,7 +159,9 @@ export class ObjectsWritable extends Writable {
       }
       logger.debug(`Rust Source import fallback: ${this.sourceValidator.unavailableReason || 'legacy object'}`);
     }
-    const { object: bitObject, inflatedSize } = await BitObject.parseObjectWithSize(obj.buffer);
+    const { object: bitObject, inflatedSize } = metadata
+      ? BitObject.parseInflatedObjectWithSize(Buffer.from(metadata.metadata, 'utf8'))
+      : await BitObject.parseObjectWithSize(obj.buffer);
     // Batching/control comparison: retain the existing hydration/cache behavior but avoid redundant compression.
     if (
       process.env.BIT_RUST_OBJECT_IMPORT === 'control' &&

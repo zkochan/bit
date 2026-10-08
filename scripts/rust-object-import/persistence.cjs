@@ -1,11 +1,14 @@
 const { installed, source } = require('./load-source.cjs');
-const { Repository, Source, Ref } = installed('@teambit/objects');
+const { Repository, Source, Ref, BitObject } = installed('@teambit/objects');
 const { default: CurrentRepository } = source('scopes/scope/objects/objects/repository.ts');
 const { ObjectsWritable } = source('components/legacy/scope/objects-fetcher/objects-writable-stream.ts');
 const { WriteObjectsQueue } = source('components/legacy/scope/objects-fetcher/write-objects-queue.ts');
 const { RustSourceValidator } = source('components/legacy/scope/objects-fetcher/rust-source-validator.ts');
 const { Readable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
+BitObject.parseInflatedObjectWithSize = source(
+  'scopes/scope/objects/objects/object.ts'
+).default.parseInflatedObjectWithSize;
 async function repository(directory) {
   const repo = await Repository.create({ scopePath: directory, scopeJson: { name: 'import-test' } });
   // Preserve the installed graph's class identities while testing the current writer method.

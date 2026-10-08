@@ -13,6 +13,8 @@ pub(crate) struct Outcome {
     pub(crate) hash: String,
     pub(crate) inflated_bytes: usize,
     pub(crate) reason: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) metadata: Option<String>,
 }
 
 fn hexadecimal(bytes: &[u8]) -> String {
@@ -28,8 +30,16 @@ fn hexadecimal(bytes: &[u8]) -> String {
 pub(crate) fn validate(compressed: &[u8], expected: [u8; 20]) -> Outcome {
     let hash = hexadecimal(&expected);
     match source(compressed, &hash, expected) {
-        Ok(inflated_bytes) => Outcome { status: "source", hash, inflated_bytes, reason: None },
-        Err(reason) => Outcome { status: "legacy", hash, inflated_bytes: 0, reason: Some(reason) },
+        Ok(inflated_bytes) => {
+            Outcome { status: "source", hash, inflated_bytes, reason: None, metadata: None }
+        }
+        Err(reason) => Outcome {
+            status: "legacy",
+            hash,
+            inflated_bytes: 0,
+            reason: Some(reason),
+            metadata: None,
+        },
     }
 }
 
@@ -117,4 +127,18 @@ fn update_digest(
     *has_header = true;
     digest.update(&bytes[start..]);
     Ok(())
+}
+
+pub(crate) fn validate_with_metadata(compressed: &[u8], expected: [u8; 20]) -> Outcome {
+    let mut outcome = validate(compressed, expected);
+    if outcome.reason != Some("mutable-or-unknown-type") {
+        return outcome;
+    }
+    if let Some(metadata) = crate::metadata::inflate(compressed) {
+        outcome.status = "metadata";
+        outcome.inflated_bytes = metadata.len();
+        outcome.reason = None;
+        outcome.metadata = Some(metadata);
+    }
+    outcome
 }

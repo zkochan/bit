@@ -14,7 +14,16 @@ const metrics = {
   objectTypes: {},
   receivedObjects: 0,
   receivedCompressedBytes: 0,
-  native: { instances: 0, submitted: 0, sources: 0, legacy: 0, batches: 0, persisted: 0, writeFallbacks: 0 },
+  native: {
+    instances: 0,
+    submitted: 0,
+    sources: 0,
+    legacy: 0,
+    batches: 0,
+    metadata: 0,
+    persisted: 0,
+    writeFallbacks: 0,
+  },
   modules: {},
 };
 if (output && process.pid === owner)
@@ -85,11 +94,13 @@ Module._load = function (request, parent, isMain) {
     wrap(value.Repository.prototype, 'writeObjectFile', 'atomicFileWrite');
     wrap(value.Repository.prototype, 'writeRemoteLanes', 'remoteLanePersistence');
   }
-  if (value?.BitObject)
+  if (value?.BitObject) {
+    wrap(value.BitObject, 'parseInflatedObjectWithSize', 'nativeMetadataHydration');
     wrap(value.BitObject, 'parseObjectWithSize', 'legacyParse', function (result) {
       const type = result.object.getType();
       metrics.objectTypes[type] = (metrics.objectTypes[type] || 0) + 1;
     });
+  }
   if (value?.ObjectsWritable)
     wrap(value.ObjectsWritable.prototype, 'writeObjectToFs', 'streamObjectProcessing', function (_, args) {
       metrics.receivedObjects++;
@@ -111,7 +122,7 @@ Module._load = function (request, parent, isMain) {
     wrap(value.RustObjectImporter.prototype, 'importBatch', 'nativeBatchValidationAndPersistence');
     wrap(value.RustObjectImporter.prototype, 'dispose', 'nativeImporterDisposal', function () {
       if (this.child) metrics.native.instances++;
-      for (const key of ['submitted', 'sources', 'legacy', 'batches', 'persisted', 'writeFallbacks'])
+      for (const key of ['submitted', 'sources', 'legacy', 'batches', 'metadata', 'persisted', 'writeFallbacks'])
         metrics.native[key] += this.stats[key];
     });
   }

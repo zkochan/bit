@@ -1,12 +1,13 @@
 const mode = process.argv[2];
 let input = Buffer.alloc(0);
 let id;
+let version;
 process.stdin.on('data', (chunk) => {
   if (mode === 'crash') process.exit(2);
   if (mode === 'hung') return;
   input = Buffer.concat([input, chunk]);
   if (input.length < 12) return;
-  if (input.toString('ascii', 0, 4) === 'BOI2') {
+  if (['BOI2', 'BOI3'].includes(input.toString('ascii', 0, 4))) {
     const count = input.readUInt32BE(8);
     const files = [];
     let offset = 12;
@@ -22,9 +23,10 @@ process.stdin.on('data', (chunk) => {
       });
       offset += 24 + length;
     }
+    version = Number(input.toString('ascii', 3, 4));
     id = input.readUInt32BE(4);
     input = input.subarray(offset);
-    process.stdout.write(JSON.stringify({ version: 2, id: mode === 'wrong-validation' ? id + 1 : id, files }) + '\n');
+    process.stdout.write(JSON.stringify({ version, id: mode === 'wrong-validation' ? id + 1 : id, files }) + '\n');
   } else {
     if (mode === 'crash-commit') process.exit(2);
     const count = input.readUInt32BE(8);
@@ -33,7 +35,7 @@ process.stdin.on('data', (chunk) => {
     input = input.subarray(12 + count * 4);
     process.stdout.write(
       JSON.stringify({
-        version: 2,
+        version,
         id: mode === 'wrong-commit' ? id + 1 : id,
         persisted: mode === 'partial-commit' ? [] : indices,
         failed: [],
