@@ -1,10 +1,10 @@
 {
   "acceptance": true,
   "node": "v24.21.0",
-  "runtimeRevision": "d1b927eca19638c8c561da87f53c3d17d7c7a6a1",
+  "runtimeRevision": "20d25c077da51eba65c981f0c6a079ef34b56149",
   "adapterRevision": "bccdbd7701ee313e661d8727141a7b1a7a128bd8",
   "adapterSourceSha256": "7b187e4f78ee8920992b55784e7a42a7c43dcace6b7e66fab415f23e90bce2bc",
-  "archiveSha256": "9b9a29d4b8be04cb66ad399febdd83d1674f02056827892257d994533a27802c",
+  "archiveSha256": "46d09c174c88b6373b5d81679e69bf3fda4bb9afe6db4a066e91da4244dd2f79",
   "priorEvidence": "packaged-cli-proof-results.json: actual whole bundle tar/extraction; this refresh deliberately does not repeat tar creation",
   "runs": [
     {
@@ -70,7 +70,7 @@
     "format": 1,
     "scannerSourceSha256": "035d2d4b9c674fddbaa33c65b0699b62e1d45801cb199a73df4315efc5801873",
     "modules": {
-      "discovery.js": "c5bb00b1091e5e22582bbe6bf11cd0c2bfeb6fd20667edbc0eef4ae411f27bd5",
+      "discovery.js": "45c7eebc97560bce42100aff8b7f61b9de3d226769bc250b7a09478ab30f7131",
       "protocol.js": "1d026342e1f4ef6afdcdebcac84207c722c57a875808b76e8ea18177c5c78d4d",
       "scope.js": "816dce4cfb4afd0e9a765713c13b6988112db3df29507e970d82d8c645ee85d4",
       "session.js": "71c9ac4574e1d9f7d5a1fc64406df72459206bf51329a7c9de2b573d19bc6246",
@@ -84,25 +84,35 @@
       {
         "version": "0.1.0",
         "target": "x86_64-unknown-linux-gnu",
-        "revision": "d1b927eca19638c8c561da87f53c3d17d7c7a6a1",
-        "binarySha256": "ab4aeb1eb389b443136f772a23f7b4d3e495638ddd4abfd07acf1091063ee14c",
-        "manifestSha256": "6821a92cdd423226b2d71a5f89387504787336df6a6f23bd87ebdcbdef5ea7ac"
+        "revision": "20d25c077da51eba65c981f0c6a079ef34b56149",
+        "binarySha256": "27b8ca9d27ea063300f903a46c271616d70761fb7034df7f5a7f0558c0277138",
+        "manifestSha256": "a4394283273d70d6c8ca19cf0e0763e75bd1756d381c566fb88cd892d9d59bfa"
       }
     ]
   },
-  "helperSha256": "ab4aeb1eb389b443136f772a23f7b4d3e495638ddd4abfd07acf1091063ee14c",
+  "helperSha256": "27b8ca9d27ea063300f903a46c271616d70761fb7034df7f5a7f0558c0277138",
   "manifest": {
     "artifactFormat": 2,
     "protocolVersion": 1,
     "name": "bit-dependency-scanner",
     "version": "0.1.0",
-    "gitRevision": "d1b927eca19638c8c561da87f53c3d17d7c7a6a1",
+    "gitRevision": "20d25c077da51eba65c981f0c6a079ef34b56149",
     "scannerSourceSha256": "035d2d4b9c674fddbaa33c65b0699b62e1d45801cb199a73df4315efc5801873",
-    "gitParents": ["79dc4d5328c54a25630cde13681bfeeb3f8b76c2"],
+    "gitParents": ["1e8d5821ca34990bea969a3605ff2a77a8310f58"],
     "provenance": {
       "revisionScope": "source checkout HEAD",
       "rustcScope": "packaging environment",
-      "binaryInput": "checkout release output"
+      "binaryInput": "checkout release output",
+      "buildCommand": [
+        "cargo",
+        "build",
+        "--locked",
+        "--offline",
+        "--release",
+        "--workspace",
+        "--target",
+        "x86_64-unknown-linux-gnu"
+      ]
     },
     "target": "x86_64-unknown-linux-gnu",
     "platform": {
@@ -128,8 +138,8 @@
     },
     "binary": {
       "name": "bit-dependency-scanner",
-      "sha256": "ab4aeb1eb389b443136f772a23f7b4d3e495638ddd4abfd07acf1091063ee14c",
-      "bytes": 2080656
+      "sha256": "27b8ca9d27ea063300f903a46c271616d70761fb7034df7f5a7f0558c0277138",
+      "bytes": 2081496
     },
     "minimumGlibc": "2.39"
   },
