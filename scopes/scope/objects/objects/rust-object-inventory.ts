@@ -3,6 +3,7 @@ import path from 'path';
 
 const MAX_HASHES = 4096;
 const MIN_HASHES = 1024;
+let batchTail: Promise<unknown> = Promise.resolve();
 
 /** Stateless filesystem checks only; pending objects and model caches are not filesystem existence. */
 export async function nativeObjectExists(directory: string, hashes: string[]): Promise<boolean[] | undefined> {
@@ -29,6 +30,13 @@ export async function nativeObjectExists(directory: string, hashes: string[]): P
 }
 
 function checkBatch(executable: string, directory: string, hashes: string[]): Promise<boolean[] | undefined> {
+  // Concurrent remotes share one bounded helper slot instead of spawning a process per caller.
+  const operation = batchTail.then(() => runBatch(executable, directory, hashes));
+  batchTail = operation.catch(() => undefined);
+  return operation.catch(() => undefined);
+}
+
+function runBatch(executable: string, directory: string, hashes: string[]): Promise<boolean[] | undefined> {
   const frame = Buffer.alloc(12 + hashes.length * 20);
   frame.write('BEX1');
   frame.writeUInt32BE(1, 4);

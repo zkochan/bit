@@ -65,3 +65,30 @@ test('partial and oversized inventory frames produce no partial success', async 
     assert.equal(result.stdout.length, 0);
   }
 });
+
+test('malformed identities, short/nonboolean responses and crashed helpers discard the entire batch', async (t) => {
+  const dir = await setup(t);
+  if (process.platform === 'win32') return;
+  const executable = path.join(dir, 'fake-helper');
+  process.env.BIT_RUST_OBJECT_IMPORT = executable;
+  const valid = { version: 1, id: 1, exists: Array(1024).fill(true) };
+  for (const response of [
+    { ...valid, id: 2 },
+    { ...valid, version: 2 },
+    { ...valid, exists: [true] },
+    { ...valid, exists: Array(1024).fill(1) },
+    null,
+  ]) {
+    await fs.writeFile(
+      executable,
+      '#!/bin/sh\nprintf %s ' + JSON.stringify(JSON.stringify(response)).replace(/'/g, "'\\''") + '\n',
+      { mode: 0o755 }
+    );
+    assert.equal(await nativeObjectExists(dir, hashes.slice(0, 1024)), undefined);
+  }
+  await fs.writeFile(executable, '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+  assert.equal(await nativeObjectExists(dir, hashes.slice(0, 1024)), undefined);
+  process.env.BIT_RUST_OBJECT_IMPORT = native;
+  const results = await Promise.all(Array.from({ length: 4 }, () => nativeObjectExists(dir, hashes.slice(0, 1024))));
+  for (const result of results) assert.deepEqual(result, Array(1024).fill(false));
+});
