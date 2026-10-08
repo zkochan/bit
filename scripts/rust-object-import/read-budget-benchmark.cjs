@@ -84,7 +84,26 @@ const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.l
         resources,
       });
     }
-    await fs.writeFile(report, JSON.stringify({ node: process.version, filesystem: directory, cases }, null, 2) + '\n');
+    await fs.writeFile(
+      report,
+      JSON.stringify(
+        {
+          node: process.version,
+          filesystem: directory,
+          helperSha256: createHash('sha256')
+            .update(await fs.readFile(helper))
+            .digest('hex'),
+          compiledReaderSha256: createHash('sha256')
+            .update(
+              await fs.readFile(path.join(cli, 'node_modules/@teambit/objects/dist/objects/rust-object-reader.js'))
+            )
+            .digest('hex'),
+          cases,
+        },
+        null,
+        2
+      ) + '\n'
+    );
     console.log(JSON.stringify(cases.map(({ bytes, mediansMs, resources }) => ({ bytes, mediansMs, resources }))));
   } finally {
     await fs.rm(directory, { recursive: true, force: true });
