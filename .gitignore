@@ -89,3 +89,7 @@ bundle-stats/
 # Generated Rust benchmark evidence belongs outside the source repository.
 /docs/rust/*.json
 /docs/rust/*.log
+
+# Object-import performance evidence belongs in external artifacts.
+/docs/rust-object-import/*.json
+/docs/rust-object-import/*.log

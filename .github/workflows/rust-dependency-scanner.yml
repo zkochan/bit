@@ -2,9 +2,13 @@ name: Rust dependency scanner
 
 on:
   push:
-    branches: [rust]
+    branches: [rust, rust-object-import]
     paths:
       - 'native/**'
+      - 'components/legacy/scope/objects-fetcher/**'
+      - 'scopes/scope/objects/objects/repository.ts'
+      - 'scripts/rust-object-import/**'
+      - 'docs/rust-object-import/**'
       - 'scripts/rust/**'
       - 'scripts/rust-dependency-analysis/discovery*'
       - '.circleci/config.yml'
@@ -27,9 +31,13 @@ on:
       - 'scopes/dependencies/dependency-resolver/detector-hook.ts'
       - '.github/workflows/rust-dependency-scanner.yml'
   pull_request:
-    branches: [rust]
+    branches: [rust, rust-object-import]
     paths:
       - 'native/**'
+      - 'components/legacy/scope/objects-fetcher/**'
+      - 'scopes/scope/objects/objects/repository.ts'
+      - 'scripts/rust-object-import/**'
+      - 'docs/rust-object-import/**'
       - 'scripts/rust/**'
       - 'scripts/rust-dependency-analysis/discovery*'
       - '.circleci/config.yml'
@@ -128,7 +136,11 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/rust-scanner-test-tools"
           echo '{"private":true}' > "$RUNNER_TEMP/rust-scanner-test-tools/package.json"
-          npm install --prefix "$RUNNER_TEMP/rust-scanner-test-tools" --no-save --package-lock=false --ignore-scripts typescript@5.9.2
+          npm install --prefix "$RUNNER_TEMP/rust-scanner-test-tools" --no-save --package-lock=false --ignore-scripts typescript@5.9.2 @types/node@22.15.3
+      - name: Check object-import coordinator types
+        shell: bash
+        run: |
+          node "$RUNNER_TEMP/rust-scanner-test-tools/node_modules/typescript/bin/tsc" --noEmit --strict --skipLibCheck --target ES2022 --module commonjs --esModuleInterop --types node --typeRoots "$RUNNER_TEMP/rust-scanner-test-tools/node_modules/@types" components/legacy/scope/objects-fetcher/rust-source-validator.ts
       - name: Build real scanner for transport tests
         working-directory: native
         run: cargo build --locked --workspace
@@ -137,6 +149,10 @@ jobs:
           BIT_LEGACY_ROOT: ${{ runner.temp }}/rust-scanner-test-tools
           BIT_NATIVE_SCANNER_REQUIRED: '1'
         run: node --test scripts/rust-dependency-analysis/session.test.cjs
+      - name: Test object-import helper protocol and fallback
+        env:
+          BIT_LEGACY_ROOT: ${{ runner.temp }}/rust-scanner-test-tools
+        run: node --test scripts/rust-object-import/validator.test.cjs
 
   lint:
     name: pnpm Rust formatting and lints
@@ -226,6 +242,10 @@ jobs:
         run: cargo test --locked --workspace
       - name: Validate deterministic packaging and archive safety
         run: python ../scripts/rust-dependency-analysis/artifacts/test_artifacts.py
+      # Packaging reads offline `cargo metadata` for notices, which needs every locked package
+      # (including other targets' and other workspace crates' dependencies), not just those built here.
+      - name: Fetch pinned Cargo dependencies for offline packaging
+        run: cargo fetch --locked
       - name: Package standalone scanner
         run: python ../scripts/rust-dependency-analysis/artifacts/package-helper.py package
       - name: Extract and smoke-test standalone artifact

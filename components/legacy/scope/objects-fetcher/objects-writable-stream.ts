@@ -4,6 +4,7 @@ import type { ObjectItem, Repository } from '@teambit/objects';
 import { BitObject, Lane, LaneHistory, ModelComponent, Version, VersionHistory } from '@teambit/objects';
 import type { WriteObjectsQueue } from './write-objects-queue';
 import type { ComponentsPerRemote } from '../component-ops/multiple-component-merger';
+import type { RustSourceValidator } from './rust-source-validator';
 
 const TIMEOUT_MINUTES_WARNING = 3;
 const TIMEOUT_MINUTES_EXIT = 30;
@@ -24,7 +25,8 @@ export class ObjectsWritable extends Writable {
     private repo: Repository,
     private remoteName: string,
     private objectsQueue: WriteObjectsQueue,
-    private componentsPerRemote: ComponentsPerRemote
+    private componentsPerRemote: ComponentsPerRemote,
+    private sourceValidator?: RustSourceValidator
   ) {
     super({ objectMode: true });
     if (!this.componentsPerRemote[remoteName]) this.componentsPerRemote[remoteName] = [];
@@ -61,8 +63,35 @@ export class ObjectsWritable extends Writable {
     callback();
   }
 
+  _destroy(error: Error | null, callback: (error?: Error | null) => void) {
+    clearInterval(this.timeoutId);
+    callback(error);
+  }
+
   private async writeObjectToFs(obj: ObjectItem) {
-    const bitObject = await BitObject.parseObject(obj.buffer);
+    if (this.sourceValidator) {
+      const validated = await this.sourceValidator.validate(obj.ref.toString(), obj.buffer);
+      if (validated) {
+        await this.objectsQueue.addImmutableObject(obj.ref.toString(), () =>
+          this.repo.writeValidatedSourceToFS(obj.ref, obj.buffer)
+        );
+        return;
+      }
+      logger.debug(`Rust Source import fallback: ${this.sourceValidator.unavailableReason || 'legacy object'}`);
+    }
+    const { object: bitObject, inflatedSize } = await BitObject.parseObjectWithSize(obj.buffer);
+    // Batching/control comparison: retain the existing hydration/cache behavior but avoid redundant compression.
+    if (
+      process.env.BIT_RUST_OBJECT_IMPORT === 'control' &&
+      bitObject.getType() === 'Source' &&
+      bitObject.hash().isEqual(obj.ref)
+    ) {
+      const raw = new Map([[bitObject, { buffer: obj.buffer, inflatedSize, ref: obj.ref }]]);
+      await this.objectsQueue.addImmutableObject(obj.ref.toString(), () =>
+        this.repo.writeObjectsToTheFS([bitObject], raw)
+      );
+      return;
+    }
     if (bitObject instanceof Lane) {
       throw new Error('ObjectsWritable does not support lanes');
     }

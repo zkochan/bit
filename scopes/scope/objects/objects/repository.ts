@@ -805,6 +805,15 @@ export default class Repository {
     if (added) await this.scopeIndex.write();
   }
 
+  /** Internal import fast path: only content-validated immutable Sources, never indexed/mutable objects. */
+  async writeValidatedSourceToFS(ref: Ref, compressed: Buffer): Promise<void> {
+    if (!isSnap(ref.toString())) throw new BitError('invalid validated Source ref');
+    const options = await this.getChownOptions();
+    await this.writeObjectFile(this.objectPath(ref), this.onPersist(compressed), options);
+    // A native Source has no hydrated JS object. Invalidate both layers so later loads read the committed data.
+    this.removeFromCache(ref);
+  }
+
   /**
    * do not call this method directly. always call this.removeObject() and once done with all objects,
    * call this.persist()

@@ -16,6 +16,8 @@ import { WriteObjectsQueue } from './write-objects-queue';
 import { groupByScopeName } from '../component-ops/scope-components-importer';
 import { pMapPool } from '@teambit/toolbox.promise.map-pool';
 import { concurrentFetchLimit } from '@teambit/harmony.modules.concurrency';
+import { createRustSourceValidator } from './rust-source-validator';
+import type { RustSourceValidator } from './rust-source-validator';
 import type { Remotes, Remote } from '@teambit/scope.remotes';
 import { ScopeNotFoundOrDenied } from '@teambit/scope.remotes';
 import type { ComponentsPerRemote } from '../component-ops/multiple-component-merger';
@@ -48,6 +50,15 @@ export class ObjectFetcher {
   ) {}
 
   public async fetchFromRemoteAndWrite(): Promise<string[]> {
+    const validator = createRustSourceValidator();
+    try {
+      return await this.fetchAndWrite(validator);
+    } finally {
+      validator?.dispose();
+    }
+  }
+
+  private async fetchAndWrite(validator?: RustSourceValidator): Promise<string[]> {
     this.fetchOptions = {
       type: 'component',
       withoutDependencies: true, // backward compatibility. not needed for remotes > 0.0.900
@@ -74,7 +85,7 @@ export class ObjectFetcher {
       async (scopeName) => {
         const readableStream = await this.fetchFromSingleRemote(scopeName, idsGrouped[scopeName]);
         if (!readableStream) return;
-        await this.writeFromSingleRemote(readableStream, scopeName, objectsQueue, componentsPerRemote);
+        await this.writeFromSingleRemote(readableStream, scopeName, objectsQueue, componentsPerRemote, validator);
       },
       { concurrency: concurrentFetchLimit() }
     );
@@ -222,9 +233,10 @@ the remote scope "${scopeName}" was not found`);
     objectsStream: ObjectItemsStream,
     scopeName: string,
     objectsQueue: WriteObjectsQueue,
-    componentsPerRemote: ComponentsPerRemote
+    componentsPerRemote: ComponentsPerRemote,
+    validator?: RustSourceValidator
   ) {
-    const writable = new ObjectsWritable(this.repo, scopeName, objectsQueue, componentsPerRemote);
+    const writable = new ObjectsWritable(this.repo, scopeName, objectsQueue, componentsPerRemote, validator);
     // add an error listener for the ObjectList to differentiate between errors coming from the
     // remote and errors happening inside the Writable.
     let readableError: Error | undefined;
