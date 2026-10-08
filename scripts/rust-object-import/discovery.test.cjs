@@ -44,11 +44,23 @@ test('real installation is immutable, discoverable and shared by import/read pro
   );
   const validator = createRustSourceValidator(f.resolve('import'));
   assert.ok(validator instanceof RustSourceValidator);
-  t.after(() => validator.dispose());
-  assert.ok((await validator.validate(hash, buffer)).inflatedBytes > 0);
   const { RustObjectImporter } = f.load(path.join(f.legacyDirectory, 'rust-object-importer.js'));
   const importer = new RustObjectImporter(f.resolve('import'), { objectsDirectory });
-  t.after(() => importer.disposeAndWait());
+  // The fixture's directory removal is an earlier-registered after hook, so it runs first. Stop
+  // both helpers here: Windows cannot unlink an executable while a process is still running it.
+  try {
+    await realInstallation(validator, importer, hash, buffer, objectsDirectory, f);
+  } finally {
+    const validatorChild = validator.child;
+    validator.dispose();
+    if (validatorChild && validatorChild.exitCode === null && validatorChild.signalCode === null)
+      await new Promise((resolve) => validatorChild.once('exit', resolve));
+    await importer.disposeAndWait();
+  }
+});
+
+async function realInstallation(validator, importer, hash, buffer, objectsDirectory, f) {
+  assert.ok((await validator.validate(hash, buffer)).inflatedBytes > 0);
   const records = [{ ref: { toString: () => hash }, buffer }];
   let persisted;
   await importer.importBatch(
@@ -75,7 +87,7 @@ test('real installation is immutable, discoverable and shared by import/read pro
       [[hash, 'Source']]
     );
   }
-});
+}
 
 test('changed executable, license, notices or runtime modules invalidate cached verification', real, (t) => {
   const f = installedFixture(t);
