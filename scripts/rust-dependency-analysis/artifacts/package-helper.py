@@ -6,6 +6,7 @@ import gzip
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 import platform
 import re
@@ -89,6 +90,10 @@ def archive_bytes(binary, manifest, license_bytes, notices_bytes=b""):
     return compressed.getvalue()
 
 
+def release_command(target):
+    return ["cargo", "build", "--locked", "--offline", "--release", "--workspace", "--target", target]
+
+
 def package(output_directory, binary_path=None, target_override=None):
     compiler = command("rustc", "-vV")
     target = next(line.removeprefix("host: ") for line in compiler.splitlines() if line.startswith("host: "))
@@ -96,9 +101,15 @@ def package(output_directory, binary_path=None, target_override=None):
     if target not in TARGETS:
         raise ValueError(f"target is outside the artifact validation matrix: {target}")
     supplied_binary = binary_path is not None
-    release_directory = ROOT / "native" / "target"
-    if target_override:
-        release_directory /= target
+    # Force the target even for host builds: ambient Cargo target configuration must
+    # never relabel an older host executable as the requested cross-target output.
+    build_command = None
+    release_directory = ROOT / "native" / "target" / target
+    if not supplied_binary:
+        build_command = release_command(target)
+        environment = os.environ.copy()
+        environment["CARGO_TARGET_DIR"] = str(ROOT / "native" / "target")
+        subprocess.check_call(build_command, cwd=ROOT / "native", env=environment, stdout=subprocess.DEVNULL)
     binary_path = binary_path or release_directory / "release" / binary_name(target)
     if binary_path.stat().st_size > MAX_BINARY_BYTES:
         raise ValueError("binary exceeds artifact size limit")
@@ -126,6 +137,7 @@ def package(output_directory, binary_path=None, target_override=None):
             "revisionScope": "source checkout HEAD",
             "rustcScope": "packaging environment",
             "binaryInput": "explicit --binary" if supplied_binary else "checkout release output",
+            "buildCommand": build_command,
         },
         "target": target,
         "platform": TARGETS[target],

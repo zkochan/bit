@@ -176,6 +176,7 @@ function matchesPackagedContract(
     gitRevision?: unknown;
     binary?: { name?: unknown };
     platform?: { os?: unknown; arch?: unknown };
+    provenance?: { binaryInput?: unknown; buildCommand?: unknown };
   },
   revision: string,
   target: string,
@@ -190,7 +191,10 @@ function matchesPackagedContract(
     manifest.gitRevision !== revision ||
     manifest.binary?.name !== filename ||
     manifest.platform?.os !== process.platform ||
-    manifest.platform?.arch !== process.arch
+    manifest.platform?.arch !== process.arch ||
+    manifest.provenance?.binaryInput !== 'checkout release output' ||
+    JSON.stringify(manifest.provenance?.buildCommand) !==
+      JSON.stringify(['cargo', 'build', '--locked', '--offline', '--release', '--workspace', '--target', target])
   );
 }
 

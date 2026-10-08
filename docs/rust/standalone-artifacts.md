@@ -26,7 +26,6 @@ Python 3.11 or newer is required for packaging, with no external Python packages
 
 ```sh
 cd native
-cargo build --locked --release --workspace
 python ../scripts/rust-dependency-analysis/artifacts/test_artifacts.py
 python ../scripts/rust-dependency-analysis/artifacts/package-helper.py package
 python ../scripts/rust-dependency-analysis/artifacts/package-helper.py smoke
@@ -37,3 +36,5 @@ Outputs go to ignored `native/dist/`. `--directory` changes that destination. `-
 The smoke validator checks the archive checksum before decoding it, enforces compressed/expanded limits, rejects duplicate/unexpected members, links, and traversal paths, verifies the embedded binary and license checksums, and compares the detached manifest. It writes only the fixed allowed filenames into a fresh directory containing spaces and Unicode, restores the executable mode, and invokes the binary directly with an argument vector. Protocol tests cover exact request IDs, Unicode dependency extraction, type-import metadata, and parse errors; the process closes after stdin EOF. The target must match the validation host.
 
 The five-architecture Rust test job runs these checks after building its release binary and uploads validated workflow artifacts for fourteen days. Real installation/discovery tests run on Node 22.13.0, 22.22.0 and 24, with x64 musl tested inside Alpine containers. No publication action follows. Review the matrix's actual successful target manifests before proposing broader distribution or platform support; platform limitations and installation/version-selection policy are recorded in the packaged-scanner document.
+
+Default packaging compiles with `cargo build --locked --offline --release --workspace --target <host-or-requested-target>` and reads `native/target/<target>/release/`. Fetch/build locked dependencies first if they are absent; packaging does not fetch them. Its manifest records this exact build command, which packaged installation and runtime discovery require. Explicit `--binary` packaging stays experimental and unattested.
