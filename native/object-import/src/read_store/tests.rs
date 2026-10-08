@@ -82,7 +82,7 @@ fn header_times_match_node_arithmetic_and_reject_windows_wrapping_range() {
     use super::modified_milliseconds;
     use std::time::{Duration, UNIX_EPOCH};
     assert_eq!(modified_milliseconds(UNIX_EPOCH), Some(0.0));
-    assert_eq!(modified_milliseconds(UNIX_EPOCH - Duration::from_nanos(1)), None);
+    assert_eq!(modified_milliseconds(UNIX_EPOCH - Duration::from_secs(1)), None);
     for (nanos, expected) in [
         (0, 1_700_000_000_000.0),
         (100, 1_700_000_000_000.0),
