@@ -77,11 +77,8 @@ async function realInstallation(validator, importer, hash, buffer, objectsDirect
     assert.ok((await nativeObjectExists(objectsDirectory, hashes)).every(Boolean));
     const { nativeObjectBuffers, nativeObjectHeaders } = f.load(path.join(f.moduleDirectory, 'rust-object-reader.js'));
     assert.ok((await nativeObjectBuffers(objectsDirectory, hashes)).every((bytes) => bytes.equals(buffer)));
-    if (process.platform === 'win32') {
-      assert.equal(await nativeObjectHeaders(objectsDirectory, hashes), undefined);
-      return;
-    }
     assert.ok((await nativeObjectHeaders(objectsDirectory, hashes)).every((header) => header.type === 'Source'));
+    if (process.platform === 'win32') return;
     for (let prefix = 0; prefix < 256; prefix++)
       fs.mkdirSync(path.join(objectsDirectory, prefix.toString(16).padStart(2, '0')), { recursive: true });
     const { nativeObjectDirectory } = f.load(path.join(f.moduleDirectory, 'rust-object-directory.js'));

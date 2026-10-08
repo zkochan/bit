@@ -127,3 +127,5 @@ Explicit-hash existence and header requests group up to four 4,096-hash frames p
 Standalone release artifact builds and qualification are documented in [standalone-artifacts.md](./standalone-artifacts.md). Explicit installation, runtime binding, `BIT_RUST_OBJECT_IMPORT=packaged`, and rollback are documented in [packaged-helper.md](./packaged-helper.md). Normal releases do not yet automatically include the helper.
 
 Read-size budgeting and the rejected streaming experiment: [read-budget-results.md](./read-budget-results.md).
+
+Windows header classification and timestamp parity: [windows-headers.md](./windows-headers.md).
