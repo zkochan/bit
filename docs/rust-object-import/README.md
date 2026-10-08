@@ -125,3 +125,5 @@ Explicit-hash existence and header requests group up to four 4,096-hash frames p
 `BIT_RUST_OBJECT_READ_OPERATIONS=off` restores one existence/header frame per helper independently of the other native stages. Helpers exit after each operation and retain no filesystem cache. Existing object/cache/Ref policy stays in Node. See [read-operation-results.md](./read-operation-results.md) for actual compiled API measurements and genuine 16,384-Source import qualification. These are bounded read-only stage gains rather than complete import-command improvements.
 
 Standalone release artifact builds and qualification are documented in [standalone-artifacts.md](./standalone-artifacts.md). Explicit installation, runtime binding, `BIT_RUST_OBJECT_IMPORT=packaged`, and rollback are documented in [packaged-helper.md](./packaged-helper.md). Normal releases do not yet automatically include the helper.
+
+Read-size budgeting and the rejected streaming experiment: [read-budget-results.md](./read-budget-results.md).

@@ -95,7 +95,15 @@ export async function nativeObjectBuffers(
   const results: (Buffer | undefined)[] = [];
   for (let offset = 0; offset < hashes.length; offset += 4096) {
     const batch = hashes.slice(offset, offset + 4096);
-    const response = await requestObjectBatch(executable, directory, batch, 'BRD1', 32 * 1024 * 1024 + 131072, 128);
+    const checked = process.env.BIT_RUST_OBJECT_READ_BUDGET !== 'off';
+    const response = await requestObjectBatch(
+      executable,
+      directory,
+      batch,
+      checked ? 'BRC1' : 'BRD1',
+      32 * 1024 * 1024 + 131072,
+      checked ? 4096 : 128
+    );
     if (!response) return undefined;
     const values = parseBuffers(response, batch.length);
     if (!values) return undefined;

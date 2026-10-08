@@ -38,6 +38,9 @@ pub(crate) fn serve(
     store: &Store,
     magic: [u8; 4],
 ) -> io::Result<()> {
+    if magic == *b"BRC1" {
+        return serve_checked(reader, writer, pool, store);
+    }
     let headers = magic == *b"BHD1";
     let (id, hashes) = inventory::request(reader, if headers { 4096 } else { 128 })?;
     if headers {
@@ -49,6 +52,48 @@ pub(crate) fn serve(
         });
         return protocol::respond(writer, &HeaderResponse { version: 1, id, objects });
     }
+    write_batch(writer, pool, store, id, &hashes)
+}
+
+fn serve_checked(
+    reader: &mut impl Read,
+    writer: &mut impl Write,
+    pool: &ThreadPool,
+    store: &Store,
+) -> io::Result<()> {
+    let (id, hashes) = inventory::request(reader, 4096)?;
+    if id != 1 {
+        return Err(io::Error::new(io::ErrorKind::InvalidData, "invalid checked read identity"));
+    }
+    let sizes: Vec<_> = pool.install(|| {
+        hashes
+            .par_iter()
+            .map(|hash| eligible_size(&store.object_path(hash)))
+            .collect()
+    });
+    let bytes: u64 = sizes.iter().flatten().sum();
+    // An empty response deliberately selects canonical reads before transferring file contents.
+    if bytes > 4 * 1024 * 1024 || sizes.iter().all(Option::is_none) {
+        return Ok(());
+    }
+    for (index, batch) in hashes.chunks(128).enumerate() {
+        write_batch(writer, pool, store, index as u32 + 1, batch)?;
+    }
+    Ok(())
+}
+
+fn eligible_size(path: &Path) -> Option<u64> {
+    let metadata = fs::metadata(path).ok()?;
+    (metadata.is_file() && metadata.len() <= MAX_RAW_BYTES).then_some(metadata.len())
+}
+
+fn write_batch(
+    writer: &mut impl Write,
+    pool: &ThreadPool,
+    store: &Store,
+    id: u32,
+    hashes: &[[u8; 20]],
+) -> io::Result<()> {
     let objects: Vec<_> = pool.install(|| {
         hashes
             .par_iter()
@@ -155,3 +200,6 @@ fn capture_header(bytes: &[u8], header: &mut Vec<u8>, found: &mut bool) -> Optio
     *found = length < bytes.len();
     Some(())
 }
+
+#[cfg(test)]
+mod tests;
