@@ -4,12 +4,12 @@ Measured on Linux x64, Node 24.21.0 with a release helper. Nine interleaved roun
 
 | Filesystem | Hashes | Node ms | Rust ms | Reduction | Node filesystem requests |
 | ---------- | -----: | ------: | ------: | --------: | -----------------------: |
-| tmpfs      |  1,024 |    3.28 |    2.15 |     34.3% |                1,024 → 0 |
-| tmpfs      |  4,096 |    9.80 |    3.42 |     65.1% |                4,096 → 0 |
-| tmpfs      | 16,384 |   36.54 |   12.58 |     65.6% |               16,384 → 0 |
-| Btrfs      |  1,024 |    3.22 |    1.99 |     38.1% |                1,024 → 0 |
-| Btrfs      |  4,096 |   10.07 |    3.03 |     69.9% |                4,096 → 0 |
-| Btrfs      | 16,384 |   43.24 |   12.21 |     71.7% |               16,384 → 0 |
+| tmpfs      |  1,024 |    2.72 |    2.13 |     21.6% |                1,024 → 0 |
+| tmpfs      |  4,096 |   10.91 |    3.33 |     69.5% |                4,096 → 0 |
+| tmpfs      | 16,384 |   38.93 |   13.58 |     65.1% |               16,384 → 0 |
+| Btrfs      |  1,024 |    3.07 |    2.15 |     30.0% |                1,024 → 0 |
+| Btrfs      |  4,096 |    9.14 |    3.00 |     67.2% |                4,096 → 0 |
+| Btrfs      | 16,384 |   44.29 |   11.47 |     74.1% |               16,384 → 0 |
 
 An initial 256-hash probe showed helper startup could cost more than Node checks. Production therefore uses Rust only for at least 1,024 hashes. Smaller batches retain Node. Existing-path checks include directories and follow symlinks; dangling links/inaccessible paths are absent, matching canonical path-existence semantics. No new inventory cache is introduced.
 
