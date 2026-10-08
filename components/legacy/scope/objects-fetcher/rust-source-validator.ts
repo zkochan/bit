@@ -187,8 +187,7 @@ export class RustSourceValidator {
   }
 }
 
-export function createRustSourceValidator(): RustSourceValidator | undefined {
-  const value = process.env.BIT_RUST_OBJECT_IMPORT;
+export function createRustSourceValidator(value = process.env.BIT_RUST_OBJECT_IMPORT): RustSourceValidator | undefined {
   if (!value || !path.isAbsolute(value)) return undefined;
   return new RustSourceValidator(process.platform === 'win32' ? path.toNamespacedPath(value) : value);
 }

@@ -11,6 +11,9 @@ on:
       - 'scopes/scope/objects/objects/rust-object-inventory.ts'
       - 'scopes/scope/objects/objects/rust-object-reader.ts'
       - 'scopes/scope/objects/objects/rust-object-directory.ts'
+      - 'scopes/scope/objects/objects/rust-object-package.ts'
+      - 'scopes/scope/objects/objects/rust-object-discovery.ts'
+      - 'scopes/scope/objects/index.ts'
       - 'components/legacy/scope/component-ops/scope-components-importer.ts'
       - 'scopes/scope/scope/scope.main.runtime.ts'
       - 'scripts/rust-object-import/**'
@@ -46,6 +49,9 @@ on:
       - 'scopes/scope/objects/objects/rust-object-inventory.ts'
       - 'scopes/scope/objects/objects/rust-object-reader.ts'
       - 'scopes/scope/objects/objects/rust-object-directory.ts'
+      - 'scopes/scope/objects/objects/rust-object-package.ts'
+      - 'scopes/scope/objects/objects/rust-object-discovery.ts'
+      - 'scopes/scope/objects/index.ts'
       - 'components/legacy/scope/component-ops/scope-components-importer.ts'
       - 'scopes/scope/scope/scope.main.runtime.ts'
       - 'scripts/rust-object-import/**'
@@ -152,7 +158,7 @@ jobs:
       - name: Check object-import coordinator types
         shell: bash
         run: |
-          node "$RUNNER_TEMP/rust-scanner-test-tools/node_modules/typescript/bin/tsc" --noEmit --strict --skipLibCheck --target ES2022 --module commonjs --esModuleInterop --types node --typeRoots "$RUNNER_TEMP/rust-scanner-test-tools/node_modules/@types" components/legacy/scope/objects-fetcher/rust-source-validator.ts components/legacy/scope/objects-fetcher/rust-object-importer.ts scopes/scope/objects/objects/rust-object-inventory.ts scopes/scope/objects/objects/rust-object-reader.ts scopes/scope/objects/objects/rust-object-directory.ts
+          node "$RUNNER_TEMP/rust-scanner-test-tools/node_modules/typescript/bin/tsc" --noEmit --strict --skipLibCheck --target ES2022 --module commonjs --esModuleInterop --types node --typeRoots "$RUNNER_TEMP/rust-scanner-test-tools/node_modules/@types" components/legacy/scope/objects-fetcher/rust-source-validator.ts components/legacy/scope/objects-fetcher/rust-object-importer.ts scopes/scope/objects/objects/rust-object-inventory.ts scopes/scope/objects/objects/rust-object-reader.ts scopes/scope/objects/objects/rust-object-directory.ts scopes/scope/objects/objects/rust-object-package.ts scopes/scope/objects/objects/rust-object-discovery.ts
       - name: Build real scanner for transport tests
         working-directory: native
         run: cargo build --locked --workspace
@@ -284,7 +290,7 @@ jobs:
         run: |
           export BIT_TEST_PACKAGED_ARCHIVE="$(find dist -maxdepth 1 -name '*.tar.gz' | head -1)"
           node --test ../scripts/rust-dependency-analysis/discovery.test.cjs
-          BIT_TEST_OBJECT_ARTIFACT="$(cat "$RUNNER_TEMP/bit-object-artifact-path.txt")" node --test ../scripts/rust-object-import/artifacts/artifacts.test.cjs
+          BIT_TEST_OBJECT_ARTIFACT="$(cat "$RUNNER_TEMP/bit-object-artifact-path.txt")" node --test ../scripts/rust-object-import/artifacts/artifacts.test.cjs ../scripts/rust-object-import/discovery.test.cjs
           python ../scripts/rust-dependency-analysis/artifacts/test_install.py
       - uses: actions/setup-node@v4
         with:
@@ -297,7 +303,7 @@ jobs:
         run: |
           export BIT_TEST_PACKAGED_ARCHIVE="$(find dist -maxdepth 1 -name '*.tar.gz' | head -1)"
           node --test ../scripts/rust-dependency-analysis/discovery.test.cjs
-          BIT_TEST_OBJECT_ARTIFACT="$(cat "$RUNNER_TEMP/bit-object-artifact-path.txt")" node --test ../scripts/rust-object-import/artifacts/artifacts.test.cjs
+          BIT_TEST_OBJECT_ARTIFACT="$(cat "$RUNNER_TEMP/bit-object-artifact-path.txt")" node --test ../scripts/rust-object-import/artifacts/artifacts.test.cjs ../scripts/rust-object-import/discovery.test.cjs
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -309,7 +315,7 @@ jobs:
         run: |
           export BIT_TEST_PACKAGED_ARCHIVE="$(find dist -maxdepth 1 -name '*.tar.gz' | head -1)"
           node --test ../scripts/rust-dependency-analysis/discovery.test.cjs
-          BIT_TEST_OBJECT_ARTIFACT="$(cat "$RUNNER_TEMP/bit-object-artifact-path.txt")" node --test ../scripts/rust-object-import/artifacts/artifacts.test.cjs
+          BIT_TEST_OBJECT_ARTIFACT="$(cat "$RUNNER_TEMP/bit-object-artifact-path.txt")" node --test ../scripts/rust-object-import/artifacts/artifacts.test.cjs ../scripts/rust-object-import/discovery.test.cjs
       - name: Upload validated experimental object-import artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -359,7 +365,9 @@ jobs:
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE:/repository:ro" -v "$RUNNER_TEMP/bit-object-import-artifacts:/artifacts:ro" -w /repository "node:${{ matrix.node }}-alpine" sh -ec '
             export BIT_TEST_OBJECT_ARTIFACT="$(find /artifacts -maxdepth 1 -name "*.tar.gz")"
-            node --test scripts/rust-object-import/artifacts/artifacts.test.cjs
+            npm install --prefix /tmp/object-import-tools --no-save --package-lock=false --ignore-scripts typescript@5.9.2
+            export BIT_LEGACY_ROOT=/tmp/object-import-tools
+            node --test scripts/rust-object-import/artifacts/artifacts.test.cjs scripts/rust-object-import/discovery.test.cjs
           '
       - name: Upload validated experimental musl object-import artifact
         uses: actions/upload-artifact@v4

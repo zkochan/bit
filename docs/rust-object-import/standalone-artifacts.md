@@ -1,6 +1,6 @@
 # Standalone object-import release artifacts
 
-Object-import artifacts can now be built and qualified independently of a Bit installation. This is the first distribution step; automatic installation and runtime discovery remain open. The runtime still opts in with an absolute executable path in `BIT_RUST_OBJECT_IMPORT`. The original `rust` branch and scanner packaging are unchanged.
+Object-import artifacts can now be built and qualified independently of a Bit installation. Explicit installation, compiled-runtime binding, packaged discovery and rollback are documented in [packaged-helper.md](./packaged-helper.md). The runtime opts in with `BIT_RUST_OBJECT_IMPORT=packaged` after assembly, or an absolute executable override. The original `rust` branch and scanner packaging are unchanged.
 
 ## Build and validate locally
 
@@ -43,4 +43,4 @@ Tests cover deterministic byte preservation, malicious archives, decompression b
 
 Local validation passes all 12 artifact tests (including the real release executable), all 72 existing Node coordinator/repository tests, canonical isolated `npm run lint`, and inherited pnpm Rust formatting/Clippy/perfectionist checks with all 40 Rust workspace tests. The extracted release executable also passes the genuine 16,384-Source scope read/inventory qualification and complete compiled file/original HTTP-tar import-command smoke, including missing/crashing helper fallback. This reuses the existing compiled runtime because packaging does not change runtime sources. Other OS/ABI results require CI. Raw evidence remains outside Git.
 
-Next distribution work is immutable installation, compiled-runtime identity binding, adjacent-only discovery, rollback, and deployment assembly. These artifacts do not change the default runtime behavior or establish whole-command performance gains.
+Explicit assembly, immutable installation, compiled-runtime identity binding, adjacent-only discovery and rollback are implemented in [packaged-helper.md](./packaged-helper.md). Automatic release-pipeline assembly and broader full-command platform qualification remain open. These artifacts do not change the default runtime behavior or establish whole-command performance gains.

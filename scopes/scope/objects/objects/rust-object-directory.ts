@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import { readdir } from 'fs/promises';
 import path from 'path';
+import { resolveRustObjectImportExecutable } from './rust-object-discovery';
 import { nativeObjectHelperEnabled, withObjectHelperSlot } from './rust-object-inventory';
 import { type NativeObjectHeader, parseNativeObjectHeader } from './rust-object-reader';
 
@@ -90,8 +91,10 @@ class DirectoryFrames {
 }
 
 function walk(directory: string, prefixes: string[], headers: boolean): Promise<NativeDirectoryEntry[] | undefined> {
+  const executable = resolveRustObjectImportExecutable();
+  if (!executable) return Promise.resolve(undefined);
   return new Promise((resolve) => {
-    const child = spawn(process.env.BIT_RUST_OBJECT_IMPORT!, ['--objects-dir', directory], {
+    const child = spawn(executable, ['--objects-dir', directory], {
       stdio: ['pipe', 'pipe', 'ignore'],
     });
     const parser = new DirectoryFrames(prefixes, headers);
