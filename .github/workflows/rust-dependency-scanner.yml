@@ -242,6 +242,10 @@ jobs:
         run: cargo test --locked --workspace
       - name: Validate deterministic packaging and archive safety
         run: python ../scripts/rust-dependency-analysis/artifacts/test_artifacts.py
+      # Packaging reads offline `cargo metadata` for notices, which needs every locked package
+      # (including other targets' and other workspace crates' dependencies), not just those built here.
+      - name: Fetch pinned Cargo dependencies for offline packaging
+        run: cargo fetch --locked
       - name: Package standalone scanner
         run: python ../scripts/rust-dependency-analysis/artifacts/package-helper.py package
       - name: Extract and smoke-test standalone artifact
