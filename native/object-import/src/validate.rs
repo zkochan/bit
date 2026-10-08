@@ -17,7 +17,7 @@ pub(crate) struct Outcome {
     pub(crate) metadata: Option<String>,
 }
 
-fn hexadecimal(bytes: &[u8]) -> String {
+pub(crate) fn hexadecimal(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     bytes
         .iter()

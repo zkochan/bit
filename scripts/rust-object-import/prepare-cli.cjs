@@ -54,6 +54,8 @@ const files = [
   'components/legacy/scope/objects-fetcher/rust-object-importer.ts',
   'scopes/scope/objects/objects/repository.ts',
   'scopes/scope/objects/objects/object.ts',
+  'scopes/scope/objects/objects/rust-object-inventory.ts',
+  'components/legacy/scope/component-ops/scope-components-importer.ts',
   'scopes/scope/scope/scope.main.runtime.ts',
 ];
 for (const file of files) fs.copyFileSync(path.join(root, file), path.join(target, file));
@@ -88,6 +90,8 @@ const modules = [
   'legacy.scope/dist/objects-fetcher/rust-object-importer.js',
   'objects/dist/objects/repository.js',
   'objects/dist/objects/object.js',
+  'objects/dist/objects/rust-object-inventory.js',
+  'legacy.scope/dist/component-ops/scope-components-importer.js',
   'scope/dist/scope.main.runtime.js',
 ];
 const provenance = {

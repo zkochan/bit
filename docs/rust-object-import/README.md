@@ -86,3 +86,11 @@ The default is nine interleaved rounds per mode after excluded warm-up, across m
 Separate diagnostic runs record stages and async resource/callback counts. Inclusive asynchronous stage sums overlap and are not an elapsed-time decomposition. Diagnostic Promise counts include wrapper overhead and must not be treated as uninstrumented production totals. Untraced runs supply wall time, CPU and helper-inclusive RSS. No generated JSON, logs or large fixtures are committed.
 
 The additional metadata results are in [metadata-results.md](./metadata-results.md). The measured Source command results are in [command-results.md](./command-results.md), and the broader native migration stages are in [next-native-stages.md](./next-native-stages.md).
+
+## Batched inventory checks
+
+With the native helper selected, `Repository.hasMultiple()` checks batches of at least 1,024 full lowercase SHA-1 hashes through the read-only `BEX1` protocol. Artifact imports and missing-history checks now use this batch API. Smaller batches, short/noncanonical refs, custom scalar/path overrides and Windows retain Node checks. `BIT_RUST_OBJECT_INVENTORY=off` disables this stage independently.
+
+Each request holds at most 4,096 binary hashes, and concurrent callers share one helper slot. The process exits after a batch; it retains no filesystem cache. Responses must contain the matching version/request identity and one boolean per input. Protocol errors, timeout, crash or an older helper cause the entire operation to use canonical Node checks. The filesystem existence contract remains disk-only: pending model objects do not make an absent path exist. Duplicates retain their original Ref instances and order.
+
+See [inventory-results.md](./inventory-results.md) for measured batch latency, callback counts and actual artifact-import qualification. These are existence-check gains; they do not establish a whole-command speedup.
