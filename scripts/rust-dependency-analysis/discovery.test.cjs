@@ -85,7 +85,11 @@ test(
     process.env.BIT_RUST_DEPENDENCY_SCANNER = 'packaged';
     const executable = r.resolveRustDependencyScannerExecutable();
     assert.ok(executable);
-    assert.ok(fs.realpathSync(executable).startsWith(fs.realpathSync(r.directory) + path.sep));
+    assert.ok(
+      path
+        .toNamespacedPath(fs.realpathSync(executable))
+        .startsWith(path.toNamespacedPath(fs.realpathSync(r.directory)) + path.sep)
+    );
     const { RustDependencyScannerSession } = require(path.join(r.directory, 'session.js'));
     const session = r.ownSession(new RustDependencyScannerSession({ executable, cwd: r.directory }));
     const result = await session.scanSource('fixture.ts', "import type {Thing} from './dependency';");
@@ -191,7 +195,11 @@ test(
     process.env.BIT_RUST_DEPENDENCY_SCANNER = 'packaged';
     const executable = loader.exports.resolveRustDependencyScannerExecutable();
     assert.ok(executable);
-    assert.ok(fs.realpathSync(executable).startsWith(fs.realpathSync(relocated) + path.sep));
+    assert.ok(
+      path
+        .toNamespacedPath(fs.realpathSync(executable))
+        .startsWith(path.toNamespacedPath(fs.realpathSync(relocated)) + path.sep)
+    );
     const { RustDependencyScannerSession } = require(path.join(relocated, moduleRelative, 'session.js'));
     const session = r.ownSession(new RustDependencyScannerSession({ executable, cwd: r.directory }));
     const result = await session.scanSource('file.ts', "import value from './real-package';");
@@ -242,7 +250,12 @@ test(
     try {
       const executable = r.resolveRustDependencyScannerExecutable();
       assert.ok(executable);
-      assert.ok(hashedReads.some((filename) => fs.realpathSync(filename) === fs.realpathSync(executable)));
+      assert.ok(
+        hashedReads.some(
+          (filename) =>
+            path.toNamespacedPath(fs.realpathSync(filename)) === path.toNamespacedPath(fs.realpathSync(executable))
+        )
+      );
       assert.ok(hashedReads.includes(path.join(r.directory, 'session.js')));
       hashedReads.length = 0;
       for (let index = 0; index < 334; index++) assert.equal(r.resolveRustDependencyScannerExecutable(), executable);

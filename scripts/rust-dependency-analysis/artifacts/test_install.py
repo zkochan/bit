@@ -23,7 +23,7 @@ class InstallTests(unittest.TestCase):
 
     def archive(self, revision, version="0.1.0", binary=b"\x7fELF\x02\x01" + b"\x00" * 12 + b"\x3e\x00fixture binary", target="x86_64-unknown-linux-gnu", source_identity=None):
         license_bytes, notices = b"repository license", b"third-party license notices"
-        manifest = {"scannerSourceSha256": source_identity or artifact.scanner_source_identity(), "provenance": {"binaryInput": "checkout release output"}, "minimumGlibc": "2.0", "artifactFormat": 2, "protocolVersion": 1, "name": "bit-dependency-scanner", "version": version, "gitRevision": revision,
+        manifest = {"scannerSourceSha256": source_identity or artifact.scanner_source_identity(), "provenance": {"binaryInput": "checkout release output", "buildCommand": artifact.release_command(target)}, "minimumGlibc": "2.0", "artifactFormat": 2, "protocolVersion": 1, "name": "bit-dependency-scanner", "version": version, "gitRevision": revision,
                     "target": target, "platform": artifact.TARGETS[target],
                     "binary": {"name": artifact.binary_name(target), "sha256": artifact.sha256(binary), "bytes": len(binary)},
                     "license": {"name": "LICENSE", "sha256": artifact.sha256(license_bytes)},
@@ -90,6 +90,19 @@ class InstallTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             installer.assemble(distribution, archive, "aarch64-unknown-linux-gnu")
         self.assertEqual(self.active()["revision"], "a" * 40)
+
+    def test_unattested_or_wrong_build_target_cannot_activate(self):
+        archive = self.archive("a" * 40)
+        manifest, members = artifact.verified_members(archive)
+        for command in (None, artifact.release_command("aarch64-unknown-linux-gnu")):
+            manifest["provenance"]["buildCommand"] = command
+            contents = artifact.archive_bytes(members["bit-dependency-scanner"], manifest, members["LICENSE"], members["THIRD-PARTY-NOTICES.txt"])
+            archive.write_bytes(contents)
+            archive.with_name(archive.name + ".sha256").write_text(f"{artifact.sha256(contents)}  {archive.name}\n")
+            archive.with_name(archive.name + ".manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+            with self.assertRaisesRegex(ValueError, "exact-target checkout build"):
+                installer.install(self.module, archive, run_smoke=False)
+            self.assertFalse((self.module / "packaged").exists())
 
 
 if __name__ == "__main__":

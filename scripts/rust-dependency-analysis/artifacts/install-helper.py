@@ -44,11 +44,18 @@ def runtime_modules(directory):
     return {name: artifact.sha256(file.read_bytes()) for name, file in files.items()}
 
 
+def trusted_release(manifest):
+    provenance = manifest.get("provenance", {})
+    return provenance.get("binaryInput") == "checkout release output" and provenance.get("buildCommand") == artifact.release_command(manifest["target"])
+
+
 def install(module_directory, archive, run_smoke=True):
     module_directory = module_directory.resolve(strict=True)
     if any(not (module_directory / name).is_file() or (module_directory / name).is_symlink() for name in ("discovery.js", "session.js")):
         raise ValueError("installation requires the compiled scanner runtime directory")
     manifest, members = artifact.verified_members(archive)
+    if not trusted_release(manifest):
+        raise ValueError("installation requires the trusted exact-target checkout build")
     chosen = selection(manifest)
     expected_source = artifact.scanner_source_identity()
     if manifest.get("scannerSourceSha256") != expected_source:
@@ -113,6 +120,8 @@ def rollback(module_directory):
         raise ValueError("rollback artifact is incompatible with assembled runtime")
     if selection(manifest) != previous:
         raise ValueError("rollback manifest mismatch")
+    if not trusted_release(manifest):
+        raise ValueError("rollback requires the trusted exact-target checkout build")
     if manifest.get("artifactFormat") != 2 or manifest.get("protocolVersion") != 1 or manifest.get("platform") != artifact.TARGETS[previous["target"]] or manifest.get("binary", {}).get("name") != artifact.binary_name(previous["target"]):
         raise ValueError("rollback contract mismatch")
     for field in ("license", "notices"):
@@ -131,7 +140,7 @@ def rollback(module_directory):
 def assemble(distribution, archive, target):
     distribution = distribution.resolve(strict=True)
     manifest, _ = artifact.verified_members(archive)
-    if manifest.get("provenance", {}).get("binaryInput") != "checkout release output":
+    if not trusted_release(manifest):
         raise ValueError("distribution assembly requires the trusted checkout release build")
     if manifest["target"] != target:
         raise ValueError("artifact does not match distribution target")

@@ -212,8 +212,6 @@ jobs:
         run: rustup show
       - name: Test scanner
         run: cargo test --locked --workspace
-      - name: Build release scanner
-        run: cargo build --locked --release --workspace
       - name: Validate deterministic packaging and archive safety
         run: python ../scripts/rust-dependency-analysis/artifacts/test_artifacts.py
       - name: Package standalone scanner
@@ -288,7 +286,6 @@ jobs:
       - name: Build and package actual musl release scanner
         working-directory: native
         run: |
-          cargo build --locked --release --target x86_64-unknown-linux-musl
           python3 ../scripts/rust-dependency-analysis/artifacts/package-helper.py package --target x86_64-unknown-linux-musl
       - name: Install, discover and execute packaged helper in actual Alpine
         run: |
