@@ -2,6 +2,8 @@
 
 Issue [#4](https://github.com/zkochan/bit/issues/4) covers the dependency extraction backend. All implementation work packages have reviewable changes and evidence. PRs [#28](https://github.com/zkochan/bit/pull/28), [#29](https://github.com/zkochan/bit/pull/29), [#30](https://github.com/zkochan/bit/pull/30), [#31](https://github.com/zkochan/bit/pull/31) and [#32](https://github.com/zkochan/bit/pull/32) target `rust`; they require user review/merge. Default enablement remains a separate rollout decision. Warm component-loading, Rust package resolution, custom detector migration and object-store projects remain outside this issue.
 
+The [final consolidated validation report](final-consolidated-validation.md) includes exact combined revisions, raw test logs, all existing pending case names and the fresh attested helper checks.
+
 ## Work packages and evidence
 
 | Work package                               | Implemented behavior / evidence                                                                                                                                                                                                                                                                                                                                                                                      |
