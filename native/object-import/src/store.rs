@@ -67,6 +67,16 @@ impl Store {
         Ok(())
     }
 
+    pub(crate) fn exists(&self, hash: &[u8; 20]) -> bool {
+        let identity = crate::validate::hexadecimal(hash);
+        fs::metadata(
+            self.directory
+                .join(&identity[..2])
+                .join(&identity[2..]),
+        )
+        .is_ok()
+    }
+
     pub(crate) fn finish_batch(&self) -> io::Result<()> {
         self.written
             .lock()

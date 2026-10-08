@@ -27,7 +27,7 @@ fn invalid(message: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, message)
 }
 
-fn word(reader: &mut impl Read) -> io::Result<u32> {
+pub(crate) fn word(reader: &mut impl Read) -> io::Result<u32> {
     let mut bytes = [0; 4];
     reader.read_exact(&mut bytes)?;
     Ok(u32::from_be_bytes(bytes))
@@ -71,6 +71,15 @@ pub(crate) fn serve_with_store(
             return Ok(());
         }
         reader.read_exact(&mut magic[1..])?;
+        if magic == *b"BEX1" {
+            crate::inventory::serve(
+                reader,
+                writer,
+                pool,
+                store.ok_or_else(|| invalid("missing inventory store"))?,
+            )?;
+            continue;
+        }
         let version = frame_version(magic, store)?;
         let id = word(reader)?;
         let count = word(reader)?;
@@ -181,7 +190,7 @@ fn frame_version(magic: [u8; 4], store: Option<&Store>) -> io::Result<u8> {
     }
 }
 
-fn respond(writer: &mut impl Write, response: &impl Serialize) -> io::Result<()> {
+pub(crate) fn respond(writer: &mut impl Write, response: &impl Serialize) -> io::Result<()> {
     serde_json::to_writer(&mut *writer, response)?;
     writer.write_all(b"\n")?;
     writer.flush()

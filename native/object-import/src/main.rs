@@ -1,3 +1,4 @@
+mod inventory;
 mod metadata;
 mod protocol;
 mod store;

@@ -28,6 +28,7 @@ import type { ObjectItem, RawObjectsMap, CompressedObject } from './object-list'
 import { ObjectList } from './object-list';
 import BitRawObject from './raw-object';
 import Ref from './ref';
+import { nativeObjectExists } from './rust-object-inventory';
 import { LiveObjects } from './live-objects';
 import type { InMemoryCache } from '@teambit/harmony.modules.in-memory-cache';
 import { getCacheOptionsForObjects, createInMemoryCache } from '@teambit/harmony.modules.in-memory-cache';
@@ -208,6 +209,18 @@ export default class Repository {
   }
 
   async hasMultiple(refs: Ref[]): Promise<Ref[]> {
+    // Preserve custom scalar/path overrides and the existing disk-only semantics.
+    if (
+      this.has === Repository.prototype.has &&
+      this.objectPath === Repository.prototype.objectPath &&
+      this.hashPath === Repository.prototype.hashPath
+    ) {
+      const exists = await nativeObjectExists(
+        path.resolve(this.getPath()),
+        refs.map((ref) => ref.toString())
+      );
+      if (exists) return refs.filter((_, index) => exists[index]);
+    }
     const concurrency = concurrentIOLimit();
     const existingRefs = await pMapPool(
       refs,
