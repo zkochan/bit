@@ -216,11 +216,13 @@ fn serve_read_only(
     pool: &ThreadPool,
     store: Option<&Store>,
 ) -> io::Result<bool> {
-    if magic != *b"BEX1" && magic != *b"BHD1" && magic != *b"BRD1" {
+    if !matches!(&magic, b"BEX1" | b"BHD1" | b"BRD1" | b"BWR1" | b"BWD1") {
         return Ok(false);
     }
     let store = store.ok_or_else(|| invalid("missing read-only store"))?;
-    if magic == *b"BEX1" {
+    if magic == *b"BWR1" || magic == *b"BWD1" {
+        crate::directory::serve(reader, writer, pool, store, magic == *b"BWD1")?;
+    } else if magic == *b"BEX1" {
         crate::inventory::serve(reader, writer, pool, store)?;
     } else {
         crate::read_store::serve(reader, writer, pool, store, magic)?;

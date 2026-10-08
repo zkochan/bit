@@ -17,6 +17,10 @@ pub(crate) struct Store {
 }
 
 impl Store {
+    pub(crate) fn directory(&self) -> &Path {
+        &self.directory
+    }
+
     pub(crate) fn new(directory: PathBuf, owner: Option<(u32, u32)>) -> io::Result<Self> {
         if !directory.is_absolute() {
             return Err(io::Error::new(

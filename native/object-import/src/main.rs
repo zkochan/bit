@@ -1,3 +1,4 @@
+mod directory;
 mod inventory;
 mod metadata;
 mod mutable_store;

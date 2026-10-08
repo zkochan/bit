@@ -63,8 +63,12 @@ export function requestObjectBatch(
   maxBuffer: number,
   frameSize = hashes.length
 ): Promise<Buffer | undefined> {
+  return withObjectHelperSlot(() => runBatch(executable, directory, hashes, magic, maxBuffer, frameSize));
+}
+
+export function withObjectHelperSlot<T>(run: () => Promise<T | undefined>): Promise<T | undefined> {
   // Concurrent read-only operations share one bounded helper slot.
-  const operation = batchTail.then(() => runBatch(executable, directory, hashes, magic, maxBuffer, frameSize));
+  const operation = batchTail.then(run);
   batchTail = operation.then(
     () => undefined,
     () => undefined

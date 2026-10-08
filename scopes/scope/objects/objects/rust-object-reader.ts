@@ -50,24 +50,31 @@ function parseHeaders(buffer: Buffer, count: number): (NativeObjectHeader | unde
         results.push(undefined);
         continue;
       }
-      if (
-        !object ||
-        typeof object.type !== 'string' ||
-        !object.type ||
-        Buffer.byteLength(object.type) > 256 ||
-        /[ \0]/.test(object.type) ||
-        !Number.isSafeInteger(object.size) ||
-        object.size < 0 ||
-        !Number.isFinite(object.mtimeMs) ||
-        object.mtimeMs < 0
-      )
-        return undefined;
-      results.push({ type: object.type, size: object.size, mtimeMs: object.mtimeMs });
+      const header = parseNativeObjectHeader(object);
+      if (!header) return undefined;
+      results.push(header);
     }
     return results;
   } catch {
     return undefined;
   }
+}
+
+export function parseNativeObjectHeader(object: unknown): NativeObjectHeader | undefined {
+  if (!object || typeof object !== 'object') return undefined;
+  const { type, size, mtimeMs } = object as NativeObjectHeader;
+  if (
+    typeof type !== 'string' ||
+    !type ||
+    Buffer.byteLength(type) > 256 ||
+    /[ \0]/.test(type) ||
+    !Number.isSafeInteger(size) ||
+    size < 0 ||
+    !Number.isFinite(mtimeMs) ||
+    mtimeMs < 0
+  )
+    return undefined;
+  return { type, size, mtimeMs };
 }
 
 export async function nativeObjectBuffers(
