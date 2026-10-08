@@ -11,13 +11,15 @@ export function nativeReadOperationSize(): number {
   return process.env.BIT_RUST_OBJECT_READ_OPERATIONS === 'off' ? MAX_HASHES : 16384;
 }
 
-export function nativeObjectHelperEnabled(count: number, minimum: number): boolean {
-  return count >= minimum && process.platform !== 'win32' && Boolean(resolveRustObjectImportExecutable());
+export function nativeObjectHelperEnabled(count: number, minimum: number, allowWindows = false): boolean {
+  return (
+    count >= minimum && (allowWindows || process.platform !== 'win32') && Boolean(resolveRustObjectImportExecutable())
+  );
 }
 
 /** Avoid mapping/allocating hashes on the default path and for batches below the crossover. */
 export function nativeInventoryEnabled(count: number): boolean {
-  return process.env.BIT_RUST_OBJECT_INVENTORY !== 'off' && nativeObjectHelperEnabled(count, MIN_HASHES);
+  return process.env.BIT_RUST_OBJECT_INVENTORY !== 'off' && nativeObjectHelperEnabled(count, MIN_HASHES, true);
 }
 
 /** Stateless filesystem checks only; pending objects and model caches are not filesystem existence. */

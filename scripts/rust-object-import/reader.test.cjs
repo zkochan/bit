@@ -12,7 +12,7 @@ const native =
   path.join(root, 'native/target/debug/bit-object-import' + (process.platform === 'win32' ? '.exe' : ''));
 const hashes = Array.from({ length: 1024 }, (_, index) => index.toString(16).padStart(40, '0'));
 async function setup(t) {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-native-read-'));
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'bit native read λ '));
   const previous = process.env.BIT_RUST_OBJECT_IMPORT;
   process.env.BIT_RUST_OBJECT_IMPORT = native;
   t.after(async () => {
@@ -29,7 +29,6 @@ const object = (body, header = 'Source hash 1') =>
 
 test('binary read batches preserve exact bytes/emptiness/order and bound oversized fallback', async (t) => {
   const dir = await setup(t);
-  if (process.platform === 'win32') return assert.equal(await nativeObjectBuffers(dir, hashes), undefined);
   const bytes = Buffer.from([0, 255, 254, 1]);
   await fs.writeFile(file(dir, 1), bytes);
   await fs.writeFile(file(dir, 2), Buffer.alloc(0));
@@ -109,10 +108,9 @@ test('native header success agrees with Node partial inflation across truncation
 
 test('oversized total transfer discards the complete group and leaves later requests usable', async (t) => {
   const dir = await setup(t);
-  if (process.platform === 'win32') return;
   await fs.writeFile(file(dir, 0), Buffer.alloc(256 * 1024, 17));
   assert.equal(await nativeObjectBuffers(dir, Array(1024).fill(hashes[0])), undefined);
-  assert.equal((await nativeObjectHeaders(dir, hashes))[0], undefined);
+  assert.equal((await nativeObjectBuffers(dir, hashes))[0].length, 256 * 1024);
 });
 
 test('malformed binary boundaries/identities and header records never expose an accepted prefix', async (t) => {
@@ -203,5 +201,74 @@ test('header operations span bounded frames and reject a corrupt later frame ato
     await fs.chmod(helper, 0o755);
     process.env.BIT_RUST_OBJECT_IMPORT = helper;
     assert.equal(await nativeObjectHeaders(dir, input.slice(0, 8192)), undefined);
+  }
+});
+
+test('Windows enables existence and raw reads while retaining header and traversal restrictions', async (t) => {
+  await setup(t);
+  const descriptor = Object.getOwnPropertyDescriptor(process, 'platform');
+  const { nativeInventoryEnabled } = source('scopes/scope/objects/objects/rust-object-inventory.ts');
+  const { nativeReadsEnabled, nativeHeadersEnabled } = source('scopes/scope/objects/objects/rust-object-reader.ts');
+  const { nativeTraversalEnabled } = source('scopes/scope/objects/objects/rust-object-directory.ts');
+  try {
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    assert.equal(nativeInventoryEnabled(1024), true);
+    assert.equal(nativeReadsEnabled(1024), true);
+    assert.equal(nativeInventoryEnabled(1023), false);
+    assert.equal(nativeReadsEnabled(1023), false);
+    assert.equal(nativeHeadersEnabled(1024), false);
+    assert.equal(nativeTraversalEnabled(), false);
+    process.env.BIT_RUST_OBJECT_IMPORT = 'off';
+    assert.equal(nativeInventoryEnabled(1024), false);
+    assert.equal(nativeReadsEnabled(1024), false);
+  } finally {
+    Object.defineProperty(process, 'platform', descriptor);
+  }
+});
+
+test('read and existence coordinators discard malformed or failed replies on every platform', async (t) => {
+  const dir = await setup(t);
+  const { nativeObjectExists } = source('scopes/scope/objects/objects/rust-object-inventory.ts');
+  const original = cp.execFile;
+  let reply;
+  let failure;
+  cp.execFile = (_executable, _args, _options, callback) => ({
+    stdin: {
+      on() {},
+      end() {
+        queueMicrotask(() => callback(failure, reply));
+      },
+    },
+  });
+  try {
+    const frames = Array.from({ length: 8 }, (_, index) => {
+      const frame = Buffer.alloc(12 + 128);
+      frame.write('BRD1');
+      frame.writeUInt32BE(index + 1, 4);
+      frame.writeUInt32BE(128, 8);
+      return frame;
+    });
+    const valid = Buffer.concat(frames);
+    const reordered = Buffer.from(valid);
+    reordered.writeUInt32BE(99, frames[0].length + 4);
+    for (reply of [valid.subarray(0, -1), reordered, Buffer.concat([valid, Buffer.from([0])])])
+      assert.equal(await nativeObjectBuffers(dir, hashes), undefined);
+    reply = valid;
+    assert.deepEqual(await nativeObjectBuffers(dir, hashes), Array(1024).fill(undefined));
+    for (const value of [
+      { version: 1, id: 2, exists: Array(1024).fill(true) },
+      { version: 1, id: 1, exists: Array(1024).fill(1) },
+      { version: 1, id: 1, exists: [true] },
+    ]) {
+      reply = Buffer.from(JSON.stringify(value) + '\n');
+      assert.equal(await nativeObjectExists(dir, hashes), undefined);
+    }
+    reply = Buffer.from(JSON.stringify({ version: 1, id: 1, exists: Array(1024).fill(true) }) + '\n');
+    assert.deepEqual(await nativeObjectExists(dir, hashes), Array(1024).fill(true));
+    failure = new Error('helper failed after producing output');
+    assert.equal(await nativeObjectExists(dir, hashes), undefined);
+    assert.equal(await nativeObjectBuffers(dir, hashes), undefined);
+  } finally {
+    cp.execFile = original;
   }
 });
