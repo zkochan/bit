@@ -4,7 +4,7 @@ import type { ObjectItem, Repository } from '@teambit/objects';
 import { BitObject, Lane, LaneHistory, ModelComponent, Version, VersionHistory } from '@teambit/objects';
 import type { WriteObjectsQueue } from './write-objects-queue';
 import type { ComponentsPerRemote } from '../component-ops/multiple-component-merger';
-import type { RustSourceValidator } from './rust-source-validator';
+import type { RustSourceValidator, SourceValidation } from './rust-source-validator';
 
 const TIMEOUT_MINUTES_WARNING = 3;
 const TIMEOUT_MINUTES_EXIT = 30;
@@ -58,6 +58,29 @@ export class ObjectsWritable extends Writable {
     }
   }
 
+  async _writev(chunks: { chunk: ObjectItem }[], callback: (error?: Error) => void) {
+    try {
+      // Validate buffered input together, but retain the existing ordered parse/write/merge behavior.
+      for (let offset = 0; offset < chunks.length; offset += 16) {
+        const objects = chunks.slice(offset, offset + 16).map(({ chunk }) => chunk);
+        for (const object of objects) {
+          if (!object.ref || !object.buffer) throw new Error('objectItem expected to have "ref" and "buffer" props');
+        }
+        const validator = this.sourceValidator;
+        const validations = validator
+          ? await Promise.all(objects.map((object) => validator.validate(object.ref.toString(), object.buffer)))
+          : undefined;
+        for (let index = 0; index < objects.length; index += 1) {
+          await this.writeObjectToFs(objects[index], validations ? { result: validations[index] } : undefined);
+        }
+      }
+      callback();
+    } catch (error: any) {
+      logger.error(`found an issue during buffered write from ${this.remoteName}`, error);
+      callback(error);
+    }
+  }
+
   async _final(callback) {
     clearInterval(this.timeoutId);
     callback();
@@ -68,9 +91,11 @@ export class ObjectsWritable extends Writable {
     callback(error);
   }
 
-  private async writeObjectToFs(obj: ObjectItem) {
+  private async writeObjectToFs(obj: ObjectItem, validation?: { result?: SourceValidation }) {
     if (this.sourceValidator) {
-      const validated = await this.sourceValidator.validate(obj.ref.toString(), obj.buffer);
+      const validated = validation
+        ? validation.result
+        : await this.sourceValidator.validate(obj.ref.toString(), obj.buffer);
       if (validated) {
         await this.objectsQueue.addImmutableObject(obj.ref.toString(), () =>
           this.repo.writeValidatedSourceToFS(obj.ref, obj.buffer)

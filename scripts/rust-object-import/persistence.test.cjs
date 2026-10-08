@@ -136,3 +136,34 @@ test('mutable histories merge and duplicate components remain available to the l
   const laneItem = { ref: lane.hash(), buffer: await lane.compress() };
   await assert.rejects(persist(repo, [laneItem], executable), /ObjectsWritable does not support lanes/);
 });
+
+test('buffered native imports use bounded batches and preserve write/deduplication order', async (t) => {
+  const repo = await temporary(t);
+  const objects = await Promise.all(Array.from({ length: 80 }, (_, i) => item(Buffer.from(`source ${i}`))));
+  const result = await persist(repo, objects, executable);
+  assert.deepEqual(
+    result.hashes,
+    objects.map((obj) => obj.ref.toString())
+  );
+  assert.equal(result.stats.sources, 80);
+  assert.ok(result.stats.batches < 15, `expected bounded buffered validation, got ${result.stats.batches} round trips`);
+  for (const obj of objects) assert.equal((await repo.load(obj.ref)).hash().toString(), obj.ref.toString());
+});
+
+test('buffered native fallback preserves legacy error and earlier immutable writes', async (t) => {
+  const repo = await temporary(t);
+  const objects = await Promise.all(Array.from({ length: 8 }, (_, i) => item(Buffer.from(`prefix ${i}`))));
+  const corrupt = { ref: new Ref('f'.repeat(40)), buffer: Buffer.from('corrupt compression') };
+  let legacyError;
+  try {
+    await persist(repo, [...objects, corrupt]);
+  } catch (error) {
+    legacyError = error;
+  }
+  const nativeRepo = await temporary(t);
+  await assert.rejects(
+    persist(nativeRepo, [...objects, corrupt], executable),
+    (error) => error.constructor === legacyError.constructor && error.message === legacyError.message
+  );
+  for (const obj of objects) assert.equal((await nativeRepo.load(obj.ref)).hash().toString(), obj.ref.toString());
+});
