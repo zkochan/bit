@@ -1,5 +1,5 @@
 import path from 'path';
-import { nativeObjectHelperEnabled, requestObjectBatch } from './rust-object-inventory';
+import { nativeObjectHelperEnabled, nativeReadOperationSize, requestObjectBatch } from './rust-object-inventory';
 
 const MAX_RAW_BYTES = 256 * 1024;
 export type NativeObjectHeader = { type: string; size: number; mtimeMs: number };
@@ -23,9 +23,10 @@ export async function nativeObjectHeaders(
   if (!nativeHeadersEnabled(hashes.length) || !validHashes(directory, hashes)) return undefined;
   const executable = process.env.BIT_RUST_OBJECT_IMPORT!;
   const results: (NativeObjectHeader | undefined)[] = [];
-  for (let offset = 0; offset < hashes.length; offset += 4096) {
-    const batch = hashes.slice(offset, offset + 4096);
-    const response = await requestObjectBatch(executable, directory, batch, 'BHD1', 8 * 1024 * 1024);
+  const groupSize = nativeReadOperationSize();
+  for (let offset = 0; offset < hashes.length; offset += groupSize) {
+    const batch = hashes.slice(offset, offset + groupSize);
+    const response = await requestObjectBatch(executable, directory, batch, 'BHD1', 8 * 1024 * 1024, 4096);
     if (!response) return undefined;
     const values = parseHeaders(response, batch.length);
     if (!values) return undefined;
@@ -36,23 +37,28 @@ export async function nativeObjectHeaders(
 
 function parseHeaders(buffer: Buffer, count: number): (NativeObjectHeader | undefined)[] | undefined {
   try {
-    const response = JSON.parse(buffer.toString('utf8'));
-    if (
-      response.version !== 1 ||
-      response.id !== 1 ||
-      !Array.isArray(response.objects) ||
-      response.objects.length !== count
-    )
-      return undefined;
+    const lines = buffer.toString('utf8').split('\n');
+    if (lines.at(-1) === '') lines.pop();
+    if (lines.length !== Math.ceil(count / 4096)) return undefined;
     const results: (NativeObjectHeader | undefined)[] = [];
-    for (const object of response.objects) {
-      if (object === null) {
-        results.push(undefined);
-        continue;
+    for (let index = 0; index < lines.length; index++) {
+      const response = JSON.parse(lines[index]);
+      if (
+        response.version !== 1 ||
+        response.id !== index + 1 ||
+        !Array.isArray(response.objects) ||
+        response.objects.length !== Math.min(4096, count - index * 4096)
+      )
+        return undefined;
+      for (const object of response.objects) {
+        if (object === null) {
+          results.push(undefined);
+          continue;
+        }
+        const header = parseNativeObjectHeader(object);
+        if (!header) return undefined;
+        results.push(header);
       }
-      const header = parseNativeObjectHeader(object);
-      if (!header) return undefined;
-      results.push(header);
     }
     return results;
   } catch {

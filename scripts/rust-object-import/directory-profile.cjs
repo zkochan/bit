@@ -6,13 +6,14 @@ const cp = require('node:child_process');
 const { performance } = require('node:perf_hooks');
 const { createProcessTreeMemorySampler } = require('../rust-dependency-analysis/process-tree-memory.cjs');
 const { createBenchmarkProcessControl } = require('../rust-dependency-analysis/process-tree-memory-control.cjs');
-module.exports = async function profile(directory, count, helper) {
+module.exports = async function profile(directory, count, helper, options = {}) {
   if (process.platform !== 'linux' || process.env.BIT_DIRECTORY_PROFILE !== '1') return undefined;
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-directory-profile-'));
-  const results = { previous: [], traversal: [] };
+  const nativeMode = options.nativeMode || 'traversal';
+  const results = { previous: [], [nativeMode]: [] };
   try {
     for (let round = -1; round < 9; round++) {
-      for (const mode of round % 2 ? ['traversal', 'previous'] : ['previous', 'traversal']) {
+      for (const mode of round % 2 ? [nativeMode, 'previous'] : ['previous', nativeMode]) {
         const cpuFile = path.join(temporary, 'cpu.txt');
         const start = performance.now();
         const child = cp.spawn(
@@ -24,7 +25,7 @@ module.exports = async function profile(directory, count, helper) {
             cpuFile,
             process.execPath,
             '--expose-gc',
-            path.join(__dirname, 'directory-profile-worker.cjs'),
+            path.join(__dirname, options.worker || 'directory-profile-worker.cjs'),
             process.env.BIT_LEGACY_ROOT,
             directory,
             String(count),
@@ -35,7 +36,7 @@ module.exports = async function profile(directory, count, helper) {
             env: {
               ...process.env,
               BIT_RUST_OBJECT_IMPORT: helper,
-              BIT_RUST_OBJECT_TRAVERSAL: mode === 'previous' ? 'off' : 'on',
+              [options.flag || 'BIT_RUST_OBJECT_TRAVERSAL']: mode === 'previous' ? 'off' : 'on',
             },
             stdio: ['ignore', 'pipe', 'pipe'],
           }

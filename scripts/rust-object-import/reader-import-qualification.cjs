@@ -23,7 +23,14 @@ const { benchmarkGlobals } = require('../rust-dependency-analysis/command-worksp
   const load = createRequire(path.join(cli, 'package.json'));
   const { Ref, Repository } = load('@teambit/objects');
   const reader = load(path.join(cli, 'node_modules/@teambit/objects/dist/objects/rust-object-reader.js'));
-  const stages = { reads: [], headers: [], directories: [] };
+  const stages = { reads: [], headers: [], directories: [], inventory: [] };
+  const inventory = load(path.join(cli, 'node_modules/@teambit/objects/dist/objects/rust-object-inventory.js'));
+  const originalInventory = inventory.nativeObjectExists;
+  inventory.nativeObjectExists = async (...args) => {
+    const result = await originalInventory(...args);
+    if (result) stages.inventory.push({ requested: args[1].length, present: result.filter(Boolean).length });
+    return result;
+  };
   const directory = load(path.join(cli, 'node_modules/@teambit/objects/dist/objects/rust-object-directory.js'));
   const originalDirectory = directory.nativeObjectDirectory;
   directory.nativeObjectDirectory = async (...args) => {
@@ -44,9 +51,11 @@ const { benchmarkGlobals } = require('../rust-dependency-analysis/command-worksp
     };
   }
   process.env.BIT_RUST_OBJECT_IMPORT = 'off';
+  const files = Number(process.env.BIT_READ_QUALIFICATION_FILES || 2048);
+  assert.ok(Number.isSafeInteger(files) && files >= 1024 && files <= 16384);
   const manifest = await createFixture(cli, path.join(temporary, 'remotes'), {
     components: 1,
-    files: 2048,
+    files,
     bytes: 128,
     versions: 1,
   });
@@ -69,7 +78,7 @@ const { benchmarkGlobals } = require('../rust-dependency-analysis/command-worksp
     unreadable: inventory.unreadable.map((ref) => ref.toString()).sort(),
   });
   assert.deepEqual(normalize(await remote.listObjectsWithType()), normalize(canonicalHeaders));
-  assert.ok(stages.reads.some((stage) => stage.native === 2048));
+  assert.ok(stages.reads.some((stage) => stage.native === refs.length));
   assert.ok(
     stages.headers.some((stage) => stage.native === Object.keys(manifest.hashes).length) ||
       stages.directories.some((stage) => stage.headers && stage.native === Object.keys(manifest.hashes).length)
@@ -86,7 +95,9 @@ const { benchmarkGlobals } = require('../rust-dependency-analysis/command-worksp
   await scope.scopeImporter.importManyObjects({ [remoteName]: hashes }, 'batched read repair qualification');
   process.env.BIT_RUST_OBJECT_IMPORT = path.join(temporary, 'missing-helper');
   assert.deepEqual(await scope.objects.loadManyRaw(refs), expected);
-  assert.equal(stages.reads.filter((stage) => stage.native === 2048).length >= 2, true);
+  assert.equal(stages.reads.filter((stage) => stage.native === refs.length).length >= 2, true);
+  assert.ok(stages.inventory.some((stage) => stage.requested === refs.length && stage.present === 0));
+  assert.ok(stages.inventory.some((stage) => stage.requested === refs.length && stage.present === refs.length));
   console.log(
     JSON.stringify({
       sourcesVerified: refs.length,
