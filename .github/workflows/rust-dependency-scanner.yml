@@ -270,6 +270,12 @@ jobs:
         run: |
           mkdir -p "$RUNNER_TEMP/rust-scanner-package-tools"
           npm install --prefix "$RUNNER_TEMP/rust-scanner-package-tools" --no-save --package-lock=false --ignore-scripts typescript@5.9.2 debug@4.4.0
+      - name: Package standalone object-import helper
+        shell: bash
+        env:
+          BIT_OBJECT_ARTIFACT_DIRECTORY: ${{ runner.temp }}/bit-object-import-artifacts
+        run: |
+          node ../scripts/rust-object-import/artifacts/package-helper.cjs --directory "$BIT_OBJECT_ARTIFACT_DIRECTORY" > "$RUNNER_TEMP/bit-object-artifact-path.txt"
       - name: Validate real packaged installation on minimum Node
         shell: bash
         env:
@@ -278,6 +284,7 @@ jobs:
         run: |
           export BIT_TEST_PACKAGED_ARCHIVE="$(find dist -maxdepth 1 -name '*.tar.gz' | head -1)"
           node --test ../scripts/rust-dependency-analysis/discovery.test.cjs
+          BIT_TEST_OBJECT_ARTIFACT="$(cat "$RUNNER_TEMP/bit-object-artifact-path.txt")" node --test ../scripts/rust-object-import/artifacts/artifacts.test.cjs
           python ../scripts/rust-dependency-analysis/artifacts/test_install.py
       - uses: actions/setup-node@v4
         with:
@@ -290,6 +297,7 @@ jobs:
         run: |
           export BIT_TEST_PACKAGED_ARCHIVE="$(find dist -maxdepth 1 -name '*.tar.gz' | head -1)"
           node --test ../scripts/rust-dependency-analysis/discovery.test.cjs
+          BIT_TEST_OBJECT_ARTIFACT="$(cat "$RUNNER_TEMP/bit-object-artifact-path.txt")" node --test ../scripts/rust-object-import/artifacts/artifacts.test.cjs
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -301,6 +309,14 @@ jobs:
         run: |
           export BIT_TEST_PACKAGED_ARCHIVE="$(find dist -maxdepth 1 -name '*.tar.gz' | head -1)"
           node --test ../scripts/rust-dependency-analysis/discovery.test.cjs
+          BIT_TEST_OBJECT_ARTIFACT="$(cat "$RUNNER_TEMP/bit-object-artifact-path.txt")" node --test ../scripts/rust-object-import/artifacts/artifacts.test.cjs
+      - name: Upload validated experimental object-import artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: object-import-${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+          path: ${{ runner.temp }}/bit-object-import-artifacts/*
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload validated experimental scanner artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -332,6 +348,26 @@ jobs:
         working-directory: native
         run: |
           python3 ../scripts/rust-dependency-analysis/artifacts/package-helper.py package --target x86_64-unknown-linux-musl
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.0
+      - name: Build and package actual musl object-import helper
+        env:
+          BIT_OBJECT_ARTIFACT_DIRECTORY: ${{ runner.temp }}/bit-object-import-artifacts
+        run: node scripts/rust-object-import/artifacts/package-helper.cjs --directory "$BIT_OBJECT_ARTIFACT_DIRECTORY" --target x86_64-unknown-linux-musl
+      - name: Execute standalone object-import artifact in actual Alpine
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/repository:ro" -v "$RUNNER_TEMP/bit-object-import-artifacts:/artifacts:ro" -w /repository "node:${{ matrix.node }}-alpine" sh -ec '
+            export BIT_TEST_OBJECT_ARTIFACT="$(find /artifacts -maxdepth 1 -name "*.tar.gz")"
+            node --test scripts/rust-object-import/artifacts/artifacts.test.cjs
+          '
+      - name: Upload validated experimental musl object-import artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: object-import-musl-node-${{ matrix.node }}-${{ github.sha }}
+          path: ${{ runner.temp }}/bit-object-import-artifacts/*
+          if-no-files-found: error
+          retention-days: 14
       - name: Install, discover and execute packaged helper in actual Alpine
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE:/repository:ro" -w /repository -e CI=1 "node:${{ matrix.node }}-alpine" sh -ec '
