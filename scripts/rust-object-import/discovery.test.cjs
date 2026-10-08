@@ -290,3 +290,28 @@ test('packaged discovery never searches another installation or PATH', real, (t)
   assert.ok(present.resolve());
   assert.equal(absent.resolve(), undefined);
 });
+
+test(
+  'release assembly selects exactly one target artifact and leaves unsupplied distributions unchanged',
+  real,
+  (t) => {
+    const { assembleRelease } = require('./artifacts/assemble-release.cjs');
+    const f = fixture(t);
+    const { manifest } = verifiedArchive(archive);
+    const artifacts = path.join(f.directory, 'release artifacts λ');
+    fs.mkdirSync(artifacts);
+    assert.equal(assembleRelease(f.directory, manifest.target, ''), undefined);
+    assert.equal(f.resolve(), undefined);
+    assert.throws(() => assembleRelease(f.directory, manifest.target, artifacts), /exactly one/);
+    const name = path.basename(archive);
+    for (const suffix of ['', '.sha256', '.manifest.json'])
+      fs.copyFileSync(archive + suffix, path.join(artifacts, name + suffix));
+    fs.writeFileSync(path.join(artifacts, 'bit-object-import-0.1.0-unrelated-target-ignore.tar.gz'), 'ignored');
+    const destination = assembleRelease(f.directory, manifest.target, artifacts);
+    assert.equal(f.resolve('import'), path.toNamespacedPath(path.join(destination, manifest.binary.name)));
+    fs.copyFileSync(path.join(artifacts, name), path.join(artifacts, name.replace('.tar.gz', '-duplicate.tar.gz')));
+    assert.throws(() => assembleRelease(f.directory, manifest.target, artifacts), /exactly one/);
+    assert.equal(f.resolve('import'), path.toNamespacedPath(path.join(destination, manifest.binary.name)));
+    assert.throws(() => assembleRelease(f.directory, 'unsupported', artifacts), /supported target/);
+  }
+);
