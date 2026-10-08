@@ -1,6 +1,6 @@
 # Installing and opting into the packaged object helper
 
-A trusted compiled Bit distribution can now include the standalone Rust object-import helper. `BIT_RUST_OBJECT_IMPORT=packaged` selects only the helper installed beside that distribution's object runtime. An absolute executable override remains supported. The default is still Node, and normal release assembly does not yet automatically include this experimental helper.
+A trusted compiled Bit distribution can now include the standalone Rust object-import helper. `BIT_RUST_OBJECT_IMPORT=packaged` selects only the helper installed beside that distribution's object runtime. An absolute executable override remains supported. The default is still Node, and release assembly includes this experimental helper only when explicitly supplied with verified artifacts.
 
 ## Assemble a separate local distribution
 
@@ -29,6 +29,20 @@ Choose the matching target from [standalone-artifacts.md](./standalone-artifacts
 
 For a single compiled object runtime, `install --module-directory DIRECTORY --archive ARCHIVE` performs the same installation and first smoke-tests the helper on the installation host. Both commands require the artifact's native source identity, including normalized Cargo lock contents, to match the assembler checkout. The assembler trusts the supplied compiled Bit build, then records its actual module hashes; this is build assembly, not a publisher-signature check.
 
+## Release pipeline assembly
+
+CircleCI's Linux x64/ARM64, macOS Intel/ARM64 and Windows bundle jobs run the Node assembler before compression. Set `BIT_RUST_OBJECT_IMPORT_ARTIFACT_DIRECTORY` to a directory attached to each bundle job containing the trusted standalone archives and both sidecars. Exactly one archive matching each bundle's target is required; unrelated targets are ignored. Missing, ambiguous, corrupt or incompatible supplied artifacts fail the bundle job. Leaving the variable unset preserves existing Node-only bundles.
+
+The equivalent local command is:
+
+```sh
+BIT_RUST_OBJECT_IMPORT_ARTIFACT_DIRECTORY="$HOME/bit-object-import-artifacts" \
+  node scripts/rust-object-import/artifacts/assemble-release.cjs \
+  "$HOME/bit-test-distribution" x86_64-unknown-linux-gnu
+```
+
+The pipeline does not download artifacts or build Rust, and cross-target assembly does not execute a foreign helper. Artifact provisioning remains an explicit release-operator step; no release has been published by this change. Bundled helpers still require `BIT_RUST_OBJECT_IMPORT=packaged` at runtime. Alpine artifacts can use the same assembler explicitly with the musl target; the existing CircleCI bundle matrix has no Alpine bundle job.
+
 ## Selection, verification and rollback
 
 Installed helpers are immutable under `packaged/VERSION/TARGET/REVISION`. Each directory contains the four validated artifact members. Reinstalling identical bytes is allowed; differing bytes, extra files, links and directory redirects are rejected. Installation stages files, explicitly sets executable/data permissions, flushes them and renames the completed directory. A lock serializes assembler changes. After a process crash, remove a leftover `.install-lock` only once no assembler owns it.
@@ -56,6 +70,6 @@ The isolated platform tests compile the standalone coordinators into disposable 
 
 The existing genuine-scope driver accepts `BIT_READ_QUALIFICATION_PACKAGED=1`; the full file/HTTP command driver accepts `BIT_IMPORT_QUALIFICATION_PACKAGED=1`. Both require an assembled private CLI. The explicit `packaged-fallback` command mode checks canonical readback with an invalid installed helper and asserts that Sources did not execute natively. Fixtures, reports, installed contracts and archives remain outside Git.
 
-Local validation passes 94 Node tests (including 12 artifact tests and 10 installation/discovery tests), 95 compiled object unit tests, 40 Rust workspace tests, strict coordinator TypeScript, canonical isolated `npm run lint` and inherited pnpm Rust formatter/Clippy/perfectionist checks. Packaged full file/original HTTP-tar import smoke verifies native Source/metadata/mutable stages and complete readback; the genuine 16,384-Source scope driver verifies exact reads, native existence, canonical header parity, repeated import and deletion repair. Removing the installed executable also passes full canonical command readback with zero native Sources. New cross-platform CI results remain pending; raw reports/logs stay outside Git.
+Local validation passes 94 Node tests (including 12 artifact tests and 10 installation/discovery tests), 95 compiled object unit tests, 40 Rust workspace tests, strict coordinator TypeScript, canonical isolated `npm run lint` and inherited pnpm Rust formatter/Clippy/perfectionist checks. Packaged full file/original HTTP-tar import smoke verifies native Source/metadata/mutable stages and complete readback; the genuine 16,384-Source scope driver verifies exact reads, native existence, canonical header parity, repeated import and deletion repair. Removing the installed executable also passes full canonical command readback with zero native Sources. PR #43 passed all 17 runnable cross-platform checks; raw reports/logs stay outside Git.
 
-Remaining distribution work includes automatic release-pipeline assembly and broader full-command platform qualification. Native merge policy, larger streaming reads, tar intake, component/index transactions and operation orchestration remain separate stages.
+Remaining distribution work includes trusted artifact provisioning in release jobs and broader full-command platform qualification. Native merge policy, larger streaming reads, tar intake, component/index transactions and operation orchestration remain separate stages.
