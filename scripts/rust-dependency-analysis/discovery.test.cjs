@@ -87,8 +87,8 @@ test(
     assert.ok(executable);
     assert.ok(
       path
-        .toNamespacedPath(fs.realpathSync(executable))
-        .startsWith(path.toNamespacedPath(fs.realpathSync(r.directory)) + path.sep)
+        .toNamespacedPath(fs.realpathSync.native(executable))
+        .startsWith(path.toNamespacedPath(fs.realpathSync.native(r.directory)) + path.sep)
     );
     const { RustDependencyScannerSession } = require(path.join(r.directory, 'session.js'));
     const session = r.ownSession(new RustDependencyScannerSession({ executable, cwd: r.directory }));
@@ -197,8 +197,8 @@ test(
     assert.ok(executable);
     assert.ok(
       path
-        .toNamespacedPath(fs.realpathSync(executable))
-        .startsWith(path.toNamespacedPath(fs.realpathSync(relocated)) + path.sep)
+        .toNamespacedPath(fs.realpathSync.native(executable))
+        .startsWith(path.toNamespacedPath(fs.realpathSync.native(relocated)) + path.sep)
     );
     const { RustDependencyScannerSession } = require(path.join(relocated, moduleRelative, 'session.js'));
     const session = r.ownSession(new RustDependencyScannerSession({ executable, cwd: r.directory }));
@@ -253,7 +253,8 @@ test(
       assert.ok(
         hashedReads.some(
           (filename) =>
-            path.toNamespacedPath(fs.realpathSync(filename)) === path.toNamespacedPath(fs.realpathSync(executable))
+            path.toNamespacedPath(fs.realpathSync.native(filename)) ===
+            path.toNamespacedPath(fs.realpathSync.native(executable))
         )
       );
       assert.ok(hashedReads.includes(path.join(r.directory, 'session.js')));
