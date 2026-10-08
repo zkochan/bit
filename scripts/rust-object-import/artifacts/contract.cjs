@@ -106,6 +106,10 @@ function verifyMembers(members) {
   assert.equal(manifest.protocolVersion, 1);
   assert.deepEqual(manifest.platform, targets[target]);
   assert.match(manifest.gitRevision, /^[a-f0-9]{40}$/);
+  assert.ok(
+    Array.isArray(manifest.gitParents) && manifest.gitParents.every((parent) => /^[a-f0-9]{40}$/.test(parent)),
+    'invalid parent revisions'
+  );
   assert.match(manifest.objectImportSourceSha256, /^[a-f0-9]{64}$/);
   assert.match(manifest.cargoLockSha256, /^[a-f0-9]{64}$/);
   assert.equal(manifest.provenance?.binaryInput, 'checkout release output');

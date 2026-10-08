@@ -22,6 +22,7 @@ function fixture(target = 'x86_64-unknown-linux-gnu') {
     target,
     platform: targets[target],
     gitRevision: 'a'.repeat(40),
+    gitParents: ['b'.repeat(40)],
     objectImportSourceSha256: 'b'.repeat(64),
     cargoLockSha256: 'c'.repeat(64),
     minimumGlibc: '2.17',
@@ -109,6 +110,12 @@ test('manifest binds source, target, release provenance, checksums and all membe
     },
     (m) => {
       m.gitRevision = '../bad';
+    },
+    (m) => {
+      m.gitParents = ['../bad'];
+    },
+    (m) => {
+      delete m.gitParents;
     },
     (m) => {
       delete m.objectImportSourceSha256;

@@ -53,6 +53,13 @@ function packageHelper(directory, target) {
     artifactFormat: 2,
     protocolVersion: 1,
     gitRevision: command(['git', 'rev-parse', 'HEAD']),
+    // Pull-request CI builds GitHub's transient merge commit; its parents name the base and PR head.
+    // Read the raw commit object: a shallow checkout's history reports no parents.
+    gitParents: command(['git', 'cat-file', 'commit', 'HEAD'])
+      .split('\n\n', 1)[0]
+      .split('\n')
+      .filter((line) => line.startsWith('parent '))
+      .map((line) => line.slice('parent '.length)),
     objectImportSourceSha256: identity,
     cargoLockSha256: sha256(fs.readFileSync(path.join(ROOT, 'native/Cargo.lock'))),
     target,
