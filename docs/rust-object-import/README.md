@@ -129,3 +129,5 @@ Standalone release artifact builds and qualification are documented in [standalo
 Read-size budgeting and the rejected streaming experiment: [read-budget-results.md](./read-budget-results.md).
 
 Windows header classification and timestamp parity: [windows-headers.md](./windows-headers.md).
+
+Windows directory traversal and combined inventories: [windows-traversal.md](./windows-traversal.md).
