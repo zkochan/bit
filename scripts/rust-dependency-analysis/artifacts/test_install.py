@@ -32,7 +32,7 @@ class InstallTests(unittest.TestCase):
         contents = artifact.archive_bytes(binary, manifest, license_bytes, notices)
         file.write_bytes(contents)
         file.with_name(file.name + ".sha256").write_text(f"{artifact.sha256(contents)}  {file.name}\n")
-        file.with_name(file.name + ".manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+        file.with_name(file.name + ".manifest.json").write_bytes((json.dumps(manifest, indent=2) + "\n").encode())
         return file
 
     def active(self):
@@ -99,7 +99,7 @@ class InstallTests(unittest.TestCase):
             contents = artifact.archive_bytes(members["bit-dependency-scanner"], manifest, members["LICENSE"], members["THIRD-PARTY-NOTICES.txt"])
             archive.write_bytes(contents)
             archive.with_name(archive.name + ".sha256").write_text(f"{artifact.sha256(contents)}  {archive.name}\n")
-            archive.with_name(archive.name + ".manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+            archive.with_name(archive.name + ".manifest.json").write_bytes((json.dumps(manifest, indent=2) + "\n").encode())
             with self.assertRaisesRegex(ValueError, "exact-target checkout build"):
                 installer.install(self.module, archive, run_smoke=False)
             self.assertFalse((self.module / "packaged").exists())
