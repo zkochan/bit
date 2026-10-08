@@ -202,7 +202,7 @@ test('header operations span bounded frames and reject a corrupt later frame ato
   }
 });
 
-test('Windows enables read-only batches while retaining traversal restrictions', async (t) => {
+test('Windows enables read-only batches including directory traversal', async (t) => {
   await setup(t);
   const descriptor = Object.getOwnPropertyDescriptor(process, 'platform');
   const { nativeInventoryEnabled } = source('scopes/scope/objects/objects/rust-object-inventory.ts');
@@ -215,7 +215,7 @@ test('Windows enables read-only batches while retaining traversal restrictions',
     assert.equal(nativeInventoryEnabled(1023), false);
     assert.equal(nativeReadsEnabled(1023), false);
     assert.equal(nativeHeadersEnabled(1024), true);
-    assert.equal(nativeTraversalEnabled(), false);
+    assert.equal(nativeTraversalEnabled(), true);
     process.env.BIT_RUST_OBJECT_IMPORT = 'off';
     assert.equal(nativeInventoryEnabled(1024), false);
     assert.equal(nativeReadsEnabled(1024), false);

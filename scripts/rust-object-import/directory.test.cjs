@@ -11,7 +11,7 @@ const native =
   process.env.BIT_TEST_OBJECT_IMPORT ||
   path.join(root, 'native/target/debug/bit-object-import' + (process.platform === 'win32' ? '.exe' : ''));
 async function setup(t) {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-directory-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bit directory λ '));
   const previous = process.env.BIT_RUST_OBJECT_IMPORT;
   process.env.BIT_RUST_OBJECT_IMPORT = native;
   t.after(async () => {
@@ -27,14 +27,15 @@ const file = (dir, h) => path.join(dir, h.slice(0, 2), h.slice(2));
 
 test('directory traversal streams multiple frames, preserves leaf directories and observes mutations', async (t) => {
   const dir = await setup(t);
-  if (process.platform === 'win32') return assert.equal(await nativeObjectDirectory(dir), undefined);
   const hashes = Array.from({ length: 4100 }, (_, i) => hash('7f', i));
   await Promise.all(hashes.map((h) => fs.writeFile(file(dir, h), 'opaque')));
   await fs.mkdir(file(dir, hash('00', 1)));
-  await fs.symlink(path.join(dir, 'missing'), file(dir, hash('00', 2)));
+  if (process.platform !== 'win32') await fs.symlink(path.join(dir, 'missing'), file(dir, hash('00', 2)));
   await fs.writeFile(path.join(dir, '7f', '.hidden'), 'ignored');
   await fs.mkdir(path.join(dir, '.hidden'));
-  const expected = [...hashes, hash('00', 1), hash('00', 2)].sort().reverse();
+  const expected = [...hashes, hash('00', 1), ...(process.platform === 'win32' ? [] : [hash('00', 2)])]
+    .sort()
+    .reverse();
   assert.deepEqual(
     (await nativeObjectDirectory(dir)).map((entry) => entry.hash),
     expected
@@ -47,7 +48,6 @@ test('directory traversal streams multiple frames, preserves leaf directories an
 
 test('combined directory headers retain null fallback and exact stat metadata', async (t) => {
   const dir = await setup(t);
-  if (process.platform === 'win32') return;
   const h = hash('7f', 1);
   await fs.writeFile(file(dir, h), zlib.deflateSync(Buffer.from('Source hash 1\0payload')));
   await fs.writeFile(file(dir, hash('00', 1)), 'corrupt');
@@ -73,7 +73,6 @@ test('combined directory headers retain null fallback and exact stat metadata', 
 
 test('unusual layouts, inaccessible directories and missing helpers return whole-operation fallback', async (t) => {
   const dir = await setup(t);
-  if (process.platform === 'win32') return;
   for (const name of ['not-a-hash', 'A'.repeat(38)]) {
     const p = path.join(dir, '00', name);
     await fs.writeFile(p, 'x');
@@ -84,11 +83,11 @@ test('unusual layouts, inaccessible directories and missing helpers return whole
   assert.equal(await nativeObjectDirectory(dir), undefined);
   await fs.rmdir(path.join(dir, 'ZZ'));
   await fs.rmdir(path.join(dir, '00'));
-  await fs.symlink(path.join(dir, '01'), path.join(dir, '00'));
+  await fs.symlink(path.join(dir, '01'), path.join(dir, '00'), process.platform === 'win32' ? 'junction' : 'dir');
   assert.equal(await nativeObjectDirectory(dir), undefined);
   await fs.unlink(path.join(dir, '00'));
   await fs.mkdir(path.join(dir, '00'));
-  if (process.getuid?.() !== 0) {
+  if (process.platform !== 'win32' && process.getuid?.() !== 0) {
     await fs.chmod(path.join(dir, '00'), 0);
     try {
       assert.equal(await nativeObjectDirectory(dir), undefined);
@@ -191,3 +190,77 @@ test('failed helpers are reaped before releasing the slot, and nonzero exit inva
   process.env.BIT_RUST_OBJECT_IMPORT = helper;
   assert.equal(await nativeObjectDirectory(dir), undefined);
 });
+
+test('portable directory replies reject invalid sequences, partial frames and failed exits', async (t) => {
+  const dir = await setup(t);
+  const { EventEmitter } = require('node:events');
+  const original = cp.spawn;
+  let output,
+    exit = 0,
+    killed = false;
+  cp.spawn = () => {
+    const child = new EventEmitter();
+    child.stdout = new EventEmitter();
+    child.stdin = new EventEmitter();
+    child.kill = () => {
+      killed = true;
+      return true;
+    };
+    child.stdin.end = () =>
+      queueMicrotask(() => {
+        // Deliberately split newline framing across pipe chunks.
+        for (let offset = 0; offset < output.length; offset += 7)
+          child.stdout.emit('data', Buffer.from(output.slice(offset, offset + 7)));
+        child.emit('close', exit);
+      });
+    return child;
+  };
+  const frame = {
+    version: 1,
+    id: 1,
+    sequence: 0,
+    headers: false,
+    done: false,
+    fallback: false,
+    objects: [{ hash: hash('7f', 1), header: null }],
+  };
+  const done = { ...frame, sequence: 1, done: true, objects: [] };
+  const line = (value) => JSON.stringify(value) + '\n';
+  try {
+    for (output of [
+      line(frame),
+      line(frame) + line({ ...done, fallback: true }),
+      line(frame) + line({ ...done, sequence: 0 }),
+      line(frame) + line(done) + 'extra',
+      line(frame) + line({ ...frame, sequence: 1 }),
+    ])
+      assert.equal(await nativeObjectDirectory(dir), undefined);
+    assert.equal(killed, true);
+    output = line(frame) + line(done);
+    assert.deepEqual(await nativeObjectDirectory(dir), [{ hash: hash('7f', 1), header: undefined }]);
+    exit = 7;
+    assert.equal(await nativeObjectDirectory(dir), undefined);
+  } finally {
+    cp.spawn = original;
+  }
+});
+
+test(
+  'Windows directory junctions are rejected by both coordinator and native snapshot checks',
+  { skip: process.platform !== 'win32' },
+  async (t) => {
+    const dir = await setup(t);
+    await fs.rmdir(path.join(dir, '00'));
+    await fs.symlink(path.join(dir, '01'), path.join(dir, '00'), 'junction');
+    assert.equal(await nativeObjectDirectory(dir), undefined);
+    const prefixes = Array.from({ length: 256 }, (_, i) => (255 - i).toString(16).padStart(2, '0')).join('');
+    const request = Buffer.alloc(12 + prefixes.length);
+    request.write('BWR1');
+    request.writeUInt32BE(1, 4);
+    request.writeUInt32BE(256, 8);
+    request.write(prefixes, 12);
+    const child = cp.spawnSync(native, ['--objects-dir', dir], { input: request });
+    assert.equal(child.status, 0);
+    assert.equal(JSON.parse(child.stdout).fallback, true);
+  }
+);

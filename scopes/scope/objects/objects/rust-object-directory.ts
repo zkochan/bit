@@ -10,7 +10,7 @@ const MAX_LINE = 4 * 1024 * 1024;
 const MAX_OBJECTS = 1048576;
 
 export function nativeTraversalEnabled(): boolean {
-  return process.env.BIT_RUST_OBJECT_TRAVERSAL !== 'off' && nativeObjectHelperEnabled(1, 1);
+  return process.env.BIT_RUST_OBJECT_TRAVERSAL !== 'off' && nativeObjectHelperEnabled(1, 1, true);
 }
 
 export async function nativeObjectDirectory(
