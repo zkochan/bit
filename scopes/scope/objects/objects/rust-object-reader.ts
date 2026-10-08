@@ -6,7 +6,7 @@ const MAX_RAW_BYTES = 256 * 1024;
 export type NativeObjectHeader = { type: string; size: number; mtimeMs: number };
 
 export function nativeReadsEnabled(count: number): boolean {
-  return process.env.BIT_RUST_OBJECT_READS !== 'off' && nativeObjectHelperEnabled(count, 1024);
+  return process.env.BIT_RUST_OBJECT_READS !== 'off' && nativeObjectHelperEnabled(count, 1024, true);
 }
 
 export function nativeHeadersEnabled(count: number): boolean {

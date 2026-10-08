@@ -12,7 +12,7 @@ const native =
 const hashes = Array.from({ length: 8500 }, (_, i) => i.toString(16).padStart(40, '0'));
 
 async function setup(t) {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-inventory-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'bit inventory λ '));
   const previous = process.env.BIT_RUST_OBJECT_IMPORT;
   process.env.BIT_RUST_OBJECT_IMPORT = native;
   t.after(async () => {
@@ -25,7 +25,6 @@ async function setup(t) {
 
 test('ordered inventory spans bounded frames and sees creation/deletion without stale caches', async (t) => {
   const dir = await setup(t);
-  if (process.platform === 'win32') return assert.equal(await nativeObjectExists(dir, hashes), undefined);
   await fs.mkdir(path.join(dir, '00'));
   const file = path.join(dir, '00', hashes[4].slice(2));
   await fs.writeFile(file, 'opaque bytes');
@@ -40,10 +39,12 @@ test('ordered inventory spans bounded frames and sees creation/deletion without 
   assert.equal((await nativeObjectExists(dir, hashes.slice(0, 1024)))[4], false);
   await fs.mkdir(file);
   assert.equal((await nativeObjectExists(dir, hashes.slice(0, 1024)))[4], true, 'pathExists includes directories');
-  const link = path.join(dir, '00', hashes[5].slice(2));
-  await fs.symlink(path.join(dir, 'absent'), link);
-  assert.equal((await nativeObjectExists(dir, hashes.slice(0, 1024)))[5], false, 'dangling symlink');
-  if (process.getuid?.() !== 0) {
+  if (process.platform !== 'win32') {
+    const link = path.join(dir, '00', hashes[5].slice(2));
+    await fs.symlink(path.join(dir, 'absent'), link);
+    assert.equal((await nativeObjectExists(dir, hashes.slice(0, 1024)))[5], false, 'dangling symlink');
+  }
+  if (process.platform !== 'win32' && process.getuid?.() !== 0) {
     await fs.chmod(path.join(dir, '00'), 0);
     try {
       assert.equal((await nativeObjectExists(dir, hashes.slice(0, 1024)))[4], false, 'inaccessible parent');
