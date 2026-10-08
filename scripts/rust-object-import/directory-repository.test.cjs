@@ -64,11 +64,15 @@ test('real inventories match canonical classification with one Node filesystem r
   assert.deepEqual(refs.result.map(String).sort(), hashes);
   await fs.writeFile(path.join(dir, '00', '0'.repeat(38)), 'broken');
   await fs.writeFile(path.join(dir, '01', '0'.repeat(38)), zlib.deflateSync(Buffer.from('Unregistered hash 1\0{}')));
+  const directoryHash = '02' + '1'.repeat(38);
+  const linkHash = '03' + '2'.repeat(38);
+  await fs.mkdir(path.join(dir, '02', directoryHash.slice(2)));
+  await fs.symlink(path.join(dir, 'missing'), path.join(dir, '03', linkHash.slice(2)));
   process.env.BIT_RUST_OBJECT_IMPORT = 'off';
   const incomplete = normalize(await repo.listObjectsWithType());
   process.env.BIT_RUST_OBJECT_IMPORT = helper;
   assert.deepEqual(normalize(await repo.listObjectsWithType()), incomplete);
-  assert.deepEqual(incomplete.unreadable, hashes.slice(0, 2));
+  assert.deepEqual(incomplete.unreadable, [...hashes.slice(0, 2), directoryHash, linkHash].sort());
 });
 
 test('custom inventory/read methods and transforms retain canonical behavior', async (t) => {
