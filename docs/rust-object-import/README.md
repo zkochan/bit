@@ -131,3 +131,5 @@ Read-size budgeting and the rejected streaming experiment: [read-budget-results.
 Windows header classification and timestamp parity: [windows-headers.md](./windows-headers.md).
 
 Windows directory traversal and combined inventories: [windows-traversal.md](./windows-traversal.md).
+
+Tar intake compatibility and Source-only prototype measurements: [tar-intake-results.md](./tar-intake-results.md).
