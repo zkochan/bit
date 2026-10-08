@@ -10,7 +10,7 @@ export function nativeReadsEnabled(count: number): boolean {
 }
 
 export function nativeHeadersEnabled(count: number): boolean {
-  return process.env.BIT_RUST_OBJECT_HEADERS !== 'off' && nativeObjectHelperEnabled(count, 256);
+  return process.env.BIT_RUST_OBJECT_HEADERS !== 'off' && nativeObjectHelperEnabled(count, 256, true);
 }
 
 function validHashes(directory: string, hashes: string[]): boolean {

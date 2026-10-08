@@ -134,15 +134,7 @@ pub(crate) fn classify(path: &Path) -> Option<Header> {
     if !metadata.is_file() {
         return None;
     }
-    let modified = metadata
-        .modified()
-        .ok()?
-        .duration_since(UNIX_EPOCH)
-        .ok()?;
-    let mtime_ms = (modified.as_secs() as f64).mul_add(
-        1000.0,
-        f64::from(modified.subsec_nanos()) / 1_000_000.0,
-    );
+    let mtime_ms = modified_milliseconds(metadata.modified().ok()?)?;
     let mut compressed = Vec::new();
     File::open(path)
         .ok()?
@@ -151,6 +143,20 @@ pub(crate) fn classify(path: &Path) -> Option<Header> {
         .ok()?;
     let object_type = header_type(&compressed)?;
     Some(Header { object_type, size: metadata.len(), mtime_ms })
+}
+
+fn modified_milliseconds(modified: std::time::SystemTime) -> Option<f64> {
+    let elapsed = modified.duration_since(UNIX_EPOCH).ok()?;
+    // Node's Windows stat binding casts seconds to unsigned long before creating Stats.
+    // Avoid accepting a different timestamp after that 32-bit range wraps.
+    // <https://github.com/nodejs/node/blob/955266bfdd854cd280dffd47548673914484e4c0/src/node_file-inl.h>
+    if cfg!(windows) && elapsed.as_secs() > u64::from(u32::MAX) {
+        return None;
+    }
+    Some((elapsed.as_secs() as f64).mul_add(
+        1000.0,
+        f64::from(elapsed.subsec_nanos()) / 1_000_000.0,
+    ))
 }
 
 fn header_type(compressed: &[u8]) -> Option<String> {

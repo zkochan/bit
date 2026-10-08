@@ -47,7 +47,6 @@ test('binary read batches preserve exact bytes/emptiness/order and bound oversiz
 
 test('header inventory reports stat size/time, accepts opaque registered types and falls back conservatively', async (t) => {
   const dir = await setup(t);
-  if (process.platform === 'win32') return assert.equal(await nativeObjectHeaders(dir, hashes), undefined);
   const sourceBytes = object(Buffer.alloc(2 * 1024 * 1024, 97));
   await fs.writeFile(file(dir, 1), sourceBytes);
   await fs.writeFile(file(dir, 2), object('{}', 'UnknownType hash 2'));
@@ -83,7 +82,6 @@ test('read-only frame bounds and truncation never produce partial success', asyn
 
 test('native header success agrees with Node partial inflation across truncation and prefix corruption', async (t) => {
   const dir = await setup(t);
-  if (process.platform === 'win32') return;
   const bytes = object(Buffer.alloc(1024 * 1024, 97));
   const corpus = [];
   for (let length = 0; length < Math.min(bytes.length, 512); length++) corpus.push(bytes.subarray(0, length));
@@ -176,13 +174,13 @@ test('malformed binary boundaries/identities and header records never expose an 
 
 test('header operations span bounded frames and reject a corrupt later frame atomically', async (t) => {
   const dir = await setup(t);
-  if (process.platform === 'win32') return;
   const input = Array.from({ length: 16385 }, (_, i) => i.toString(16).padStart(40, '0'));
   await fs.writeFile(file(dir, 1), object('fixture'));
   const results = await nativeObjectHeaders(dir, input);
   assert.equal(results.length, input.length);
   assert.equal(results[1].type, 'Source');
   assert.equal(results.filter(Boolean).length, 1);
+  if (process.platform === 'win32') return;
   const helper = path.join(dir, 'header-frames.cjs');
   const first = { version: 1, id: 1, objects: Array(4096).fill(null) };
   for (const second of [
@@ -204,7 +202,7 @@ test('header operations span bounded frames and reject a corrupt later frame ato
   }
 });
 
-test('Windows enables existence and raw reads while retaining header and traversal restrictions', async (t) => {
+test('Windows enables read-only batches while retaining traversal restrictions', async (t) => {
   await setup(t);
   const descriptor = Object.getOwnPropertyDescriptor(process, 'platform');
   const { nativeInventoryEnabled } = source('scopes/scope/objects/objects/rust-object-inventory.ts');
@@ -216,7 +214,7 @@ test('Windows enables existence and raw reads while retaining header and travers
     assert.equal(nativeReadsEnabled(1024), true);
     assert.equal(nativeInventoryEnabled(1023), false);
     assert.equal(nativeReadsEnabled(1023), false);
-    assert.equal(nativeHeadersEnabled(1024), false);
+    assert.equal(nativeHeadersEnabled(1024), true);
     assert.equal(nativeTraversalEnabled(), false);
     process.env.BIT_RUST_OBJECT_IMPORT = 'off';
     assert.equal(nativeInventoryEnabled(1024), false);
@@ -265,10 +263,41 @@ test('read and existence coordinators discard malformed or failed replies on eve
     }
     reply = Buffer.from(JSON.stringify({ version: 1, id: 1, exists: Array(1024).fill(true) }) + '\n');
     assert.deepEqual(await nativeObjectExists(dir, hashes), Array(1024).fill(true));
+    for (const header of [
+      { type: 'Source', size: -1, mtimeMs: 1 },
+      { type: 'Source', size: 1, mtimeMs: NaN },
+      { type: 'Source ', size: 1, mtimeMs: 1 },
+    ]) {
+      reply = Buffer.from(JSON.stringify({ version: 1, id: 1, objects: Array(256).fill(header) }));
+      assert.equal(await nativeObjectHeaders(dir, hashes.slice(0, 256)), undefined);
+    }
     failure = new Error('helper failed after producing output');
     assert.equal(await nativeObjectExists(dir, hashes), undefined);
     assert.equal(await nativeObjectBuffers(dir, hashes), undefined);
   } finally {
     cp.execFile = original;
+  }
+});
+
+test('header timestamps exactly match Node for explicit fractional, epoch and future file times', async (t) => {
+  const dir = await setup(t);
+  const filename = file(dir, 1);
+  await fs.writeFile(filename, object('timestamp fixture'));
+  for (const seconds of [0, 1.1234567, 1700000000.1234567, 2147483648.9876543, 4294967295.5]) {
+    await fs.utimes(filename, seconds, seconds);
+    const stat = await fs.stat(filename);
+    const result = (await nativeObjectHeaders(dir, hashes))[1];
+    assert.deepEqual(result, { type: 'Source', size: stat.size, mtimeMs: stat.mtimeMs });
+  }
+  const beforeEpoch = new Date(-1000);
+  await fs.utimes(filename, beforeEpoch, beforeEpoch);
+  assert.equal((await nativeObjectHeaders(dir, hashes))[1], undefined, 'pre-epoch metadata uses canonical fallback');
+  if (process.platform === 'win32') {
+    await fs.utimes(filename, 4294967296, 4294967296);
+    assert.equal(
+      (await nativeObjectHeaders(dir, hashes))[1],
+      undefined,
+      'wrapped Windows stat timestamps use canonical fallback'
+    );
   }
 });

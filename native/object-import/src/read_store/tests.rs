@@ -76,3 +76,24 @@ fn checked_reads_reject_invalid_identity_count_and_truncated_hashes_before_outpu
         assert!(output.is_empty());
     }
 }
+
+#[test]
+fn header_times_match_node_arithmetic_and_reject_windows_wrapping_range() {
+    use super::modified_milliseconds;
+    use std::time::{Duration, UNIX_EPOCH};
+    assert_eq!(modified_milliseconds(UNIX_EPOCH), Some(0.0));
+    assert_eq!(modified_milliseconds(UNIX_EPOCH - Duration::from_secs(1)), None);
+    for (nanos, expected) in [
+        (0, 1_700_000_000_000.0),
+        (100, 1_700_000_000_000.0),
+        (123_456_700, 1_700_000_000_123.456_8),
+        (999_999_900, 1_700_000_001_000.0),
+    ] {
+        let timestamp = UNIX_EPOCH + Duration::new(1_700_000_000, nanos);
+        assert_eq!(modified_milliseconds(timestamp), Some(expected));
+    }
+    let beyond = u64::from(u32::MAX) + 1;
+    let timestamp = UNIX_EPOCH + Duration::from_secs(beyond);
+    let expected = if cfg!(windows) { None } else { Some(beyond as f64 * 1000.0) };
+    assert_eq!(modified_milliseconds(timestamp), expected);
+}
