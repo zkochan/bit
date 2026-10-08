@@ -3,7 +3,7 @@ import path from 'path';
 
 const MAX_HASHES = 4096;
 const MIN_HASHES = 1024;
-let batchTail: Promise<unknown> = Promise.resolve();
+let batchTail: Promise<void> = Promise.resolve();
 
 export function nativeObjectHelperEnabled(count: number, minimum: number): boolean {
   const executable = process.env.BIT_RUST_OBJECT_IMPORT;
@@ -65,7 +65,10 @@ export function requestObjectBatch(
 ): Promise<Buffer | undefined> {
   // Concurrent read-only operations share one bounded helper slot.
   const operation = batchTail.then(() => runBatch(executable, directory, hashes, magic, maxBuffer, frameSize));
-  batchTail = operation.catch(() => undefined);
+  batchTail = operation.then(
+    () => undefined,
+    () => undefined
+  );
   return operation.catch(() => undefined);
 }
 

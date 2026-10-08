@@ -62,6 +62,24 @@ test('repository batch reads preserve dedup/order/Ref identity and avoid per-obj
   };
   await repo.loadManyRaw(refs);
   assert.equal(overrides, refs.length);
+  delete repo.loadRaw;
+  const defaultRead = repo.onRead;
+  repo.onRead = () => Buffer.from('transformed');
+  const transformed = await filesystemCount(() => repo.loadManyRawIgnoreMissing(refs));
+  assert.ok(transformed.count > 0, 'custom instance transforms retain canonical reads');
+  assert.ok(transformed.result.every((item) => item.buffer.equals(Buffer.from('transformed'))));
+  repo.onRead = defaultRead;
+  const large = Buffer.alloc(256 * 1024 + 1, 31);
+  await fs.writeFile(repo.objectPath(refs[0]), large);
+  assert.deepEqual((await repo.loadManyRawIgnoreMissing(refs))[0].buffer, large);
+  if (process.getuid?.() !== 0) {
+    await fs.chmod(repo.objectPath(refs[3]), 0);
+    try {
+      await assert.rejects(repo.loadManyRawIgnoreMissing(refs), { code: 'EACCES' });
+    } finally {
+      await fs.chmod(repo.objectPath(refs[3]), 0o600);
+    }
+  }
 });
 
 test('header classification matches canonical inventory and retains unknown/corrupt unreadable entries', async (t) => {
