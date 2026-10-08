@@ -10,6 +10,7 @@ async function repository(directory) {
   const repo = await Repository.create({ scopePath: directory, scopeJson: { name: 'import-test' } });
   // Preserve the installed graph's class identities while testing the current writer method.
   repo.writeValidatedSourceToFS = CurrentRepository.prototype.writeValidatedSourceToFS;
+  repo.getNativeSourceStoreOptions = CurrentRepository.prototype.getNativeSourceStoreOptions;
   return repo;
 }
 async function persist(repo, items, executable) {

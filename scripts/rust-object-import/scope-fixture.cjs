@@ -97,6 +97,7 @@ async function createFixture(cliRoot, directory, options) {
       };
     }
   }
+  Scope.scopeCache = {};
   await fs.writeFile(path.join(directory, 'manifest.json'), JSON.stringify(manifest, null, 2));
   return manifest;
 }
@@ -114,34 +115,39 @@ async function verify(cliRoot, directory, manifest) {
   const { Scope } = load('@teambit/legacy.scope');
   const { Ref } = load('@teambit/objects');
   const scope = await Scope.load(directory, false);
-  const found = {};
-  const models = {};
-  for (const [hash, expected] of Object.entries(manifest.hashes)) {
-    const obj = await scope.objects.load(new Ref(hash));
-    assert.ok(obj, `missing ${expected.type} ${hash}`);
-    assert.equal(obj.getType(), expected.type);
-    if (expected.type === 'Source') {
-      assert.equal(createHash('sha256').update(obj.contents).digest('hex'), expected.contentSha256);
-      assert.equal(obj.contents.length, expected.bytes);
-      assert.equal(obj.hash().toString(), hash);
+  try {
+    const found = {};
+    const models = {};
+    for (const [hash, expected] of Object.entries(manifest.hashes)) {
+      const obj = await scope.objects.load(new Ref(hash));
+      assert.ok(obj, `missing ${expected.type} ${hash}`);
+      assert.equal(obj.getType(), expected.type);
+      if (expected.type === 'Source') {
+        assert.equal(createHash('sha256').update(obj.contents).digest('hex'), expected.contentSha256);
+        assert.equal(obj.contents.length, expected.bytes);
+        assert.equal(obj.hash().toString(), hash);
+      }
+      found[hash] = obj.getType();
+      if (expected.type !== 'Source') models[hash] = obj.toObject();
     }
-    found[hash] = obj.getType();
-    if (expected.type !== 'Source') models[hash] = obj.toObject();
+    for (const [id, expected] of Object.entries(manifest.components)) {
+      const component = await scope.objects.load(new Ref(expected.hash));
+      assert.equal(component.head.toString(), expected.head);
+      assert.deepEqual(
+        Object.fromEntries(Object.entries(component.versions).map(([tag, ref]) => [tag, ref.toString()])),
+        expected.tags
+      );
+      assert.ok(scope.objects.scopeIndex.find(expected.hash), `component not indexed: ${id}`);
+    }
+    return {
+      count: Object.keys(found).length,
+      contentsAndModelsVerified: true,
+      modelsSha256: createHash('sha256').update(JSON.stringify(models)).digest('hex'),
+    };
+  } finally {
+    scope.objects.clearObjectsFromCache();
+    delete Scope.scopeCache[scope.path];
   }
-  for (const [id, expected] of Object.entries(manifest.components)) {
-    const component = await scope.objects.load(new Ref(expected.hash));
-    assert.equal(component.head.toString(), expected.head);
-    assert.deepEqual(
-      Object.fromEntries(Object.entries(component.versions).map(([tag, ref]) => [tag, ref.toString()])),
-      expected.tags
-    );
-    assert.ok(scope.objects.scopeIndex.find(expected.hash), `component not indexed: ${id}`);
-  }
-  return {
-    count: Object.keys(found).length,
-    contentsAndModelsVerified: true,
-    modelsSha256: createHash('sha256').update(JSON.stringify(models)).digest('hex'),
-  };
 }
 module.exports = { createFixture, destination, verify };
 if (require.main === module)

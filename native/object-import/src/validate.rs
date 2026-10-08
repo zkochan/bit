@@ -6,7 +6,7 @@ const MAX_INFLATED_BYTES: usize = 1024 * 1024 * 1024;
 const CHUNK_BYTES: usize = 64 * 1024;
 const MAX_HEADER_BYTES: usize = 256;
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Outcome {
     pub(crate) status: &'static str,

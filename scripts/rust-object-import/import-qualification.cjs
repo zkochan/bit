@@ -14,6 +14,9 @@ const cliRoot = path.resolve(process.argv[2] || '');
 const helper = path.resolve(process.argv[3] || '');
 const rounds = Number(process.env.BIT_IMPORT_QUALIFICATION_ROUNDS || 9);
 const smoke = process.env.BIT_IMPORT_QUALIFICATION_SMOKE === '1';
+const transport = process.env.BIT_IMPORT_QUALIFICATION_TRANSPORT || 'file';
+assert.ok(['file', 'http'].includes(transport));
+const selectedCases = process.env.BIT_IMPORT_QUALIFICATION_CASES?.split(',');
 async function command(directory, ids, mode, allHistory, traceFile) {
   const cpuFile = path.join(directory, 'cpu.txt');
   const args = [
@@ -30,7 +33,7 @@ async function command(directory, ids, mode, allHistory, traceFile) {
   const env = {
     ...process.env,
     BIT_RUST_OBJECT_IMPORT:
-      mode === 'native'
+      mode === 'native' || mode === 'validate'
         ? helper
         : mode === 'control'
           ? 'control'
@@ -39,6 +42,7 @@ async function command(directory, ids, mode, allHistory, traceFile) {
             : mode === 'crash'
               ? path.join(directory, 'crashing-helper')
               : 'off',
+    BIT_RUST_OBJECT_IMPORT_MODE: mode === 'validate' ? 'validate' : 'store',
     CI: '1',
   };
   delete env.BIT_IMPORT_TRACE;
@@ -131,6 +135,8 @@ async function workspace(directory, manifest) {
       .digest('hex'),
     rounds,
     smoke,
+    transport,
+    serverCpuAndMemoryIncluded: false,
     command: 'bit import <ids> --objects --skip-dependency-installation --json --safe-mode [--all-history for cold]',
     cases: {},
   };
@@ -144,62 +150,114 @@ async function workspace(directory, manifest) {
         ['multi-remote', { components: 8, files: 2, bytes: 8 * 1024 * 1024, versions: 2, remotes: 2 }],
       ];
   for (const [name, options] of cases) {
+    if (selectedCases && !selectedCases.includes(name)) continue;
     const directory = path.join(temporary, name);
     await fs.mkdir(directory);
     const manifest = await createFixture(cliRoot, path.join(directory, 'remotes'), options);
-    const data = (report.cases[name] = {
-      options,
-      sourceBytes: manifest.sourceBytes,
-      expectedObjects: Object.keys(manifest.hashes).length,
-      runs: [],
-      diagnostics: [],
-    });
-    let expectedModels;
-    function checkModels(verification) {
-      expectedModels ||= verification.modelsSha256;
-      assert.equal(
-        verification.modelsSha256,
-        expectedModels,
-        'model data must match across modes and repeated commands'
-      );
+    let server;
+    if (transport === 'http') {
+      server = cp.fork(path.join(__dirname, 'http-fixture.cjs'), [cliRoot, JSON.stringify(manifest.remotes)], {
+        stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
+      });
+      const ready = await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          server.kill();
+          reject(new Error('HTTP fixture startup timed out'));
+        }, 10000);
+        server.once('error', (error) => {
+          clearTimeout(timer);
+          reject(error);
+        });
+        server.once('exit', (code) => {
+          clearTimeout(timer);
+          reject(new Error(`HTTP fixture exited ${code}`));
+        });
+        server.once('message', (message) => {
+          clearTimeout(timer);
+          resolve(message);
+        });
+      });
+      manifest.remotes = ready.remotes;
     }
-    for (let round = -1; round < rounds; round++) {
-      const modes = ['legacy', 'control', 'native'];
-      for (let offset = 0; offset < modes.length; offset++) {
-        const mode = modes[(offset + Math.max(round, 0)) % modes.length];
-        const destination = path.join(directory, `${round}-${mode}`);
+    try {
+      const data = (report.cases[name] = {
+        options,
+        sourceBytes: manifest.sourceBytes,
+        expectedObjects: Object.keys(manifest.hashes).length,
+        runs: [],
+        diagnostics: [],
+      });
+      let expectedModels;
+      function checkModels(verification) {
+        expectedModels ||= verification.modelsSha256;
+        assert.equal(
+          verification.modelsSha256,
+          expectedModels,
+          'model data must match across modes and repeated commands'
+        );
+      }
+      for (let round = -1; round < rounds; round++) {
+        const modes = ['legacy', 'control', 'validate', 'native'];
+        for (let offset = 0; offset < modes.length; offset++) {
+          const mode = modes[(offset + Math.max(round, 0)) % modes.length];
+          const destination = path.join(directory, `${round}-${mode}`);
+          await workspace(destination, manifest);
+          const cold = await command(destination, manifest.ids, mode, true);
+          cold.verification = await verify(cliRoot, path.join(destination, '.bit'), manifest);
+          checkModels(cold.verification);
+          const warm = await command(destination, manifest.ids, mode, false);
+          warm.verification = await verify(cliRoot, path.join(destination, '.bit'), manifest);
+          checkModels(warm.verification);
+          await new Promise((resolve) => setImmediate(resolve));
+          global.gc?.();
+          if (round >= 0) data.runs.push({ round, cold, warm });
+          await fs.rm(destination, { recursive: true, force: true });
+        }
+      }
+      for (const mode of ['legacy', 'control', 'validate', 'native', ...(smoke ? ['missing', 'crash'] : [])]) {
+        const destination = path.join(directory, `diagnostic-${mode}`);
         await workspace(destination, manifest);
-        const cold = await command(destination, manifest.ids, mode, true);
+        const cold = await command(destination, manifest.ids, mode, true, path.join(destination, 'cold-trace.json'));
         cold.verification = await verify(cliRoot, path.join(destination, '.bit'), manifest);
         checkModels(cold.verification);
-        const warm = await command(destination, manifest.ids, mode, false);
+        const warm = await command(destination, manifest.ids, mode, false, path.join(destination, 'warm-trace.json'));
         warm.verification = await verify(cliRoot, path.join(destination, '.bit'), manifest);
         checkModels(warm.verification);
-        if (round >= 0) data.runs.push({ round, cold, warm });
+        await new Promise((resolve) => setImmediate(resolve));
+        global.gc?.();
+        if (mode === 'native' || mode === 'validate') {
+          const expectedSources = Object.values(manifest.hashes).filter((obj) => obj.type === 'Source').length;
+          assert.equal(cold.trace.native.sources, expectedSources, 'native cold Source coverage must be real');
+          if (mode === 'native') {
+            assert.equal(cold.trace.native.persisted, expectedSources, 'Sources must be committed by Rust');
+            assert.equal(cold.trace.stages.nativeAtomicPersistence?.calls || 0, 0, 'no per-Source Node atomic writes');
+            assert.equal(cold.trace.native.writeFallbacks, 0);
+          }
+          assert.equal(warm.trace.native.sources, 0, 'ordinary repeated import should not reprocess Sources');
+          assert.ok(cold.trace.stages.componentMergeAndIndex?.calls, 'actual mutable component merge required');
+        }
+        if (mode === 'missing' || mode === 'crash') assert.equal(cold.trace.native.sources, 0);
+        data.diagnostics.push({ mode, cold, warm });
         await fs.rm(destination, { recursive: true, force: true });
       }
-    }
-    for (const mode of ['legacy', 'control', 'native', ...(smoke ? ['missing', 'crash'] : [])]) {
-      const destination = path.join(directory, `diagnostic-${mode}`);
-      await workspace(destination, manifest);
-      const cold = await command(destination, manifest.ids, mode, true, path.join(destination, 'cold-trace.json'));
-      cold.verification = await verify(cliRoot, path.join(destination, '.bit'), manifest);
-      checkModels(cold.verification);
-      const warm = await command(destination, manifest.ids, mode, false, path.join(destination, 'warm-trace.json'));
-      warm.verification = await verify(cliRoot, path.join(destination, '.bit'), manifest);
-      checkModels(warm.verification);
-      if (mode === 'native') {
-        const expectedSources = Object.values(manifest.hashes).filter((obj) => obj.type === 'Source').length;
-        assert.equal(cold.trace.native.sources, expectedSources, 'native cold Source coverage must be real');
-        assert.equal(warm.trace.native.sources, 0, 'ordinary repeated import should not reprocess Sources');
-        assert.ok(cold.trace.stages.componentMergeAndIndex?.calls, 'actual mutable component merge required');
+      await fs.writeFile(path.join(temporary, 'results.json'), JSON.stringify(report, null, 2));
+      if (process.env.BIT_IMPORT_QUALIFICATION_REPORT) {
+        const saved = path.resolve(process.env.BIT_IMPORT_QUALIFICATION_REPORT);
+        const repository = path.resolve(__dirname, '../..');
+        assert.ok(
+          saved !== repository && !saved.startsWith(repository + path.sep),
+          'raw evidence must stay outside the repository'
+        );
+        await fs.mkdir(path.dirname(saved), { recursive: true });
+        await fs.writeFile(saved, JSON.stringify(report, null, 2));
       }
-      if (mode === 'missing' || mode === 'crash') assert.equal(cold.trace.native.sources, 0);
-      data.diagnostics.push({ mode, cold, warm });
-      await fs.rm(destination, { recursive: true, force: true });
+      console.log(JSON.stringify({ name, retainedRuns: data.runs.length, verifiedObjects: data.expectedObjects }));
+    } finally {
+      if (server) {
+        server.disconnect();
+        server.kill();
+      }
     }
-    await fs.writeFile(path.join(temporary, 'results.json'), JSON.stringify(report, null, 2));
-    console.log(JSON.stringify({ name, retainedRuns: data.runs.length, verifiedObjects: data.expectedObjects }));
   }
   console.log(`Evidence: ${path.join(temporary, 'results.json')}`);
 })().catch((error) => {

@@ -5,15 +5,35 @@ const { createHash } = require('node:crypto');
 const output = process.env.BIT_IMPORT_TRACE;
 process.env.BIT_IMPORT_TRACE_OWNER ??= String(process.pid);
 const owner = Number(process.env.BIT_IMPORT_TRACE_OWNER);
+const asyncHooks = require('node:async_hooks');
+const asyncTypes = new Map();
 const metrics = {
   schemaVersion: 1,
   stages: {},
+  asyncResources: {},
   objectTypes: {},
   receivedObjects: 0,
   receivedCompressedBytes: 0,
-  native: { instances: 0, submitted: 0, sources: 0, legacy: 0, batches: 0 },
+  native: { instances: 0, submitted: 0, sources: 0, legacy: 0, batches: 0, persisted: 0, writeFallbacks: 0 },
   modules: {},
 };
+if (output && process.pid === owner)
+  asyncHooks
+    .createHook({
+      init(id, type) {
+        if (!['FSREQCALLBACK', 'FSREQPROMISE', 'ZLIB', 'WRITEWRAP', 'PROMISE'].includes(type)) return;
+        asyncTypes.set(id, type);
+        (metrics.asyncResources[type] ||= { created: 0, callbacks: 0 }).created++;
+      },
+      before(id) {
+        const type = asyncTypes.get(id);
+        if (type) metrics.asyncResources[type].callbacks++;
+      },
+      destroy(id) {
+        asyncTypes.delete(id);
+      },
+    })
+    .enable();
 const seen = new WeakMap();
 function wrap(target, key, stage, inspect) {
   if (!target || typeof target[key] !== 'function') return;
@@ -58,7 +78,7 @@ function wrap(target, key, stage, inspect) {
 const originalLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   const value = originalLoad.apply(this, arguments);
-  if (!output || process.pid !== owner || !/objects|scope|source-validator/.test(request)) return value;
+  if (!output || process.pid !== owner || !/objects|scope|source-validator|object-importer/.test(request)) return value;
   if (value?.Repository) {
     wrap(value.Repository.prototype, 'writeValidatedSourceToFS', 'nativeAtomicPersistence');
     wrap(value.Repository.prototype, '_writeOne', 'legacyPersistence');
@@ -83,11 +103,19 @@ Module._load = function (request, parent, isMain) {
   if (value?.RustSourceValidator) {
     wrap(value.RustSourceValidator.prototype, 'validate', 'nativeValidation');
     wrap(value.RustSourceValidator.prototype, 'dispose', 'helperDisposal', function () {
-      metrics.native.instances++;
+      if (this.child) metrics.native.instances++;
       for (const key of ['submitted', 'sources', 'legacy', 'batches']) metrics.native[key] += this.stats[key];
     });
   }
-  if (value?.ObjectFetcher || value?.RustSourceValidator || value?.ObjectsWritable) {
+  if (value?.RustObjectImporter) {
+    wrap(value.RustObjectImporter.prototype, 'importBatch', 'nativeBatchValidationAndPersistence');
+    wrap(value.RustObjectImporter.prototype, 'dispose', 'nativeImporterDisposal', function () {
+      if (this.child) metrics.native.instances++;
+      for (const key of ['submitted', 'sources', 'legacy', 'batches', 'persisted', 'writeFallbacks'])
+        metrics.native[key] += this.stats[key];
+    });
+  }
+  if (value?.ObjectFetcher || value?.RustSourceValidator || value?.RustObjectImporter || value?.ObjectsWritable) {
     const file = Module._resolveFilename(request, parent);
     if (!metrics.modules[file])
       metrics.modules[file] = createHash('sha256').update(fs.readFileSync(file)).digest('hex');

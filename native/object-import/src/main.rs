@@ -1,22 +1,61 @@
 mod protocol;
+mod store;
 mod validate;
 
 use std::{env, io, process::ExitCode};
 
-fn run() -> Result<(), Box<dyn std::error::Error>> {
+type Options = (usize, Option<std::path::PathBuf>, Option<(u32, u32)>);
+
+fn options() -> Result<Options, Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().skip(1).collect();
-    let threads = if args.is_empty() {
-        std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get).min(4)
-    } else if args.len() == 2 && args[0] == "--threads" {
-        args[1].parse::<usize>()?
-    } else {
-        return Err("usage: bit-object-import [--threads 1..8]".into());
-    };
+    let mut threads =
+        std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get).min(4);
+    let mut directory = None;
+    let mut owner = None;
+    let mut arguments = args.iter();
+    while let Some(argument) = arguments.next() {
+        match argument.as_str() {
+            "--threads" => {
+                threads = arguments
+                    .next()
+                    .ok_or("missing thread count")?
+                    .parse::<usize>()?;
+            }
+            "--objects-dir" => {
+                directory = Some(std::path::PathBuf::from(
+                    arguments.next().ok_or("missing object directory")?,
+                ));
+            }
+            "--owner" => {
+                let value = arguments.next().ok_or("missing owner")?;
+                let (uid, gid) = value.split_once(':').ok_or("expected owner uid:gid")?;
+                owner = Some((uid.parse::<u32>()?, gid.parse::<u32>()?));
+            }
+            _ => return Err(
+                "usage: bit-object-import [--threads 1..8] [--objects-dir PATH] [--owner uid:gid]"
+                    .into(),
+            ),
+        }
+    }
+    if owner.is_some() && directory.is_none() {
+        return Err("owner requires object directory".into());
+    }
     if !(1..=8).contains(&threads) {
         return Err("thread count must be between 1 and 8".into());
     }
+    Ok((threads, directory, owner))
+}
+
+fn run() -> Result<(), Box<dyn std::error::Error>> {
+    let (threads, directory, owner) = options()?;
+    let store = directory.map(|directory| store::Store::new(directory, owner)).transpose()?;
     let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build()?;
-    protocol::serve(&mut io::stdin().lock(), &mut io::stdout().lock(), &pool)?;
+    protocol::serve_with_store(
+        &mut io::stdin().lock(),
+        &mut io::stdout().lock(),
+        &pool,
+        store.as_ref(),
+    )?;
     Ok(())
 }
 

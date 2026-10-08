@@ -51,21 +51,31 @@ const files = [
   'components/legacy/scope/objects-fetcher/objects-writable-stream.ts',
   'components/legacy/scope/objects-fetcher/write-objects-queue.ts',
   'components/legacy/scope/objects-fetcher/rust-source-validator.ts',
+  'components/legacy/scope/objects-fetcher/rust-object-importer.ts',
   'scopes/scope/objects/objects/repository.ts',
+  'scopes/scope/scope/scope.main.runtime.ts',
 ];
 for (const file of files) fs.copyFileSync(path.join(root, file), path.join(target, file));
 const output = fs.openSync(path.join(target, '.bit-object-import-compile.json'), 'w');
 try {
   cp.execFileSync(
     process.execPath,
-    ['bin/bit.js', 'compile', 'teambit.legacy/scope', 'teambit.scope/objects', '--json', '--safe-mode'],
+    [
+      'bin/bit.js',
+      'compile',
+      'teambit.legacy/scope',
+      'teambit.scope/objects',
+      'teambit.scope/scope',
+      '--json',
+      '--safe-mode',
+    ],
     { cwd: target, stdio: ['ignore', output, 'inherit'] }
   );
 } finally {
   fs.closeSync(output);
 }
 const compilation = JSON.parse(fs.readFileSync(path.join(target, '.bit-object-import-compile.json')));
-assert.equal(compilation.length, 2);
+assert.equal(compilation.length, 3);
 assert.ok(compilation.every((c) => c.errors.length === 0));
 for (const component of compilation)
   for (const file of component.buildResults) assert.ok(fs.realpathSync(file).startsWith(target + path.sep));
@@ -74,7 +84,9 @@ const modules = [
   'legacy.scope/dist/objects-fetcher/objects-writable-stream.js',
   'legacy.scope/dist/objects-fetcher/write-objects-queue.js',
   'legacy.scope/dist/objects-fetcher/rust-source-validator.js',
+  'legacy.scope/dist/objects-fetcher/rust-object-importer.js',
   'objects/dist/objects/repository.js',
+  'scope/dist/scope.main.runtime.js',
 ];
 const provenance = {
   schemaVersion: 1,

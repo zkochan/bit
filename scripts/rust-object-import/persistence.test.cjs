@@ -167,3 +167,105 @@ test('buffered native fallback preserves legacy error and earlier immutable writ
   );
   for (const obj of objects) assert.equal((await nativeRepo.load(obj.ref)).hash().toString(), obj.ref.toString());
 });
+
+test('native store eligibility respects instance transforms and live extension slots', async (t) => {
+  const { source } = require('./load-source.cjs');
+  const { default: CurrentRepository } = source('scopes/scope/objects/objects/repository.ts');
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-store-hooks-'));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const previous = Object.fromEntries(
+    ['onPreObjectPersist', 'onPostObjectRead', 'hasPreObjectPersistTransformer', 'hasPostObjectReadTransformer'].map(
+      (key) => [key, CurrentRepository[key]]
+    )
+  );
+  t.after(() => Object.assign(CurrentRepository, previous));
+  CurrentRepository.onPreObjectPersist = undefined;
+  CurrentRepository.onPostObjectRead = undefined;
+  CurrentRepository.hasPreObjectPersistTransformer = undefined;
+  CurrentRepository.hasPostObjectReadTransformer = undefined;
+  const repo = new CurrentRepository(directory, { name: 'hook-test' });
+  repo.getChownOptions = async () => null;
+  if (process.platform !== 'linux' && process.platform !== 'darwin') {
+    assert.equal(await repo.getNativeSourceStoreOptions(), undefined);
+    return;
+  }
+  assert.equal((await repo.getNativeSourceStoreOptions()).objectsDirectory, path.resolve(repo.getPath()));
+  const persistHook = repo.onPersist;
+  repo.onPersist = (buffer) => buffer;
+  assert.equal(await repo.getNativeSourceStoreOptions(), undefined);
+  repo.onPersist = persistHook;
+  const readHook = repo.onRead;
+  repo.onRead = (buffer) => buffer;
+  assert.equal(await repo.getNativeSourceStoreOptions(), undefined);
+  repo.onRead = readHook;
+  CurrentRepository.onPreObjectPersist = (buffer) => buffer;
+  assert.equal(await repo.getNativeSourceStoreOptions(), undefined);
+  let active = false;
+  CurrentRepository.hasPreObjectPersistTransformer = () => active;
+  assert.ok(await repo.getNativeSourceStoreOptions());
+  active = true;
+  assert.equal(await repo.getNativeSourceStoreOptions(), undefined);
+  active = false;
+  CurrentRepository.onPostObjectRead = (buffer) => buffer;
+  assert.equal(await repo.getNativeSourceStoreOptions(), undefined);
+  CurrentRepository.hasPostObjectReadTransformer = () => active;
+  assert.ok(await repo.getNativeSourceStoreOptions());
+  active = true;
+  assert.equal(await repo.getNativeSourceStoreOptions(), undefined);
+});
+
+test('Rust batch writes preserve prefix persistence before a canonical corrupt-object error', async (t) => {
+  const { source } = require('./load-source.cjs');
+  const { RustObjectImporter } = source('components/legacy/scope/objects-fetcher/rust-object-importer.ts');
+  const { ObjectsWritable } = source('components/legacy/scope/objects-fetcher/objects-writable-stream.ts');
+  const { WriteObjectsQueue } = source('components/legacy/scope/objects-fetcher/write-objects-queue.ts');
+  const { Readable } = require('node:stream');
+  const { pipeline } = require('node:stream/promises');
+  const repo = await temporary(t);
+  const items = await Promise.all(Array.from({ length: 8 }, (_, i) => item(Buffer.from(`prefix-${i}`))));
+  const queue = new WriteObjectsQueue();
+  const importer = new RustObjectImporter(executable, { objectsDirectory: path.resolve(repo.getPath()) });
+  t.after(() => importer.dispose());
+  await assert.rejects(
+    pipeline(
+      Readable.from([...items, { ref: new Ref('0'.repeat(40)), buffer: Buffer.from('corrupt') }]),
+      new ObjectsWritable(repo, 'prefix', queue, {}, undefined, importer)
+    )
+  );
+  assert.deepEqual(
+    queue.addedHashes,
+    items.map(({ ref }) => ref.toString())
+  );
+  for (const obj of items) assert.equal((await repo.load(obj.ref)).hash().toString(), obj.ref.toString());
+  assert.equal(importer.stats.persisted, 8);
+});
+
+test('Rust commits keep the first duplicate buffer, preserve mode, and invalidate stale caches', async (t) => {
+  const { source } = require('./load-source.cjs');
+  const { RustObjectImporter } = source('components/legacy/scope/objects-fetcher/rust-object-importer.ts');
+  const { ObjectsWritable } = source('components/legacy/scope/objects-fetcher/objects-writable-stream.ts');
+  const { WriteObjectsQueue } = source('components/legacy/scope/objects-fetcher/write-objects-queue.ts');
+  const { Readable } = require('node:stream');
+  const { pipeline } = require('node:stream/promises');
+  const zlib = require('node:zlib');
+  const repo = await temporary(t);
+  const obj = await item(Buffer.alloc(1024, 97));
+  await persist(repo, [obj]);
+  const stale = await repo.load(obj.ref);
+  stale.contents = Buffer.from('stale');
+  if (process.platform !== 'win32') await fs.chmod(repo.objectPath(obj.ref), 0o640);
+  const duplicate = { ...obj, buffer: zlib.deflateSync(zlib.inflateSync(obj.buffer), { level: 0 }) };
+  const queue = new WriteObjectsQueue();
+  const importer = new RustObjectImporter(executable, { objectsDirectory: path.resolve(repo.getPath()) });
+  t.after(() => importer.dispose());
+  await pipeline(
+    Readable.from([obj, duplicate]),
+    new ObjectsWritable(repo, 'duplicate', queue, {}, undefined, importer)
+  );
+  assert.equal(importer.stats.persisted, 1);
+  assert.equal(queue.added, 1);
+  assert.deepEqual(queue.addedHashes, [obj.ref.toString()]);
+  assert.deepEqual(await fs.readFile(repo.objectPath(obj.ref)), obj.buffer);
+  assert.deepEqual((await repo.load(obj.ref)).contents, Buffer.alloc(1024, 97));
+  if (process.platform !== 'win32') assert.equal((await fs.stat(repo.objectPath(obj.ref))).mode & 0o777, 0o640);
+});
