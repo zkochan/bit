@@ -175,3 +175,33 @@ test('malformed binary boundaries/identities and header records never expose an 
     assert.equal(await nativeObjectHeaders(dir, hashes.slice(0, 256)), undefined);
   }
 });
+
+test('header operations span bounded frames and reject a corrupt later frame atomically', async (t) => {
+  const dir = await setup(t);
+  if (process.platform === 'win32') return;
+  const input = Array.from({ length: 16385 }, (_, i) => i.toString(16).padStart(40, '0'));
+  await fs.writeFile(file(dir, 1), object('fixture'));
+  const results = await nativeObjectHeaders(dir, input);
+  assert.equal(results.length, input.length);
+  assert.equal(results[1].type, 'Source');
+  assert.equal(results.filter(Boolean).length, 1);
+  const helper = path.join(dir, 'header-frames.cjs');
+  const first = { version: 1, id: 1, objects: Array(4096).fill(null) };
+  for (const second of [
+    { ...first, id: 1 },
+    { ...first, id: 2, objects: [] },
+    { ...first, id: 2, objects: [false, ...Array(4095).fill(null)] },
+  ]) {
+    await fs.writeFile(
+      helper,
+      '#!' +
+        process.execPath +
+        '\nprocess.stdin.resume();process.stdin.on("end",()=>process.stdout.write(' +
+        JSON.stringify(JSON.stringify(first) + '\n' + JSON.stringify(second) + '\n') +
+        '));\n'
+    );
+    await fs.chmod(helper, 0o755);
+    process.env.BIT_RUST_OBJECT_IMPORT = helper;
+    assert.equal(await nativeObjectHeaders(dir, input.slice(0, 8192)), undefined);
+  }
+});

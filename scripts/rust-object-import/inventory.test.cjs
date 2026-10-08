@@ -102,3 +102,33 @@ test('malformed identities, short/nonboolean responses and crashed helpers disca
   const results = await Promise.all(Array.from({ length: 4 }, () => nativeObjectExists(dir, hashes.slice(0, 1024))));
   for (const result of results) assert.deepEqual(result, Array(1024).fill(false));
 });
+
+test('multi-frame existence operations reject missing, reordered or extra frames without partial results', async (t) => {
+  const dir = await setup(t);
+  if (process.platform === 'win32') return;
+  const input = hashes.slice(0, 8192);
+  const first = { version: 1, id: 1, exists: Array(4096).fill(false) };
+  const second = { ...first, id: 2 };
+  const helper = path.join(dir, 'frames.cjs');
+  for (const frames of [[first], [second, first], [first, { ...second, exists: [] }], [first, second, second]]) {
+    const output = frames.map((frame) => JSON.stringify(frame)).join('\n') + '\n';
+    await fs.writeFile(
+      helper,
+      '#!' +
+        process.execPath +
+        '\nprocess.stdin.resume();process.stdin.on("end",()=>process.stdout.write(' +
+        JSON.stringify(output) +
+        '));\n'
+    );
+    await fs.chmod(helper, 0o755);
+    process.env.BIT_RUST_OBJECT_IMPORT = helper;
+    assert.equal(await nativeObjectExists(dir, input), undefined);
+  }
+  process.env.BIT_RUST_OBJECT_IMPORT = native;
+  process.env.BIT_RUST_OBJECT_READ_OPERATIONS = 'off';
+  try {
+    assert.deepEqual(await nativeObjectExists(dir, input), Array(input.length).fill(false));
+  } finally {
+    delete process.env.BIT_RUST_OBJECT_READ_OPERATIONS;
+  }
+});

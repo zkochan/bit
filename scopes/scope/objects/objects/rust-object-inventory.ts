@@ -2,8 +2,13 @@ import { execFile } from 'child_process';
 import path from 'path';
 
 const MAX_HASHES = 4096;
+
 const MIN_HASHES = 1024;
 let batchTail: Promise<void> = Promise.resolve();
+
+export function nativeReadOperationSize(): number {
+  return process.env.BIT_RUST_OBJECT_READ_OPERATIONS === 'off' ? MAX_HASHES : 16384;
+}
 
 export function nativeObjectHelperEnabled(count: number, minimum: number): boolean {
   const executable = process.env.BIT_RUST_OBJECT_IMPORT;
@@ -27,8 +32,9 @@ export async function nativeObjectExists(directory: string, hashes: string[]): P
     return undefined;
   }
   const result: boolean[] = [];
-  for (let offset = 0; offset < hashes.length; offset += MAX_HASHES) {
-    const batch = hashes.slice(offset, offset + MAX_HASHES);
+  const groupSize = nativeReadOperationSize();
+  for (let offset = 0; offset < hashes.length; offset += groupSize) {
+    const batch = hashes.slice(offset, offset + groupSize);
     const values = await checkBatch(executable, directory, batch);
     if (!values) return undefined;
     result.push(...values);
@@ -37,19 +43,26 @@ export async function nativeObjectExists(directory: string, hashes: string[]): P
 }
 
 async function checkBatch(executable: string, directory: string, hashes: string[]): Promise<boolean[] | undefined> {
-  const buffer = await requestObjectBatch(executable, directory, hashes, 'BEX1', 65536);
+  const buffer = await requestObjectBatch(executable, directory, hashes, 'BEX1', hashes.length * 6 + 1024, MAX_HASHES);
   if (!buffer) return undefined;
   try {
-    const response = JSON.parse(buffer.toString('utf8'));
-    if (
-      response.version !== 1 ||
-      response.id !== 1 ||
-      !Array.isArray(response.exists) ||
-      response.exists.length !== hashes.length ||
-      !response.exists.every((value: unknown) => typeof value === 'boolean')
-    )
-      return undefined;
-    return response.exists;
+    const lines = buffer.toString('utf8').split('\n');
+    if (lines.at(-1) === '') lines.pop();
+    if (lines.length !== Math.ceil(hashes.length / MAX_HASHES)) return undefined;
+    const values: boolean[] = [];
+    for (let index = 0; index < lines.length; index++) {
+      const response = JSON.parse(lines[index]);
+      if (
+        response.version !== 1 ||
+        response.id !== index + 1 ||
+        !Array.isArray(response.exists) ||
+        response.exists.length !== Math.min(MAX_HASHES, hashes.length - index * MAX_HASHES) ||
+        !response.exists.every((value: unknown) => typeof value === 'boolean')
+      )
+        return undefined;
+      values.push(...response.exists);
+    }
+    return values;
   } catch {
     return undefined;
   }
