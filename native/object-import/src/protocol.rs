@@ -71,6 +71,10 @@ pub(crate) fn serve_with_store(
             return Ok(());
         }
         reader.read_exact(&mut magic[1..])?;
+        if magic == *b"BMP1" {
+            crate::mutable_store::serve(reader, writer, pool, store)?;
+            continue;
+        }
         if serve_read_only(magic, reader, writer, pool, store)? {
             continue;
         }

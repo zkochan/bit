@@ -1,5 +1,6 @@
 import { Writable } from 'stream';
 import { logger } from '@teambit/legacy.logger';
+import { deflate } from '@teambit/legacy.utils';
 import type { ObjectItem, Repository } from '@teambit/objects';
 import { BitObject, Lane, LaneHistory, ModelComponent, Version, VersionHistory } from '@teambit/objects';
 import type { WriteObjectsQueue } from './write-objects-queue';
@@ -9,6 +10,7 @@ import type { RustSourceValidator, SourceValidation } from './rust-source-valida
 
 const TIMEOUT_MINUTES_WARNING = 3;
 const TIMEOUT_MINUTES_EXIT = 30;
+const MAX_NATIVE_MUTABLE_BYTES = 16 * 1024;
 
 /**
  * first, write all immutable objects, such as files/sources/versions into the filesystem, as they arrive.
@@ -28,7 +30,8 @@ export class ObjectsWritable extends Writable {
     private objectsQueue: WriteObjectsQueue,
     private componentsPerRemote: ComponentsPerRemote,
     private sourceValidator?: RustSourceValidator,
-    private nativeImporter?: RustObjectImporter
+    private nativeImporter?: RustObjectImporter,
+    private mutableWriter?: RustObjectImporter
   ) {
     super({ objectMode: true });
     if (!this.componentsPerRemote[remoteName]) this.componentsPerRemote[remoteName] = [];
@@ -215,9 +218,9 @@ export class ObjectsWritable extends Writable {
     const existingVersionHistory = (await this.repo.load(versionHistory.hash())) as VersionHistory | undefined;
     if (existingVersionHistory) {
       existingVersionHistory.merge(versionHistory);
-      await this.repo.writeObjectsToTheFS([existingVersionHistory]);
+      await this.writeMutableObject(existingVersionHistory);
     } else {
-      await this.repo.writeObjectsToTheFS([versionHistory]);
+      await this.writeMutableObject(versionHistory);
     }
   }
 
@@ -225,9 +228,9 @@ export class ObjectsWritable extends Writable {
     const existingLaneHistory = (await this.repo.load(laneHistory.hash())) as LaneHistory | undefined;
     if (existingLaneHistory) {
       existingLaneHistory.merge(laneHistory);
-      await this.repo.writeObjectsToTheFS([existingLaneHistory]);
+      await this.writeMutableObject(existingLaneHistory);
     } else {
-      await this.repo.writeObjectsToTheFS([laneHistory]);
+      await this.writeMutableObject(laneHistory);
     }
   }
 
@@ -235,6 +238,44 @@ export class ObjectsWritable extends Writable {
     const existingVersion = (await this.repo.load(version.hash())) as Version | undefined;
     const isExistingNewer = existingVersion && existingVersion.lastModified() > version.lastModified();
     if (isExistingNewer) return;
-    await this.repo.writeObjectsToTheFS([version]);
+    await this.writeMutableObject(version);
+  }
+
+  private async writeMutableObject(object: Version | VersionHistory | LaneHistory) {
+    if (
+      this.mutableWriter &&
+      !this.mutableWriter.unavailableReason &&
+      this.repo.canWriteMutableObjectsNatively() &&
+      (await this.repo.getNativeSourceStoreOptions()) &&
+      object.serialize === BitObject.prototype.serialize &&
+      object.compressWithSize === BitObject.prototype.compressWithSize
+    ) {
+      const buffer = object.serialize();
+      const ref = object.hash();
+      const sizes =
+        buffer.byteLength <= MAX_NATIVE_MUTABLE_BYTES
+          ? await this.mutableWriter.persistMetadata([{ ref, buffer }])
+          : undefined;
+      if (sizes?.[0]) {
+        this.repo.recordNativeObjectWrite(object, buffer.byteLength, sizes[0]);
+        return;
+      }
+      // Reuse canonical serialization when the measured native crossover or a write failure selects Node.
+      await this.repo.writeObjectsToTheFS(
+        [object],
+        new Map([
+          [
+            object,
+            {
+              ref,
+              buffer: await deflate(buffer),
+              inflatedSize: buffer.byteLength,
+            },
+          ],
+        ])
+      );
+      return;
+    }
+    await this.repo.writeObjectsToTheFS([object]);
   }
 }

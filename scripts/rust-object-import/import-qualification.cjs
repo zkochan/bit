@@ -17,6 +17,17 @@ const smoke = process.env.BIT_IMPORT_QUALIFICATION_SMOKE === '1';
 const transport = process.env.BIT_IMPORT_QUALIFICATION_TRANSPORT || 'file';
 assert.ok(['file', 'http'].includes(transport));
 const selectedCases = process.env.BIT_IMPORT_QUALIFICATION_CASES?.split(',');
+const modes = process.env.BIT_IMPORT_QUALIFICATION_MODES?.split(',') || [
+  'legacy',
+  'control',
+  'validate',
+  'store',
+  'native',
+];
+assert.ok(
+  modes.length &&
+    modes.every((mode) => ['legacy', 'control', 'validate', 'store', 'native', 'mutable-control'].includes(mode))
+);
 async function command(directory, ids, mode, allHistory, traceFile) {
   const cpuFile = path.join(directory, 'cpu.txt');
   const args = [
@@ -33,7 +44,7 @@ async function command(directory, ids, mode, allHistory, traceFile) {
   const env = {
     ...process.env,
     BIT_RUST_OBJECT_IMPORT:
-      mode === 'native' || mode === 'validate' || mode === 'store'
+      mode === 'native' || mode === 'validate' || mode === 'store' || mode === 'mutable-control'
         ? helper
         : mode === 'control'
           ? 'control'
@@ -44,6 +55,7 @@ async function command(directory, ids, mode, allHistory, traceFile) {
               : 'off',
     BIT_RUST_OBJECT_IMPORT_METADATA: mode === 'store' ? 'off' : 'on',
     BIT_RUST_OBJECT_IMPORT_MODE: mode === 'validate' ? 'validate' : 'store',
+    BIT_RUST_OBJECT_IMPORT_MUTABLE: mode === 'store' || mode === 'mutable-control' ? 'off' : 'on',
     CI: '1',
   };
   delete env.BIT_IMPORT_TRACE;
@@ -206,7 +218,6 @@ async function workspace(directory, manifest) {
         );
       }
       for (let round = -1; round < rounds; round++) {
-        const modes = ['legacy', 'control', 'validate', 'store', 'native'];
         for (let offset = 0; offset < modes.length; offset++) {
           const mode = modes[(offset + Math.max(round, 0)) % modes.length];
           const destination = path.join(directory, `${round}-${mode}`);
@@ -223,7 +234,7 @@ async function workspace(directory, manifest) {
           await fs.rm(destination, { recursive: true, force: true });
         }
       }
-      for (const mode of ['legacy', 'control', 'validate', 'store', 'native', ...(smoke ? ['missing', 'crash'] : [])]) {
+      for (const mode of [...modes, ...(smoke ? ['missing', 'crash'] : [])]) {
         const destination = path.join(directory, `diagnostic-${mode}`);
         await workspace(destination, manifest);
         const cold = await command(destination, manifest.ids, mode, true, path.join(destination, 'cold-trace.json'));
@@ -234,14 +245,26 @@ async function workspace(directory, manifest) {
         checkModels(warm.verification);
         await new Promise((resolve) => setImmediate(resolve));
         global.gc?.();
-        if (mode === 'native' || mode === 'validate' || mode === 'store') {
+        if (mode === 'native' || mode === 'validate' || mode === 'store' || mode === 'mutable-control') {
           const expectedSources = Object.values(manifest.hashes).filter((obj) => obj.type === 'Source').length;
           assert.equal(cold.trace.native.sources, expectedSources, 'native cold Source coverage must be real');
-          if (mode === 'native' || mode === 'store') {
+          if (mode !== 'validate') {
             assert.equal(cold.trace.native.persisted, expectedSources, 'Sources must be committed by Rust');
             assert.equal(cold.trace.stages.nativeAtomicPersistence?.calls || 0, 0, 'no per-Source Node atomic writes');
             assert.equal(cold.trace.native.writeFallbacks, 0);
             if (mode === 'native') assert.ok(cold.trace.native.metadata, 'metadata must be inflated natively');
+            if (mode === 'native') {
+              const mutableObjects = Object.values(manifest.hashes).filter((obj) =>
+                ['Version', 'VersionHistory', 'LaneHistory'].includes(obj.type)
+              ).length;
+              assert.equal(
+                cold.trace.native.mutablePersisted,
+                mutableObjects,
+                'mutable native writes must actually execute'
+              );
+              assert.equal(cold.trace.native.mutableFallbacks, 0);
+            }
+            if (mode === 'mutable-control') assert.equal(cold.trace.native.mutablePersisted, 0);
           }
           assert.equal(warm.trace.native.sources, 0, 'ordinary repeated import should not reprocess Sources');
           assert.ok(cold.trace.stages.componentMergeAndIndex?.calls, 'actual mutable component merge required');

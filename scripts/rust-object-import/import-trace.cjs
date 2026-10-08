@@ -23,6 +23,9 @@ const metrics = {
     metadata: 0,
     persisted: 0,
     writeFallbacks: 0,
+    mutableSubmitted: 0,
+    mutablePersisted: 0,
+    mutableFallbacks: 0,
   },
   modules: {},
 };
@@ -120,9 +123,21 @@ Module._load = function (request, parent, isMain) {
   }
   if (value?.RustObjectImporter) {
     wrap(value.RustObjectImporter.prototype, 'importBatch', 'nativeBatchValidationAndPersistence');
+    wrap(value.RustObjectImporter.prototype, 'persistMetadata', 'nativeMutableCompressionAndPersistence');
     wrap(value.RustObjectImporter.prototype, 'dispose', 'nativeImporterDisposal', function () {
       if (this.child) metrics.native.instances++;
-      for (const key of ['submitted', 'sources', 'legacy', 'batches', 'metadata', 'persisted', 'writeFallbacks'])
+      for (const key of [
+        'submitted',
+        'sources',
+        'legacy',
+        'batches',
+        'metadata',
+        'persisted',
+        'writeFallbacks',
+        'mutableSubmitted',
+        'mutablePersisted',
+        'mutableFallbacks',
+      ])
         metrics.native[key] += this.stats[key];
     });
   }

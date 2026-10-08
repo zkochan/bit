@@ -57,15 +57,24 @@ export class ObjectFetcher {
         ? await this.repo.getNativeSourceStoreOptions()
         : undefined;
     const importer = options ? new RustObjectImporter(process.env.BIT_RUST_OBJECT_IMPORT!, options) : undefined;
+    const mutableWriter =
+      options && process.env.BIT_RUST_OBJECT_IMPORT_MUTABLE !== 'off'
+        ? new RustObjectImporter(process.env.BIT_RUST_OBJECT_IMPORT!, options)
+        : undefined;
     try {
-      return await this.fetchAndWrite(importer ? undefined : validator, importer);
+      return await this.fetchAndWrite(importer ? undefined : validator, importer, mutableWriter);
     } finally {
       validator?.dispose();
       importer?.dispose();
+      await mutableWriter?.disposeAndWait();
     }
   }
 
-  private async fetchAndWrite(validator?: RustSourceValidator, importer?: RustObjectImporter): Promise<string[]> {
+  private async fetchAndWrite(
+    validator?: RustSourceValidator,
+    importer?: RustObjectImporter,
+    mutableWriter?: RustObjectImporter
+  ): Promise<string[]> {
     this.fetchOptions = {
       type: 'component',
       withoutDependencies: true, // backward compatibility. not needed for remotes > 0.0.900
@@ -98,7 +107,8 @@ export class ObjectFetcher {
           objectsQueue,
           componentsPerRemote,
           validator,
-          importer
+          importer,
+          mutableWriter
         );
       },
       { concurrency: concurrentFetchLimit() }
@@ -249,9 +259,18 @@ the remote scope "${scopeName}" was not found`);
     objectsQueue: WriteObjectsQueue,
     componentsPerRemote: ComponentsPerRemote,
     validator?: RustSourceValidator,
-    importer?: RustObjectImporter
+    importer?: RustObjectImporter,
+    mutableWriter?: RustObjectImporter
   ) {
-    const writable = new ObjectsWritable(this.repo, scopeName, objectsQueue, componentsPerRemote, validator, importer);
+    const writable = new ObjectsWritable(
+      this.repo,
+      scopeName,
+      objectsQueue,
+      componentsPerRemote,
+      validator,
+      importer,
+      mutableWriter
+    );
     // add an error listener for the ObjectList to differentiate between errors coming from the
     // remote and errors happening inside the Writable.
     let readableError: Error | undefined;
