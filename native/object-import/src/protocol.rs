@@ -71,11 +71,7 @@ pub(crate) fn serve_with_store(
             return Ok(());
         }
         reader.read_exact(&mut magic[1..])?;
-        if magic == *b"BMP1" {
-            crate::mutable_store::serve(reader, writer, pool, store)?;
-            continue;
-        }
-        if serve_read_only(magic, reader, writer, pool, store)? {
+        if serve_extension(magic, reader, writer, pool, store)? {
             continue;
         }
         let version = frame_version(magic, store)?;
@@ -226,6 +222,21 @@ fn serve_read_only(
         crate::inventory::serve(reader, writer, pool, store)?;
     } else {
         crate::read_store::serve(reader, writer, pool, store, magic)?;
+    }
+    Ok(true)
+}
+
+fn serve_extension(
+    magic: [u8; 4],
+    reader: &mut impl Read,
+    writer: &mut impl Write,
+    pool: &ThreadPool,
+    store: Option<&Store>,
+) -> io::Result<bool> {
+    match magic {
+        value if value == *b"BTI1" => crate::tar_batch::serve(reader, writer, pool, store)?,
+        value if value == *b"BMP1" => crate::mutable_store::serve(reader, writer, pool, store)?,
+        _ => return serve_read_only(magic, reader, writer, pool, store),
     }
     Ok(true)
 }

@@ -27,7 +27,9 @@ const candidate = process.argv[3] && path.resolve(process.argv[3]);
     const actual = JSON.parse(canonical.stdout);
     const result = (report.cases[name] = { canonical: actual });
     if (candidate) {
-      const native = cp.spawnSync(candidate, ['probe'], {
+      const command = candidate.endsWith('.cjs') ? process.execPath : candidate;
+      const args = candidate.endsWith('.cjs') ? [candidate, 'probe'] : ['probe'];
+      const native = cp.spawnSync(command, args, {
         input: buffer,
         encoding: 'utf8',
         timeout: 15000,
