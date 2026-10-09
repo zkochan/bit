@@ -233,3 +233,67 @@ fn wrong_sequence_and_missing_store_reject_without_successful_acknowledgement() 
         assert_eq!(values.len(), 1);
     }
 }
+fn compressed(bytes: &[u8]) -> Vec<u8> {
+    let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+    encoder.write_all(bytes).unwrap();
+    encoder.finish().unwrap()
+}
+#[test]
+fn metadata_flag_returns_lossless_text_and_preserves_legacy_default() {
+    let directory = Directory::new();
+    let hash = "a".repeat(40);
+    let text = format!("Version {hash} 0\0{{\"unicode\":\"日本語 🚀\",\"invalid\":");
+    let path = directory.archive(&entry(&hash, &compressed(text.as_bytes()), b'0'));
+    for (flags, status) in [(1_u32, "legacy"), (2, "metadata"), (3, "metadata")] {
+        let mut request = request(&path);
+        request[8..12].copy_from_slice(&flags.to_be_bytes());
+        commit(&mut request, 0, &[]);
+        let (result, values) = serve(request, None);
+        result.unwrap();
+        let value = &values[0]["files"][0]["validation"];
+        assert_eq!(value["status"], status);
+        if flags & 2 != 0 {
+            assert_eq!(value["metadata"], text);
+            assert_eq!(value["inflatedBytes"], text.len());
+            assert!(value["reason"].is_null());
+        } else {
+            assert!(value["metadata"].is_null());
+        }
+    }
+}
+#[test]
+fn metadata_response_budget_preserves_order_and_downgrades_excess_entries() {
+    let directory = Directory::new();
+    let hash = "a".repeat(40);
+    let mut text = format!("Version {hash} 0\0").into_bytes();
+    text.resize(crate::metadata::MAX_BYTES, b'a');
+    let bytes = entry(&hash, &compressed(&text), b'0').repeat(3);
+    let path = directory.archive(&bytes);
+    let mut request = request(&path);
+    request[8..12].copy_from_slice(&2_u32.to_be_bytes());
+    commit(&mut request, 0, &[]);
+    let (result, values) = serve(request, None);
+    result.unwrap();
+    let files = values[0]["files"].as_array().unwrap();
+    assert_eq!(files[0]["validation"]["status"], "metadata");
+    assert_eq!(files[1]["validation"]["status"], "metadata");
+    assert_eq!(files[2]["validation"]["status"], "legacy");
+    assert_eq!(files[2]["validation"]["reason"], "metadata-response-limit");
+    assert_eq!(files[2]["validation"]["inflatedBytes"], 0);
+    assert!(files[2]["validation"]["metadata"].is_null());
+}
+#[test]
+fn metadata_is_never_a_selectable_source_and_unknown_flags_reject() {
+    let directory = Directory::new();
+    let hash = "a".repeat(40);
+    let text = format!("Version {hash} 2\0{{}}");
+    let path = directory.archive(&entry(&hash, &compressed(text.as_bytes()), b'0'));
+    let store = Store::new(directory.0.join("objects"), None).unwrap();
+    for flags in [2_u32, 4] {
+        let mut request = request(&path);
+        request[8..12].copy_from_slice(&flags.to_be_bytes());
+        commit(&mut request, 0, &[0]);
+        assert!(serve(request, Some(&store)).0.is_err());
+        assert!(!directory.0.join("objects").exists());
+    }
+}

@@ -45,7 +45,11 @@ export async function importStagedTar(
       native = await readTarBatches(
         executable,
         archive,
-        { ...options, awaitSelection: true },
+        {
+          ...options,
+          metadata: options.metadata ?? process.env.BIT_RUST_OBJECT_IMPORT_METADATA !== 'off',
+          awaitSelection: true,
+        },
         async (files, signal) => {
           const decisions: { offset: number; decision: TarDecision }[] = [];
           const selected: number[] = [];
@@ -94,6 +98,10 @@ export async function importStagedTar(
                 files.slice(first, limit).map((entry) => ({
                   name: entry.name,
                   sourceHash: entry.validation?.status === 'source' ? entry.validation.hash : undefined,
+                  metadata:
+                    entry.validation?.status === 'metadata'
+                      ? { metadata: entry.validation.metadata!, inflatedBytes: entry.validation.inflatedBytes }
+                      : undefined,
                 })),
                 (index) => load(files[first + index]),
                 signal

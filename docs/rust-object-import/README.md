@@ -147,3 +147,5 @@ Production TypeScript adapter for owned tar archives, markers and canonical suff
 Opt-in production HTTP/ObjectFetcher integration and controls: [http-tar.md](./http-tar.md).
 
 Genuine HTTP objects-only command results and the mutable-heavy regression: [http-command-results.md](./http-command-results.md).
+
+Bounded Rust metadata inflation for staged HTTP imports: [tar-metadata.md](./tar-metadata.md).

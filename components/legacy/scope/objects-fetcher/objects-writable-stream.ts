@@ -8,7 +8,7 @@ import type { ComponentsPerRemote } from '../component-ops/multiple-component-me
 import type { RustObjectImporter, MetadataValidation } from './rust-object-importer';
 import type { RustSourceValidator, SourceValidation } from './rust-source-validator';
 
-export type TarImportDescriptor = { name: string; sourceHash?: string };
+export type TarImportDescriptor = { name: string; sourceHash?: string; metadata?: MetadataValidation };
 
 const TIMEOUT_MINUTES_WARNING = 3;
 const TIMEOUT_MINUTES_EXIT = 30;
@@ -161,9 +161,11 @@ export class ObjectsWritable extends Writable {
         if (native && entry.sourceHash === object.ref.toString() && /^[a-f0-9]{40}$/.test(entry.sourceHash)) {
           if (this.objectsQueue.reserveNativeSource(entry.sourceHash)) reserved.set(index, object);
         } else {
-          const buffer = await load(index);
+          // Hydrate through the canonical parser, rechecking eligibility after earlier policy.
+          const metadata = entry.metadata && (await eligible()) ? entry.metadata : undefined;
+          const buffer = metadata ? Buffer.alloc(0) : await load(index);
           signal?.throwIfAborted();
-          await this.writeObjectToFs({ ...object, buffer }, { result: undefined });
+          await this.writeObjectToFs({ ...object, buffer }, { result: undefined }, metadata);
         }
         processed += 1;
       } catch (cause) {

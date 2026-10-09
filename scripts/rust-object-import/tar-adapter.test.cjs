@@ -248,3 +248,97 @@ test('invalid transport Ref remains a remote error after a valid Source prefix',
   );
   assert.deepEqual((await state.repo.load(state.values[0].hash())).contents, state.values[0].contents);
 });
+test('disabling native metadata retains canonical mixed-object import', { skip: !hasNative }, async (t) => {
+  const previous = process.env.BIT_RUST_OBJECT_IMPORT_METADATA;
+  process.env.BIT_RUST_OBJECT_IMPORT_METADATA = 'off';
+  t.after(() => {
+    if (previous === undefined) delete process.env.BIT_RUST_OBJECT_IMPORT_METADATA;
+    else process.env.BIT_RUST_OBJECT_IMPORT_METADATA = previous;
+  });
+  const state = await setup(t);
+  const result = await importStagedTar(
+    native,
+    state.archive,
+    state.writer,
+    await state.repo.getNativeSourceStoreOptions()
+  );
+  assert.equal(result.fallback, false);
+  assert.equal(result.nativeSources, 2);
+  await verify(state);
+});
+test(
+  'an older helper rejecting the metadata flag replays the archive before any native policy',
+  { skip: !unix },
+  async (t) => {
+    const state = await setup(t);
+    const executable = path.join(state.directory, 'old-helper');
+    const flagFile = path.join(state.directory, 'request-flags');
+    await fs.writeFile(
+      executable,
+      `#!/usr/bin/env node
+const fs=require('node:fs');let input=Buffer.alloc(0);
+process.stdin.on('data',chunk=>{input=Buffer.concat([input,chunk]);if(input.length>=16){const flags=input.readUInt32BE(8);fs.writeFileSync(${JSON.stringify(flagFile)},String(flags));process.exit(flags>1?1:2);}});
+`,
+      { mode: 0o700 }
+    );
+    const result = await importStagedTar(executable, state.archive, state.writer, {
+      ...(await state.repo.getNativeSourceStoreOptions()),
+      metadata: true,
+    });
+    assert.equal(await fs.readFile(flagFile, 'utf8'), '2');
+    assert.equal(result.fallback, true);
+    assert.equal(result.nativeSources, 0);
+    await verify(state);
+  }
+);
+test(
+  'the direct adapter can explicitly retain Node metadata while persisting Sources natively',
+  { skip: !hasNative },
+  async (t) => {
+    const state = await setup(t);
+    const result = await importStagedTar(native, state.archive, state.writer, {
+      ...(await state.repo.getNativeSourceStoreOptions()),
+      metadata: false,
+    });
+    assert.equal(result.fallback, false);
+    assert.equal(result.nativeSources, 2);
+    await verify(state);
+  }
+);
+test(
+  'invalid Rust-inflated metadata retains the canonical error and persisted Source prefix',
+  { skip: !hasNative },
+  async (t) => {
+    const state = await setup(t, false);
+    const hash = 'a'.repeat(40);
+    const buffer = require('node:zlib').deflateSync(Buffer.from(`VersionHistory ${hash} 0\0{"invalid":`));
+    const { BitObject } = installed('@teambit/objects');
+    let canonical;
+    try {
+      await BitObject.parseObjectWithSize(buffer);
+    } catch (error) {
+      canonical = error;
+    }
+    assert.ok(canonical);
+    const pack = installed('tar-stream').pack();
+    pack.entry({ name: `scope/${state.values[0].hash()}` }, await state.values[0].compress());
+    pack.entry({ name: `scope/${hash}` }, buffer);
+    pack.entry({ name: `scope/${state.values[1].hash()}` }, await state.values[1].compress());
+    pack.finalize();
+    const chunks = [];
+    for await (const chunk of pack) chunks.push(chunk);
+    await fs.writeFile(state.archive, Buffer.concat(chunks));
+    await assert.rejects(
+      importStagedTar(native, state.archive, state.writer, await state.repo.getNativeSourceStoreOptions()),
+      (error) => {
+        assert.equal(error.constructor, canonical.constructor);
+        assert.equal(error.message, canonical.message);
+        assert.equal(error instanceof TarRemoteError, false);
+        return true;
+      }
+    );
+    assert.deepEqual((await state.repo.load(state.values[0].hash())).contents, state.values[0].contents);
+    assert.equal(await state.repo.load(state.values[1].hash()), null);
+    assert.equal(state.merges(), 0);
+  }
+);

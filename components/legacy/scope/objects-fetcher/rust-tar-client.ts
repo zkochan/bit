@@ -9,7 +9,13 @@ export type TarRecord = {
   size: number;
   sha1: string | null;
   text: string | null;
-  validation: { hash: string; status: 'source' | 'legacy'; reason: string | null; inflatedBytes: number } | null;
+  validation: {
+    hash: string;
+    status: 'source' | 'legacy' | 'metadata';
+    reason: string | null;
+    inflatedBytes: number;
+    metadata?: string;
+  } | null;
 };
 export type TarDecision = {
   selected?: number[];
@@ -22,6 +28,7 @@ export type TarOptions = {
   signal?: AbortSignal;
   timeoutMs?: number;
   digest?: boolean;
+  metadata?: boolean;
   awaitSelection?: boolean;
 };
 type Frame = {
@@ -147,7 +154,7 @@ export async function readTarBatches(
     const request = Buffer.alloc(16 + archivePath.length);
     request.write('BTI1');
     request.writeUInt32BE(1, 4);
-    request.writeUInt32BE(options.digest ? 1 : 0, 8);
+    request.writeUInt32BE((options.digest ? 1 : 0) | (options.metadata ? 2 : 0), 8);
     request.writeUInt32BE(archivePath.length, 12);
     archivePath.copy(request, 16);
     await write(request);
@@ -175,7 +182,12 @@ export async function readTarBatches(
       assert.equal(response.fallback, false);
       assert.equal(response.error, null);
       assert.ok(response.files.length >= 1 && response.files.length <= 16);
-      for (const file of response.files) validate(file, size, options.digest);
+      let metadataBytes = 0;
+      for (const file of response.files) {
+        validate(file, size, options.digest, options.metadata);
+        if (file.validation?.status === 'metadata') metadataBytes += file.validation.inflatedBytes;
+      }
+      assert.ok(metadataBytes <= 512 * 1024, 'oversized tar metadata batch');
       selectionTask = Promise.resolve().then(() => consume(response.files, selectionControl.signal));
       const decision = await Promise.race([selectionTask, interrupted]);
       selectionTask = undefined;
@@ -232,7 +244,7 @@ export async function readTarBatches(
     await settle?.(acknowledged, !cancelled);
   }
 }
-function validate(file: TarRecord, size: number, digest?: boolean) {
+function validate(file: TarRecord, size: number, digest?: boolean, metadata?: boolean) {
   assert.equal(typeof file.name, 'string');
   assert.ok(Buffer.byteLength(file.name) <= 65536);
   assert.ok(Number.isSafeInteger(file.offset) && file.offset >= 0);
@@ -245,7 +257,19 @@ function validate(file: TarRecord, size: number, digest?: boolean) {
     const value = file.validation;
     const hash = file.name.split('/')[1] ?? file.name;
     assert.equal(value.hash, hash);
-    if (value.status === 'source') {
+    if (value.status === 'metadata') {
+      assert.equal(metadata, true);
+      assert.equal(value.reason, null);
+      assert.equal(typeof value.metadata, 'string');
+      const bytes = Buffer.from(value.metadata!, 'utf8');
+      assert.equal(bytes.toString('utf8'), value.metadata, 'metadata must be lossless UTF-8');
+      const end = value.metadata!.indexOf('\0');
+      assert.ok(end >= 0 && end < 256, 'invalid metadata header');
+      assert.notEqual(value.metadata!.slice(0, end).split(' ')[0], 'Source');
+      assert.equal(bytes.length, value.inflatedBytes);
+      assert.ok(value.inflatedBytes >= 1 && value.inflatedBytes <= 256 * 1024);
+    } else if (value.status === 'source') {
+      assert.equal(value.metadata, undefined);
       assert.equal(value.reason, null);
       assert.ok(
         Number.isSafeInteger(value.inflatedBytes) &&
@@ -254,6 +278,7 @@ function validate(file: TarRecord, size: number, digest?: boolean) {
       );
     } else {
       assert.equal(value.status, 'legacy');
+      assert.equal(value.metadata, undefined);
       assert.equal(value.inflatedBytes, 0);
       assert.equal(typeof value.reason, 'string');
     }
