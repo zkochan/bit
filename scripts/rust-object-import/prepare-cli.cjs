@@ -95,7 +95,10 @@ try {
   fs.closeSync(output);
 }
 const compilation = JSON.parse(fs.readFileSync(path.join(target, '.bit-object-import-compile.json')));
-assert.equal(compilation.length, 3);
+assert.deepEqual(
+  compilation.map((component) => component.component.split('@')[0]).sort(),
+  ['teambit.legacy/scope', 'teambit.scope/objects', 'teambit.scope/network', 'teambit.scope/scope'].sort()
+);
 assert.ok(compilation.every((c) => c.errors.length === 0));
 for (const component of compilation)
   for (const file of component.buildResults) assert.ok(fs.realpathSync(file).startsWith(target + path.sep));

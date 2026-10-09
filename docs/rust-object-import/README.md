@@ -150,4 +150,6 @@ Genuine HTTP objects-only command results and the mutable-heavy regression: [htt
 
 Bounded Rust metadata inflation for staged HTTP imports: [tar-metadata.md](./tar-metadata.md).
 
-Progressive append-only Rust tar intake and the remaining HTTP integration: [progressive-tar.md](./progressive-tar.md).
+Progressive append-only Rust tar intake: [progressive-tar.md](./progressive-tar.md).
+
+Production progressive HTTP staging, replay and command qualification: [progressive-http.md](./progressive-http.md).

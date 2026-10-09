@@ -12,6 +12,7 @@ const metrics = {
   stages: {},
   asyncResources: {},
   objectTypes: {},
+  inflation: { incoming: 0, repository: 0 },
   receivedObjects: 0,
   receivedCompressedBytes: 0,
   native: {
@@ -101,7 +102,8 @@ Module._load = function (request, parent, isMain) {
   }
   if (value?.BitObject) {
     wrap(value.BitObject, 'parseInflatedObjectWithSize', 'nativeMetadataHydration');
-    wrap(value.BitObject, 'parseObjectWithSize', 'legacyParse', function (result) {
+    wrap(value.BitObject, 'parseObjectWithSize', 'legacyParse', function (result, args) {
+      metrics.inflation[args[1] === undefined ? 'incoming' : 'repository']++;
       const type = result.object.getType();
       metrics.objectTypes[type] = (metrics.objectTypes[type] || 0) + 1;
     });
@@ -150,17 +152,19 @@ Module._load = function (request, parent, isMain) {
       metrics.tar.nativeSources += result.nativeSources;
       metrics.tar.fallbacks += Number(result.fallback);
     });
-  if (value?.readTarBatches)
-    wrap(value, 'readTarBatches', 'nativeTarProtocol', function (result) {
-      metrics.tar.batches += result.batches;
-    });
+  for (const method of ['readTarBatches', 'readProgressiveTarBatches'])
+    if (value?.[method])
+      wrap(value, method, 'nativeTarProtocol', function (result) {
+        metrics.tar.batches += result.batches;
+      });
   if (
     value?.ObjectFetcher ||
     value?.RustSourceValidator ||
     value?.RustObjectImporter ||
     value?.ObjectsWritable ||
     value?.importTarStream ||
-    value?.readTarBatches
+    value?.readTarBatches ||
+    value?.readProgressiveTarBatches
   ) {
     const file = Module._resolveFilename(request, parent);
     if (!metrics.modules[file])

@@ -277,3 +277,344 @@ test('authenticated fixture HTTP transfer completes native Source persistence an
     await transport.close();
   }
 });
+
+test('owned progressive intake persists Sources before HTTP EOF and retains the stage through producer cleanup', async (t) => {
+  const root = await directory(t);
+  const values = Array.from({ length: 16 }, (_, index) => {
+    const contents = Buffer.from(`owned progressive ${index}`);
+    const hash = crypto.createHash('sha1').update(contents).digest('hex');
+    const body = zlib.deflateSync(Buffer.concat([Buffer.from(`Source ${hash} ${contents.length}\0`), contents]));
+    return { hash, body, entry: entry(`scope/${hash}`, body) };
+  });
+  const prefix = Buffer.concat(values.map((value) => value.entry));
+  let resultStream,
+    staged,
+    acknowledged = false;
+  const url = await server(t, (_, result) => {
+    resultStream = result;
+    result.write(prefix);
+  });
+  const { readProgressiveTarBatches } = require('./tar-batch-client.cjs');
+  const result = await withStagedArchive(
+    await response(url),
+    {
+      directory: root,
+      timeoutMs: 5000,
+      progressive: ({ archive, signal, progress }) => {
+        staged = archive;
+        return readProgressiveTarBatches(
+          native,
+          archive,
+          { signal, objectsDirectory: path.join(root, 'objects') },
+          progress,
+          async (files) => ({
+            selected: files.map((_, index) => index),
+            settle: async (persisted) => {
+              assert.equal(persisted.size, 16);
+              for (const value of values)
+                assert.deepEqual(
+                  await fs.readFile(path.join(root, 'objects', value.hash.slice(0, 2), value.hash.slice(2))),
+                  value.body
+                );
+              assert.equal(resultStream.writableEnded, false);
+              assert.ok((await fs.stat(archive)).isFile());
+              acknowledged = true;
+              resultStream.end(Buffer.alloc(1024));
+            },
+          })
+        );
+      },
+    },
+    () => assert.fail('complete-transfer path')
+  );
+  assert.equal(acknowledged, true);
+  assert.equal(result.persisted, 16);
+  await assert.rejects(fs.stat(staged), { code: 'ENOENT' });
+});
+
+test('helper failure interrupts a producer waiting for bytes without destroying the original unread tail', async (t) => {
+  const root = await directory(t);
+  const input = new PassThrough();
+  const bytes = Buffer.from('received prefix then unread suffix');
+  input.write(bytes.subarray(0, 10));
+  const result = await withStagedArchive(
+    input,
+    {
+      directory: root,
+      progressive: async ({ progress, continuation }) => {
+        const controller = new AbortController();
+        const producer = progress(controller.signal)[Symbol.asyncIterator]();
+        assert.deepEqual(await producer.next(), { value: { bytes: 10 }, done: false });
+        const waiting = producer.next();
+        controller.abort(new Error('helper failed'));
+        await assert.rejects(waiting, /helper failed/);
+        assert.equal(input.destroyed, false);
+        input.end(bytes.subarray(10));
+        const chunks = [];
+        for await (const chunk of continuation()) chunks.push(chunk);
+        return Buffer.concat(chunks);
+      },
+    },
+    () => assert.fail('complete-transfer path')
+  );
+  assert.deepEqual(result, bytes);
+  assert.deepEqual(await fs.readdir(root), []);
+});
+
+test('progressive disk-limit failure replays the published prefix, pending chunk and unread input', async (t) => {
+  const root = await directory(t);
+  const input = new PassThrough();
+  const result = await withStagedArchive(
+    input,
+    {
+      directory: root,
+      maxBytes: 4,
+      progressive: async ({ progress, continuation }) => {
+        const producer = progress(new AbortController().signal)[Symbol.asyncIterator]();
+        input.write(Buffer.from('abcd'));
+        await producer.next();
+        input.write(Buffer.from('efghi'));
+        await assert.rejects(producer.next(), /byte limit exceeded/);
+        input.end(Buffer.from('jkl'));
+        const chunks = [];
+        for await (const chunk of continuation()) chunks.push(chunk);
+        return Buffer.concat(chunks).toString();
+      },
+    },
+    () => assert.fail('complete-transfer path')
+  );
+  assert.equal(result, 'abcdefghijkl');
+  assert.deepEqual(await fs.readdir(root), []);
+});
+
+test('progressive transfer failure retains the received prefix and the original transport Error', async (t) => {
+  const root = await directory(t);
+  const input = new PassThrough();
+  const failure = new Error('original HTTP reset');
+  const chunks = [];
+  await assert.rejects(
+    withStagedArchive(
+      input,
+      {
+        directory: root,
+        progressive: async ({ progress, continuation }) => {
+          const producer = progress(new AbortController().signal)[Symbol.asyncIterator]();
+          input.write(Buffer.from('prefix'));
+          await producer.next();
+          input.destroy(failure);
+          await assert.rejects(producer.next(), (error) => error === failure);
+          for await (const chunk of continuation()) chunks.push(chunk);
+        },
+      },
+      () => assert.fail('complete-transfer path')
+    ),
+    (error) => error === failure
+  );
+  assert.equal(Buffer.concat(chunks).toString(), 'prefix');
+  assert.deepEqual(await fs.readdir(root), []);
+});
+
+test('owned progressive cancellation interrupts a producer waiting on HTTP and reaps the helper before cleanup', async (t) => {
+  const root = await directory(t);
+  const input = new PassThrough();
+  const controller = new AbortController();
+  const failure = new Error('caller stopped progressive HTTP');
+  let staged;
+  const { readProgressiveTarBatches } = require('./tar-batch-client.cjs');
+  const operation = withStagedArchive(
+    input,
+    {
+      directory: root,
+      signal: controller.signal,
+      progressive: ({ archive, signal, progress }) => {
+        staged = archive;
+        return readProgressiveTarBatches(
+          native,
+          archive,
+          { signal, awaitSelection: true },
+          (producerSignal) => {
+            controller.abort(failure);
+            return progress(producerSignal);
+          },
+          () => assert.fail('cancelled policy')
+        );
+      },
+    },
+    () => assert.fail('complete-transfer path')
+  );
+  await assert.rejects(operation, (error) => error === failure);
+  assert.equal(input.destroyed, true);
+  await assert.rejects(fs.stat(staged), { code: 'ENOENT' });
+  assert.deepEqual(await fs.readdir(root), []);
+});
+
+test('progressive operation deadline cleans a live helper and a producer stalled on unread HTTP', async (t) => {
+  const root = await directory(t);
+  const input = new PassThrough();
+  const { readProgressiveTarBatches } = require('./tar-batch-client.cjs');
+  await assert.rejects(
+    withStagedArchive(
+      input,
+      {
+        directory: root,
+        timeoutMs: 50,
+        progressive: ({ archive, signal, progress }) =>
+          readProgressiveTarBatches(native, archive, { signal, awaitSelection: true }, progress, () =>
+            assert.fail('incomplete policy')
+          ),
+      },
+      () => assert.fail('complete-transfer path')
+    ),
+    /staging timed out/
+  );
+  assert.equal(input.destroyed, true);
+  assert.deepEqual(await fs.readdir(root), []);
+});
+
+test('progressive premature close matches the canonical Node iterator error name, code and message', async (t) => {
+  const root = await directory(t);
+  const original = new PassThrough();
+  const iterator = original.iterator({ destroyOnReturn: false });
+  const waiting = iterator.next();
+  original.destroy();
+  let expected;
+  await assert.rejects(waiting, (error) => {
+    expected = error;
+    return true;
+  });
+  const input = new PassThrough();
+  await assert.rejects(
+    withStagedArchive(
+      input,
+      {
+        directory: root,
+        progressive: async ({ progress, continuation }) => {
+          const producer = progress(new AbortController().signal)[Symbol.asyncIterator]();
+          input.write(Buffer.from('prefix'));
+          await producer.next();
+          input.destroy();
+          await assert.rejects(producer.next(), (error) => error.code === expected.code);
+          for await (const _chunk of continuation()) {
+            /* drain received prefix before the close error */
+          }
+        },
+      },
+      () => assert.fail('complete-transfer path')
+    ),
+    (error) => {
+      assert.equal(error.name, expected.name);
+      assert.equal(error.code, expected.code);
+      assert.equal(error.message, expected.message);
+      return true;
+    }
+  );
+  assert.deepEqual(await fs.readdir(root), []);
+});
+
+test(
+  'an older helper rejecting BTI2 at normal exit stops its idle producer before original-stream replay',
+  { skip: process.platform === 'win32' },
+  async (t) => {
+    const root = await directory(t);
+    const helper = path.join(root, 'old-helper.cjs');
+    await fs.writeFile(
+      helper,
+      `#!/usr/bin/env node
+process.stdin.once('data',()=>{
+process.stdout.write(JSON.stringify({version:1,id:1,sequence:0,done:true,fallback:true,error:null,files:[]})+'\\n');
+process.stdin.resume(); process.stdin.on('end',()=>process.exit(0));
+});
+`,
+      { mode: 0o700 }
+    );
+    const input = new PassThrough();
+    input.write(Buffer.from('received'));
+    const { readProgressiveTarBatches } = require('./tar-batch-client.cjs');
+    const result = await withStagedArchive(
+      input,
+      {
+        directory: root,
+        timeoutMs: 5000,
+        progressive: async ({ archive, signal, progress, continuation }) => {
+          await assert.rejects(
+            readProgressiveTarBatches(helper, archive, { signal }, progress, () => assert.fail('unsupported policy')),
+            /fallback required/
+          );
+          assert.equal(input.destroyed, false);
+          input.end(Buffer.from(' unread tail'));
+          const chunks = [];
+          for await (const chunk of continuation()) chunks.push(chunk);
+          return Buffer.concat(chunks).toString();
+        },
+      },
+      () => assert.fail('complete-transfer path')
+    );
+    assert.equal(result, 'received unread tail');
+    assert.deepEqual(await fs.readdir(root), ['old-helper.cjs']);
+  }
+);
+
+test(
+  'a helper claiming success before transport EOF cannot complete an owned progressive import',
+  { skip: process.platform === 'win32' },
+  async (t) => {
+    const root = await directory(t);
+    const helper = path.join(root, 'premature-success.cjs');
+    await fs.writeFile(
+      helper,
+      `#!/usr/bin/env node
+process.stdin.once('data',()=>{
+process.stdout.write(JSON.stringify({version:1,id:1,sequence:0,done:true,fallback:false,error:null,files:[]})+'\\n');
+process.stdin.resume(); process.stdin.on('end',()=>process.exit(0));
+});
+`,
+      { mode: 0o700 }
+    );
+    const input = new PassThrough();
+    const { readProgressiveTarBatches } = require('./tar-batch-client.cjs');
+    await assert.rejects(
+      withStagedArchive(
+        input,
+        {
+          directory: root,
+          timeoutMs: 100,
+          progressive: ({ archive, signal, progress }) =>
+            readProgressiveTarBatches(helper, archive, { signal }, progress, () => assert.fail('premature policy')),
+        },
+        () => assert.fail('complete-transfer path')
+      ),
+      /staging timed out/
+    );
+    assert.equal(input.destroyed, true);
+    assert.deepEqual(await fs.readdir(root), ['premature-success.cjs']);
+  }
+);
+
+test('a transport emitting an error without destroying itself replays all buffered bytes and preserves the error', async (t) => {
+  const root = await directory(t);
+  const input = new PassThrough();
+  const failure = new Error('transport error before destruction');
+  const chunks = [];
+  await assert.rejects(
+    withStagedArchive(
+      input,
+      {
+        directory: root,
+        progressive: async ({ progress, continuation }) => {
+          const producer = progress(new AbortController().signal)[Symbol.asyncIterator]();
+          input.write(Buffer.from('prefix'));
+          await producer.next();
+          input.write(Buffer.from('buffered'));
+          input.emit('error', failure);
+          assert.equal(input.destroyed, false);
+          await assert.rejects(producer.next(), (error) => error === failure);
+          for await (const chunk of continuation()) chunks.push(chunk);
+        },
+      },
+      () => assert.fail('complete-transfer path')
+    ),
+    (error) => error === failure
+  );
+  assert.equal(Buffer.concat(chunks).toString(), 'prefixbuffered');
+  assert.deepEqual(await fs.readdir(root), []);
+});

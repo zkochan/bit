@@ -3,8 +3,9 @@ import fs from 'fs/promises';
 import syncFs from 'fs';
 import os from 'os';
 import path from 'path';
-import { transfer, replay } from './rust-tar-transfer';
+import { transfer, transferProgressively, replay } from './rust-tar-transfer';
 import type { TarStageState } from './rust-tar-transfer';
+import type { TarProgressProducer } from './rust-tar-client';
 import type { Readable } from 'stream';
 const MAX_ARCHIVE = 2 * 1024 * 1024 * 1024;
 const MAX_ACTIVE = 4;
@@ -17,6 +18,12 @@ export type TarStageOptions<T> = {
   timeoutMs?: number;
   directory?: string;
   signal?: AbortSignal;
+  progressive?: (stage: {
+    archive: string;
+    signal: AbortSignal;
+    progress: TarProgressProducer;
+    continuation: () => Readable;
+  }) => Promise<T>;
   replay?: (input: Readable, context: { cause: unknown; signal: AbortSignal }) => Promise<T>;
 };
 function aborted(signal: AbortSignal) {
@@ -80,8 +87,9 @@ export async function withStagedArchive<T>(
   const state: TarStageState = { bytes: 0, offset: 0, replayable: true };
   const inputError = (error: Error) => {
     inputFailure = error;
+    state.failure = error;
     if (phase === 'queue') admission.abort(error);
-    else if (phase === 'consume') controller.abort(error);
+    else if (phase === 'consume' && !options.progressive) controller.abort(error);
   };
   input.on('error', inputError);
   if (inputFailure) admission.abort(inputFailure);
@@ -100,6 +108,31 @@ export async function withStagedArchive<T>(
     signal.throwIfAborted();
     temporary = await fs.mkdtemp(path.join(root, 'bit-tar-stage-'));
     state.archive = path.join(temporary, 'input.tar');
+    if (options.progressive) {
+      await fs.writeFile(state.archive, Buffer.alloc(0), { flag: 'wx', mode: 0o600 });
+      consumed = true;
+      phase = 'consume';
+      const result = await options.progressive({
+        archive: state.archive,
+        signal,
+        progress: (producerSignal) => transferProgressively(input, state, maxBytes, producerSignal, true),
+        continuation: () => {
+          assert.ok(state.replayable, 'tar input cannot be replayed');
+          if (!inputFailure && input.destroyed && !input.readableEnded)
+            inputFailure = Object.assign(new Error('Premature close'), { code: 'ERR_STREAM_PREMATURE_CLOSE' });
+          phase = 'replay';
+          replayStream = replay(input, state, signal, () => inputFailure);
+          return replayStream;
+        },
+      });
+      signal.throwIfAborted();
+      if (replayStream)
+        assert.ok(
+          replayStream.readableEnded && !replayStream.errored,
+          'replay must consume the original stream to completion'
+        );
+      return result;
+    }
     await transfer(input, state, maxBytes, signal);
     if (inputFailure) throw inputFailure;
     signal.throwIfAborted();
