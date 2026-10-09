@@ -133,3 +133,5 @@ Windows header classification and timestamp parity: [windows-headers.md](./windo
 Windows directory traversal and combined inventories: [windows-traversal.md](./windows-traversal.md).
 
 Tar intake compatibility and Source-only prototype measurements: [tar-intake-results.md](./tar-intake-results.md).
+
+Experimental staged tar framing and selected Source persistence: [tar-batches.md](./tar-batches.md). This kernel is not yet connected to normal imports.

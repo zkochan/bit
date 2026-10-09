@@ -26,6 +26,11 @@ function finish(result) {
 process.on('uncaughtException', (error) => finish({ error: error.message, entries: observed }));
 (async () => {
   const started = performance.now();
+  if (mode === 'native' && executable.endsWith('.cjs')) {
+    const result = await require(executable).processArchive(archive, 'store', directory);
+    finish({ ...result, elapsedMs: performance.now() - started });
+    return;
+  }
   input = fs.createReadStream(archive);
   if (mode === 'native') {
     const child = cp.spawn(executable, ['store', directory], { stdio: ['pipe', 'pipe', 'pipe'] });

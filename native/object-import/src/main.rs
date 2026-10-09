@@ -5,6 +5,10 @@ mod mutable_store;
 mod protocol;
 mod read_store;
 mod store;
+mod tar_archive;
+mod tar_batch;
+mod tar_extensions;
+mod tar_header;
 mod validate;
 
 use std::{env, io, process::ExitCode};

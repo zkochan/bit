@@ -88,7 +88,20 @@ async function verify(directory, items) {
       .createHash('sha256')
       .update(await fs.readFile(candidate))
       .digest('hex'),
-    boundary: 'Source-only archive intake, validation and persistence; no merge/index/HTTP/full-command qualification',
+    candidateNativeSha256: process.env.BIT_TEST_OBJECT_IMPORT
+      ? crypto
+          .createHash('sha256')
+          .update(await fs.readFile(process.env.BIT_TEST_OBJECT_IMPORT))
+          .digest('hex')
+      : null,
+    candidateClientSha256: candidate.endsWith('.cjs')
+      ? crypto
+          .createHash('sha256')
+          .update(await fs.readFile(path.join(path.dirname(candidate), 'tar-batch-client.cjs')))
+          .digest('hex')
+      : null,
+    boundary:
+      'Pre-staged Source-only archive intake, validation and persistence; no merge/index/HTTP/full-command qualification',
     cases: {},
   };
   const cases = [
