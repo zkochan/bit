@@ -30,12 +30,16 @@ pub(crate) fn serve(
     let store = store.ok_or_else(|| invalid("missing mutable store"))?;
     let id = protocol::word(reader)?;
     let inputs = request(reader)?;
-    let sizes = pool.install(|| {
-        inputs
-            .par_iter()
-            .map(|input| persist(store, input).ok())
-            .collect()
-    });
+    let sizes = if inputs.len() == 1 {
+        vec![persist(store, &inputs[0]).ok()]
+    } else {
+        pool.install(|| {
+            inputs
+                .par_iter()
+                .map(|input| persist(store, input).ok())
+                .collect()
+        })
+    };
     store.finish_batch()?;
     protocol::respond(writer, &Response { version: 1, id, sizes })
 }
