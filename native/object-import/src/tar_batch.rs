@@ -46,12 +46,12 @@ pub(crate) fn serve(
     pool: &ThreadPool,
     store: Option<&Store>,
 ) -> io::Result<()> {
-    let (id, digest, path) = request(reader)?;
+    let (id, flags, path) = request(reader)?;
     let mut archive = Archive::open(&path)?;
     let mut sequence = 0;
     loop {
         let batch = archive.batch();
-        let files = records(&batch.inputs, pool, digest)?;
+        let files = records(&batch.inputs, pool, flags)?;
         if !files.is_empty() {
             send(
                 writer,
@@ -80,17 +80,17 @@ pub(crate) fn serve(
         }
     }
 }
-fn request(reader: &mut impl Read) -> io::Result<(u32, bool, PathBuf)> {
+fn request(reader: &mut impl Read) -> io::Result<(u32, u32, PathBuf)> {
     let id = protocol::word(reader)?;
     let flags = protocol::word(reader)?;
     let length = protocol::word(reader)? as usize;
-    if id == 0 || flags > 1 || !(1..=4096).contains(&length) {
+    if id == 0 || flags > 3 || !(1..=4096).contains(&length) {
         return Err(invalid("invalid tar request"));
     }
     let mut bytes = vec![0; length];
     reader.read_exact(&mut bytes)?;
     let path = String::from_utf8(bytes).map_err(|_| invalid("invalid tar path"))?;
-    Ok((id, flags == 1, path.into()))
+    Ok((id, flags, path.into()))
 }
 fn identity(name: &str) -> Option<[u8; 20]> {
     let hash = name.split('/').nth(1).unwrap_or(name);
@@ -110,7 +110,7 @@ fn identity(name: &str) -> Option<[u8; 20]> {
     }
     Some(result)
 }
-fn record(input: &Input, digest: bool) -> io::Result<Record> {
+fn record(input: &Input, flags: u32) -> io::Result<Record> {
     let marker = matches!(input.name.as_str(), ".BIT.START" | ".BIT.END" | ".BIT.ERROR");
     if marker && input.bytes.len() > MAX_EXTENSION {
         return Err(unsupported());
@@ -119,18 +119,43 @@ fn record(input: &Input, digest: bool) -> io::Result<Record> {
         name: input.name.clone(),
         offset: input.offset,
         size: input.bytes.len(),
-        sha1: digest.then(|| validate::hexadecimal(&Sha1::digest(&input.bytes))),
+        sha1: (flags & 1 != 0).then(|| validate::hexadecimal(&Sha1::digest(&input.bytes))),
         text: marker.then(|| String::from_utf8_lossy(&input.bytes).into_owned()),
-        validation: identity(&input.name).map(|hash| validate::validate(&input.bytes, hash)),
+        validation: identity(&input.name)
+            .map(|hash| {
+                if flags & 2 != 0 {
+                    validate::validate_with_metadata(&input.bytes, hash)
+                } else {
+                    validate::validate(&input.bytes, hash)
+                }
+            }),
     })
 }
-fn records(inputs: &[Input], pool: &ThreadPool, digest: bool) -> io::Result<Vec<Record>> {
-    pool.install(|| {
+fn records(inputs: &[Input], pool: &ThreadPool, flags: u32) -> io::Result<Vec<Record>> {
+    let mut files: Vec<Record> = pool.install(|| {
         inputs
             .par_iter()
-            .map(|input| record(input, digest))
-            .collect()
-    })
+            .map(|input| record(input, flags))
+            .collect::<io::Result<_>>()
+    })?;
+    let mut remaining = 512 * 1024;
+    for file in &mut files {
+        let Some(value) = &mut file.validation else {
+            continue;
+        };
+        let Some(metadata) = &value.metadata else {
+            continue;
+        };
+        if metadata.len() <= remaining {
+            remaining -= metadata.len();
+        } else {
+            value.status = "legacy";
+            value.reason = Some("metadata-response-limit");
+            value.inflated_bytes = 0;
+            value.metadata = None;
+        }
+    }
+    Ok(files)
 }
 fn selection(
     reader: &mut impl Read,

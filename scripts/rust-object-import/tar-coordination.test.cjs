@@ -152,7 +152,7 @@ test('metadata can disable native persistence after reservation', { skip: !unix 
   assert.equal(persisted, 2);
 });
 test(
-  'real tar helper persists Sources while the repository merges metadata from staged ranges',
+  'real tar helper persists Sources and returns metadata without Node range reads',
   { skip: !unix || !require('node:fs').existsSync(executable) },
   async (t) => {
     const { repo, writer, queue } = await setup(t);
@@ -171,25 +171,34 @@ test(
     const options = await repo.getNativeSourceStoreOptions();
     const loaded = [];
     try {
-      const stats = await readTarBatches(executable, archive, { ...options, awaitSelection: true }, (files, signal) => {
-        return writer.prepareTarBatch(
-          files.map((file) => ({
-            name: file.name,
-            sourceHash: file.validation?.status === 'source' ? file.validation.hash : undefined,
-          })),
-          async (index) => {
-            loaded.push(index);
-            const file = files[index];
-            const buffer = Buffer.alloc(file.size);
-            assert.equal((await handle.read(buffer, 0, buffer.length, file.offset)).bytesRead, file.size);
-            return buffer;
-          },
-          signal
-        );
-      });
+      const stats = await readTarBatches(
+        executable,
+        archive,
+        { ...options, metadata: true, awaitSelection: true },
+        (files, signal) => {
+          return writer.prepareTarBatch(
+            files.map((file) => ({
+              name: file.name,
+              sourceHash: file.validation?.status === 'source' ? file.validation.hash : undefined,
+              metadata:
+                file.validation?.status === 'metadata'
+                  ? { metadata: file.validation.metadata, inflatedBytes: file.validation.inflatedBytes }
+                  : undefined,
+            })),
+            async (index) => {
+              loaded.push(index);
+              const file = files[index];
+              const buffer = Buffer.alloc(file.size);
+              assert.equal((await handle.read(buffer, 0, buffer.length, file.offset)).bytesRead, file.size);
+              return buffer;
+            },
+            signal
+          );
+        }
+      );
       assert.deepEqual(stats, { count: 2, persisted: 1, batches: 1 });
       await queue.onIdle();
-      assert.deepEqual(loaded, [1]);
+      assert.deepEqual(loaded, []);
       assert.equal(
         (await repo.load(new Ref(value.hash))).contents.toString(),
         'native Source with repository metadata'
@@ -198,5 +207,92 @@ test(
     } finally {
       await handle.close();
     }
+  }
+);
+test(
+  'native metadata preserves canonical parsing errors and selects the accepted Source prefix',
+  { skip: !unix },
+  async (t) => {
+    const { writer } = await setup(t);
+    const value = await item('accepted before invalid metadata');
+    const hash = 'a'.repeat(40);
+    const metadata = `VersionHistory ${hash} 0\0{"invalid":`;
+    const { BitObject } = installed('@teambit/objects');
+    let canonical;
+    try {
+      BitObject.parseInflatedObjectWithSize(Buffer.from(metadata));
+    } catch (error) {
+      canonical = error;
+    }
+    assert.ok(canonical);
+    const decision = await writer.prepareTarBatch(
+      [
+        descriptor(value),
+        { name: `scope/${hash}`, metadata: { metadata, inflatedBytes: Buffer.byteLength(metadata) } },
+      ],
+      async () => {
+        throw new Error('metadata must not read the archive');
+      }
+    );
+    assert.deepEqual(decision.selected, [0]);
+    assert.equal(decision.processed, 1);
+    assert.equal(decision.error.constructor, canonical.constructor);
+    assert.equal(decision.error.message, canonical.message);
+    await decision.settle(new Set([0]));
+  }
+);
+test('metadata descriptors retain canonical reads when persistence hooks are active', async (t) => {
+  const { repo, writer, queue } = await setup(t);
+  const history = VersionHistory.create('hooked', 'scope', [{ hash: new Ref('4'.repeat(40)), parents: [] }]);
+  const metadata = history.serialize().toString('utf8');
+  const buffer = await history.compress();
+  let loads = 0,
+    hooks = 0;
+  repo.onPersist = (value) => {
+    hooks++;
+    return value;
+  };
+  const decision = await writer.prepareTarBatch(
+    [{ name: `scope/${history.hash()}`, metadata: { metadata, inflatedBytes: Buffer.byteLength(metadata) } }],
+    async () => {
+      loads++;
+      return buffer;
+    }
+  );
+  assert.equal(decision.error, undefined);
+  await decision.settle(new Set());
+  await queue.onIdle();
+  assert.equal(loads, 1);
+  assert.equal(hooks, 1);
+  assert.equal((await repo.load(history.hash())).getType(), 'VersionHistory');
+});
+test(
+  'metadata policy changing hooks downgrades later metadata to canonical range loading',
+  { skip: !unix },
+  async (t) => {
+    const { repo, writer, queue } = await setup(t);
+    const histories = ['first', 'second'].map((name) =>
+      VersionHistory.create(name, 'scope', [{ hash: new Ref('5'.repeat(40)), parents: [] }])
+    );
+    const buffers = await Promise.all(histories.map((history) => history.compress()));
+    const descriptors = histories.map((history) => {
+      const metadata = history.serialize().toString('utf8');
+      return { name: `scope/${history.hash()}`, metadata: { metadata, inflatedBytes: Buffer.byteLength(metadata) } };
+    });
+    const merge = writer.mergeVersionHistory.bind(writer);
+    writer.mergeVersionHistory = async (history) => {
+      repo.onPersist = (value) => value;
+      return merge(history);
+    };
+    const loaded = [];
+    const decision = await writer.prepareTarBatch(descriptors, async (index) => {
+      loaded.push(index);
+      return buffers[index];
+    });
+    assert.equal(decision.error, undefined);
+    await decision.settle(new Set());
+    await queue.onIdle();
+    assert.deepEqual(loaded, [1]);
+    for (const history of histories) assert.equal((await repo.load(history.hash())).getType(), 'VersionHistory');
   }
 );

@@ -28,10 +28,23 @@ const modes = process.env.BIT_IMPORT_QUALIFICATION_MODES?.split(',') || [
 assert.ok(
   modes.length &&
     modes.every((mode) =>
-      ['legacy', 'control', 'validate', 'store', 'native', 'tar', 'mutable-control', 'packaged-fallback'].includes(mode)
+      [
+        'legacy',
+        'control',
+        'validate',
+        'store',
+        'native',
+        'tar',
+        'tar-node-metadata',
+        'mutable-control',
+        'packaged-fallback',
+      ].includes(mode)
     )
 );
-assert.ok(!modes.includes('tar') || transport === 'http', 'tar qualification requires actual HTTP');
+assert.ok(
+  !modes.some((mode) => mode === 'tar' || mode === 'tar-node-metadata') || transport === 'http',
+  'tar qualification requires actual HTTP'
+);
 async function command(directory, ids, mode, allHistory, traceFile) {
   const cpuFile = path.join(directory, 'cpu.txt');
   const args = [
@@ -48,7 +61,12 @@ async function command(directory, ids, mode, allHistory, traceFile) {
   const env = {
     ...process.env,
     BIT_RUST_OBJECT_IMPORT:
-      mode === 'native' || mode === 'tar' || mode === 'validate' || mode === 'store' || mode === 'mutable-control'
+      mode === 'native' ||
+      mode === 'tar' ||
+      mode === 'tar-node-metadata' ||
+      mode === 'validate' ||
+      mode === 'store' ||
+      mode === 'mutable-control'
         ? packaged
           ? 'packaged'
           : helper
@@ -61,8 +79,8 @@ async function command(directory, ids, mode, allHistory, traceFile) {
               : mode === 'crash'
                 ? path.join(directory, 'crashing-helper')
                 : 'off',
-    BIT_RUST_OBJECT_TAR: mode === 'tar' ? 'on' : 'off',
-    BIT_RUST_OBJECT_IMPORT_METADATA: mode === 'store' ? 'off' : 'on',
+    BIT_RUST_OBJECT_TAR: mode === 'tar' || mode === 'tar-node-metadata' ? 'on' : 'off',
+    BIT_RUST_OBJECT_IMPORT_METADATA: mode === 'store' || mode === 'tar-node-metadata' ? 'off' : 'on',
     BIT_RUST_OBJECT_IMPORT_MODE: mode === 'validate' ? 'validate' : 'store',
     BIT_RUST_OBJECT_IMPORT_MUTABLE: mode === 'store' || mode === 'mutable-control' ? 'off' : 'on',
     CI: '1',
@@ -266,13 +284,20 @@ async function workspace(directory, manifest) {
         checkModels(warm.verification);
         await new Promise((resolve) => setImmediate(resolve));
         global.gc?.();
-        if (mode === 'tar') {
+        if (mode === 'tar' || mode === 'tar-node-metadata') {
           const sources = Object.values(manifest.hashes).filter((object) => object.type === 'Source').length;
           assert.equal(cold.trace.tar.nativeSources, sources, 'actual HTTP Source coverage must be native');
           assert.equal(cold.trace.tar.fallbacks, 0, 'successful fixture must not silently fall back');
           assert.ok(cold.trace.tar.operations, 'production stream operation must actually run');
           assert.ok(cold.trace.tar.batches, 'production tar protocol must actually run');
           assert.equal(cold.trace.objectTypes.Source || 0, 0, 'Source bodies must not be hydrated in Node');
+          if (mode === 'tar') {
+            assert.equal(cold.trace.stages.legacyParse?.calls || 0, 0, 'eligible metadata must not inflate in Node');
+            assert.ok(
+              cold.trace.stages.nativeMetadataHydration?.calls >= Object.keys(manifest.hashes).length - sources,
+              'eligible metadata must use canonical hydration of Rust-inflated bytes'
+            );
+          }
           assert.equal(cold.trace.stages.nativeAtomicPersistence?.calls || 0, 0, 'no per-Source Node atomic writes');
           assert.equal(warm.trace.tar.nativeSources, 0);
           assert.ok(cold.trace.stages.componentMergeAndIndex?.calls, 'genuine component merge/index required');

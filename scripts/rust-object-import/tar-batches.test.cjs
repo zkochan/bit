@@ -265,3 +265,86 @@ test('a failing settlement is never retried', async (t) => {
   );
   assert.equal(settled, 1);
 });
+test('native metadata is opt-in, lossless and bounded with canonical fallback descriptors', async (t) => {
+  const hash = 'a'.repeat(40);
+  const text = `Version ${hash} 0\0{"unicode":"日本語 🚀","invalid":`;
+  const body = zlib.deflateSync(Buffer.from(text));
+  const truncated = body.subarray(0, body.length - 1);
+  const invalidUtf8 = zlib.deflateSync(Buffer.concat([Buffer.from(`Version ${hash} 0\0`), Buffer.from([255])]));
+  const oversized = zlib.deflateSync(Buffer.from(`Version ${hash} 0\0` + 'a'.repeat(256 * 1024)));
+  const badSource = source('invalid Source identity');
+  const bodies = [body, truncated, invalidUtf8, oversized, badSource.body];
+  const { archive } = await fixture(t, Buffer.concat(bodies.map((bytes) => entry(`scope/${hash}`, bytes))));
+  for (const metadata of [false, true]) {
+    await readTarBatches(native, archive, { metadata }, async (files) => {
+      assert.equal(files[0].validation.status, metadata ? 'metadata' : 'legacy');
+      assert.equal(files[0].validation.metadata, metadata ? text : undefined);
+      if (metadata) assert.equal(files[0].validation.inflatedBytes, Buffer.byteLength(text));
+      for (const file of files.slice(1)) {
+        assert.equal(file.validation.status, 'legacy');
+        assert.equal(file.validation.metadata, undefined);
+      }
+      return { selected: [] };
+    });
+  }
+});
+test(
+  'invalid or unsolicited helper metadata is rejected before repository policy',
+  { skip: process.platform === 'win32' },
+  async (t) => {
+    const hash = 'a'.repeat(40);
+    const text = `Version ${hash} 2\0{}`;
+    const { archive, directory } = await fixture(t, entry(`scope/${hash}`, zlib.deflateSync(Buffer.from(text))));
+    const valid = { hash, status: 'metadata', reason: null, inflatedBytes: Buffer.byteLength(text), metadata: text };
+    const cases = [
+      [false, valid],
+      [true, { ...valid, inflatedBytes: text.length + 1 }],
+      [true, { ...valid, metadata: 1 }],
+      [true, { ...valid, metadata: 'a'.repeat(256 * 1024 + 1), inflatedBytes: 256 * 1024 + 1 }],
+      [true, { ...valid, status: 'source' }],
+      [true, { ...valid, metadata: 'Source ' + hash + ' 0\0', inflatedBytes: 50 }],
+      [true, { ...valid, metadata: 'no header separator', inflatedBytes: 19 }],
+      [true, { ...valid, metadata: 'Version ' + hash + ' 0\0\ud800', inflatedBytes: 54 }],
+      [true, { ...valid, status: 'legacy', inflatedBytes: 0, reason: 'unsupported' }],
+      [
+        true,
+        { ...valid, metadata: text + 'a'.repeat(256 * 1024 - Buffer.byteLength(text)), inflatedBytes: 256 * 1024 },
+        3,
+      ],
+    ];
+    for (const [index, [metadata, validation, count = 1]] of cases.entries()) {
+      const executable = path.join(directory, `invalid-helper-${index}`);
+      const response = {
+        version: 1,
+        id: 1,
+        sequence: 0,
+        done: false,
+        fallback: false,
+        error: null,
+        files: Array.from({ length: count }, () => ({
+          name: `scope/${hash}`,
+          offset: 512,
+          size: 1,
+          sha1: null,
+          text: null,
+          validation,
+        })),
+      };
+      await fs.writeFile(
+        executable,
+        '#!/usr/bin/env node\nprocess.stdin.once("data",()=>process.stdout.write(' +
+          JSON.stringify(JSON.stringify(response) + '\n') +
+          '));process.stdin.resume();',
+        { mode: 0o700 }
+      );
+      let consumed = false;
+      await assert.rejects(
+        readTarBatches(executable, archive, { metadata }, async () => {
+          consumed = true;
+          return {};
+        })
+      );
+      assert.equal(consumed, false);
+    }
+  }
+);

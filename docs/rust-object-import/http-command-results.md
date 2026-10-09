@@ -82,3 +82,5 @@ For disk qualification set TMPDIR to an existing scratch directory on that files
 ## Next work
 
 Extend the tar protocol to return bounded metadata inflated by Rust, reusing native metadata validation while retaining canonical JavaScript hydration, merge decisions and error fallback. This should remove the repeated metadata range reads and Node zlib callbacks exposed here. Then assess reducing staging callbacks and operation boundaries. Re-run this three-mode qualification before considering default enablement. Native merge/index transactions, trusted release provisioning and broader platform/ACL, real-network and checkout/install qualification remain open.
+
+The bounded native metadata follow-up and four-mode results are recorded in [tar-metadata.md](./tar-metadata.md). It removes the regression against JavaScript while retaining a mutable-heavy gap to the previous native path.
