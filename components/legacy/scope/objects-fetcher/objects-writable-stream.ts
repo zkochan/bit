@@ -146,6 +146,7 @@ export class ObjectsWritable extends Writable {
     if (entries.length > 16) throw new Error('tar batch exceeds 16 entries');
     const reserved = new Map<number, ReturnType<typeof ObjectList.extractScopeAndHash>>();
     let error: unknown;
+    let processed = 0;
     const eligible = async () =>
       this.repo.canWriteMutableObjectsNatively() && Boolean(await this.repo.getNativeSourceStoreOptions());
     const native = await eligible();
@@ -164,6 +165,7 @@ export class ObjectsWritable extends Writable {
           signal?.throwIfAborted();
           await this.writeObjectToFs({ ...object, buffer }, { result: undefined });
         }
+        processed += 1;
       } catch (cause) {
         error = cause;
         break;
@@ -180,6 +182,7 @@ export class ObjectsWritable extends Writable {
     return {
       selected,
       error,
+      processed,
       settle: async (persisted?: ReadonlySet<number>, repair = true) => {
         if (settled) throw new Error('tar batch already settled');
         settled = true;

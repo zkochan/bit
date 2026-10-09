@@ -23,6 +23,8 @@ export const OBJECT_IMPORT_RUNTIME_MODULES = [
 export const OBJECT_IMPORT_LEGACY_MODULES = [
   'rust-source-validator.js',
   'rust-object-importer.js',
+  'rust-tar-client.js',
+  'rust-tar-importer.js',
   'objects-fetcher.js',
   'objects-writable-stream.js',
   'write-objects-queue.js',
