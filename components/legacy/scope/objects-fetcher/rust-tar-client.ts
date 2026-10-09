@@ -208,6 +208,8 @@ async function readArchive(
         assert.equal(output.length, 0);
         if (response.error) throw new Error(response.error);
         if (response.fallback) throw new Error('native tar fallback required');
+        await producerTask;
+        if (failure) throw failure;
         return { count, persisted, batches: sequence };
       }
       assert.equal(response.fallback, false);
@@ -260,6 +262,7 @@ async function readArchive(
     clearTimeout(timer);
     options.signal?.removeEventListener('abort', abort);
     if (!closed) fail(new Error('tar session disposed'));
+    if (progress && !selectionControl.signal.aborted) selectionControl.abort(new Error('tar session disposed'));
     await stopped;
     await producerTask;
     if (options.awaitSelection && selectionTask) {

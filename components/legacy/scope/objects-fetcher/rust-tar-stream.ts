@@ -15,6 +15,12 @@ export async function importTarStream(
     input,
     {
       signal: options.signal,
+      timeoutMs: options.timeoutMs,
+      progressive:
+        process.env.BIT_RUST_OBJECT_TAR_PROGRESSIVE === 'off'
+          ? undefined
+          : ({ archive, signal, progress, continuation }) =>
+              importStagedTar(executable, archive, writer, { ...options, signal }, { progress, continuation }),
       replay: async (original, { signal }) => ({
         objects: await importCanonicalTar(original, writer, signal),
         nativeSources: 0,

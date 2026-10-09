@@ -2,7 +2,7 @@
 
 The staged HTTP path waits for the complete archive before Rust parses and persists it. The previous native path overlaps transfer with persistence. In the mutable-heavy tmpfs diagnostic from the [metadata qualification](./tar-metadata.md), native tar intake took about 651 ms and its protocol operation about 378 ms. Their roughly 273 ms difference identifies staging as a useful next target; these nested diagnostics are not additive command stages or a prediction of the resulting speedup.
 
-The helper now supports an append-only archive with explicitly published byte prefixes. `readProgressiveTarBatches` exposes this capability separately from the existing `readTarBatches`. **Production HTTP imports still use complete-transfer staging.** There is no new full-command performance result or default enablement in this change.
+The helper now supports an append-only archive with explicitly published byte prefixes. `readProgressiveTarBatches` exposes this capability separately from the existing `readTarBatches`. PR #58 introduced this kernel/client foundation without changing production HTTP. The follow-on [production HTTP integration](./progressive-http.md) connects owned staging to this client; tar remains opt-in.
 
 ## Protocol
 
@@ -26,4 +26,4 @@ Six new Rust tests cover progress framing, fragmented reads, explicit EOF, malfo
 
 The workspace Rust tests, pinned pnpm formatting, Clippy, warning-denied perfectionist Dylint, and rustdoc checks pass. Portable tests are included in the existing native platform matrix. Local raw logs and release archives stay outside Git in `$HOME/bit-progressive-tar-evidence-2026-10-09` and `/tmp/bit-progressive-*.log`.
 
-Next, connect the progressive producer to owned HTTP staging while preserving received-prefix replay, the processed cursor, transport errors, cancellation, and canonical policy. Requalify genuine HTTP commands against the existing modes before changing enablement. Native merge/index work, trusted release provisioning, and broader platform qualification remain separate open tasks.
+The follow-on [production HTTP integration](./progressive-http.md) connects the progressive producer to owned staging with received-prefix replay, the processed cursor, transport errors, cancellation and canonical policy, and repeats genuine HTTP command qualification. Native merge/index work, trusted release provisioning, and broader platform qualification remain separate open tasks.

@@ -8,30 +8,66 @@ export type TarStageState = {
   offset: number;
   replayable: boolean;
   pending?: Uint8Array;
+  failure?: Error;
 };
 
 function aborted(signal: AbortSignal) {
   return signal.reason instanceof Error ? signal.reason : new Error('tar staging aborted');
 }
-export async function transfer(input: Readable, state: TarStageState, maxBytes: number, signal: AbortSignal) {
-  const handle = await fs.promises.open(state.archive!, 'wx', 0o600);
-  const iterator = input.iterator({ destroyOnReturn: false });
-  const abort = () => input.destroy(aborted(signal));
-  signal.addEventListener('abort', abort, { once: true });
-  try {
+/** Wait without owning/destroying the transport, so helper failure can replay unread input. */
+async function nextChunk(input: Readable, signal: AbortSignal, state: TarStageState): Promise<Uint8Array | null> {
+  for (;;) {
     signal.throwIfAborted();
+    if (state.failure) throw state.failure;
+    const chunk = input.read();
+    if (chunk !== null) return chunk;
+    if (input.errored) throw input.errored;
+    if (input.readableEnded) return null;
+    if (input.destroyed) throw Object.assign(new Error('Premature close'), { code: 'ERR_STREAM_PREMATURE_CLOSE' });
+    await new Promise<void>((resolve, reject) => {
+      const ready = () => {
+        cleanup();
+        resolve();
+      };
+      const abort = () => {
+        cleanup();
+        reject(aborted(signal));
+      };
+      function cleanup() {
+        for (const event of ['readable', 'end', 'error', 'close']) input.removeListener(event, ready);
+        signal.removeEventListener('abort', abort);
+      }
+      for (const event of ['readable', 'end', 'error', 'close']) input.once(event, ready);
+      signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) abort();
+    });
+  }
+}
+export async function transfer(input: Readable, state: TarStageState, maxBytes: number, signal: AbortSignal) {
+  for await (const _update of transferProgressively(input, state, maxBytes, signal)) {
+    // Complete-transfer callers deliberately wait for EOF.
+  }
+}
+export async function* transferProgressively(
+  input: Readable,
+  state: TarStageState,
+  maxBytes: number,
+  signal: AbortSignal,
+  existing = false
+) {
+  const handle = await fs.promises.open(state.archive!, existing ? 'r+' : 'wx', 0o600);
+  try {
     for (;;) {
-      const item = await iterator.next();
-      if (item.done) return;
-      if (!(item.value instanceof Uint8Array)) {
+      const chunk = await nextChunk(input, signal, state);
+      if (chunk === null) return;
+      if (!(chunk instanceof Uint8Array)) {
         state.replayable = false;
         throw new TypeError('tar staging requires byte chunks');
       }
-      state.pending = item.value;
+      state.pending = chunk;
       state.offset = 0;
       if (state.bytes + state.pending.byteLength > maxBytes) {
-        const error = Object.assign(new Error('staged archive byte limit exceeded'), { code: 'BIT_TAR_STAGE_LIMIT' });
-        throw error;
+        throw Object.assign(new Error('staged archive byte limit exceeded'), { code: 'BIT_TAR_STAGE_LIMIT' });
       }
       while (state.offset < state.pending.byteLength) {
         signal.throwIfAborted();
@@ -42,14 +78,10 @@ export async function transfer(input: Readable, state: TarStageState, maxBytes: 
         state.bytes += bytesWritten;
       }
       state.pending = undefined;
+      yield { bytes: state.bytes };
     }
   } finally {
-    signal.removeEventListener('abort', abort);
-    try {
-      await iterator.return?.();
-    } finally {
-      await handle.close();
-    }
+    await handle.close();
   }
 }
 export function replay(
@@ -69,7 +101,7 @@ export function replay(
       assert.equal(count, state.bytes, 'staging prefix changed before replay');
     }
     if (state.pending) yield state.pending.subarray(state.offset);
-    if (input.destroyed) {
+    if (input.destroyed || inputFailure()) {
       let buffered;
       while ((buffered = input.read()) !== null) yield buffered;
     }

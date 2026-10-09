@@ -342,3 +342,87 @@ test(
     assert.equal(state.merges(), 0);
   }
 );
+
+for (const outcome of ['success', 'transport failure', 'helper failure']) {
+  test(
+    `progressive repository intake ${outcome} preserves committed policy before the unread suffix`,
+    { skip: !hasNative },
+    async (t) => {
+      const state = await setup(t, false);
+      const { PassThrough } = require('node:stream');
+      const { importTarStream } = installed('@teambit/legacy.scope/dist/objects-fetcher/rust-tar-stream.js');
+      const input = new PassThrough();
+      const values = Array.from({ length: 33 }, (_, index) => Source.from(Buffer.from(`streamed repository ${index}`)));
+      const pack = installed('tar-stream').pack();
+      pack.entry({ name: `scope/${state.history.hash()}` }, await state.history.compress());
+      for (const value of values) pack.entry({ name: `scope/${value.hash()}` }, await value.compress());
+      pack.finalize();
+      const chunks = [];
+      for await (const chunk of pack) chunks.push(chunk);
+      const bytes = Buffer.concat(chunks);
+      // Small metadata + fifteen small Sources occupy the first complete 16-record batch.
+      const boundary = 16 * 1024;
+      const transportFailure = new Error('original progressive HTTP reset');
+      let checked = false;
+      const prepare = state.writer.prepareTarBatch.bind(state.writer);
+      state.writer.prepareTarBatch = async (...args) => {
+        const decision = await prepare(...args);
+        const settle = decision.settle;
+        decision.settle = async (...settlement) => {
+          await settle(...settlement);
+          if (!checked) {
+            checked = true;
+            assert.equal(input.readableEnded, false);
+            assert.equal(state.merges(), 1);
+            for (const value of values.slice(0, 15))
+              assert.deepEqual(await fs.readFile(state.repo.objectPath(value.hash())), await value.compress());
+            if (outcome === 'transport failure') input.destroy(transportFailure);
+            else input.end(bytes.subarray(boundary));
+          }
+        };
+        return decision;
+      };
+      let executable = native;
+      if (outcome === 'helper failure') {
+        executable = path.join(state.directory, 'exit-after-ack.cjs');
+        await fs.writeFile(
+          executable,
+          `#!/usr/bin/env node
+const {spawn}=require('child_process');
+const child=spawn(${JSON.stringify(native)},process.argv.slice(2));
+process.stdin.pipe(child.stdin); child.stderr.resume();
+let output='';
+child.stdout.on('data',chunk=>{
+output+=chunk.toString(); let end;
+while((end=output.indexOf('\\n'))>=0){
+const line=output.slice(0,end); output=output.slice(end+1);
+process.stdout.write(line+'\\n');
+if(Array.isArray(JSON.parse(line).persisted)){child.kill();}
+}
+});
+child.on('close',()=>process.exit(7));
+child.stdin.on('error',()=>{});
+`,
+          { mode: 0o700 }
+        );
+      }
+      input.write(bytes.subarray(0, boundary));
+      const operation = importTarStream(input, executable, state.writer, {
+        ...(await state.repo.getNativeSourceStoreOptions()),
+        timeoutMs: 5000,
+      });
+      if (outcome === 'transport failure') {
+        await assert.rejects(operation, (error) => error.original === transportFailure);
+        for (const value of values.slice(15)) assert.equal(await state.repo.load(value.hash()), null);
+      } else {
+        const result = await operation;
+        assert.equal(result.objects, 34);
+        assert.equal(result.fallback, outcome === 'helper failure');
+        for (const value of values) assert.deepEqual((await state.repo.load(value.hash())).contents, value.contents);
+      }
+      assert.equal(checked, true);
+      assert.equal(state.merges(), 1);
+      assert.equal(new Set(state.queue.addedHashes).size, state.queue.addedHashes.length);
+    }
+  );
+}

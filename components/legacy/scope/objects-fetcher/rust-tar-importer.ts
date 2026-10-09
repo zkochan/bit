@@ -4,8 +4,8 @@ import fs from 'fs/promises';
 import { ObjectList } from '@teambit/objects';
 import { logger } from '@teambit/legacy.logger';
 import type { ObjectsWritable } from './objects-writable-stream';
-import { readTarBatches, TarTimeoutError } from './rust-tar-client';
-import type { TarDecision, TarOptions, TarRecord } from './rust-tar-client';
+import { readTarBatches, readProgressiveTarBatches, TarTimeoutError } from './rust-tar-client';
+import type { TarDecision, TarOptions, TarRecord, TarProgressProducer } from './rust-tar-client';
 
 /** Remote framing/marker errors retain their origin for ObjectFetcher's error attribution. */
 export class TarRemoteError extends Error {
@@ -15,12 +15,13 @@ export class TarRemoteError extends Error {
   }
 }
 
-/** Import an owned, immutable archive; callers retain it until this complete operation returns. */
+/** Import an owned archive, optionally append-only; retain it until helper, producer and policy settle. */
 export async function importStagedTar(
   executable: string,
   archive: string,
   writer: ObjectsWritable,
-  options: TarOptions
+  options: TarOptions,
+  progressive?: { progress: TarProgressProducer; continuation: () => Readable }
 ) {
   let processed = 0;
   let nativeSources = 0;
@@ -28,12 +29,12 @@ export async function importStagedTar(
   let remoteFailure: unknown;
   let start: { schema?: string } | undefined;
   let end: unknown;
-  const handle = await fs.open(archive, 'r');
+  let handle: Awaited<ReturnType<typeof fs.open>> | undefined;
   const load = async (file: TarRecord) => {
     const buffer = Buffer.alloc(file.size);
     let offset = 0;
     while (offset < buffer.length) {
-      const { bytesRead } = await handle.read(buffer, offset, buffer.length - offset, file.offset + offset);
+      const { bytesRead } = await handle!.read(buffer, offset, buffer.length - offset, file.offset + offset);
       if (!bytesRead) throw new Error('staged tar body changed before loading');
       offset += bytesRead;
     }
@@ -42,7 +43,12 @@ export async function importStagedTar(
   try {
     let native;
     try {
-      native = await readTarBatches(
+      handle = await fs.open(archive, 'r');
+      const read = progressive
+        ? (exe: string, file: string, opts: TarOptions, consume: Parameters<typeof readTarBatches>[3]) =>
+            readProgressiveTarBatches(exe, file, opts, progressive.progress, consume)
+        : readTarBatches;
+      native = await read(
         executable,
         archive,
         {
@@ -153,7 +159,12 @@ export async function importStagedTar(
       if (remoteFailure) throw new TarRemoteError(remoteFailure);
       // The helper is reaped and all reserved Sources repaired before this continuation.
       // Decode from the original archive and skip completed objects, never completed policy.
-      const seen = await importCanonicalTar(createReadStream(archive), writer, options.signal, processed);
+      const seen = await importCanonicalTar(
+        progressive ? progressive.continuation() : createReadStream(archive),
+        writer,
+        options.signal,
+        processed
+      );
       return { objects: seen, nativeSources, fallback: true };
     }
     if (start?.schema === '1.0.0' && !end) {
@@ -163,7 +174,7 @@ export async function importStagedTar(
     }
     return { objects: processed, nativeSources: native.persisted, fallback: false };
   } finally {
-    await handle.close();
+    await handle?.close();
   }
 }
 

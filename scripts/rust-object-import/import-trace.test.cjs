@@ -91,7 +91,8 @@ test('production tar diagnostics preserve result/error identity and distinguish 
     module,
     `module.exports = {
     async importTarStream(value) { if (value instanceof Error) throw value; return value; },
-    async readTarBatches(value) { return value; }
+    async readTarBatches(value) { return value; },
+    async readProgressiveTarBatches(value) { return value; }
   };`
   );
   const actual = execute(
@@ -106,11 +107,38 @@ test('production tar diagnostics preserve result/error identity and distinguish 
       const error = new Error('original tar error');
       await assert.rejects(api.importTarStream(error),value=>value===error);
       await api.readTarBatches({batches:3});
+      await api.readProgressiveTarBatches({batches:2});
     })().catch(error=>{console.error(error);process.exitCode=1;});
   `
   );
-  assert.deepEqual(actual.tar, { operations: 2, objects: 7, nativeSources: 4, fallbacks: 1, batches: 3 });
+  assert.deepEqual(actual.tar, { operations: 2, objects: 7, nativeSources: 4, fallbacks: 1, batches: 5 });
   assert.equal(actual.stages.nativeTarIntake.calls, 3);
-  assert.equal(actual.stages.nativeTarProtocol.calls, 1);
+  assert.equal(actual.stages.nativeTarProtocol.calls, 2);
   assert.equal(Object.keys(actual.modules).length, 1);
+});
+
+test('tar intake inflation attribution separates later canonical repository reads', (t) => {
+  const files = fixture(t);
+  const module = path.join(files.directory, 'objects-parse-fixture.cjs');
+  fs.writeFileSync(
+    module,
+    `module.exports = { BitObject: {
+    async parseObjectWithSize(bytes, filename) {
+      return { object: { getType: () => 'Version' } };
+    }
+  } };`
+  );
+  const actual = execute(
+    files,
+    `
+    const { BitObject } = require(${JSON.stringify(module)});
+    (async () => {
+      await BitObject.parseObjectWithSize(Buffer.alloc(0));
+      await BitObject.parseObjectWithSize(Buffer.alloc(0), '/repository/objects/hash');
+    })().catch(error=>{console.error(error);process.exitCode=1;});
+  `
+  );
+  assert.deepEqual(actual.inflation, { incoming: 1, repository: 1 });
+  assert.equal(actual.stages.legacyParse.calls, 2);
+  assert.deepEqual(actual.objectTypes, { Version: 2 });
 });
