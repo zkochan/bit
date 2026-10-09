@@ -170,7 +170,7 @@ jobs:
       - name: Test object-import helper protocol and fallback
         env:
           BIT_LEGACY_ROOT: ${{ runner.temp }}/rust-scanner-test-tools
-        run: node --test scripts/rust-object-import/validator.test.cjs scripts/rust-object-import/importer.test.cjs scripts/rust-object-import/import-trace.test.cjs scripts/rust-object-import/inventory.test.cjs scripts/rust-object-import/reader.test.cjs scripts/rust-object-import/read-budget.test.cjs scripts/rust-object-import/directory.test.cjs scripts/rust-object-import/mutable.test.cjs scripts/rust-object-import/tar-batches.test.cjs scripts/rust-object-import/tar-staging.test.cjs scripts/rust-object-import/tar-prefix-replay.test.cjs
+        run: node --test scripts/rust-object-import/validator.test.cjs scripts/rust-object-import/importer.test.cjs scripts/rust-object-import/import-trace.test.cjs scripts/rust-object-import/inventory.test.cjs scripts/rust-object-import/reader.test.cjs scripts/rust-object-import/read-budget.test.cjs scripts/rust-object-import/directory.test.cjs scripts/rust-object-import/mutable.test.cjs scripts/rust-object-import/tar-batches.test.cjs scripts/rust-object-import/tar-progressive.test.cjs scripts/rust-object-import/tar-staging.test.cjs scripts/rust-object-import/tar-prefix-replay.test.cjs
 
   lint:
     name: pnpm Rust formatting and lints

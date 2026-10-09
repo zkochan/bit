@@ -50,14 +50,32 @@ export class TarTimeoutError extends Error {
     this.name = 'TarTimeoutError';
   }
 }
-export async function readTarBatches(
+export type TarProgressProducer = (signal: AbortSignal) => AsyncIterable<{ bytes: number }>;
+type Consume = (files: TarRecord[], signal: AbortSignal) => Promise<TarDecision>;
+
+export function readTarBatches(executable: string, archive: string, options: TarOptions, consume: Consume) {
+  return readArchive(executable, archive, options, consume);
+}
+/** The producer owns an append-only file; successful completion declares EOF. */
+export function readProgressiveTarBatches(
   executable: string,
   archive: string,
   options: TarOptions,
-  consume: (files: TarRecord[], signal: AbortSignal) => Promise<TarDecision>
+  progress: TarProgressProducer,
+  consume: Consume
+) {
+  return readArchive(executable, archive, options, consume, progress);
+}
+async function readArchive(
+  executable: string,
+  archive: string,
+  options: TarOptions,
+  consume: Consume,
+  progress?: TarProgressProducer
 ) {
   options.signal?.throwIfAborted();
-  const size = (await fs.stat(archive)).size;
+  let size = (await fs.stat(archive)).size;
+  if (progress) size = 0;
   options.signal?.throwIfAborted();
   const args = options.objectsDirectory ? ['--objects-dir', options.objectsDirectory] : [];
   if (options.owner) args.push('--owner', `${options.owner.uid}:${options.owner.gid}`);
@@ -75,7 +93,8 @@ export async function readTarBatches(
     settlement: TarDecision['settle'],
     acknowledged: ReadonlySet<number> | undefined,
     cancelled = false,
-    selectionTask: Promise<TarDecision> | undefined;
+    selectionTask: Promise<TarDecision> | undefined,
+    producerTask: Promise<void> | undefined;
   const selectionControl = new AbortController();
   let rejectInterrupted!: (error: Error) => void;
   const interrupted = new Promise<never>((_, reject) => {
@@ -152,12 +171,24 @@ export async function readTarBatches(
   try {
     const archivePath = Buffer.from(path.resolve(archive));
     const request = Buffer.alloc(16 + archivePath.length);
-    request.write('BTI1');
+    request.write(progress ? 'BTI2' : 'BTI1');
     request.writeUInt32BE(1, 4);
     request.writeUInt32BE((options.digest ? 1 : 0) | (options.metadata ? 2 : 0), 8);
     request.writeUInt32BE(archivePath.length, 12);
     archivePath.copy(request, 16);
     await write(request);
+    if (progress) {
+      producerTask = (async () => {
+        for await (const update of progress(selectionControl.signal)) {
+          selectionControl.signal.throwIfAborted();
+          assert.ok(Number.isSafeInteger(update.bytes) && update.bytes >= size && update.bytes <= 2 * 1024 ** 3);
+          size = update.bytes;
+          await write(progressFrame(size, false));
+        }
+        selectionControl.signal.throwIfAborted();
+        await write(progressFrame(size, true));
+      })().catch((error) => fail(error instanceof Error ? error : new Error(String(error))));
+    }
     for (;;) {
       const response = await next();
       assert.equal(response.version, 1);
@@ -230,6 +261,7 @@ export async function readTarBatches(
     options.signal?.removeEventListener('abort', abort);
     if (!closed) fail(new Error('tar session disposed'));
     await stopped;
+    await producerTask;
     if (options.awaitSelection && selectionTask) {
       try {
         const decision = await selectionTask;
@@ -243,6 +275,14 @@ export async function readTarBatches(
     settlement = undefined;
     await settle?.(acknowledged, !cancelled);
   }
+}
+function progressFrame(bytes: number, done: boolean) {
+  const frame = Buffer.alloc(20);
+  frame.write('BTP1');
+  frame.writeUInt32BE(1, 4);
+  frame.writeBigUInt64BE(BigInt(bytes), 8);
+  frame.writeUInt32BE(Number(done), 16);
+  return frame;
 }
 function validate(file: TarRecord, size: number, digest?: boolean, metadata?: boolean) {
   assert.equal(typeof file.name, 'string');

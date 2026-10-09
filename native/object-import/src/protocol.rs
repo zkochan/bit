@@ -234,7 +234,8 @@ fn serve_extension(
     store: Option<&Store>,
 ) -> io::Result<bool> {
     match magic {
-        value if value == *b"BTI1" => crate::tar_batch::serve(reader, writer, pool, store)?,
+        value if value == *b"BTI1" => crate::tar_batch::serve(reader, writer, pool, store, false)?,
+        value if value == *b"BTI2" => crate::tar_batch::serve(reader, writer, pool, store, true)?,
         value if value == *b"BMP1" => crate::mutable_store::serve(reader, writer, pool, store)?,
         _ => return serve_read_only(magic, reader, writer, pool, store),
     }

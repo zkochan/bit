@@ -9,6 +9,7 @@ mod tar_archive;
 mod tar_batch;
 mod tar_extensions;
 mod tar_header;
+mod tar_progress;
 mod validate;
 
 use std::{env, io, process::ExitCode};
