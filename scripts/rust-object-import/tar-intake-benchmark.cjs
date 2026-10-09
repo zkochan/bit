@@ -124,6 +124,12 @@ async function verify(directory, items) {
           .update(await fs.readFile(path.join(path.dirname(candidate), 'tar-staging.cjs')))
           .digest('hex')
       : null,
+    transferSha256: candidate.endsWith('.cjs')
+      ? crypto
+          .createHash('sha256')
+          .update(await fs.readFile(path.join(path.dirname(candidate), 'tar-stage-transfer.cjs')))
+          .digest('hex')
+      : null,
     cases: {},
   };
   const cases = [
@@ -179,6 +185,7 @@ async function verify(directory, items) {
   for (const [file, expected] of [
     [path.join(__dirname, 'tar-intake-worker.cjs'), report.workerSha256],
     [path.join(__dirname, 'tar-loopback.cjs'), report.loopbackSha256],
+    [candidate.endsWith('.cjs') && path.join(path.dirname(candidate), 'tar-stage-transfer.cjs'), report.transferSha256],
     [helper, report.helperSha256],
     [candidate, report.candidateSha256],
     [process.env.BIT_TEST_OBJECT_IMPORT, report.candidateNativeSha256],
