@@ -3,6 +3,7 @@ use crate::{
     store::Store,
     tar_archive::{Archive, Input},
     tar_header::{MAX_EXTENSION, invalid, unsupported},
+    tar_progress::Peer,
     validate::{self, Outcome},
 };
 use rayon::{ThreadPool, prelude::*};
@@ -45,27 +46,22 @@ pub(crate) fn serve(
     writer: &mut impl Write,
     pool: &ThreadPool,
     store: Option<&Store>,
+    progressive: bool,
 ) -> io::Result<()> {
     let (id, flags, path) = request(reader)?;
-    let mut archive = Archive::open(&path)?;
+    let mut peer = Peer::new(reader, id, progressive);
+    let mut archive = if progressive {
+        Archive::progressive(&path, peer.clone())?
+    } else {
+        Archive::open(&path)?
+    };
     let mut sequence = 0;
     loop {
         let batch = archive.batch();
         let files = records(&batch.inputs, pool, flags)?;
         if !files.is_empty() {
-            send(
-                writer,
-                &Response {
-                    version: 1,
-                    id,
-                    sequence,
-                    done: false,
-                    fallback: false,
-                    error: None,
-                    files: &files,
-                },
-            )?;
-            commit(reader, writer, pool, store, (id, sequence), &batch.inputs, &files)?;
+            send_batch(writer, &files, id, sequence)?;
+            commit(&mut peer, writer, pool, store, (id, sequence), &batch.inputs, &files)?;
             sequence += 1;
         }
         if batch.done {
@@ -79,6 +75,12 @@ pub(crate) fn serve(
             );
         }
     }
+}
+fn send_batch(writer: &mut impl Write, files: &[Record], id: u32, sequence: u32) -> io::Result<()> {
+    send(
+        writer,
+        &Response { version: 1, id, sequence, done: false, fallback: false, error: None, files },
+    )
 }
 fn request(reader: &mut impl Read) -> io::Result<(u32, u32, PathBuf)> {
     let id = protocol::word(reader)?;
@@ -158,12 +160,11 @@ fn records(inputs: &[Input], pool: &ThreadPool, flags: u32) -> io::Result<Vec<Re
     Ok(files)
 }
 fn selection(
-    reader: &mut impl Read,
+    reader: &mut Peer<'_, impl Read>,
     identity: (u32, u32),
     files: &[Record],
 ) -> io::Result<Vec<u32>> {
-    let mut magic = [0; 4];
-    reader.read_exact(&mut magic)?;
+    let magic = reader.commit_magic()?;
     let actual = (protocol::word(reader)?, protocol::word(reader)?);
     let count = protocol::word(reader)?;
     if magic != *b"BTC1" || actual != identity || count as usize > files.len() {
@@ -183,7 +184,7 @@ fn selection(
     Ok(selected)
 }
 fn commit(
-    reader: &mut impl Read,
+    reader: &mut Peer<'_, impl Read>,
     writer: &mut impl Write,
     pool: &ThreadPool,
     store: Option<&Store>,
@@ -243,3 +244,6 @@ fn send(writer: &mut impl Write, response: &Response<'_>) -> io::Result<()> {
 }
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod progressive_tests;

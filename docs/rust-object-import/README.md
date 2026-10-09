@@ -149,3 +149,5 @@ Opt-in production HTTP/ObjectFetcher integration and controls: [http-tar.md](./h
 Genuine HTTP objects-only command results and the mutable-heavy regression: [http-command-results.md](./http-command-results.md).
 
 Bounded Rust metadata inflation for staged HTTP imports: [tar-metadata.md](./tar-metadata.md).
+
+Progressive append-only Rust tar intake and the remaining HTTP integration: [progressive-tar.md](./progressive-tar.md).

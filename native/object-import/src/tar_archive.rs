@@ -1,6 +1,7 @@
 use crate::{
     tar_extensions::Extensions,
     tar_header::{self, Header, MAX_EXTENSION, invalid, unsupported},
+    tar_progress::{Peer, Tail},
 };
 use std::{
     fs::File,
@@ -8,7 +9,7 @@ use std::{
     path::Path,
 };
 
-const MAX_ARCHIVE: u64 = 2 * 1024 * 1024 * 1024;
+pub(crate) const MAX_ARCHIVE: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_OBJECTS: usize = 1_048_576;
 pub(crate) struct Input {
     pub(crate) name: String,
@@ -20,31 +21,35 @@ pub(crate) struct Batch {
     pub(crate) terminal: Option<io::Error>,
     pub(crate) done: bool,
 }
-pub(crate) struct Archive {
-    reader: BufReader<File>,
+pub(crate) struct Archive<'a> {
+    reader: BufReader<Box<dyn Read + 'a>>,
     extensions: Extensions,
     pending: Option<Header>,
     position: u64,
     count: usize,
     length: u64,
 }
-impl Archive {
+impl<'a> Archive<'a> {
     pub(crate) fn open(path: &Path) -> io::Result<Self> {
-        if !path.is_absolute() {
-            return Err(unsupported());
-        }
-        let metadata = std::fs::symlink_metadata(path)?;
-        if !metadata.is_file() || metadata.len() > MAX_ARCHIVE {
-            return Err(unsupported());
-        }
-        Ok(Self {
-            reader: BufReader::new(File::open(path)?),
+        let (file, length) = file(path)?;
+        Ok(Self::new(Box::new(file), length))
+    }
+    pub(crate) fn progressive<Reader: Read + 'a>(
+        path: &Path,
+        peer: Peer<'a, Reader>,
+    ) -> io::Result<Self> {
+        let (file, _) = file(path)?;
+        Ok(Self::new(Box::new(Tail::new(file, peer)), MAX_ARCHIVE))
+    }
+    fn new(reader: Box<dyn Read + 'a>, length: u64) -> Self {
+        Self {
+            reader: BufReader::new(reader),
             extensions: Extensions::default(),
             pending: None,
             position: 0,
             count: 0,
-            length: metadata.len(),
-        })
+            length,
+        }
     }
     pub(crate) fn batch(&mut self) -> Batch {
         let mut inputs = Vec::new();
@@ -145,6 +150,16 @@ impl Archive {
         }
         Ok(())
     }
+}
+fn file(path: &Path) -> io::Result<(File, u64)> {
+    if !path.is_absolute() {
+        return Err(unsupported());
+    }
+    let metadata = std::fs::symlink_metadata(path)?;
+    if !metadata.is_file() || metadata.len() > MAX_ARCHIVE {
+        return Err(unsupported());
+    }
+    Ok((File::open(path)?, metadata.len()))
 }
 fn exact(reader: &mut impl Read, bytes: &mut [u8]) -> io::Result<()> {
     reader

@@ -9,9 +9,9 @@ use std::{
 };
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
-struct Directory(PathBuf);
+pub(super) struct Directory(pub(super) PathBuf);
 impl Directory {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         let path = std::env::temp_dir()
             .join(format!(
                 "bit-tar-kernel-{}-{}",
@@ -21,7 +21,7 @@ impl Directory {
         fs::create_dir(&path).unwrap();
         Self(path)
     }
-    fn archive(&self, bytes: &[u8]) -> PathBuf {
+    pub(super) fn archive(&self, bytes: &[u8]) -> PathBuf {
         let path = self.0.join("archive.tar");
         fs::write(&path, bytes).unwrap();
         path
@@ -32,7 +32,7 @@ impl Drop for Directory {
         let _cleanup = fs::remove_dir_all(&self.0);
     }
 }
-fn entry(name: &str, body: &[u8], kind: u8) -> Vec<u8> {
+pub(super) fn entry(name: &str, body: &[u8], kind: u8) -> Vec<u8> {
     let mut header = [0; 512];
     header[..name.len()].copy_from_slice(name.as_bytes());
     let size = format!("{:011o}", body.len());
@@ -51,7 +51,7 @@ fn entry(name: &str, body: &[u8], kind: u8) -> Vec<u8> {
     bytes.resize(bytes.len().next_multiple_of(512), 0);
     bytes
 }
-fn source(content: &[u8]) -> (String, Vec<u8>) {
+pub(super) fn source(content: &[u8]) -> (String, Vec<u8>) {
     let hash = format!("{:x}", Sha1::digest(content));
     let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
     encoder
@@ -60,7 +60,7 @@ fn source(content: &[u8]) -> (String, Vec<u8>) {
     encoder.write_all(content).unwrap();
     (hash, encoder.finish().unwrap())
 }
-fn request(path: &std::path::Path) -> Vec<u8> {
+pub(super) fn request(path: &std::path::Path) -> Vec<u8> {
     let name = path.to_str().unwrap().as_bytes();
     let mut bytes = b"BTI1".to_vec();
     for value in [1_u32, 1, name.len() as u32] {
@@ -69,7 +69,7 @@ fn request(path: &std::path::Path) -> Vec<u8> {
     bytes.extend_from_slice(name);
     bytes
 }
-fn commit(bytes: &mut Vec<u8>, sequence: u32, selected: &[u32]) {
+pub(super) fn commit(bytes: &mut Vec<u8>, sequence: u32, selected: &[u32]) {
     bytes.extend_from_slice(b"BTC1");
     for value in [1_u32, sequence, selected.len() as u32] {
         bytes.extend_from_slice(&value.to_be_bytes());
@@ -78,7 +78,10 @@ fn commit(bytes: &mut Vec<u8>, sequence: u32, selected: &[u32]) {
         bytes.extend_from_slice(&value.to_be_bytes());
     }
 }
-fn serve(bytes: Vec<u8>, store: Option<&Store>) -> (std::io::Result<()>, Vec<serde_json::Value>) {
+pub(super) fn serve(
+    bytes: Vec<u8>,
+    store: Option<&Store>,
+) -> (std::io::Result<()>, Vec<serde_json::Value>) {
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(2)
         .build()
