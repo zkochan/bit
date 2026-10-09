@@ -95,6 +95,9 @@ Module._load = function (request, parent, isMain) {
   if (!output || process.pid !== owner || !/objects|scope|source-validator|object-importer|rust-tar/.test(request))
     return value;
   if (value?.Repository) {
+    wrap(value.Repository.prototype, 'getNativeSourceStoreEligibility', 'nativeStoreEligibility');
+    wrap(value.Repository.prototype, 'getNativeSourceStoreOptions', 'nativeStoreOptions');
+    wrap(value.Repository.prototype, 'getChownOptions', 'nativeStoreOwnership');
     wrap(value.Repository.prototype, 'writeValidatedSourceToFS', 'nativeAtomicPersistence');
     wrap(value.Repository.prototype, '_writeOne', 'legacyPersistence');
     wrap(value.Repository.prototype, 'writeObjectFile', 'atomicFileWrite');

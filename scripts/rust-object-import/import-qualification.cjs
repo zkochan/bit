@@ -12,6 +12,9 @@ const { createBenchmarkProcessControl } = require('../rust-dependency-analysis/p
 const { benchmarkGlobals } = require('../rust-dependency-analysis/command-workspace.cjs');
 const cliRoot = path.resolve(process.argv[2] || '');
 const helper = path.resolve(process.argv[3] || '');
+const baselineCli = process.env.BIT_IMPORT_QUALIFICATION_BASELINE_CLI
+  ? path.resolve(process.env.BIT_IMPORT_QUALIFICATION_BASELINE_CLI)
+  : undefined;
 const rounds = Number(process.env.BIT_IMPORT_QUALIFICATION_ROUNDS || 9);
 const smoke = process.env.BIT_IMPORT_QUALIFICATION_SMOKE === '1';
 const packaged = process.env.BIT_IMPORT_QUALIFICATION_PACKAGED === '1';
@@ -36,6 +39,7 @@ assert.ok(
         'native',
         'tar',
         'tar-staged',
+        'tar-baseline',
         'tar-node-metadata',
         'mutable-control',
         'packaged-fallback',
@@ -43,14 +47,18 @@ assert.ok(
     )
 );
 assert.ok(
-  !modes.some((mode) => mode === 'tar' || mode === 'tar-staged' || mode === 'tar-node-metadata') ||
-    transport === 'http',
+  !modes.some(
+    (mode) => mode === 'tar' || mode === 'tar-staged' || mode === 'tar-baseline' || mode === 'tar-node-metadata'
+  ) || transport === 'http',
   'tar qualification requires actual HTTP'
 );
-async function command(directory, ids, mode, allHistory, traceFile) {
+assert.ok(!modes.includes('tar-baseline') || baselineCli, 'tar-baseline requires a separate compiled baseline CLI');
+async function command(directory, ids, requestedMode, allHistory, traceFile) {
+  const commandRoot = requestedMode === 'tar-baseline' ? baselineCli : cliRoot;
+  const mode = requestedMode === 'tar-baseline' ? 'tar' : requestedMode;
   const cpuFile = path.join(directory, 'cpu.txt');
   const args = [
-    path.join(cliRoot, 'bin/bit.js'),
+    path.join(commandRoot, 'bin/bit.js'),
     'import',
     ...ids,
     '--objects',
@@ -82,7 +90,8 @@ async function command(directory, ids, mode, allHistory, traceFile) {
               : mode === 'crash'
                 ? path.join(directory, 'crashing-helper')
                 : 'off',
-    BIT_RUST_OBJECT_TAR: mode === 'tar' || mode === 'tar-staged' || mode === 'tar-node-metadata' ? 'on' : 'off',
+    BIT_RUST_OBJECT_TAR:
+      mode === 'tar' || mode === 'tar-staged' || mode === 'tar-baseline' || mode === 'tar-node-metadata' ? 'on' : 'off',
     BIT_RUST_OBJECT_TAR_PROGRESSIVE: mode === 'tar-staged' ? 'off' : 'on',
     BIT_RUST_OBJECT_IMPORT_METADATA: mode === 'store' || mode === 'tar-node-metadata' ? 'off' : 'on',
     BIT_RUST_OBJECT_IMPORT_MODE: mode === 'validate' ? 'validate' : 'store',
@@ -129,7 +138,7 @@ async function command(directory, ids, mode, allHistory, traceFile) {
   assert.equal(result.importDetails.length, ids.length);
   const [user, system] = (await fs.readFile(cpuFile, 'utf8')).trim().split(/\s+/).map(Number);
   return {
-    mode,
+    mode: requestedMode,
     elapsedMs,
     cpuSeconds: user + system,
     memory,
@@ -160,13 +169,25 @@ async function workspace(directory, manifest) {
   assert.equal(process.platform, 'linux', 'GNU time and process-tree measurements require Linux');
   assert.ok(Number.isInteger(rounds) && rounds >= 1 && rounds <= 100);
   const provenance = JSON.parse(await fs.readFile(path.join(cliRoot, '.bit-object-import-build.json'), 'utf8'));
-  for (const file of provenance.compiledModules)
-    assert.equal(
-      createHash('sha256')
-        .update(await fs.readFile(path.join(cliRoot, 'node_modules/@teambit', file.path)))
-        .digest('hex'),
-      file.sha256
-    );
+  const baselineProvenance = baselineCli
+    ? JSON.parse(await fs.readFile(path.join(baselineCli, '.bit-object-import-build.json'), 'utf8'))
+    : undefined;
+  async function verifyCompiledSnapshots() {
+    for (const [root, snapshot] of [
+      [cliRoot, provenance],
+      ...(baselineCli ? [[baselineCli, baselineProvenance]] : []),
+    ]) {
+      for (const file of snapshot.compiledModules)
+        assert.equal(
+          createHash('sha256')
+            .update(await fs.readFile(path.join(root, 'node_modules/@teambit', file.path)))
+            .digest('hex'),
+          file.sha256,
+          'compiled code changed during qualification'
+        );
+    }
+  }
+  await verifyCompiledSnapshots();
   const scratch = path.resolve(process.env.BIT_IMPORT_QUALIFICATION_TMPDIR || os.tmpdir());
   const repository = path.resolve(__dirname, '../..');
   assert.ok(
@@ -184,6 +205,7 @@ async function workspace(directory, manifest) {
     filesystemType: (await fs.statfs(temporary)).type,
     node: process.version,
     cliProvenance: provenance,
+    baselineCliProvenance: baselineProvenance,
     helperSha256: createHash('sha256')
       .update(await fs.readFile(helper))
       .digest('hex'),
@@ -288,14 +310,14 @@ async function workspace(directory, manifest) {
         checkModels(warm.verification);
         await new Promise((resolve) => setImmediate(resolve));
         global.gc?.();
-        if (mode === 'tar' || mode === 'tar-staged' || mode === 'tar-node-metadata') {
+        if (mode === 'tar' || mode === 'tar-staged' || mode === 'tar-baseline' || mode === 'tar-node-metadata') {
           const sources = Object.values(manifest.hashes).filter((object) => object.type === 'Source').length;
           assert.equal(cold.trace.tar.nativeSources, sources, 'actual HTTP Source coverage must be native');
           assert.equal(cold.trace.tar.fallbacks, 0, 'successful fixture must not silently fall back');
           assert.ok(cold.trace.tar.operations, 'production stream operation must actually run');
           assert.ok(cold.trace.tar.batches, 'production tar protocol must actually run');
           assert.equal(cold.trace.objectTypes.Source || 0, 0, 'Source bodies must not be hydrated in Node');
-          if (mode === 'tar' || mode === 'tar-staged') {
+          if (mode === 'tar' || mode === 'tar-staged' || mode === 'tar-baseline') {
             assert.equal(cold.trace.inflation.incoming, 0, 'eligible incoming metadata must not inflate in Node');
             assert.ok(
               cold.trace.stages.nativeMetadataHydration?.calls >= Object.keys(manifest.hashes).length - sources,
@@ -354,14 +376,7 @@ async function workspace(directory, manifest) {
       }
     }
   }
-  for (const file of provenance.compiledModules)
-    assert.equal(
-      createHash('sha256')
-        .update(await fs.readFile(path.join(cliRoot, 'node_modules/@teambit', file.path)))
-        .digest('hex'),
-      file.sha256,
-      'compiled code changed during qualification'
-    );
+  await verifyCompiledSnapshots();
   assert.equal(
     createHash('sha256')
       .update(await fs.readFile(helper))

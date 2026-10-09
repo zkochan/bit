@@ -296,3 +296,70 @@ test(
     for (const history of histories) assert.equal((await repo.load(history.hash())).getType(), 'VersionHistory');
   }
 );
+
+test('default native store eligibility is synchronous and rechecks live transforms', { skip: !unix }, async (t) => {
+  const { repo } = await setup(t);
+  assert.equal(repo.getNativeSourceStoreEligibility(), true);
+  const original = repo.onPersist;
+  repo.onPersist = (value) => value;
+  assert.equal(repo.getNativeSourceStoreEligibility(), false);
+  assert.equal(await repo.getNativeSourceStoreOptions(), undefined);
+  repo.onPersist = original;
+  assert.equal(repo.getNativeSourceStoreEligibility(), true);
+});
+
+test('group ownership retains asynchronous resolution for every eligibility check', { skip: !unix }, async (t) => {
+  const { repo, writer } = await setup(t);
+  repo.scopeJson.groupName = 'test-group';
+  let ownershipQueries = 0;
+  repo.getChownOptions = async () => {
+    ownershipQueries += 1;
+    return { uid: 123, gid: 456 };
+  };
+  assert.equal(repo.getNativeSourceStoreEligibility(), undefined);
+  const value = await item('group-owned source');
+  const decision = await writer.prepareTarBatch([descriptor(value)], () => {
+    throw new Error('native Sources need no body load');
+  });
+  assert.deepEqual(decision.selected, [0]);
+  assert.equal(ownershipQueries, 2);
+  assert.deepEqual((await repo.getNativeSourceStoreOptions()).owner, { uid: 123, gid: 456 });
+  await decision.settle(new Set([0]));
+});
+
+test('custom native store options remain authoritative at selection and commit', { skip: !unix }, async (t) => {
+  const { repo, writer } = await setup(t);
+  const original = repo.getNativeSourceStoreOptions.bind(repo);
+  let queries = 0;
+  repo.getNativeSourceStoreOptions = async () => (++queries === 1 ? original() : undefined);
+  assert.equal(repo.getNativeSourceStoreEligibility(), undefined);
+  const value = await item('custom store decision');
+  const decision = await writer.prepareTarBatch([descriptor(value)], async () => value.buffer);
+  assert.deepEqual(decision.selected, []);
+  assert.equal(queries, 2);
+  await decision.settle(new Set());
+  assert.equal((await repo.load(Ref.from(value.hash))).contents.toString(), 'custom store decision');
+});
+
+test('ownership and custom path errors preserve their original identity', { skip: !unix }, async (t) => {
+  const { repo, writer } = await setup(t);
+  const error = new Error('ownership resolution failed');
+  repo.getChownOptions = async () => {
+    throw error;
+  };
+  assert.equal(repo.getNativeSourceStoreEligibility(), undefined);
+  await assert.rejects(
+    writer.prepareTarBatch([], async () => Buffer.alloc(0)),
+    (cause) => cause === error
+  );
+  delete repo.getChownOptions;
+  repo.getPath = () => {
+    throw error;
+  };
+  assert.equal(repo.getNativeSourceStoreEligibility(), undefined);
+  await assert.rejects(
+    writer.prepareTarBatch([], async () => Buffer.alloc(0)),
+    (cause) => cause === error
+  );
+  delete repo.getPath;
+});
