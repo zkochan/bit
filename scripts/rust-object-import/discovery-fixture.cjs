@@ -10,14 +10,16 @@ function fixture(t) {
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const moduleDirectory = path.join(directory, 'node_modules/@teambit/objects/dist/objects');
   const legacyDirectory = path.join(directory, 'node_modules/@teambit/legacy.scope/dist/objects-fetcher');
+  const networkDirectory = path.join(directory, 'node_modules/@teambit/scope.network/dist/http');
   fs.mkdirSync(moduleDirectory, { recursive: true });
   fs.mkdirSync(legacyDirectory, { recursive: true });
+  fs.mkdirSync(networkDirectory, { recursive: true });
   const write = (file, content) => {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, content);
   };
   write(path.join(directory, 'package.json'), '{}');
-  for (const name of ['objects', 'legacy.scope'])
+  for (const name of ['objects', 'legacy.scope', 'scope.network'])
     write(
       path.join(directory, 'node_modules/@teambit', name, 'package.json'),
       JSON.stringify({ main: 'dist/index.js' })
@@ -36,10 +38,12 @@ function fixture(t) {
   for (const [base, files] of [
     [moduleDirectory, contract.OBJECT_IMPORT_RUNTIME_MODULES],
     [legacyDirectory, contract.OBJECT_IMPORT_LEGACY_MODULES],
+    [networkDirectory, contract.OBJECT_IMPORT_NETWORK_MODULES],
   ])
     for (const name of files)
       if (!fs.existsSync(path.join(base, name))) write(path.join(base, name), 'module.exports = {};\n');
   write(path.join(legacyDirectory, '../index.js'), 'module.exports = {};\n');
+  write(path.join(networkDirectory, '../index.js'), 'module.exports = {};\n');
   for (const name of ['discovery', 'inventory', 'reader', 'directory'])
     compile(
       `scopes/scope/objects/objects/rust-object-${name}.ts`,
@@ -54,6 +58,6 @@ function fixture(t) {
     else process.env.BIT_RUST_OBJECT_IMPORT = previous;
   });
   const resolve = load(path.join(moduleDirectory, 'rust-object-discovery.js')).resolveRustObjectImportExecutable;
-  return { directory, moduleDirectory, legacyDirectory, resolve, load, contract, compile };
+  return { directory, moduleDirectory, legacyDirectory, networkDirectory, resolve, load, contract, compile };
 }
 module.exports = { fixture };

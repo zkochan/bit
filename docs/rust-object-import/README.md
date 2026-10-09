@@ -134,7 +134,7 @@ Windows directory traversal and combined inventories: [windows-traversal.md](./w
 
 Tar intake compatibility and Source-only prototype measurements: [tar-intake-results.md](./tar-intake-results.md).
 
-Experimental staged tar framing and selected Source persistence: [tar-batches.md](./tar-batches.md). This kernel is not yet connected to normal imports.
+Experimental staged tar framing and selected Source persistence: [tar-batches.md](./tar-batches.md). Opt-in HTTP integration is documented in [http-tar.md](./http-tar.md).
 
 Owned archive staging, cancellation and staging-inclusive HTTP qualification: [tar-staging.md](./tar-staging.md).
 
@@ -143,3 +143,5 @@ Lossless pre-policy staging fallback and received-prefix error parity: [tar-pref
 Actual repository writer coordination for staged batches: [tar-coordination.md](./tar-coordination.md).
 
 Production TypeScript adapter for owned tar archives, markers and canonical suffix continuation: [tar-adapter.md](./tar-adapter.md).
+
+Opt-in production HTTP/ObjectFetcher integration and controls: [http-tar.md](./http-tar.md).

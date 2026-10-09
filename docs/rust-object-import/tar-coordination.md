@@ -1,5 +1,7 @@
 # Repository coordination for staged tar batches
 
+This records the preceding coordination/adapter step. Current opt-in HTTP integration is documented in [http-tar.md](./http-tar.md).
+
 `ObjectsWritable.prepareTarBatch()` connects transport-validated descriptors to the existing repository policy. It is an internal interface for the next transport integration; ordinary HTTP imports do not call it yet.
 
 The caller supplies at most sixteen ordered descriptors and a lazy compressed-body loader. A `sourceHash` may only come from the Rust kernel's validated `source` outcome for that exact descriptor in an owned, immutable archive. Markers remain the transport's responsibility. The caller must use the repository's current native store directory and ownership options, keep the archive open through settlement, and await the complete native operation as well as the shared write queue.

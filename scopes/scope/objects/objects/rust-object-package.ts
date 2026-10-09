@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { createHash } from 'crypto';
+import { createRequire } from 'module';
 
 export const OBJECT_IMPORT_VERSION = '0.1.0';
 export const OBJECT_IMPORT_RUNTIME_MODULES = [
@@ -13,6 +14,7 @@ export const OBJECT_IMPORT_RUNTIME_MODULES = [
   'object.js',
   'scope-index.js',
   'object-list.js',
+  'tar-input-stream.js',
   'ref.js',
   '../index.js',
   '../models/version.js',
@@ -25,11 +27,15 @@ export const OBJECT_IMPORT_LEGACY_MODULES = [
   'rust-object-importer.js',
   'rust-tar-client.js',
   'rust-tar-importer.js',
+  'rust-tar-transfer.js',
+  'rust-tar-staging.js',
+  'rust-tar-stream.js',
   'objects-fetcher.js',
   'objects-writable-stream.js',
   'write-objects-queue.js',
   '../component-ops/scope-components-importer.js',
 ];
+export const OBJECT_IMPORT_NETWORK_MODULES = ['http.js'];
 export type ObjectHelperSelection = { version: string; target: string; revision: string };
 const digest = (data: Buffer) => createHash('sha256').update(data).digest('hex');
 let verifiedRuntime: { fingerprint: string; matches: boolean } | undefined;
@@ -102,8 +108,11 @@ export function objectRuntimeMatches(
     return false;
   const modules = runtimeFiles(directory, contract.modules, OBJECT_IMPORT_RUNTIME_MODULES);
   if (importing) {
-    const legacy = path.join(path.dirname(require.resolve('@teambit/legacy.scope')), 'objects-fetcher');
+    const entry = require.resolve('@teambit/legacy.scope');
+    const legacy = path.join(path.dirname(entry), 'objects-fetcher');
     modules.push(...runtimeFiles(legacy, contract.legacyModules, OBJECT_IMPORT_LEGACY_MODULES));
+    const network = path.join(path.dirname(createRequire(entry).resolve('@teambit/scope.network')), 'http');
+    modules.push(...runtimeFiles(network, contract.networkModules, OBJECT_IMPORT_NETWORK_MODULES));
   }
   const fingerprint = JSON.stringify([directory, importing, contract, modules.map(({ file, stamp }) => [file, stamp])]);
   if (verifiedRuntime?.fingerprint === fingerprint) return verifiedRuntime.matches;
