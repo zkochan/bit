@@ -28,9 +28,10 @@ const modes = process.env.BIT_IMPORT_QUALIFICATION_MODES?.split(',') || [
 assert.ok(
   modes.length &&
     modes.every((mode) =>
-      ['legacy', 'control', 'validate', 'store', 'native', 'mutable-control', 'packaged-fallback'].includes(mode)
+      ['legacy', 'control', 'validate', 'store', 'native', 'tar', 'mutable-control', 'packaged-fallback'].includes(mode)
     )
 );
+assert.ok(!modes.includes('tar') || transport === 'http', 'tar qualification requires actual HTTP');
 async function command(directory, ids, mode, allHistory, traceFile) {
   const cpuFile = path.join(directory, 'cpu.txt');
   const args = [
@@ -47,7 +48,7 @@ async function command(directory, ids, mode, allHistory, traceFile) {
   const env = {
     ...process.env,
     BIT_RUST_OBJECT_IMPORT:
-      mode === 'native' || mode === 'validate' || mode === 'store' || mode === 'mutable-control'
+      mode === 'native' || mode === 'tar' || mode === 'validate' || mode === 'store' || mode === 'mutable-control'
         ? packaged
           ? 'packaged'
           : helper
@@ -60,6 +61,7 @@ async function command(directory, ids, mode, allHistory, traceFile) {
               : mode === 'crash'
                 ? path.join(directory, 'crashing-helper')
                 : 'off',
+    BIT_RUST_OBJECT_TAR: mode === 'tar' ? 'on' : 'off',
     BIT_RUST_OBJECT_IMPORT_METADATA: mode === 'store' ? 'off' : 'on',
     BIT_RUST_OBJECT_IMPORT_MODE: mode === 'validate' ? 'validate' : 'store',
     BIT_RUST_OBJECT_IMPORT_MUTABLE: mode === 'store' || mode === 'mutable-control' ? 'off' : 'on',
@@ -152,6 +154,8 @@ async function workspace(directory, manifest) {
   await fs.mkdir(scratch, { recursive: true });
   const temporary = await fs.mkdtemp(path.join(scratch, 'bit-real-import-'));
   process.env.BIT_GLOBALS_DIR = benchmarkGlobals(temporary);
+  process.env.BIT_RUST_OBJECT_IMPORT = 'off';
+  process.env.BIT_RUST_OBJECT_TAR = 'off';
   const report = {
     schemaVersion: 1,
     temporary,
@@ -166,6 +170,14 @@ async function workspace(directory, manifest) {
     transport,
     packaged,
     serverCpuAndMemoryIncluded: false,
+    harnessSha256: Object.fromEntries(
+      ['import-qualification.cjs', 'import-trace.cjs', 'http-fixture.cjs', 'scope-fixture.cjs'].map((name) => [
+        name,
+        createHash('sha256')
+          .update(require('node:fs').readFileSync(path.join(__dirname, name)))
+          .digest('hex'),
+      ])
+    ),
     command: 'bit import <ids> --objects --skip-dependency-installation --json --safe-mode [--all-history for cold]',
     cases: {},
   };
@@ -239,6 +251,7 @@ async function workspace(directory, manifest) {
           await new Promise((resolve) => setImmediate(resolve));
           global.gc?.();
           if (round >= 0) data.runs.push({ round, cold, warm });
+          console.log(JSON.stringify({ name, round, mode, coldMs: cold.elapsedMs, warmMs: warm.elapsedMs }));
           await fs.rm(destination, { recursive: true, force: true });
         }
       }
@@ -253,6 +266,17 @@ async function workspace(directory, manifest) {
         checkModels(warm.verification);
         await new Promise((resolve) => setImmediate(resolve));
         global.gc?.();
+        if (mode === 'tar') {
+          const sources = Object.values(manifest.hashes).filter((object) => object.type === 'Source').length;
+          assert.equal(cold.trace.tar.nativeSources, sources, 'actual HTTP Source coverage must be native');
+          assert.equal(cold.trace.tar.fallbacks, 0, 'successful fixture must not silently fall back');
+          assert.ok(cold.trace.tar.operations, 'production stream operation must actually run');
+          assert.ok(cold.trace.tar.batches, 'production tar protocol must actually run');
+          assert.equal(cold.trace.objectTypes.Source || 0, 0, 'Source bodies must not be hydrated in Node');
+          assert.equal(cold.trace.stages.nativeAtomicPersistence?.calls || 0, 0, 'no per-Source Node atomic writes');
+          assert.equal(warm.trace.tar.nativeSources, 0);
+          assert.ok(cold.trace.stages.componentMergeAndIndex?.calls, 'genuine component merge/index required');
+        }
         if (mode === 'native' || mode === 'validate' || mode === 'store' || mode === 'mutable-control') {
           const expectedSources = Object.values(manifest.hashes).filter((obj) => obj.type === 'Source').length;
           assert.equal(cold.trace.native.sources, expectedSources, 'native cold Source coverage must be real');
@@ -301,6 +325,21 @@ async function workspace(directory, manifest) {
       }
     }
   }
+  for (const file of provenance.compiledModules)
+    assert.equal(
+      createHash('sha256')
+        .update(await fs.readFile(path.join(cliRoot, 'node_modules/@teambit', file.path)))
+        .digest('hex'),
+      file.sha256,
+      'compiled code changed during qualification'
+    );
+  assert.equal(
+    createHash('sha256')
+      .update(await fs.readFile(helper))
+      .digest('hex'),
+    report.helperSha256,
+    'helper changed during qualification'
+  );
   console.log(`Evidence: ${path.join(temporary, 'results.json')}`);
 })().catch((error) => {
   console.error(error);

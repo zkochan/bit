@@ -145,3 +145,5 @@ Actual repository writer coordination for staged batches: [tar-coordination.md](
 Production TypeScript adapter for owned tar archives, markers and canonical suffix continuation: [tar-adapter.md](./tar-adapter.md).
 
 Opt-in production HTTP/ObjectFetcher integration and controls: [http-tar.md](./http-tar.md).
+
+Genuine HTTP objects-only command results and the mutable-heavy regression: [http-command-results.md](./http-command-results.md).

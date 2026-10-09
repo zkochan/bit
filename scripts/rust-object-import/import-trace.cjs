@@ -27,6 +27,7 @@ const metrics = {
     mutablePersisted: 0,
     mutableFallbacks: 0,
   },
+  tar: { operations: 0, objects: 0, nativeSources: 0, fallbacks: 0, batches: 0 },
   modules: {},
 };
 if (output && process.pid === owner)
@@ -90,7 +91,8 @@ function wrap(target, key, stage, inspect) {
 const originalLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   const value = originalLoad.apply(this, arguments);
-  if (!output || process.pid !== owner || !/objects|scope|source-validator|object-importer/.test(request)) return value;
+  if (!output || process.pid !== owner || !/objects|scope|source-validator|object-importer|rust-tar/.test(request))
+    return value;
   if (value?.Repository) {
     wrap(value.Repository.prototype, 'writeValidatedSourceToFS', 'nativeAtomicPersistence');
     wrap(value.Repository.prototype, '_writeOne', 'legacyPersistence');
@@ -141,7 +143,25 @@ Module._load = function (request, parent, isMain) {
         metrics.native[key] += this.stats[key];
     });
   }
-  if (value?.ObjectFetcher || value?.RustSourceValidator || value?.RustObjectImporter || value?.ObjectsWritable) {
+  if (value?.importTarStream)
+    wrap(value, 'importTarStream', 'nativeTarIntake', function (result) {
+      metrics.tar.operations++;
+      metrics.tar.objects += result.objects;
+      metrics.tar.nativeSources += result.nativeSources;
+      metrics.tar.fallbacks += Number(result.fallback);
+    });
+  if (value?.readTarBatches)
+    wrap(value, 'readTarBatches', 'nativeTarProtocol', function (result) {
+      metrics.tar.batches += result.batches;
+    });
+  if (
+    value?.ObjectFetcher ||
+    value?.RustSourceValidator ||
+    value?.RustObjectImporter ||
+    value?.ObjectsWritable ||
+    value?.importTarStream ||
+    value?.readTarBatches
+  ) {
     const file = Module._resolveFilename(request, parent);
     if (!metrics.modules[file])
       metrics.modules[file] = createHash('sha256').update(fs.readFileSync(file)).digest('hex');
