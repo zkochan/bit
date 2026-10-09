@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const crypto = require('node:crypto');
 const { once } = require('node:events');
 const { pipeline } = require('node:stream/promises');
-async function openLoopbackArchive(archive) {
+async function openLoopbackArchive(archive, options = {}) {
   const token = crypto.randomBytes(24).toString('hex');
   const size = (await fs.promises.stat(archive)).size;
   const server = http.createServer((request, response) => {
@@ -13,7 +13,18 @@ async function openLoopbackArchive(archive) {
       return;
     }
     response.writeHead(200, { 'Content-Length': size });
-    pipeline(fs.createReadStream(archive), response).catch(() => response.destroy());
+    if (options.abortAfterBytes !== undefined) {
+      const end = options.abortAfterBytes - 1;
+      if (end < 0) {
+        response.flushHeaders();
+        setTimeout(() => response.destroy(), 20);
+      } else {
+        const prefix = fs.createReadStream(archive, { end });
+        prefix.on('error', () => response.destroy());
+        prefix.on('end', () => setTimeout(() => response.destroy(), 20));
+        prefix.pipe(response, { end: false });
+      }
+    } else pipeline(fs.createReadStream(archive), response).catch(() => response.destroy());
   });
   const close = () =>
     new Promise((resolve, reject) => {

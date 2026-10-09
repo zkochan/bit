@@ -137,3 +137,5 @@ Tar intake compatibility and Source-only prototype measurements: [tar-intake-res
 Experimental staged tar framing and selected Source persistence: [tar-batches.md](./tar-batches.md). This kernel is not yet connected to normal imports.
 
 Owned archive staging, cancellation and staging-inclusive HTTP qualification: [tar-staging.md](./tar-staging.md).
+
+Lossless pre-policy staging fallback and received-prefix error parity: [tar-prefix-replay.md](./tar-prefix-replay.md).
