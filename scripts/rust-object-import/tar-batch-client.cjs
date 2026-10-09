@@ -5,7 +5,9 @@ const path = require('node:path');
 const fs = require('node:fs/promises');
 const MAX_FRAME = 8 * 1024 * 1024 + 1;
 async function readTarBatches(executable, archive, options, consume) {
+  options.signal?.throwIfAborted();
   const size = (await fs.stat(archive)).size;
+  options.signal?.throwIfAborted();
   const args = options.objectsDirectory ? ['--objects-dir', options.objectsDirectory] : [];
   const child = cp.spawn(executable, args, { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
   let output = Buffer.alloc(0),
@@ -66,6 +68,10 @@ async function readTarBatches(executable, archive, options, consume) {
       fail(error);
     }
   });
+  const abort = () =>
+    fail(options.signal.reason instanceof Error ? options.signal.reason : new Error('tar operation aborted'));
+  options.signal?.addEventListener('abort', abort, { once: true });
+  if (options.signal?.aborted) abort();
   const timer = setTimeout(() => fail(new Error('tar operation timed out')), options.timeoutMs || 120000);
   function next() {
     if (failure) return Promise.reject(failure);
@@ -143,6 +149,7 @@ async function readTarBatches(executable, archive, options, consume) {
     }
   } finally {
     clearTimeout(timer);
+    options.signal?.removeEventListener('abort', abort);
     if (!closed) fail(new Error('tar session disposed'));
     await stopped;
   }

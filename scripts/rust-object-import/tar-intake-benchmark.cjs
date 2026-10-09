@@ -11,6 +11,9 @@ const { archive, source, start, end } = require('./tar-fixtures.cjs');
 const { createProcessTreeMemorySampler } = require('../rust-dependency-analysis/process-tree-memory.cjs');
 const { createBenchmarkProcessControl } = require('../rust-dependency-analysis/process-tree-memory-control.cjs');
 const [cli, helper, candidate] = process.argv.slice(2).map((arg) => path.resolve(arg));
+const transport = process.env.BIT_TAR_QUALIFICATION_TRANSPORT || 'file';
+assert.ok(['file', 'http'].includes(transport));
+const staged = transport === 'http' || process.env.BIT_TAR_QUALIFICATION_STAGE === '1';
 const rounds = Number(process.env.BIT_TAR_QUALIFICATION_ROUNDS || 9);
 assert.ok(Number.isSafeInteger(rounds) && rounds >= 1 && rounds <= 99);
 assert.equal(process.platform, 'linux', 'whole-process CPU/RSS measurement currently requires Linux');
@@ -77,6 +80,10 @@ async function verify(directory, items) {
   const report = {
     scratch,
     filesystemType: (await fs.statfs(scratch)).type,
+    transport,
+    staged,
+    stagingDirectory: process.env.BIT_TAR_STAGING_DIRECTORY || os.tmpdir(),
+    stagingFilesystemType: (await fs.statfs(process.env.BIT_TAR_STAGING_DIRECTORY || os.tmpdir())).type,
     cli,
     rounds,
     node: process.version,
@@ -100,8 +107,23 @@ async function verify(directory, items) {
           .update(await fs.readFile(path.join(path.dirname(candidate), 'tar-batch-client.cjs')))
           .digest('hex')
       : null,
-    boundary:
-      'Pre-staged Source-only archive intake, validation and persistence; no merge/index/HTTP/full-command qualification',
+    boundary: staged
+      ? 'Source-only intake including owned staging and optional same-worker loopback HTTP server/client; no Bit HTTP client/merge/index/full-command qualification'
+      : 'Pre-staged Source-only archive intake, validation and persistence; no merge/index/HTTP/full-command qualification',
+    workerSha256: crypto
+      .createHash('sha256')
+      .update(await fs.readFile(path.join(__dirname, 'tar-intake-worker.cjs')))
+      .digest('hex'),
+    loopbackSha256: crypto
+      .createHash('sha256')
+      .update(await fs.readFile(path.join(__dirname, 'tar-loopback.cjs')))
+      .digest('hex'),
+    candidateStagingSha256: candidate.endsWith('.cjs')
+      ? crypto
+          .createHash('sha256')
+          .update(await fs.readFile(path.join(path.dirname(candidate), 'tar-staging.cjs')))
+          .digest('hex')
+      : null,
     cases: {},
   };
   const cases = [
@@ -153,6 +175,31 @@ async function verify(directory, items) {
       })
     );
     console.error(JSON.stringify({ case: name, medians: data.medians }));
+  }
+  for (const [file, expected] of [
+    [path.join(__dirname, 'tar-intake-worker.cjs'), report.workerSha256],
+    [path.join(__dirname, 'tar-loopback.cjs'), report.loopbackSha256],
+    [helper, report.helperSha256],
+    [candidate, report.candidateSha256],
+    [process.env.BIT_TEST_OBJECT_IMPORT, report.candidateNativeSha256],
+    [
+      candidate.endsWith('.cjs') && path.join(path.dirname(candidate), 'tar-batch-client.cjs'),
+      report.candidateClientSha256,
+    ],
+    [
+      candidate.endsWith('.cjs') && path.join(path.dirname(candidate), 'tar-staging.cjs'),
+      report.candidateStagingSha256,
+    ],
+  ]) {
+    if (file && expected)
+      assert.equal(
+        crypto
+          .createHash('sha256')
+          .update(await fs.readFile(file))
+          .digest('hex'),
+        expected,
+        'benchmark source changed during measurement'
+      );
   }
   console.log(JSON.stringify(report, null, 2));
 })().catch((error) => {
