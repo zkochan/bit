@@ -6,6 +6,8 @@ const cp = require('node:child_process');
 const { createRequire } = require('node:module');
 const { performance } = require('node:perf_hooks');
 const { pipeline } = require('node:stream/promises');
+const { withStagedArchive } = require('./tar-staging.cjs');
+const { openLoopbackArchive } = require('./tar-loopback.cjs');
 const [cli, mode, archive, executable, directory] = process.argv.slice(2);
 const load = createRequire(path.join(cli, 'package.json'));
 const { ObjectList } = load('@teambit/objects');
@@ -15,23 +17,44 @@ const { RustObjectImporter } = require('./load-source.cjs').source(
 let completed = false;
 let input;
 let importer;
+let closeTransport;
 const observed = [];
-function finish(result) {
+async function finish(result) {
   if (completed) return;
   completed = true;
   input?.destroy();
-  importer?.dispose();
+  await importer?.disposeAndWait();
+  await closeTransport?.();
   process.stdout.write(JSON.stringify(result) + '\n');
 }
 process.on('uncaughtException', (error) => finish({ error: error.message, entries: observed }));
 (async () => {
   const started = performance.now();
-  if (mode === 'native' && executable.endsWith('.cjs')) {
-    const result = await require(executable).processArchive(archive, 'store', directory);
-    finish({ ...result, elapsedMs: performance.now() - started });
+  const http = process.env.BIT_TAR_QUALIFICATION_TRANSPORT === 'http';
+  const stage = http || process.env.BIT_TAR_QUALIFICATION_STAGE === '1';
+  if (http) {
+    const transport = await openLoopbackArchive(archive);
+    input = transport.stream;
+    closeTransport = transport.close;
+  }
+  if ((mode === 'native' || mode === 'native-probe') && executable.endsWith('.cjs')) {
+    const probe = mode === 'native-probe';
+    const processArchive = (archive, options) =>
+      require(executable).processArchive(archive, probe ? 'probe' : 'store', directory, {
+        ...options,
+        onEntry: (entry) => observed.push(entry),
+      });
+    const result = stage
+      ? await withStagedArchive(
+          input || fs.createReadStream(archive),
+          { directory: process.env.BIT_TAR_STAGING_DIRECTORY },
+          ({ archive, signal }) => processArchive(archive, { signal })
+        )
+      : await processArchive(archive, {});
+    await finish({ ...result, ...(probe ? { entries: observed } : {}), elapsedMs: performance.now() - started });
     return;
   }
-  input = fs.createReadStream(archive);
+  input ||= fs.createReadStream(archive);
   if (mode === 'native') {
     const child = cp.spawn(executable, ['store', directory], { stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '',
@@ -51,7 +74,7 @@ process.on('uncaughtException', (error) => finish({ error: error.message, entrie
     });
     const code = await closed;
     if (code) throw new Error(stderr.trim());
-    finish({ ...JSON.parse(stdout), elapsedMs: performance.now() - started });
+    await finish({ ...JSON.parse(stdout), elapsedMs: performance.now() - started });
     return;
   }
   const entries = observed;
@@ -87,7 +110,7 @@ process.on('uncaughtException', (error) => finish({ error: error.message, entrie
       stream.once('error', reject);
       stream.once('end', resolve);
     });
-    finish({ entries, count: entries.length, elapsedMs: performance.now() - started });
+    await finish({ entries, count: entries.length, elapsedMs: performance.now() - started });
     return;
   }
   for await (const object of stream) {
@@ -101,5 +124,5 @@ process.on('uncaughtException', (error) => finish({ error: error.message, entrie
     await flush();
     await importer.disposeAndWait();
   }
-  finish({ entries, count, sources, elapsedMs: performance.now() - started });
+  await finish({ entries, count, sources, elapsedMs: performance.now() - started });
 })().catch((error) => finish({ error: error.message, entries: observed }));
