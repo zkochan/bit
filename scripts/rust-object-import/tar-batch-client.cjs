@@ -9,6 +9,7 @@ async function readTarBatches(executable, archive, options, consume) {
   const size = (await fs.stat(archive)).size;
   options.signal?.throwIfAborted();
   const args = options.objectsDirectory ? ['--objects-dir', options.objectsDirectory] : [];
+  if (options.owner) args.push('--owner', `${options.owner.uid}:${options.owner.gid}`);
   const child = cp.spawn(executable, args, { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
   let output = Buffer.alloc(0),
     failure,
@@ -19,7 +20,12 @@ async function readTarBatches(executable, archive, options, consume) {
     sequence = 0,
     count = 0,
     persisted = 0,
-    killTimer;
+    killTimer,
+    settlement,
+    acknowledged,
+    cancelled = false,
+    selectionTask;
+  const selectionControl = new AbortController();
   let rejectInterrupted;
   const interrupted = new Promise((_, reject) => {
     rejectInterrupted = reject;
@@ -36,6 +42,7 @@ async function readTarBatches(executable, archive, options, consume) {
   function fail(error) {
     if (failure) return;
     failure = error;
+    selectionControl.abort(error);
     rejectInterrupted(error);
     pending?.reject(error);
     pending = undefined;
@@ -68,11 +75,16 @@ async function readTarBatches(executable, archive, options, consume) {
       fail(error);
     }
   });
-  const abort = () =>
+  const abort = () => {
+    cancelled = true;
     fail(options.signal.reason instanceof Error ? options.signal.reason : new Error('tar operation aborted'));
+  };
   options.signal?.addEventListener('abort', abort, { once: true });
   if (options.signal?.aborted) abort();
-  const timer = setTimeout(() => fail(new Error('tar operation timed out')), options.timeoutMs || 120000);
+  const timer = setTimeout(() => {
+    cancelled = true;
+    fail(new Error('tar operation timed out'));
+  }, options.timeoutMs || 120000);
   function next() {
     if (failure) return Promise.reject(failure);
     if (frames.length) return Promise.resolve(frames.shift());
@@ -118,7 +130,11 @@ async function readTarBatches(executable, archive, options, consume) {
       assert.equal(response.error, null);
       assert.ok(response.files.length >= 1 && response.files.length <= 16);
       for (const file of response.files) validate(file, size, options.digest);
-      const decision = await Promise.race([Promise.resolve().then(() => consume(response.files)), interrupted]);
+      selectionTask = Promise.resolve().then(() => consume(response.files, selectionControl.signal));
+      const decision = await Promise.race([selectionTask, interrupted]);
+      selectionTask = undefined;
+      settlement = decision.settle;
+      acknowledged = undefined;
       const selected = decision.selected || [];
       assert.equal(new Set(selected).size, selected.length);
       for (const index of selected) {
@@ -141,7 +157,11 @@ async function readTarBatches(executable, archive, options, consume) {
       assert.equal(coverage.length, selected.length);
       assert.equal(new Set(coverage).size, coverage.length);
       assert.ok(coverage.every((index) => selected.includes(index)));
+      acknowledged = new Set(ack.persisted);
       if (ack.failed.length) throw new Error('native tar Source persistence failed');
+      const settle = settlement;
+      settlement = undefined;
+      await settle?.(acknowledged);
       persisted += ack.persisted.length;
       count += response.files.length;
       sequence++;
@@ -152,6 +172,18 @@ async function readTarBatches(executable, archive, options, consume) {
     options.signal?.removeEventListener('abort', abort);
     if (!closed) fail(new Error('tar session disposed'));
     await stopped;
+    if (options.awaitSelection && selectionTask) {
+      try {
+        const decision = await selectionTask;
+        settlement = decision.settle;
+        acknowledged = undefined;
+      } catch {
+        // Selection failed before returning a settlement; its original error remains authoritative.
+      }
+    }
+    const settle = settlement;
+    settlement = undefined;
+    await settle?.(acknowledged, !cancelled);
   }
 }
 function validate(file, size, digest) {

@@ -139,3 +139,5 @@ Experimental staged tar framing and selected Source persistence: [tar-batches.md
 Owned archive staging, cancellation and staging-inclusive HTTP qualification: [tar-staging.md](./tar-staging.md).
 
 Lossless pre-policy staging fallback and received-prefix error parity: [tar-prefix-replay.md](./tar-prefix-replay.md).
+
+Actual repository writer coordination for staged batches: [tar-coordination.md](./tar-coordination.md).

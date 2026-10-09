@@ -2,11 +2,13 @@ import { Writable } from 'stream';
 import { logger } from '@teambit/legacy.logger';
 import { deflate } from '@teambit/legacy.utils';
 import type { ObjectItem, Repository } from '@teambit/objects';
-import { BitObject, Lane, LaneHistory, ModelComponent, Version, VersionHistory } from '@teambit/objects';
+import { BitObject, Lane, LaneHistory, ModelComponent, ObjectList, Version, VersionHistory } from '@teambit/objects';
 import type { WriteObjectsQueue } from './write-objects-queue';
 import type { ComponentsPerRemote } from '../component-ops/multiple-component-merger';
 import type { RustObjectImporter, MetadataValidation } from './rust-object-importer';
 import type { RustSourceValidator, SourceValidation } from './rust-source-validator';
+
+export type TarImportDescriptor = { name: string; sourceHash?: string };
 
 const TIMEOUT_MINUTES_WARNING = 3;
 const TIMEOUT_MINUTES_EXIT = 30;
@@ -133,6 +135,71 @@ export class ObjectsWritable extends Writable {
       }
     );
     if (legacyError) throw legacyError;
+  }
+
+  /** Prepare one transport-validated tar batch; the transport owns markers and helper lifetime. */
+  async prepareTarBatch(
+    entries: TarImportDescriptor[],
+    load: (index: number) => Promise<Buffer>,
+    signal?: AbortSignal
+  ) {
+    if (entries.length > 16) throw new Error('tar batch exceeds 16 entries');
+    const reserved = new Map<number, ReturnType<typeof ObjectList.extractScopeAndHash>>();
+    let error: unknown;
+    const eligible = async () =>
+      this.repo.canWriteMutableObjectsNatively() && Boolean(await this.repo.getNativeSourceStoreOptions());
+    const native = await eligible();
+    for (let index = 0; index < entries.length; index += 1) {
+      try {
+        signal?.throwIfAborted();
+        const entry = entries[index];
+        if (['.BIT.START', '.BIT.END', '.BIT.ERROR'].includes(entry.name)) {
+          throw new Error('tar markers must be processed by the transport');
+        }
+        const object = ObjectList.extractScopeAndHash(entry.name);
+        if (native && entry.sourceHash === object.ref.toString() && /^[a-f0-9]{40}$/.test(entry.sourceHash)) {
+          if (this.objectsQueue.reserveNativeSource(entry.sourceHash)) reserved.set(index, object);
+        } else {
+          const buffer = await load(index);
+          signal?.throwIfAborted();
+          await this.writeObjectToFs({ ...object, buffer }, { result: undefined });
+        }
+      } catch (cause) {
+        error = cause;
+        break;
+      }
+    }
+    // Metadata policy may change hooks or methods. Downgrade reserved Sources before native commit.
+    let selected: number[] = [];
+    try {
+      if (!signal?.aborted && (await eligible())) selected = [...reserved.keys()];
+    } catch (cause) {
+      error ??= cause;
+    }
+    let settled = false;
+    return {
+      selected,
+      error,
+      settle: async (persisted?: ReadonlySet<number>, repair = true) => {
+        if (settled) throw new Error('tar batch already settled');
+        settled = true;
+        // Invalidate all possibly written Sources even if an earlier repair subsequently fails.
+        for (const { ref } of reserved.values()) this.repo.removeFromCache(ref);
+        if (persisted && [...persisted].some((index) => !selected.includes(index))) {
+          throw new Error('invalid tar Source acknowledgement');
+        }
+        if (!repair) return;
+        for (const [index, object] of reserved) {
+          if (persisted?.has(index)) continue;
+          const buffer = await load(index);
+          const { object: parsed, inflatedSize } = await BitObject.parseObjectWithSize(buffer);
+          if (parsed.getType() !== 'Source' || parsed.hash().toString() !== object.ref.toString()) {
+            throw new Error('staged tar Source changed before repair');
+          }
+          await this.repo.writeObjectsToTheFS([parsed], new Map([[parsed, { buffer, inflatedSize, ref: object.ref }]]));
+        }
+      },
+    };
   }
 
   async _final(callback) {

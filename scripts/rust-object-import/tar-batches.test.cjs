@@ -175,3 +175,93 @@ test('failed persistence reports failure without completing the operation or lea
   );
   assert.deepEqual(await fs.readdir(path.join(objectsDirectory, item.hash.slice(0, 2))), [item.hash.slice(2)]);
 });
+test('acknowledgement settles once before reporting an ordered host error', async (t) => {
+  const value = source('prefix before policy error');
+  const { archive, objectsDirectory } = await fixture(t, value.entry);
+  let settled = 0;
+  await assert.rejects(
+    readTarBatches(native, archive, { objectsDirectory }, async () => ({
+      selected: [0],
+      error: new Error('later policy failure'),
+      settle: async (persisted) => {
+        settled++;
+        assert.deepEqual([...persisted], [0]);
+        assert.deepEqual(await fs.readFile(filename(objectsDirectory, value.hash)), value.body);
+      },
+    })),
+    { message: 'later policy failure' }
+  );
+  assert.equal(settled, 1);
+});
+test('failed writes settle their acknowledged subset before propagating failure', async (t) => {
+  const values = ['written', 'blocked'].map(source);
+  const { archive, objectsDirectory } = await fixture(t, Buffer.concat(values.map((value) => value.entry)));
+  await fs.mkdir(filename(objectsDirectory, values[1].hash), { recursive: true });
+  let settled = 0;
+  await assert.rejects(
+    readTarBatches(native, archive, { objectsDirectory }, async () => ({
+      selected: [0, 1],
+      settle: async (persisted, repair) => {
+        settled++;
+        assert.equal(repair, true);
+        assert.deepEqual([...persisted], [0]);
+        await fs.rm(filename(objectsDirectory, values[1].hash), { recursive: true });
+        await fs.writeFile(filename(objectsDirectory, values[1].hash), values[1].body);
+      },
+    })),
+    { message: 'native tar Source persistence failed' }
+  );
+  assert.equal(settled, 1);
+  for (const value of values) assert.deepEqual(await fs.readFile(filename(objectsDirectory, value.hash)), value.body);
+});
+test('cooperative cancellation waits for selection cleanup and disables Source repairs', async (t) => {
+  const { archive, objectsDirectory } = await fixture(t, source('cancel selection').entry);
+  const control = new AbortController();
+  let cleaned = false,
+    settled = 0;
+  await assert.rejects(
+    readTarBatches(
+      native,
+      archive,
+      {
+        objectsDirectory,
+        signal: control.signal,
+        awaitSelection: true,
+      },
+      async (_files, signal) => {
+        control.abort(new Error('cancel repository operation'));
+        assert.equal(signal.aborted, true);
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        cleaned = true;
+        return {
+          selected: [],
+          settle: async (persisted, repair) => {
+            settled++;
+            assert.equal(cleaned, true);
+            assert.equal(persisted, undefined);
+            assert.equal(repair, false);
+          },
+        };
+      }
+    ),
+    { message: 'cancel repository operation' }
+  );
+  assert.equal(cleaned, true);
+  assert.equal(settled, 1);
+  await assert.rejects(fs.stat(objectsDirectory), { code: 'ENOENT' });
+});
+test('a failing settlement is never retried', async (t) => {
+  const { archive } = await fixture(t, source('settlement failure').entry);
+  let settled = 0;
+  await assert.rejects(
+    readTarBatches(native, archive, {}, async () => ({
+      selected: [],
+      settle: async () => {
+        settled++;
+        throw new Error('repair failed');
+      },
+    })),
+    { message: 'repair failed' }
+  );
+  assert.equal(settled, 1);
+});
