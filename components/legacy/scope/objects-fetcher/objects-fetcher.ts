@@ -24,6 +24,8 @@ import type { Remotes, Remote } from '@teambit/scope.remotes';
 import { ScopeNotFoundOrDenied } from '@teambit/scope.remotes';
 import type { ComponentsPerRemote } from '../component-ops/multiple-component-merger';
 import { MultipleComponentMerger } from '../component-ops/multiple-component-merger';
+import { importTarStream } from './rust-tar-stream';
+import { TarRemoteError } from './rust-tar-importer';
 
 /**
  * due to the use of streams, this is memory efficient and can handle easily GBs of objects.
@@ -64,7 +66,7 @@ export class ObjectFetcher {
         ? new RustObjectImporter(executable!, options)
         : undefined;
     try {
-      return await this.fetchAndWrite(importer ? undefined : validator, importer, mutableWriter);
+      return await this.fetchAndWrite(importer ? undefined : validator, importer, mutableWriter, executable);
     } finally {
       validator?.dispose();
       importer?.dispose();
@@ -75,7 +77,8 @@ export class ObjectFetcher {
   private async fetchAndWrite(
     validator?: RustSourceValidator,
     importer?: RustObjectImporter,
-    mutableWriter?: RustObjectImporter
+    mutableWriter?: RustObjectImporter,
+    tarExecutable?: string
   ): Promise<string[]> {
     this.fetchOptions = {
       type: 'component',
@@ -110,7 +113,8 @@ export class ObjectFetcher {
           componentsPerRemote,
           validator,
           importer,
-          mutableWriter
+          mutableWriter,
+          tarExecutable
         );
       },
       { concurrency: concurrentFetchLimit() }
@@ -262,7 +266,8 @@ the remote scope "${scopeName}" was not found`);
     componentsPerRemote: ComponentsPerRemote,
     validator?: RustSourceValidator,
     importer?: RustObjectImporter,
-    mutableWriter?: RustObjectImporter
+    mutableWriter?: RustObjectImporter,
+    tarExecutable?: string
   ) {
     const writable = new ObjectsWritable(
       this.repo,
@@ -281,6 +286,25 @@ the remote scope "${scopeName}" was not found`);
       readableError = err;
     });
     try {
+      if (
+        process.env.BIT_RUST_OBJECT_TAR === 'on' &&
+        process.env.BIT_RUST_OBJECT_IMPORT_MODE !== 'validate' &&
+        tarExecutable &&
+        this.repo.canWriteMutableObjectsNatively() &&
+        objectsStream.claimTarInput
+      ) {
+        const options = await this.repo.getNativeSourceStoreOptions();
+        const input = options && objectsStream.claimTarInput();
+        if (input) {
+          try {
+            await importTarStream(input, tarExecutable, writable, options);
+          } catch (error) {
+            if (error instanceof TarRemoteError) throw new ErrorFromRemote(scopeName, error.message);
+            throw error;
+          }
+          return;
+        }
+      }
       await pipeline(objectsStream, writable);
     } catch (err: any) {
       if (readableError) {
@@ -291,6 +315,9 @@ the remote scope "${scopeName}" was not found`);
       }
       // the error is coming from the writable, no need to treat it specially. just throw it.
       throw err;
+    } finally {
+      writable.destroy();
+      objectsStream.destroy();
     }
   }
 

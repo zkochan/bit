@@ -1,4 +1,5 @@
 import { createReadStream } from 'fs';
+import type { Readable } from 'stream';
 import fs from 'fs/promises';
 import { ObjectList } from '@teambit/objects';
 import { logger } from '@teambit/legacy.logger';
@@ -144,38 +145,7 @@ export async function importStagedTar(
       if (remoteFailure) throw new TarRemoteError(remoteFailure);
       // The helper is reaped and all reserved Sources repaired before this continuation.
       // Decode from the original archive and skip completed objects, never completed policy.
-      const input = createReadStream(archive);
-      const objects = ObjectList.fromTarToObjectStream(input);
-      const abort = () =>
-        input.destroy(
-          options.signal!.reason instanceof Error ? options.signal!.reason : new Error('tar import aborted')
-        );
-      options.signal?.addEventListener('abort', abort, { once: true });
-      let seen = 0;
-      try {
-        for await (const item of objects) {
-          options.signal?.throwIfAborted();
-          if (seen++ < processed) continue;
-          const name = item.scope ? `${item.scope}/${item.ref}` : item.ref.toString();
-          const decision = await writer.prepareTarBatch([{ name }], async () => item.buffer, options.signal);
-          try {
-            await decision.settle(new Set());
-            if (decision.error) throw decision.error;
-          } catch (failure) {
-            policyFailure = failure;
-            throw failure;
-          }
-        }
-      } catch (failure) {
-        if (options.signal?.aborted) throw options.signal.reason;
-        if (policyFailure) throw policyFailure;
-        throw new TarRemoteError(failure);
-      } finally {
-        options.signal?.removeEventListener('abort', abort);
-        objects.destroy();
-        input.destroy();
-      }
-      if (seen < processed) throw new TarRemoteError(new Error('staged tar prefix changed before continuation'));
+      const seen = await importCanonicalTar(createReadStream(archive), writer, options.signal, processed);
       return { objects: seen, nativeSources, fallback: true };
     }
     if (start?.schema === '1.0.0' && !end) {
@@ -187,4 +157,39 @@ export async function importStagedTar(
   } finally {
     await handle.close();
   }
+}
+
+/** Canonical replay/continuation consumes the original bytes and preserves error origin. */
+export async function importCanonicalTar(input: Readable, writer: ObjectsWritable, signal?: AbortSignal, skip = 0) {
+  const objects = ObjectList.fromTarToObjectStream(input);
+  const abort = () => input.destroy(signal!.reason instanceof Error ? signal!.reason : new Error('tar import aborted'));
+  signal?.addEventListener('abort', abort, { once: true });
+  if (signal?.aborted) abort();
+  let seen = 0;
+  let policyFailure: unknown;
+  try {
+    for await (const item of objects) {
+      signal?.throwIfAborted();
+      if (seen++ < skip) continue;
+      try {
+        const name = item.scope ? `${item.scope}/${item.ref}` : item.ref.toString();
+        const decision = await writer.prepareTarBatch([{ name }], async () => item.buffer, signal);
+        await decision.settle(new Set());
+        if (decision.error) throw decision.error;
+      } catch (cause) {
+        policyFailure = cause;
+        throw cause;
+      }
+    }
+  } catch (cause) {
+    if (signal?.aborted) throw signal.reason;
+    if (policyFailure) throw policyFailure;
+    throw new TarRemoteError(cause);
+  } finally {
+    signal?.removeEventListener('abort', abort);
+    objects.destroy();
+    input.destroy();
+  }
+  if (seen < skip) throw new TarRemoteError(new Error('staged tar prefix changed before continuation'));
+  return seen;
 }

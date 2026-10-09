@@ -10,6 +10,7 @@ import { logger } from '@teambit/legacy.logger';
 import { concurrentIOLimit } from '@teambit/harmony.modules.concurrency';
 import { ExportMetadata } from '../models';
 import { UnknownObjectType } from '@teambit/legacy.scope';
+import { deferTarInput } from './tar-input-stream';
 
 /**
  * when error occurred during streaming between HTTP server and client, there is no good way to
@@ -44,7 +45,7 @@ export const FETCH_FORMAT_OBJECT_LIST = 'ObjectList';
 /**
  * Stream.Readable that operates with objectMode, while each 'data' event emits one ObjectItem object.
  */
-export type ObjectItemsStream = Readable;
+export type ObjectItemsStream = Readable & { claimTarInput?: () => Readable | undefined };
 
 /**
  * compressed buffer of an object (as stored on the filesystem) and the size of its inflated content.
@@ -142,7 +143,10 @@ export class ObjectList {
     return new ObjectList(objectItems);
   }
 
-  static fromTarToObjectStream(packStream: NodeJS.ReadableStream): ObjectItemsStream {
+  static fromTarToObjectStream(packStream: NodeJS.ReadableStream, defer = false): ObjectItemsStream {
+    if (defer && packStream instanceof Readable) {
+      return deferTarInput(packStream, (input) => ObjectList.fromTarToObjectStream(input));
+    }
     const passThrough = new PassThrough({ objectMode: true });
     const extract = tarStream.extract();
     let startData: StartFile | undefined;

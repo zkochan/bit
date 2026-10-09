@@ -65,7 +65,11 @@ function runtime(directory) {
   // This is a trusted, already compiled Bit build, as with the existing scanner assembler.
   const contractModule = path.join(moduleDirectory, 'rust-object-package.js');
   read(contractModule, 4 * 1024 * 1024);
-  const { OBJECT_IMPORT_RUNTIME_MODULES: objects, OBJECT_IMPORT_LEGACY_MODULES: legacy } = require(contractModule);
+  const {
+    OBJECT_IMPORT_RUNTIME_MODULES: objects,
+    OBJECT_IMPORT_LEGACY_MODULES: legacy,
+    OBJECT_IMPORT_NETWORK_MODULES: network,
+  } = require(contractModule);
   assert.ok(
     objects.includes('rust-object-discovery.js') && objects.includes('repository.js'),
     'compiled object runtime required'
@@ -74,13 +78,21 @@ function runtime(directory) {
     legacy.includes('rust-object-importer.js') && legacy.includes('objects-fetcher.js'),
     'compiled import runtime required'
   );
+  assert.ok(Array.isArray(network) && network.includes('http.js'), 'compiled HTTP runtime required');
   const requireRuntime = createRequire(contractModule);
-  const legacyDirectory = path.join(path.dirname(requireRuntime.resolve('@teambit/legacy.scope')), 'objects-fetcher');
+  const legacyEntry = requireRuntime.resolve('@teambit/legacy.scope');
+  const legacyDirectory = path.join(path.dirname(legacyEntry), 'objects-fetcher');
+  const networkDirectory = path.join(
+    path.dirname(createRequire(legacyEntry).resolve('@teambit/scope.network')),
+    'http'
+  );
   return {
     moduleDirectory,
     legacyDirectory,
+    networkDirectory,
     modules: moduleHashes(moduleDirectory, objects),
     legacyModules: moduleHashes(legacyDirectory, legacy),
+    networkModules: moduleHashes(networkDirectory, network),
   };
 }
 function rootDirectory(directory) {
@@ -192,6 +204,7 @@ function install(moduleDirectory, archive, options = {}) {
       objectImportSourceSha256: identity,
       modules: build.modules,
       legacyModules: build.legacyModules,
+      networkModules: build.networkModules,
       artifacts,
     });
     const previous = isDeepStrictEqual(selected.current, chosen) ? selected.previous : selected.current;
@@ -214,6 +227,7 @@ function rollback(moduleDirectory) {
     );
     assert.deepEqual(contract.modules, build.modules, 'rollback object runtime changed');
     assert.deepEqual(contract.legacyModules, build.legacyModules, 'rollback import runtime changed');
+    assert.deepEqual(contract.networkModules, build.networkModules, 'rollback HTTP runtime changed');
     assert.ok(
       contract.artifacts.some((item) => isDeepStrictEqual(item, entry(prior.manifest, prior.manifestBytes))),
       'rollback artifact not bound to runtime'
@@ -228,7 +242,11 @@ function assemble(distribution, archive, target) {
   const requireDistribution = createRequire(path.join(root, 'package.json'));
   const directory = path.join(path.dirname(requireDistribution.resolve('@teambit/objects')), 'objects');
   const build = runtime(directory);
-  for (const dir of [build.moduleDirectory, fs.realpathSync(build.legacyDirectory)])
+  for (const dir of [
+    build.moduleDirectory,
+    fs.realpathSync(build.legacyDirectory),
+    fs.realpathSync(build.networkDirectory),
+  ])
     assert.ok(dir.startsWith(root + path.sep), 'runtime escapes distribution');
   return install(directory, archive, { target, smoke: false });
 }

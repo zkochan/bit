@@ -111,6 +111,15 @@ test('changed executable, license, notices or runtime modules invalidate cached 
   assert.equal(f.resolve('import'), undefined, 'imports verify their own coordinators');
 });
 
+test('changed HTTP handoff invalidates imports while preserving read-only selection', real, (t) => {
+  const f = installedFixture(t);
+  const filename = path.join(f.networkDirectory, 'http.js');
+  assert.ok(f.resolve('import'));
+  fs.appendFileSync(filename, '\nchanged');
+  assert.ok(f.resolve());
+  assert.equal(f.resolve('import'), undefined);
+});
+
 test('unbound manifest, source, target, version, GLIBC and selection reject native discovery', real, (t) => {
   const f = installedFixture(t);
   const selector = path.join(f.moduleDirectory, 'packaged/selection.json');

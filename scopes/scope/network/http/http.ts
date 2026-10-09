@@ -431,7 +431,7 @@ export class Http implements Network {
     // const res = await fetch(urlToFetch, opts);
     logger.debug(`Http.fetch got a response, ${scopeData}, status ${res.status}, statusText ${res.statusText}`);
     await this.throwForNonOkStatus(res);
-    const objectListReadable = ObjectList.fromTarToObjectStream(res.body);
+    const objectListReadable = ObjectList.fromTarToObjectStream(res.body, process.env.BIT_RUST_OBJECT_TAR === 'on');
 
     return objectListReadable;
   }

@@ -158,7 +158,7 @@ jobs:
       - name: Check object-import coordinator types
         shell: bash
         run: |
-          node "$RUNNER_TEMP/rust-scanner-test-tools/node_modules/typescript/bin/tsc" --noEmit --strict --skipLibCheck --target ES2022 --module commonjs --esModuleInterop --types node --typeRoots "$RUNNER_TEMP/rust-scanner-test-tools/node_modules/@types" components/legacy/scope/objects-fetcher/rust-source-validator.ts components/legacy/scope/objects-fetcher/rust-object-importer.ts components/legacy/scope/objects-fetcher/rust-tar-client.ts scopes/scope/objects/objects/rust-object-inventory.ts scopes/scope/objects/objects/rust-object-reader.ts scopes/scope/objects/objects/rust-object-directory.ts scopes/scope/objects/objects/rust-object-package.ts scopes/scope/objects/objects/rust-object-discovery.ts
+          node "$RUNNER_TEMP/rust-scanner-test-tools/node_modules/typescript/bin/tsc" --noEmit --strict --skipLibCheck --target ES2022 --module commonjs --esModuleInterop --types node --typeRoots "$RUNNER_TEMP/rust-scanner-test-tools/node_modules/@types" components/legacy/scope/objects-fetcher/rust-source-validator.ts components/legacy/scope/objects-fetcher/rust-object-importer.ts components/legacy/scope/objects-fetcher/rust-tar-client.ts components/legacy/scope/objects-fetcher/rust-tar-transfer.ts components/legacy/scope/objects-fetcher/rust-tar-staging.ts scopes/scope/objects/objects/rust-object-inventory.ts scopes/scope/objects/objects/rust-object-reader.ts scopes/scope/objects/objects/rust-object-directory.ts scopes/scope/objects/objects/rust-object-package.ts scopes/scope/objects/objects/rust-object-discovery.ts
       - name: Build real scanner for transport tests
         working-directory: native
         run: cargo build --locked --workspace

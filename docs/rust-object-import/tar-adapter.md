@@ -1,5 +1,7 @@
 # Staged tar repository adapter
 
+This records the preceding coordination/adapter step. Current opt-in HTTP integration is documented in [http-tar.md](./http-tar.md).
+
 `importStagedTar()` is now an internal TypeScript operation in the legacy scope component. It imports an owned, immutable archive through the Rust tar kernel and `ObjectsWritable`, including ordered marker policy and canonical continuation. Normal HTTP/ObjectFetcher imports do not call it yet; production stream staging and the transport handoff remain the next integration step.
 
 The operation lazily loads only canonical object bodies from archive ranges. Validated eligible Sources remain in Rust, share the existing import queue and are settled through the repository coordinator. It handles START/END JSON, the schema-1 termination rule, ERROR messages, and the existing transport Ref interpretation. Remote framing/marker errors use `TarRemoteError`, retaining the original message for future ObjectFetcher attribution. Repository parse/merge/persistence failures remain writable errors.
