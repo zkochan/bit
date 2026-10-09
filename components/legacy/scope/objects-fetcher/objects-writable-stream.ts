@@ -147,9 +147,8 @@ export class ObjectsWritable extends Writable {
     const reserved = new Map<number, ReturnType<typeof ObjectList.extractScopeAndHash>>();
     let error: unknown;
     let processed = 0;
-    const eligible = async () =>
-      this.repo.canWriteMutableObjectsNatively() && Boolean(await this.repo.getNativeSourceStoreOptions());
-    const native = await eligible();
+    const initialEligibility = this.nativeStoreEligibility();
+    const native = typeof initialEligibility === 'boolean' ? initialEligibility : await initialEligibility;
     for (let index = 0; index < entries.length; index += 1) {
       try {
         signal?.throwIfAborted();
@@ -162,7 +161,10 @@ export class ObjectsWritable extends Writable {
           if (this.objectsQueue.reserveNativeSource(entry.sourceHash)) reserved.set(index, object);
         } else {
           // Hydrate through the canonical parser, rechecking eligibility after earlier policy.
-          const metadata = entry.metadata && (await eligible()) ? entry.metadata : undefined;
+          const eligibility = entry.metadata ? this.nativeStoreEligibility() : false;
+          const metadata = (typeof eligibility === 'boolean' ? eligibility : await eligibility)
+            ? entry.metadata
+            : undefined;
           const buffer = metadata ? Buffer.alloc(0) : await load(index);
           signal?.throwIfAborted();
           await this.writeObjectToFs({ ...object, buffer }, { result: undefined }, metadata);
@@ -176,7 +178,10 @@ export class ObjectsWritable extends Writable {
     // Metadata policy may change hooks or methods. Downgrade reserved Sources before native commit.
     let selected: number[] = [];
     try {
-      if (!signal?.aborted && (await eligible())) selected = [...reserved.keys()];
+      if (!signal?.aborted) {
+        const eligibility = this.nativeStoreEligibility();
+        if (typeof eligibility === 'boolean' ? eligibility : await eligibility) selected = [...reserved.keys()];
+      }
     } catch (cause) {
       error ??= cause;
     }
@@ -313,12 +318,19 @@ export class ObjectsWritable extends Writable {
     await this.writeMutableObject(version);
   }
 
+  private nativeStoreEligibility(): boolean | Promise<boolean> {
+    if (!this.repo.canWriteMutableObjectsNatively()) return false;
+    const eligibility = this.repo.getNativeSourceStoreEligibility?.();
+    return eligibility === undefined ? this.repo.getNativeSourceStoreOptions().then(Boolean) : eligibility;
+  }
+
   private async writeMutableObject(object: Version | VersionHistory | LaneHistory) {
+    const eligibility =
+      this.mutableWriter && !this.mutableWriter.unavailableReason ? this.nativeStoreEligibility() : false;
     if (
       this.mutableWriter &&
       !this.mutableWriter.unavailableReason &&
-      this.repo.canWriteMutableObjectsNatively() &&
-      (await this.repo.getNativeSourceStoreOptions()) &&
+      (typeof eligibility === 'boolean' ? eligibility : await eligibility) &&
       object.serialize === BitObject.prototype.serialize &&
       object.compressWithSize === BitObject.prototype.compressWithSize
     ) {

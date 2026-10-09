@@ -898,18 +898,33 @@ export default class Repository {
     if (added) await this.scopeIndex.write();
   }
 
-  async getNativeSourceStoreOptions(): Promise<{ objectsDirectory: string; owner: ObjectChownOptions } | undefined> {
-    // Custom transforms stay in JavaScript. Native writes are currently qualified on Unix hosts.
+  /** Recheck live policy without allocating options when the default store needs no ownership lookup. */
+  getNativeSourceStoreEligibility(): boolean | undefined {
     if (
-      (process.platform !== 'linux' && process.platform !== 'darwin') ||
-      this.onPersist !== this.defaultOnPersist ||
-      this.onRead !== this.defaultOnRead ||
-      (Repository.hasPreObjectPersistTransformer
-        ? Repository.hasPreObjectPersistTransformer()
-        : Boolean(Repository.onPreObjectPersist)) ||
-      this.isContentTransformed()
+      this.scopeJson.groupName ||
+      this.getNativeSourceStoreOptions !== Repository.prototype.getNativeSourceStoreOptions ||
+      this.getChownOptions !== Repository.prototype.getChownOptions ||
+      this.getPath !== Repository.prototype.getPath
     )
       return undefined;
+    return this.isNativeSourceStoreEligible();
+  }
+
+  private isNativeSourceStoreEligible(): boolean {
+    // Custom transforms stay in JavaScript. Native writes are currently qualified on Unix hosts.
+    return (
+      (process.platform === 'linux' || process.platform === 'darwin') &&
+      this.onPersist === this.defaultOnPersist &&
+      this.onRead === this.defaultOnRead &&
+      !(Repository.hasPreObjectPersistTransformer
+        ? Repository.hasPreObjectPersistTransformer()
+        : Boolean(Repository.onPreObjectPersist)) &&
+      !this.isContentTransformed()
+    );
+  }
+
+  async getNativeSourceStoreOptions(): Promise<{ objectsDirectory: string; owner: ObjectChownOptions } | undefined> {
+    if (!this.isNativeSourceStoreEligible()) return undefined;
     return { objectsDirectory: path.resolve(this.getPath()), owner: await this.getChownOptions() };
   }
 
