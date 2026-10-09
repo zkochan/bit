@@ -146,3 +146,25 @@ test(
     assert.equal(await fs.readFile(marker, 'utf8'), 'canonical');
   }
 );
+
+test('singleton and parallel mutable writes produce identical bytes and recover after rejection', async (t) => {
+  const single = await setup(t);
+  const batch = await setup(t);
+  const objects = ['Version', 'VersionHistory', 'LaneHistory'].map((type, index) =>
+    item(type, { data: '🚀'.repeat(1000), updated: index }, index + 20)
+  );
+  const batchSizes = await batch.writer.persistMetadata(objects);
+  for (const [index, object] of objects.entries()) {
+    assert.deepEqual(await single.writer.persistMetadata([object]), [batchSizes[index]]);
+    assert.deepEqual(
+      await fs.readFile(filename(single.directory, object)),
+      await fs.readFile(filename(batch.directory, object))
+    );
+  }
+  const invalid = item('Source', {}, 30);
+  assert.deepEqual(await single.writer.persistMetadata([invalid]), [null]);
+  const replacement = item('Version', { replacement: true }, 20);
+  assert.ok((await single.writer.persistMetadata([replacement]))[0]);
+  assert.deepEqual(zlib.inflateSync(await fs.readFile(filename(single.directory, replacement))), replacement.buffer);
+  assert.equal(single.writer.unavailableReason, undefined);
+});

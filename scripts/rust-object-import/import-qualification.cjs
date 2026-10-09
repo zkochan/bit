@@ -15,6 +15,9 @@ const helper = path.resolve(process.argv[3] || '');
 const baselineCli = process.env.BIT_IMPORT_QUALIFICATION_BASELINE_CLI
   ? path.resolve(process.env.BIT_IMPORT_QUALIFICATION_BASELINE_CLI)
   : undefined;
+const baselineHelper = process.env.BIT_IMPORT_QUALIFICATION_BASELINE_HELPER
+  ? path.resolve(process.env.BIT_IMPORT_QUALIFICATION_BASELINE_HELPER)
+  : helper;
 const rounds = Number(process.env.BIT_IMPORT_QUALIFICATION_ROUNDS || 9);
 const smoke = process.env.BIT_IMPORT_QUALIFICATION_SMOKE === '1';
 const packaged = process.env.BIT_IMPORT_QUALIFICATION_PACKAGED === '1';
@@ -56,6 +59,7 @@ assert.ok(!modes.includes('tar-baseline') || baselineCli, 'tar-baseline requires
 async function command(directory, ids, requestedMode, allHistory, traceFile) {
   const commandRoot = requestedMode === 'tar-baseline' ? baselineCli : cliRoot;
   const mode = requestedMode === 'tar-baseline' ? 'tar' : requestedMode;
+  const commandHelper = requestedMode === 'tar-baseline' ? baselineHelper : helper;
   const cpuFile = path.join(directory, 'cpu.txt');
   const args = [
     path.join(commandRoot, 'bin/bit.js'),
@@ -80,7 +84,7 @@ async function command(directory, ids, requestedMode, allHistory, traceFile) {
       mode === 'mutable-control'
         ? packaged
           ? 'packaged'
-          : helper
+          : commandHelper
         : mode === 'packaged-fallback'
           ? 'packaged'
           : mode === 'control'
@@ -208,6 +212,9 @@ async function workspace(directory, manifest) {
     baselineCliProvenance: baselineProvenance,
     helperSha256: createHash('sha256')
       .update(await fs.readFile(helper))
+      .digest('hex'),
+    baselineHelperSha256: createHash('sha256')
+      .update(await fs.readFile(baselineHelper))
       .digest('hex'),
     rounds,
     smoke,
@@ -383,6 +390,13 @@ async function workspace(directory, manifest) {
       .digest('hex'),
     report.helperSha256,
     'helper changed during qualification'
+  );
+  assert.equal(
+    createHash('sha256')
+      .update(await fs.readFile(baselineHelper))
+      .digest('hex'),
+    report.baselineHelperSha256,
+    'baseline helper changed during qualification'
   );
   console.log(`Evidence: ${path.join(temporary, 'results.json')}`);
 })().catch((error) => {
