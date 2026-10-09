@@ -141,3 +141,5 @@ Owned archive staging, cancellation and staging-inclusive HTTP qualification: [t
 Lossless pre-policy staging fallback and received-prefix error parity: [tar-prefix-replay.md](./tar-prefix-replay.md).
 
 Actual repository writer coordination for staged batches: [tar-coordination.md](./tar-coordination.md).
+
+Production TypeScript adapter for owned tar archives, markers and canonical suffix continuation: [tar-adapter.md](./tar-adapter.md).

@@ -80,7 +80,7 @@ jobs:
 
       - name: test compiled tar repository coordination
         if: matrix.shard == 0
-        run: node --test scripts/rust-object-import/tar-coordination.test.cjs
+        run: node --test scripts/rust-object-import/tar-coordination.test.cjs scripts/rust-object-import/tar-adapter.test.cjs
 
       - name: link the repo bit binary for the e2e tests
         run: |
