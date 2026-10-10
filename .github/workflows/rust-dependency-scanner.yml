@@ -431,6 +431,7 @@ jobs:
           bvm link --verbose
           node -e "console.log(require('path').join(require('os').homedir(),'bin'))" >> "$GITHUB_PATH"
       - name: Compile the actual object import graph
+        shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
         run: |
           bbit config set analytics_reporting false
           bbit config set error_reporting false
