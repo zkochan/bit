@@ -54,6 +54,7 @@ assert.ok(
         'tar-staged',
         'tar-baseline',
         'tar-node-metadata',
+        'tar-node-mutable',
         'mutable-control',
         'packaged-fallback',
       ].includes(mode)
@@ -61,7 +62,12 @@ assert.ok(
 );
 assert.ok(
   !modes.some(
-    (mode) => mode === 'tar' || mode === 'tar-staged' || mode === 'tar-baseline' || mode === 'tar-node-metadata'
+    (mode) =>
+      mode === 'tar' ||
+      mode === 'tar-staged' ||
+      mode === 'tar-baseline' ||
+      mode === 'tar-node-metadata' ||
+      mode === 'tar-node-mutable'
   ) || transport === 'http',
   'tar qualification requires actual HTTP'
 );
@@ -90,6 +96,7 @@ async function command(directory, ids, requestedMode, allHistory, traceFile, cpu
       mode === 'tar' ||
       mode === 'tar-staged' ||
       mode === 'tar-node-metadata' ||
+      mode === 'tar-node-mutable' ||
       mode === 'validate' ||
       mode === 'store' ||
       mode === 'mutable-control'
@@ -106,11 +113,18 @@ async function command(directory, ids, requestedMode, allHistory, traceFile, cpu
                 ? path.join(directory, 'crashing-helper')
                 : 'off',
     BIT_RUST_OBJECT_TAR:
-      mode === 'tar' || mode === 'tar-staged' || mode === 'tar-baseline' || mode === 'tar-node-metadata' ? 'on' : 'off',
+      mode === 'tar' ||
+      mode === 'tar-staged' ||
+      mode === 'tar-baseline' ||
+      mode === 'tar-node-metadata' ||
+      mode === 'tar-node-mutable'
+        ? 'on'
+        : 'off',
     BIT_RUST_OBJECT_TAR_PROGRESSIVE: mode === 'tar-staged' ? 'off' : 'on',
     BIT_RUST_OBJECT_IMPORT_METADATA: mode === 'store' || mode === 'tar-node-metadata' ? 'off' : 'on',
     BIT_RUST_OBJECT_IMPORT_MODE: mode === 'validate' ? 'validate' : 'store',
-    BIT_RUST_OBJECT_IMPORT_MUTABLE: mode === 'store' || mode === 'mutable-control' ? 'off' : 'on',
+    BIT_RUST_OBJECT_IMPORT_MUTABLE:
+      mode === 'store' || mode === 'mutable-control' || mode === 'tar-node-mutable' ? 'off' : 'on',
     CI: '1',
   };
   delete env.BIT_IMPORT_CPU_PROFILE;
@@ -380,14 +394,41 @@ async function workspace(directory, manifest) {
         checkModels(warm.verification);
         await new Promise((resolve) => setImmediate(resolve));
         global.gc?.();
-        if (mode === 'tar' || mode === 'tar-staged' || mode === 'tar-baseline' || mode === 'tar-node-metadata') {
+        const incomingVersions = Object.values(manifest.hashes).filter((object) => object.type === 'Version').length;
+        if (incomingVersions) {
+          assert.ok(cold.trace.stages.versionParseOther?.calls >= incomingVersions, 'Version parsing must be traced');
+          assert.ok(
+            cold.trace.stages.versionSerialization?.calls >= incomingVersions,
+            'Version serialization must be traced'
+          );
+          assert.ok(
+            cold.trace.stages.versionParseForPersistence?.calls >= incomingVersions,
+            'serialized Version validation must remain active'
+          );
+        }
+        const mutableFrames = Object.entries(cold.trace.mutableFrames.counts);
+        assert.equal(
+          mutableFrames.reduce((sum, [count, frames]) => sum + Number(count) * frames, 0),
+          cold.trace.native.mutableSubmitted
+        );
+        assert.equal(
+          mutableFrames.reduce((sum, [, frames]) => sum + frames, 0),
+          cold.trace.native.mutableBatches
+        );
+        if (
+          mode === 'tar' ||
+          mode === 'tar-staged' ||
+          mode === 'tar-baseline' ||
+          mode === 'tar-node-metadata' ||
+          mode === 'tar-node-mutable'
+        ) {
           const sources = Object.values(manifest.hashes).filter((object) => object.type === 'Source').length;
           assert.equal(cold.trace.tar.nativeSources, sources, 'actual HTTP Source coverage must be native');
           assert.equal(cold.trace.tar.fallbacks, 0, 'successful fixture must not silently fall back');
           assert.ok(cold.trace.tar.operations, 'production stream operation must actually run');
           assert.ok(cold.trace.tar.batches, 'production tar protocol must actually run');
           assert.equal(cold.trace.objectTypes.Source || 0, 0, 'Source bodies must not be hydrated in Node');
-          if (mode === 'tar' || mode === 'tar-staged' || mode === 'tar-baseline') {
+          if (mode === 'tar' || mode === 'tar-staged' || mode === 'tar-baseline' || mode === 'tar-node-mutable') {
             assert.equal(cold.trace.inflation.incoming, 0, 'eligible incoming metadata must not inflate in Node');
             assert.ok(
               cold.trace.stages.nativeMetadataHydration?.calls >= Object.keys(manifest.hashes).length - sources,
@@ -397,6 +438,10 @@ async function workspace(directory, manifest) {
           assert.equal(cold.trace.stages.nativeAtomicPersistence?.calls || 0, 0, 'no per-Source Node atomic writes');
           assert.equal(warm.trace.tar.nativeSources, 0);
           assert.ok(cold.trace.stages.componentMergeAndIndex?.calls, 'genuine component merge/index required');
+          if (mode === 'tar-node-mutable') {
+            assert.equal(cold.trace.native.mutableSubmitted, 0);
+            assert.equal(warm.trace.native.mutableSubmitted, 0);
+          }
         }
         if (mode === 'native' || mode === 'validate' || mode === 'store' || mode === 'mutable-control') {
           const expectedSources = Object.values(manifest.hashes).filter((obj) => obj.type === 'Source').length;

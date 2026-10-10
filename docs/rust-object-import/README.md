@@ -161,3 +161,5 @@ Seeded origin/local-state HTTP imports, cached-policy repository regressions and
 Shared origin/cache identities, arrival-sensitive histories and interrupted HTTP prefixes: [shared-history.md](./shared-history.md).
 
 Larger retained histories, canonical/native persistence size boundaries and Version CPU attribution: [history-scaling.md](./history-scaling.md).
+
+Version round-trip validation, actual mutable frame sizes and the Node mutable-write control: [version-attribution.md](./version-attribution.md).
