@@ -265,6 +265,14 @@ async function workspace(directory, manifest) {
         ['concurrent-mutable', { components: 100, files: 1, bytes: 1024, versions: 8, remotes: 4 }],
       ];
   if (selectedCases) {
+    for (const versions of [32, 512]) {
+      const name = `history-overlap-${versions}`;
+      if (selectedCases.includes(name))
+        cases.push([
+          name,
+          { components: 4, files: 1, bytes: 1024, versions, localVersions: versions, remotes: 1, overlap: 'local' },
+        ]);
+    }
     for (const overlap of ['origin', 'local']) {
       const name = `overlap-${overlap}`;
       if (selectedCases.includes(name))
@@ -306,6 +314,9 @@ async function workspace(directory, manifest) {
         options,
         sourceBytes: manifest.sourceBytes,
         expectedObjects: Object.keys({ ...manifest.hashes, ...manifest.localHashes }).length,
+        historySerializedBytes: options.localVersions
+          ? Object.values(manifest.components).map((component) => component.history.serializedBytes)
+          : undefined,
         runs: [],
         diagnostics: [],
         profiles: [],
@@ -422,6 +433,15 @@ async function workspace(directory, manifest) {
             cold.trace.stages.versionHistoryMergePolicy?.calls >= options.components * options.remotes,
             'seeded history merge policy must actually run'
           );
+          if (options.localVersions && mode === 'tar') {
+            const eligibleHistories = data.historySerializedBytes.filter((bytes) => bytes <= 16 * 1024).length;
+            assert.equal(eligibleHistories, options.versions === 32 ? options.components : 0);
+            const mutableCount = options.components * options.versions + eligibleHistories;
+            assert.equal(cold.trace.native.mutableSubmitted, mutableCount);
+            assert.equal(cold.trace.native.mutablePersisted, mutableCount);
+            assert.equal(cold.trace.native.mutableFallbacks, 0);
+            assert.equal(warm.trace.native.mutableSubmitted, 0);
+          }
         }
         data.diagnostics.push({ mode, cold, warm });
         await fs.rm(destination, { recursive: true, force: true });

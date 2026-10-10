@@ -12,7 +12,7 @@ const { LaneId } = installed('@teambit/lane-id');
 const { ModelComponentMerger } = installed('@teambit/legacy.scope/dist/component-ops/model-components-merger.js');
 const { MultipleComponentMerger } = installed('@teambit/legacy.scope/dist/component-ops/multiple-component-merger.js');
 const { benchmarkGlobals } = require('../rust-dependency-analysis/command-workspace.cjs');
-for (const overlap of ['origin', 'local', 'cached']) {
+for (const overlap of ['origin', 'local', 'cached', 'large-local']) {
   test(`${overlap} overlap fixture verifies canonical merge and detects lost local history`, async (t) => {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'bit overlap fixture '));
     const oldGlobals = process.env.BIT_GLOBALS_DIR;
@@ -27,8 +27,9 @@ for (const overlap of ['origin', 'local', 'cached']) {
       components: 1,
       files: 1,
       bytes: 1024,
-      versions: 3,
-      overlap: overlap === 'cached' ? 'local' : overlap,
+      versions: overlap === 'large-local' ? 128 : 3,
+      localVersions: overlap === 'large-local' ? 128 : 3,
+      overlap: overlap === 'cached' || overlap === 'large-local' ? 'local' : overlap,
     });
     const target = path.join(directory, 'destination');
     await destination(installedRoot, target, manifest);
@@ -36,6 +37,12 @@ for (const overlap of ['origin', 'local', 'cached']) {
     const scope = await Scope.load(target, false);
     const remote = await Scope.load(path.join(directory, 'remotes', 'qualification.remote0'), false);
     const expected = Object.values(manifest.components)[0];
+    if (overlap === 'large-local') {
+      assert.equal(Object.keys(expected.history.versions).length, 256);
+      assert.ok(expected.tags['1.0.90'], 'incoming tag 90 must survive the separate local tag');
+      assert.ok(expected.tags['9.0.90'], 'local tag must avoid incoming tag collision');
+      assert.ok(expected.orphaned['9.0.91']);
+    }
     const incoming = await remote.objects.load(new Ref(expected.hash));
     const existing = await scope.objects.load(new Ref(expected.hash));
     let mergedComponent;

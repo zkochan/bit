@@ -159,3 +159,5 @@ Detailed merge/index attribution, CPU profiling and local-overlap qualification 
 Seeded origin/local-state HTTP imports, cached-policy repository regressions and conflict-prefix qualification: [local-overlap.md](./local-overlap.md).
 
 Shared origin/cache identities, arrival-sensitive histories and interrupted HTTP prefixes: [shared-history.md](./shared-history.md).
+
+Larger retained histories, canonical/native persistence size boundaries and Version CPU attribution: [history-scaling.md](./history-scaling.md).
