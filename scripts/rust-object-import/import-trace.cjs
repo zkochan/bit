@@ -12,6 +12,7 @@ const metrics = {
   stages: {},
   asyncResources: {},
   objectTypes: {},
+  lookupResults: { repository: { found: 0, missing: 0 }, component: { found: 0, missing: 0 } },
   inflation: { incoming: 0, repository: 0 },
   receivedObjects: 0,
   receivedCompressedBytes: 0,
@@ -93,9 +94,17 @@ function wrap(target, key, stage, inspect) {
 const originalLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   const value = originalLoad.apply(this, arguments);
-  if (!output || process.pid !== owner || !/objects|scope|source-validator|object-importer|rust-tar/.test(request))
+  if (
+    !output ||
+    process.pid !== owner ||
+    !/objects|scope|repositories|component.*merger|remote-lanes|source-validator|object-importer|rust-tar/.test(request)
+  )
     return value;
   if (value?.Repository) {
+    wrap(value.Repository.prototype, 'load', 'repositoryObjectLoad', function (result) {
+      metrics.lookupResults.repository[result ? 'found' : 'missing']++;
+    });
+    wrap(value.Repository.prototype, 'writeObjectsToTheFS', 'repositoryWriteAndIndex');
     wrap(value.Repository.prototype, 'getNativeSourceStoreEligibility', 'nativeStoreEligibility');
     wrap(value.Repository.prototype, 'getNativeSourceStoreOptions', 'nativeStoreOptions');
     wrap(value.Repository.prototype, 'getChownOptions', 'nativeStoreOwnership');
@@ -103,6 +112,28 @@ Module._load = function (request, parent, isMain) {
     wrap(value.Repository.prototype, '_writeOne', 'legacyPersistence');
     wrap(value.Repository.prototype, 'writeObjectFile', 'atomicFileWrite');
     wrap(value.Repository.prototype, 'writeRemoteLanes', 'remoteLanePersistence');
+  }
+  for (const [name, methods] of Object.entries({
+    ScopeIndex: { addMany: 'scopeIndexAdd', write: 'scopeIndexWrite' },
+    SourceRepository: { _findComponent: 'existingComponentLookup' },
+    MultipleComponentMerger: { merge: 'multipleComponentMerge' },
+    ModelComponentMerger: { merge: 'modelComponentMergePolicy' },
+    VersionHistory: { merge: 'versionHistoryMergePolicy' },
+    LaneHistory: { merge: 'laneHistoryMergePolicy' },
+    RemoteLanes: { addEntriesFromModelComponents: 'remoteLaneEntries' },
+  })) {
+    const target = value?.[name] || (value?.default?.name === name ? value.default : undefined);
+    for (const [method, stage] of Object.entries(methods))
+      wrap(
+        target?.prototype,
+        method,
+        stage,
+        name === 'SourceRepository'
+          ? function (result) {
+              metrics.lookupResults.component[result ? 'found' : 'missing']++;
+            }
+          : undefined
+      );
   }
   if (value?.BitObject) {
     wrap(value.BitObject, 'parseInflatedObjectWithSize', 'nativeMetadataHydration');
@@ -163,6 +194,14 @@ Module._load = function (request, parent, isMain) {
         metrics.tar.batches += result.batches;
       });
   if (
+    value?.ScopeIndex ||
+    value?.SourceRepository ||
+    value?.MultipleComponentMerger ||
+    value?.ModelComponentMerger ||
+    value?.VersionHistory ||
+    value?.LaneHistory ||
+    value?.RemoteLanes ||
+    ['SourceRepository', 'VersionHistory', 'LaneHistory'].includes(value?.default?.name) ||
     value?.ObjectFetcher ||
     value?.RustSourceValidator ||
     value?.RustObjectImporter ||
