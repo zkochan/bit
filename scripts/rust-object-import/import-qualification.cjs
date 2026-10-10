@@ -53,6 +53,8 @@ assert.ok(
         'store',
         'native',
         'tar-operation',
+        'workspace-node',
+        'workspace-native',
         'tar',
         'tar-staged',
         'tar-baseline',
@@ -78,7 +80,9 @@ assert.ok(
 assert.ok(!modes.includes('tar-baseline') || baselineCli, 'tar-baseline requires a separate compiled baseline CLI');
 async function command(directory, ids, requestedMode, allHistory, traceFile, cpuProfileFile) {
   const commandRoot = requestedMode === 'tar-baseline' ? baselineCli : cliRoot;
-  const mode = requestedMode === 'tar-baseline' || requestedMode === 'tar-operation' ? 'tar' : requestedMode;
+  const mode = ['tar-baseline', 'tar-operation', 'workspace-node', 'workspace-native'].includes(requestedMode)
+    ? 'tar'
+    : requestedMode;
   const commandHelper = requestedMode === 'tar-baseline' ? baselineHelper : helper;
   const cpuFile = path.join(directory, 'cpu.txt');
   const args = [
@@ -95,6 +99,7 @@ async function command(directory, ids, requestedMode, allHistory, traceFile, cpu
   if (traceFile) args.unshift('--require', path.join(__dirname, 'import-trace.cjs'));
   const env = {
     ...process.env,
+    BIT_RUST_WORKSPACE_MATERIALIZATION: requestedMode === 'workspace-native' ? 'on' : 'off',
     BIT_RUST_OBJECT_IMPORT:
       mode === 'native' ||
       mode === 'tar' ||
@@ -481,6 +486,14 @@ async function workspace(directory, manifest) {
               'overlapping imports require native merge coverage'
             );
         }
+        if (mode === 'workspace-native') {
+          assert.ok(commandKind !== 'objects', 'workspace qualification must materialize files');
+          assert.ok(cold.trace.materialization.files > 0, 'actual workspace files must reach Rust');
+          assert.equal(cold.trace.materialization.completed, cold.trace.materialization.files);
+          assert.equal(cold.trace.materialization.failed, 0, 'ordinary fixture must not hide write fallback');
+          assert.ok(cold.trace.materialization.completed >= cold.workspaceVerification.files);
+        }
+        if (mode === 'workspace-node') assert.equal(cold.trace.materialization.files, 0);
         const incomingVersions = Object.values(manifest.hashes).filter((object) => object.type === 'Version').length;
         if (incomingVersions) {
           assert.ok(cold.trace.stages.versionParseOther?.calls >= incomingVersions, 'Version parsing must be traced');
