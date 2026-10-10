@@ -271,3 +271,28 @@ test('coalesced timeout settles all callers only after the helper exits', async 
   assert.equal(writer.stats.mutableBatches, 1);
   assert.equal(writer.stats.mutableFallbacks, 2);
 });
+
+test('two-object direct byte boundary preserves singleton and parallel compressed bytes', async (t) => {
+  const batch = await setup(t);
+  const single = await setup(t);
+  for (const extra of [0, 1]) {
+    const objects = [0, 1].map((index) => item('Version', { data: 'x'.repeat(1983 + extra) }, 600 + extra * 2 + index));
+    assert.equal(
+      objects.reduce((sum, object) => sum + object.buffer.length, 0),
+      4096 + extra * 2
+    );
+    const sizes = await batch.writer.persistMetadata(objects);
+    for (const [index, object] of objects.entries()) {
+      assert.deepEqual(await single.writer.persistMetadata([object]), [sizes[index]]);
+      assert.deepEqual(
+        await fs.readFile(filename(batch.directory, object)),
+        await fs.readFile(filename(single.directory, object))
+      );
+    }
+  }
+  const invalid = item('Source', {}, 610);
+  const valid = item('VersionHistory', { versions: [] }, 611);
+  const expected = (await single.writer.persistMetadata([valid]))[0];
+  assert.deepEqual(await batch.writer.persistMetadata([invalid, valid]), [null, expected]);
+  assert.deepEqual(zlib.inflateSync(await fs.readFile(filename(batch.directory, valid))), valid.buffer);
+});

@@ -30,8 +30,18 @@ pub(crate) fn serve(
     let store = store.ok_or_else(|| invalid("missing mutable store"))?;
     let id = protocol::word(reader)?;
     let inputs = request(reader)?;
-    let sizes = if inputs.len() == 1 {
-        vec![persist(store, &inputs[0]).ok()]
+    let sizes = if inputs.len() == 1
+        || (inputs.len() == 2
+            && inputs
+                .iter()
+                .map(|input| input.serialized.len())
+                .sum::<usize>()
+                <= 4 * 1024)
+    {
+        inputs
+            .iter()
+            .map(|input| persist(store, input).ok())
+            .collect()
     } else {
         pool.install(|| {
             inputs
