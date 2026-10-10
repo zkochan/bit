@@ -109,6 +109,11 @@ export class LaneHistory extends BitObject {
     this.history = { ...this.history, ...laneHistory.history };
   }
 
+  mergeNative(laneHistory: LaneHistory, selections: [number, number][]) {
+    const values = [Object.entries(this.history), Object.entries(laneHistory.history)];
+    this.history = Object.fromEntries(selections.map(([side, index]) => values[side][index]));
+  }
+
   static create(name: string, scope: string, laneHash: string) {
     return new LaneHistory({
       name,

@@ -90,3 +90,50 @@ test('ObjectFetcher disposes its helper on remote failure and missing helper pre
   assert.equal(disposed, 2);
   assert.equal((await repo.load(obj.ref)).hash().toString(), obj.ref.toString());
 });
+
+test('external cancellation stops active streams and rejects with the caller error', async (t) => {
+  const { PassThrough } = require('node:stream');
+  const controller = new AbortController();
+  const reason = new Error('external import cancellation');
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-fetcher-cancel-'));
+  const previous = process.env.BIT_RUST_OBJECT_IMPORT;
+  process.env.BIT_RUST_OBJECT_IMPORT = executable;
+  t.after(async () => {
+    if (previous === undefined) delete process.env.BIT_RUST_OBJECT_IMPORT;
+    else process.env.BIT_RUST_OBJECT_IMPORT = previous;
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+  const repo = await repository(directory);
+  const stream = new PassThrough({ objectMode: true });
+  let fetched;
+  const ready = new Promise((resolve) => {
+    fetched = resolve;
+  });
+  const fetcher = new ObjectFetcher(
+    repo,
+    { sources: {} },
+    {
+      resolve: async () => ({
+        fetch: async () => {
+          fetched();
+          return stream;
+        },
+      }),
+    },
+    {},
+    [],
+    undefined,
+    {},
+    true,
+    { remote: ['1'.repeat(40)] },
+    'cancellation test',
+    controller.signal
+  );
+  const result = fetcher.fetchFromRemoteAndWrite();
+  await ready;
+  await new Promise(setImmediate);
+  controller.abort(reason);
+  await assert.rejects(result, (error) => error === reason);
+  assert.ok(stream.destroyed);
+  assert.deepEqual(await fs.readdir(directory), [], 'cancelled operation never writes models or index');
+});

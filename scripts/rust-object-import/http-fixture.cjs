@@ -8,6 +8,8 @@ const scopes = JSON.parse(process.argv[3]);
 const servers = [];
 const failures = process.argv[5] ? JSON.parse(process.argv[5]) : [];
 const gates = process.argv[4] ? JSON.parse(process.argv[4]) : {};
+const delayMs = Number(process.env.BIT_IMPORT_QUALIFICATION_HTTP_DELAY_MS || 0);
+if (!Number.isInteger(delayMs) || delayMs < 0 || delayMs > 5000) throw new Error('invalid controlled HTTP delay');
 async function waitForHistory(markers) {
   const fs = require('node:fs/promises');
   const zlib = require('node:zlib');
@@ -68,6 +70,7 @@ async function waitForHistory(markers) {
           setTimeout(() => res.destroy(), 20);
           return;
         }
+        if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
         await route.middlewares[0](req, res);
       } catch (error) {
         if (!res.headersSent) res.writeHead(500, { 'content-type': 'application/json' });

@@ -44,7 +44,7 @@ function fixture(t) {
       if (!fs.existsSync(path.join(base, name))) write(path.join(base, name), 'module.exports = {};\n');
   write(path.join(legacyDirectory, '../index.js'), 'module.exports = {};\n');
   write(path.join(networkDirectory, '../index.js'), 'module.exports = {};\n');
-  for (const name of ['discovery', 'inventory', 'reader', 'directory'])
+  for (const name of ['discovery', 'inventory', 'reader', 'directory', 'operation'])
     compile(
       `scopes/scope/objects/objects/rust-object-${name}.ts`,
       path.join(moduleDirectory, `rust-object-${name}.js`)

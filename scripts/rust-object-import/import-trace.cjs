@@ -14,6 +14,8 @@ const metrics = {
   stages: {},
   asyncResources: {},
   objectTypes: {},
+  incomingObjectTypes: {},
+  operation: { kinds: {}, fallbackKinds: {}, spoolBytes: 0, spoolFallbacks: 0, stalePlans: 0, missingHits: 0 },
   lookupResults: { repository: { found: 0, missing: 0 }, component: { found: 0, missing: 0 } },
   version: { serializedBytes: 0, serializedObjects: 0 },
   mutableFrames: { counts: {}, serializedBytes: 0 },
@@ -147,8 +149,8 @@ Module._load = function (request, parent, isMain) {
     SourceRepository: { _findComponent: 'existingComponentLookup' },
     MultipleComponentMerger: { merge: 'multipleComponentMerge' },
     ModelComponentMerger: { merge: 'modelComponentMergePolicy' },
-    VersionHistory: { merge: 'versionHistoryMergePolicy' },
-    LaneHistory: { merge: 'laneHistoryMergePolicy' },
+    VersionHistory: { merge: 'versionHistoryMergePolicy', mergeNative: 'versionHistoryNativeApply' },
+    LaneHistory: { merge: 'laneHistoryMergePolicy', mergeNative: 'laneHistoryNativeApply' },
     RemoteLanes: { addEntriesFromModelComponents: 'remoteLaneEntries' },
   })) {
     const target = value?.[name] || (value?.default?.name === name ? value.default : undefined);
@@ -170,6 +172,7 @@ Module._load = function (request, parent, isMain) {
       metrics.inflation[args[1] === undefined ? 'incoming' : 'repository']++;
       const type = result.object.getType();
       metrics.objectTypes[type] = (metrics.objectTypes[type] || 0) + 1;
+      if (args[1] === undefined) metrics.incomingObjectTypes[type] = (metrics.incomingObjectTypes[type] || 0) + 1;
     });
   }
   if (value?.ObjectsWritable)
@@ -187,6 +190,26 @@ Module._load = function (request, parent, isMain) {
     wrap(value.RustSourceValidator.prototype, 'dispose', 'helperDisposal', function () {
       if (this.child) metrics.native.instances++;
       for (const key of ['submitted', 'sources', 'legacy', 'batches']) metrics.native[key] += this.stats[key];
+    });
+  }
+  if (value?.NativeImportOperation) {
+    wrap(value.NativeImportOperation.prototype, 'disposeAndWait', 'nativeOperationDisposal', function () {
+      metrics.operation.stalePlans += this.stats.stalePlans;
+      metrics.operation.missingHits += this.stats.missingHits;
+      this.stats.stalePlans = 0;
+    });
+    wrap(value.NativeImportOperation.prototype, 'request', 'nativeImportPlan', function (result, args) {
+      const failed =
+        result === undefined ||
+        (args[0].kind === 'persist' && result === null) ||
+        (args[0].kind === 'indexWrite' && result === false) ||
+        (args[0].kind === 'index' && result === null);
+      const bucket = failed ? metrics.operation.fallbackKinds : metrics.operation.kinds;
+      bucket[args[0].kind] = (bucket[args[0].kind] || 0) + 1;
+    });
+    wrap(value.NativeImportOperation.prototype, 'appendArchive', 'nativeTarSpool', function (result, args) {
+      if (result === undefined) metrics.operation.spoolFallbacks++;
+      else metrics.operation.spoolBytes += args[1].length;
     });
   }
   if (value?.RustObjectImporter) {

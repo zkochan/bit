@@ -382,7 +382,7 @@ commands:
               python3 bit/scripts/rust-dependency-analysis/artifacts/install-helper.py assemble --distribution "bit-${BIT_VERSION}" --archive "${scanner_archives[0]}" --target "$scanner_target"
             fi
       - run:
-          name: Assemble explicitly supplied experimental Rust object helper
+          name: Provision and assemble trusted experimental Rust object helper
           command: |
             node bit/scripts/rust-object-import/artifacts/assemble-release.cjs "bit-${BIT_VERSION}" "<<parameters.scanner_target>>"
       - run:

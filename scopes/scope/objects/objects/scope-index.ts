@@ -10,6 +10,7 @@ import Lane from '../models/lane';
 import type BitObject from './object';
 import type Ref from './ref';
 import { difference } from 'lodash';
+import type { NativeImportOperation } from './rust-object-operation';
 
 const COMPONENTS_INDEX_FILENAME = 'index.json';
 
@@ -55,6 +56,7 @@ export enum IndexType {
 type Index = { [IndexType.components]: ComponentItem[]; [IndexType.lanes]: LaneItem[] };
 
 export class ScopeIndex {
+  nativeImportOperation?: NativeImportOperation;
   indexPath: string;
   index: Index;
   _writeIndexMutex?: Mutex;
@@ -104,7 +106,24 @@ export class ScopeIndex {
   }
   async write() {
     // write only one at a time to avoid corrupting the json file.
-    await this.writeIndexMutex.runExclusive(() => fs.writeJson(this.indexPath, this.index, { spaces: 2 }));
+    await this.writeIndexMutex.runExclusive(async () => {
+      const operation = this.nativeImportOperation;
+      const saved =
+        operation && process.platform === 'linux'
+          ? await operation.request(
+              { kind: 'indexWrite', contents: JSON.stringify(this.index, null, 2) + '\n' },
+              (value) => {
+                if (typeof value !== 'boolean') throw new Error('invalid native index acknowledgement');
+                return value;
+              }
+            )
+          : undefined;
+      if (saved) {
+        operation!.stats.indexes++;
+        return;
+      }
+      await fs.writeJson(this.indexPath, this.index, { spaces: 2 });
+    });
   }
   getAll(): IndexItem[] {
     return Object.values(this.index).flat();
@@ -123,6 +142,92 @@ export class ScopeIndex {
   addMany(bitObjects: BitObject[]): boolean {
     const added = bitObjects.map((bitObject) => this.addOne(bitObject));
     return added.some((oneAdded) => oneAdded); // return true if one of the objects was added
+  }
+
+  async addManyForImport(bitObjects: BitObject[], operation?: NativeImportOperation): Promise<boolean> {
+    const objects = bitObjects.filter(
+      (object) => object instanceof ModelComponent || object instanceof Symlink || object instanceof Lane
+    );
+    if (
+      !operation ||
+      this.addMany !== ScopeIndex.prototype.addMany ||
+      this.addOne !== ScopeIndex.prototype.addOne ||
+      this.find !== ScopeIndex.prototype.find ||
+      this._exist !== ScopeIndex.prototype._exist ||
+      !objects.length ||
+      objects.some(
+        (object) =>
+          object instanceof Lane &&
+          (object.toLaneId !== Lane.prototype.toLaneId ||
+            typeof object.scope !== 'string' ||
+            typeof object.name !== 'string')
+      ) ||
+      this.index.lanes.some(
+        (item) =>
+          item.toLaneId !== LaneItem.prototype.toLaneId ||
+          typeof item.id.name !== 'string' ||
+          (item.id.scope && typeof item.id.scope !== 'string')
+      )
+    )
+      return this.addMany(bitObjects);
+    const projected = objects.map((object) => ({
+      hash: object.hash().toString(),
+      id: { scope: (object as ModelComponent).scope || null, name: (object as ModelComponent).name },
+      category: object instanceof Lane ? 'lane' : 'component',
+    }));
+    const initialCounts = { component: this.index.components.length, lane: this.index.lanes.length };
+    const plan = await operation.plan(
+      () => ({
+        kind: 'index',
+        components: this.index.components,
+        lanes: this.index.lanes.map((item) => ({
+          hash: item.hash,
+          id: { scope: item.id.scope || null, name: item.id.name },
+        })),
+        objects: objects.map((object) => ({
+          hash: object.hash().toString(),
+          id: { scope: (object as ModelComponent).scope || null, name: (object as ModelComponent).name },
+          category: object instanceof Lane ? 'lane' : 'component',
+        })),
+      }),
+      (value) => {
+        if (value === null) return undefined;
+        if (!Array.isArray(value)) throw new Error('invalid native index actions');
+        const counts = { ...initialCounts };
+        for (const entry of value) {
+          if (
+            !Array.isArray(entry) ||
+            entry.length !== 3 ||
+            !['add', 'rename'].includes(entry[0]) ||
+            !Number.isInteger(entry[1]) ||
+            entry[1] < 0 ||
+            entry[1] >= objects.length ||
+            !Number.isInteger(entry[2])
+          )
+            throw new Error('invalid native index action');
+          const category = projected[entry[1]].category as keyof typeof counts;
+          if (entry[0] === 'add') {
+            if (entry[2] !== counts[category]++) throw new Error('invalid native index append');
+          } else if (category !== 'lane' || entry[2] < 0 || entry[2] >= counts.lane)
+            throw new Error('invalid native lane rename');
+        }
+        return value as [string, number, number][];
+      }
+    );
+    const added = plan?.apply((actions) => {
+      if (!actions) return undefined;
+      for (const [kind, offset, index] of actions) {
+        const object = objects[offset];
+        if (kind === 'rename') this.index.lanes[index].id = (object as Lane).toLaneId();
+        else if (object instanceof Lane) this.index.lanes.push(new LaneItem(object.toLaneId(), projected[offset].hash));
+        else
+          this.index.components.push(
+            new ComponentItem(projected[offset].id, object instanceof Symlink, projected[offset].hash)
+          );
+      }
+      return actions.length > 0;
+    });
+    return added === undefined ? this.addMany(bitObjects) : added;
   }
   addOne(bitObject: BitObject): boolean {
     if (!(bitObject instanceof ModelComponent) && !(bitObject instanceof Symlink) && !(bitObject instanceof Lane))

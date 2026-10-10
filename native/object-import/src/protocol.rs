@@ -234,8 +234,13 @@ fn serve_extension(
     store: Option<&Store>,
 ) -> io::Result<bool> {
     match magic {
+        value if value == *b"BOP1" => crate::operation::serve(reader, writer, store)?,
+        value if value == *b"BSP1" => crate::operation::spool(reader, writer, store)?,
         value if value == *b"BTI1" => crate::tar_batch::serve(reader, writer, pool, store, false)?,
         value if value == *b"BTI2" => crate::tar_batch::serve(reader, writer, pool, store, true)?,
+        value if value == *b"BMS1" => {
+            crate::mutable_store::serve_sequential(reader, writer, store)?;
+        }
         value if value == *b"BMP1" => crate::mutable_store::serve(reader, writer, pool, store)?,
         _ => return serve_read_only(magic, reader, writer, pool, store),
     }

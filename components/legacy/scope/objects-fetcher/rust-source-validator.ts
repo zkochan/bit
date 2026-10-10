@@ -20,6 +20,7 @@ export class RustSourceValidator {
   readonly stats = { submitted: 0, sources: 0, legacy: 0, batches: 0 };
   unavailableReason?: string;
   private child?: ChildProcessWithoutNullStreams;
+  private stopped: Promise<void> = Promise.resolve();
   private queued: Request[] = [];
   private active?: Batch;
   private bytes = 0;
@@ -55,6 +56,11 @@ export class RustSourceValidator {
     this.fail('object validator disposed');
   }
 
+  async disposeAndWait() {
+    this.dispose();
+    await this.stopped;
+  }
+
   private schedule() {
     if (this.scheduled || this.active || this.unavailableReason) return;
     this.scheduled = true;
@@ -83,6 +89,10 @@ export class RustSourceValidator {
     if (this.child) return this.child;
     const child = spawn(this.executable, this.args, { stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     this.child = child;
+    this.stopped = new Promise((resolve) => {
+      child.once('exit', resolve);
+      child.once('error', resolve);
+    });
     child.on('error', (error) => this.fail(`spawn error: ${error.message}`));
     child.on('exit', () => this.fail('object validator exited'));
     child.stdin.on('error', (error) => this.fail(`input error: ${error.message}`));

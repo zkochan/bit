@@ -27,6 +27,7 @@ export {
 export { DepEdge, DepEdgeType, SourceFileModel, Log } from './models/version';
 export { ComponentWithCollectOptions, ObjectsReadableGenerator } from './objects/objects-readable-generator';
 export { ScopeIndex } from './objects/scope-index';
+export { NativeImportOperation, nativeIndices, nativeSelections } from './objects/rust-object-operation';
 export { VersionHistoryGraph } from './models/version-history';
 export { VersionParents, versionParentsToGraph } from './models/version-history';
 export { HistoryItem } from './models/lane-history';

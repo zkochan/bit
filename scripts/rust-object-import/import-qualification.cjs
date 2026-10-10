@@ -22,6 +22,8 @@ const rounds = Number(process.env.BIT_IMPORT_QUALIFICATION_ROUNDS || 9);
 const smoke = process.env.BIT_IMPORT_QUALIFICATION_SMOKE === '1';
 const packaged = process.env.BIT_IMPORT_QUALIFICATION_PACKAGED === '1';
 const transport = process.env.BIT_IMPORT_QUALIFICATION_TRANSPORT || 'file';
+const commandKind = process.env.BIT_IMPORT_QUALIFICATION_COMMAND || 'objects';
+assert.ok(['objects', 'checkout', 'install'].includes(commandKind));
 assert.ok(['file', 'http'].includes(transport));
 const cpuProfileDirectory = process.env.BIT_IMPORT_QUALIFICATION_CPU_PROFILE_DIR
   ? path.resolve(process.env.BIT_IMPORT_QUALIFICATION_CPU_PROFILE_DIR)
@@ -50,6 +52,7 @@ assert.ok(
         'validate',
         'store',
         'native',
+        'tar-operation',
         'tar',
         'tar-staged',
         'tar-baseline',
@@ -63,6 +66,7 @@ assert.ok(
 assert.ok(
   !modes.some(
     (mode) =>
+      mode === 'tar-operation' ||
       mode === 'tar' ||
       mode === 'tar-staged' ||
       mode === 'tar-baseline' ||
@@ -74,15 +78,15 @@ assert.ok(
 assert.ok(!modes.includes('tar-baseline') || baselineCli, 'tar-baseline requires a separate compiled baseline CLI');
 async function command(directory, ids, requestedMode, allHistory, traceFile, cpuProfileFile) {
   const commandRoot = requestedMode === 'tar-baseline' ? baselineCli : cliRoot;
-  const mode = requestedMode === 'tar-baseline' ? 'tar' : requestedMode;
+  const mode = requestedMode === 'tar-baseline' || requestedMode === 'tar-operation' ? 'tar' : requestedMode;
   const commandHelper = requestedMode === 'tar-baseline' ? baselineHelper : helper;
   const cpuFile = path.join(directory, 'cpu.txt');
   const args = [
     path.join(commandRoot, 'bin/bit.js'),
     'import',
     ...ids,
-    '--objects',
-    '--skip-dependency-installation',
+    ...(commandKind === 'objects' ? ['--objects'] : ['--override']),
+    ...(commandKind !== 'install' ? ['--skip-dependency-installation'] : []),
     '--json',
     '--safe-mode',
   ];
@@ -125,6 +129,9 @@ async function command(directory, ids, requestedMode, allHistory, traceFile, cpu
     BIT_RUST_OBJECT_IMPORT_MODE: mode === 'validate' ? 'validate' : 'store',
     BIT_RUST_OBJECT_IMPORT_MUTABLE:
       mode === 'store' || mode === 'mutable-control' || mode === 'tar-node-mutable' ? 'off' : 'on',
+    BIT_RUST_OBJECT_IMPORT_OPERATION: requestedMode === 'tar-operation' ? 'on' : 'off',
+    BIT_RUST_OBJECT_IMPORT_SEQUENTIAL: requestedMode === 'tar-operation' ? 'on' : 'off',
+    BIT_RUST_OBJECT_IMPORT_MISSING: requestedMode === 'tar-operation' ? 'on' : 'off',
     CI: '1',
   };
   delete env.BIT_IMPORT_CPU_PROFILE;
@@ -178,6 +185,43 @@ async function command(directory, ids, requestedMode, allHistory, traceFile, cpu
     trace: traceFile ? JSON.parse(await fs.readFile(traceFile, 'utf8')) : undefined,
   };
 }
+async function verifyWorkspace(directory, manifest) {
+  if (commandKind === 'objects') return undefined;
+  const load = require('node:module').createRequire(path.join(cliRoot, 'package.json'));
+  const bitmap = load('comment-json').parse(await fs.readFile(path.join(directory, '.bitmap'), 'utf8'));
+  const contents = [];
+  for (const [id, expected] of Object.entries(manifest.components)) {
+    const entry = bitmap[id];
+    assert.ok(entry?.rootDir && entry.mainFile === 'index.js', `missing checkout entry ${id}`);
+    for (const file of expected.files) {
+      const filename = path.join(directory, entry.rootDir, file.relativePath);
+      const digest = createHash('sha256')
+        .update(await fs.readFile(filename))
+        .digest('hex');
+      assert.equal(digest, file.contentSha256, `checkout bytes ${id}/${file.relativePath}`);
+      contents.push([id, file.relativePath, digest]);
+    }
+    if (commandKind === 'install') {
+      const [prefix, ...scopeParts] = entry.scope.split('.');
+      const packageName = '@' + prefix + '/' + [...scopeParts, entry.name.replaceAll('/', '.')].join('.');
+      const packageDirectory = path.join(directory, 'node_modules', packageName);
+      const pkg = JSON.parse(await fs.readFile(path.join(packageDirectory, 'package.json'), 'utf8'));
+      assert.equal(pkg.name, packageName);
+      assert.equal(pkg.version, entry.version);
+      for (const file of expected.files)
+        assert.equal(
+          await fs.realpath(path.join(packageDirectory, file.relativePath)),
+          await fs.realpath(path.join(directory, entry.rootDir, file.relativePath)),
+          `installed source link ${id}/${file.relativePath}`
+        );
+    }
+  }
+  return {
+    files: contents.length,
+    sha256: createHash('sha256').update(JSON.stringify(contents)).digest('hex'),
+    dependencies: 'fixture has no external dependencies',
+  };
+}
 async function workspace(directory, manifest) {
   await fs.mkdir(directory);
   cp.execFileSync(
@@ -185,7 +229,7 @@ async function workspace(directory, manifest) {
     [
       path.join(cliRoot, 'bin/bit.js'),
       'init',
-      '--standalone',
+      ...(commandKind === 'objects' ? ['--standalone'] : []),
       '--skip-interactive',
       '--default-scope',
       'qualification.destination',
@@ -197,6 +241,11 @@ async function workspace(directory, manifest) {
   json.remotes = manifest.remotes;
   await fs.writeFile(file, JSON.stringify(json, null, 2));
   await seedDestination(cliRoot, path.join(directory, '.bit'), manifest);
+  if (commandKind !== 'objects')
+    await fs.writeFile(
+      path.join(directory, 'package.json'),
+      JSON.stringify({ name: 'qualification-workspace', private: true, type: 'module' })
+    );
 }
 (async () => {
   assert.equal(process.platform, 'linux', 'GNU time and process-tree measurements require Linux');
@@ -248,6 +297,7 @@ async function workspace(directory, manifest) {
     rounds,
     smoke,
     transport,
+    controlledHttpDelayMs: Number(process.env.BIT_IMPORT_QUALIFICATION_HTTP_DELAY_MS || 0),
     packaged,
     cpuProfileDirectory,
     serverCpuAndMemoryIncluded: false,
@@ -265,7 +315,8 @@ async function workspace(directory, manifest) {
           .digest('hex'),
       ])
     ),
-    command: 'bit import <ids> --objects --skip-dependency-installation --json --safe-mode [--all-history for cold]',
+    commandKind,
+    command: `bit import <ids> ${commandKind === 'objects' ? '--objects' : '--override'} ${commandKind === 'install' ? '' : '--skip-dependency-installation'} --json --safe-mode [--all-history for cold]`,
     cases: {},
   };
   const cases = smoke
@@ -279,6 +330,8 @@ async function workspace(directory, manifest) {
         ['concurrent-mutable', { components: 100, files: 1, bytes: 1024, versions: 8, remotes: 4 }],
       ];
   if (selectedCases) {
+    if (selectedCases.includes('command-workspace'))
+      cases.push(['command-workspace', { components: 8, files: 2, bytes: 16 * 1024, versions: 4, remotes: 2 }]);
     for (const versions of [32, 512]) {
       const name = `history-overlap-${versions}`;
       if (selectedCases.includes(name))
@@ -297,7 +350,10 @@ async function workspace(directory, manifest) {
     if (selectedCases && !selectedCases.includes(name)) continue;
     const directory = path.join(temporary, name);
     await fs.mkdir(directory);
-    const manifest = await createFixture(cliRoot, path.join(directory, 'remotes'), options);
+    const manifest = await createFixture(cliRoot, path.join(directory, 'remotes'), {
+      ...options,
+      harmony: commandKind !== 'objects',
+    });
     let server;
     if (transport === 'http') {
       server = cp.fork(path.join(__dirname, 'http-fixture.cjs'), [cliRoot, JSON.stringify(manifest.remotes)], {
@@ -351,9 +407,11 @@ async function workspace(directory, manifest) {
           await workspace(destination, manifest);
           const cold = await command(destination, manifest.ids, mode, true);
           cold.verification = await verify(cliRoot, path.join(destination, '.bit'), manifest);
+          cold.workspaceVerification = await verifyWorkspace(destination, manifest);
           checkModels(cold.verification);
           const warm = await command(destination, manifest.ids, mode, false);
           warm.verification = await verify(cliRoot, path.join(destination, '.bit'), manifest);
+          warm.workspaceVerification = await verifyWorkspace(destination, manifest);
           checkModels(warm.verification);
           await new Promise((resolve) => setImmediate(resolve));
           global.gc?.();
@@ -370,9 +428,11 @@ async function workspace(directory, manifest) {
           const warmFile = path.join(cpuProfileDirectory, `${name}-${mode}-warm.cpuprofile`);
           const cold = await command(destination, manifest.ids, mode, true, undefined, coldFile);
           cold.verification = await verify(cliRoot, path.join(destination, '.bit'), manifest);
+          cold.workspaceVerification = await verifyWorkspace(destination, manifest);
           checkModels(cold.verification);
           const warm = await command(destination, manifest.ids, mode, false, undefined, warmFile);
           warm.verification = await verify(cliRoot, path.join(destination, '.bit'), manifest);
+          warm.workspaceVerification = await verifyWorkspace(destination, manifest);
           checkModels(warm.verification);
           for (const filename of [coldFile, warmFile]) {
             const profile = JSON.parse(await fs.readFile(filename, 'utf8'));
@@ -388,12 +448,39 @@ async function workspace(directory, manifest) {
         await workspace(destination, manifest);
         const cold = await command(destination, manifest.ids, mode, true, path.join(destination, 'cold-trace.json'));
         cold.verification = await verify(cliRoot, path.join(destination, '.bit'), manifest);
+        cold.workspaceVerification = await verifyWorkspace(destination, manifest);
         checkModels(cold.verification);
         const warm = await command(destination, manifest.ids, mode, false, path.join(destination, 'warm-trace.json'));
         warm.verification = await verify(cliRoot, path.join(destination, '.bit'), manifest);
+        warm.workspaceVerification = await verifyWorkspace(destination, manifest);
         checkModels(warm.verification);
         await new Promise((resolve) => setImmediate(resolve));
         global.gc?.();
+        if (mode === 'tar-operation') {
+          assert.ok(cold.trace.operation.spoolBytes > 0, 'native archive transfer must actually run');
+          assert.equal(cold.trace.operation.spoolFallbacks, 0);
+          assert.ok(
+            cold.trace.operation.kinds.persist > 0 && cold.trace.operation.kinds.index > 0,
+            'native model persistence and index planning must run'
+          );
+          const { persist: backpressure = 0, ...fallbacks } = cold.trace.operation.fallbackKinds;
+          assert.deepEqual(fallbacks, {}, 'ordinary fixture must not hide native operation failure');
+          const modelRequests = cold.trace.operation.kinds.persist + backpressure;
+          const components = options.components * (options.remotes || 1);
+          assert.ok(
+            modelRequests >= 1 && modelRequests <= components + (options.remotes || 1),
+            'bounded native model requests include eligible component and per-scope metadata'
+          );
+          assert.ok(
+            backpressure <= Math.max(0, modelRequests - 64),
+            'only model requests exceeding the bounded outstanding queue may fall back'
+          );
+          if (options.overlap)
+            assert.ok(
+              cold.trace.operation.kinds.component > 0 && cold.trace.operation.kinds.versionHistory > 0,
+              'overlapping imports require native merge coverage'
+            );
+        }
         const incomingVersions = Object.values(manifest.hashes).filter((object) => object.type === 'Version').length;
         if (incomingVersions) {
           assert.ok(cold.trace.stages.versionParseOther?.calls >= incomingVersions, 'Version parsing must be traced');
@@ -416,6 +503,7 @@ async function workspace(directory, manifest) {
           cold.trace.native.mutableBatches
         );
         if (
+          mode === 'tar-operation' ||
           mode === 'tar' ||
           mode === 'tar-staged' ||
           mode === 'tar-baseline' ||
@@ -427,8 +515,14 @@ async function workspace(directory, manifest) {
           assert.equal(cold.trace.tar.fallbacks, 0, 'successful fixture must not silently fall back');
           assert.ok(cold.trace.tar.operations, 'production stream operation must actually run');
           assert.ok(cold.trace.tar.batches, 'production tar protocol must actually run');
-          assert.equal(cold.trace.objectTypes.Source || 0, 0, 'Source bodies must not be hydrated in Node');
-          if (mode === 'tar' || mode === 'tar-staged' || mode === 'tar-baseline' || mode === 'tar-node-mutable') {
+          assert.equal(cold.trace.incomingObjectTypes.Source || 0, 0, 'Source bodies must not be hydrated in Node');
+          if (
+            mode === 'tar-operation' ||
+            mode === 'tar' ||
+            mode === 'tar-staged' ||
+            mode === 'tar-baseline' ||
+            mode === 'tar-node-mutable'
+          ) {
             assert.equal(cold.trace.inflation.incoming, 0, 'eligible incoming metadata must not inflate in Node');
             assert.ok(
               cold.trace.stages.nativeMetadataHydration?.calls >= Object.keys(manifest.hashes).length - sources,
@@ -475,7 +569,9 @@ async function workspace(directory, manifest) {
             'seeded model merge policy must actually run'
           );
           assert.ok(
-            cold.trace.stages.versionHistoryMergePolicy?.calls >= options.components * options.remotes,
+            (cold.trace.stages.versionHistoryMergePolicy?.calls || 0) +
+              (cold.trace.stages.versionHistoryNativeApply?.calls || 0) >=
+              options.components * (options.remotes || 1),
             'seeded history merge policy must actually run'
           );
           if (options.localVersions && mode === 'tar') {

@@ -26,6 +26,7 @@ import type { ComponentsPerRemote } from '../component-ops/multiple-component-me
 import { MultipleComponentMerger } from '../component-ops/multiple-component-merger';
 import { importTarStream } from './rust-tar-stream';
 import { TarRemoteError } from './rust-tar-importer';
+import { withImportCancellation, cancelImportStream } from './import-cancellation';
 
 /**
  * due to the use of streams, this is memory efficient and can handle easily GBs of objects.
@@ -50,10 +51,12 @@ export class ObjectFetcher {
     private context = {},
     private throwOnUnavailableScope = true,
     private groupedHashes?: { [scopeName: string]: string[] },
-    private reason?: string // console the reason why the import is needed
+    private reason?: string, // console the reason why the import is needed
+    private signal?: AbortSignal
   ) {}
 
   public async fetchFromRemoteAndWrite(): Promise<string[]> {
+    this.signal?.throwIfAborted();
     const executable = resolveRustObjectImportExecutable('import');
     const validator = createRustSourceValidator(executable);
     const options =
@@ -65,12 +68,20 @@ export class ObjectFetcher {
       options && process.env.BIT_RUST_OBJECT_IMPORT_MUTABLE !== 'off'
         ? new RustObjectImporter(executable!, options)
         : undefined;
-    try {
-      return await this.fetchAndWrite(importer ? undefined : validator, importer, mutableWriter, executable);
-    } finally {
+    const abort = () => {
       validator?.dispose();
       importer?.dispose();
-      await mutableWriter?.disposeAndWait();
+      void mutableWriter?.disposeAndWait();
+      void this.repo.getNativeImportOperation?.()?.disposeAndWait();
+    };
+    this.signal?.addEventListener('abort', abort, { once: true });
+    try {
+      this.signal?.throwIfAborted();
+      const run = () => this.fetchAndWrite(importer ? undefined : validator, importer, mutableWriter, executable);
+      return await (this.repo.withNativeImportOperation ? this.repo.withNativeImportOperation(run) : run());
+    } finally {
+      this.signal?.removeEventListener('abort', abort);
+      await Promise.all([validator?.disposeAndWait(), importer?.disposeAndWait(), mutableWriter?.disposeAndWait()]);
     }
   }
 
@@ -104,6 +115,7 @@ export class ObjectFetcher {
     await pMapPool(
       scopes,
       async (scopeName) => {
+        this.signal?.throwIfAborted();
         const readableStream = await this.fetchFromSingleRemote(scopeName, idsGrouped[scopeName]);
         if (!readableStream) return;
         await this.writeFromSingleRemote(
@@ -119,6 +131,7 @@ export class ObjectFetcher {
       },
       { concurrency: concurrentFetchLimit() }
     );
+    this.signal?.throwIfAborted();
     if (Object.keys(this.failedScopes).length) {
       const failedScopesErr = Object.keys(this.failedScopes).map(
         (failedScope) => `${failedScope} - ${this.failedScopes[failedScope].message}`
@@ -130,6 +143,7 @@ server responded with the following error messages:
 ${failedScopesErr.join('\n')}`);
     }
     await objectsQueue.onIdle();
+    this.signal?.throwIfAborted();
     logger.debug(`[-] fetchFromRemoteAndWrite, completed writing ${objectsQueue.added} objects`);
     const multipleComponentsMerger = new MultipleComponentMerger(componentsPerRemote, this.scope.sources);
     const totalComponents = multipleComponentsMerger.totalComponents();
@@ -139,15 +153,20 @@ ${failedScopesErr.join('\n')}`);
       await this.mergeAndPersistComponents(multipleComponentsMerger);
     }
     // even when no component has updated, we need to write the refs we got from the remote lanes
+    this.signal?.throwIfAborted();
     await this.repo.writeRemoteLanes();
+    this.signal?.throwIfAborted();
     logger.debug(`[-] fetchFromRemoteAndWrite, completed writing ${totalComponents} components`);
 
     return objectsQueue.addedHashes;
   }
 
   private async mergeAndPersistComponents(multipleComponentsMerger: MultipleComponentMerger) {
+    this.signal?.throwIfAborted();
     const modelComponents = await multipleComponentsMerger.merge();
+    this.signal?.throwIfAborted();
     await this.repo.writeObjectsToTheFS(modelComponents);
+    this.signal?.throwIfAborted();
 
     const mergedPerRemote = modelComponents.reduce((acc, component) => {
       if (!component.remoteHead) {
@@ -201,7 +220,7 @@ ${failedScopesErr.join('\n')}`);
     const shouldThrowOnUnavailableScope = this.throwOnUnavailableScope && !this.fetchOptions.withoutDependencies;
     let remote: Remote;
     try {
-      remote = await this.remotes.resolve(scopeName);
+      remote = await withImportCancellation(this.remotes.resolve(scopeName), this.signal);
     } catch (err: any) {
       if (err instanceof ScopeNotFoundOrDenied) {
         throw new Error(`unable to import the following component(s): ${ids.join(', ')}.
@@ -234,8 +253,18 @@ the remote scope "${scopeName}" was not found`);
     const maxAttempts = 3;
     for (let attempt = 1; ; attempt += 1) {
       try {
-        return await remote.fetch(ids, this.getFetchOptionsPerRemote(scopeName), this.context);
+        this.signal?.throwIfAborted();
+        return await withImportCancellation(
+          remote.fetch(
+            ids,
+            this.getFetchOptionsPerRemote(scopeName),
+            this.signal ? { ...this.context, signal: this.signal } : this.context
+          ),
+          this.signal,
+          (stream) => stream.destroy()
+        );
       } catch (err: any) {
+        this.signal?.throwIfAborted();
         if (!(err instanceof UnexpectedNetworkError) || attempt >= maxAttempts) throw err;
         const delayMs = 3000 * 4 ** (attempt - 1); // 3s, then 12s
         logger.warn(
@@ -243,7 +272,20 @@ the remote scope "${scopeName}" was not found`);
             delayMs / 1000
           }s. error: ${err.message}`
         );
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        await new Promise<void>((resolve, reject) => {
+          let timer: ReturnType<typeof setTimeout>;
+          const abort = () => {
+            clearTimeout(timer);
+            this.signal?.removeEventListener('abort', abort);
+            reject(this.signal?.reason);
+          };
+          timer = setTimeout(() => {
+            this.signal?.removeEventListener('abort', abort);
+            resolve();
+          }, delayMs);
+          this.signal?.addEventListener('abort', abort, { once: true });
+          if (this.signal?.aborted) abort();
+        });
       }
     }
   }
@@ -278,6 +320,7 @@ the remote scope "${scopeName}" was not found`);
       importer,
       mutableWriter
     );
+    const detachCancellation = cancelImportStream(objectsStream, this.signal);
     // add an error listener for the ObjectList to differentiate between errors coming from the
     // remote and errors happening inside the Writable.
     let readableError: Error | undefined;
@@ -297,7 +340,7 @@ the remote scope "${scopeName}" was not found`);
         const input = options && objectsStream.claimTarInput();
         if (input) {
           try {
-            await importTarStream(input, tarExecutable, writable, options);
+            await importTarStream(input, tarExecutable, writable, { ...options, signal: this.signal });
           } catch (error) {
             if (error instanceof TarRemoteError) throw new ErrorFromRemote(scopeName, error.message);
             throw error;
@@ -307,6 +350,7 @@ the remote scope "${scopeName}" was not found`);
       }
       await pipeline(objectsStream, writable);
     } catch (err: any) {
+      this.signal?.throwIfAborted();
       if (readableError) {
         if (!readableError.message) {
           logger.error(`error coming from a remote has no message, please fix!`, readableError);
@@ -316,6 +360,7 @@ the remote scope "${scopeName}" was not found`);
       // the error is coming from the writable, no need to treat it specially. just throw it.
       throw err;
     } finally {
+      detachCancellation();
       writable.destroy();
       objectsStream.destroy();
     }

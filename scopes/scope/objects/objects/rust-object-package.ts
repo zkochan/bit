@@ -10,6 +10,7 @@ export const OBJECT_IMPORT_RUNTIME_MODULES = [
   'rust-object-inventory.js',
   'rust-object-reader.js',
   'rust-object-directory.js',
+  'rust-object-operation.js',
   'repository.js',
   'object.js',
   'scope-index.js',
@@ -21,6 +22,7 @@ export const OBJECT_IMPORT_RUNTIME_MODULES = [
   '../models/version-history.js',
   '../models/lane-history.js',
   '../models/model-component.js',
+  '../models/detach-heads.js',
 ];
 export const OBJECT_IMPORT_LEGACY_MODULES = [
   'rust-source-validator.js',
@@ -31,9 +33,12 @@ export const OBJECT_IMPORT_LEGACY_MODULES = [
   'rust-tar-staging.js',
   'rust-tar-stream.js',
   'objects-fetcher.js',
+  'import-cancellation.js',
   'objects-writable-stream.js',
   'write-objects-queue.js',
   '../component-ops/scope-components-importer.js',
+  '../component-ops/model-components-merger.js',
+  '../component-ops/multiple-component-merger.js',
 ];
 export const OBJECT_IMPORT_NETWORK_MODULES = ['http.js'];
 export type ObjectHelperSelection = { version: string; target: string; revision: string };
