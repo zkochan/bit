@@ -296,3 +296,35 @@ test('two-object direct byte boundary preserves singleton and parallel compresse
   assert.deepEqual(await batch.writer.persistMetadata([invalid, valid]), [null, expected]);
   assert.deepEqual(zlib.inflateSync(await fs.readFile(filename(batch.directory, valid))), valid.buffer);
 });
+
+test('three-object direct byte boundary preserves compressed bytes and per-object rejection', async (t) => {
+  const batch = await setup(t);
+  const single = await setup(t);
+  for (const extra of [0, 1]) {
+    const objects = [0, 1, 2].map((index) =>
+      item('Version', { data: 'x'.repeat(1000 + extra) }, 700 + extra * 3 + index)
+    );
+    const remaining = 4096 + extra * 3 - objects.reduce((sum, object) => sum + object.buffer.length, 0);
+    objects[0] = item('Version', { data: 'x'.repeat(1000 + extra + remaining) }, 700 + extra * 3);
+    assert.equal(
+      objects.reduce((sum, object) => sum + object.buffer.length, 0),
+      4096 + extra * 3
+    );
+    const sizes = await batch.writer.persistMetadata(objects);
+    for (const [index, object] of objects.entries()) {
+      assert.deepEqual(await single.writer.persistMetadata([object]), [sizes[index]]);
+      assert.deepEqual(
+        await fs.readFile(filename(batch.directory, object)),
+        await fs.readFile(filename(single.directory, object))
+      );
+    }
+  }
+  const valid = item('Version', { data: 'ok' }, 710);
+  const invalid = item('Source', {}, 711);
+  const history = item('VersionHistory', { versions: [] }, 712);
+  const expected = await single.writer.persistMetadata([valid, history]);
+  assert.deepEqual(await batch.writer.persistMetadata([valid, invalid, history]), [expected[0], null, expected[1]]);
+  await assert.rejects(fs.access(filename(batch.directory, invalid)), { code: 'ENOENT' });
+  for (const object of [valid, history])
+    assert.deepEqual(zlib.inflateSync(await fs.readFile(filename(batch.directory, object))), object.buffer);
+});
