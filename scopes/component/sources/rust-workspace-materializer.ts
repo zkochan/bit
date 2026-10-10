@@ -25,7 +25,7 @@ class MaterializationSession {
   private killTimer?: NodeJS.Timeout;
 
   constructor(executable: string) {
-    this.child = spawn(executable, [], { stdio: ['pipe', 'pipe', 'pipe'] });
+    this.child = spawn(executable, ['--threads', '1'], { stdio: ['pipe', 'pipe', 'pipe'] });
     this.child.stderr.resume();
     this.closed = new Promise((resolve) => {
       this.child.once('close', () => {
@@ -92,6 +92,8 @@ class MaterializationSession {
 export async function persistWorkspaceFiles(files: AbstractVinyl[], concurrency: number): Promise<boolean> {
   if (process.env.BIT_RUST_WORKSPACE_MATERIALIZATION !== 'on' || !files.length || active >= 4 || !(concurrency >= 1))
     return false;
+  const snapshot = files.slice();
+  if (!hasNativeChunk(snapshot, concurrency)) return false;
   const executable = resolveRustObjectImportExecutable();
   if (!executable) return false;
   active++;
@@ -103,12 +105,20 @@ export async function persistWorkspaceFiles(files: AbstractVinyl[], concurrency:
     return false;
   }
   try {
-    await persist(files.slice(), concurrency, session);
+    await persist(snapshot, concurrency, session);
     return true;
   } finally {
     await session.dispose();
     active--;
   }
+}
+
+function hasNativeChunk(files: AbstractVinyl[], concurrency: number): boolean {
+  const width = Number.isFinite(concurrency) ? Math.floor(concurrency) : files.length;
+  for (let start = 0; start < files.length; start += width) {
+    if (files.slice(start, start + width).every(eligible)) return true;
+  }
+  return false;
 }
 
 async function persist(files: AbstractVinyl[], concurrency: number, session: MaterializationSession) {
@@ -127,8 +137,8 @@ async function persistChunk(files: AbstractVinyl[], concurrency: number, session
   while (index < files.length) {
     const batch = projectBatch(files, index);
     if (!batch.length) {
-      await files[index++].write();
-      continue;
+      await pMapPool(files.slice(index), (file) => file.write(), { concurrency });
+      return;
     }
     for (let offset = 0; offset < batch.length; offset++) {
       const file = files[index + offset];

@@ -26,9 +26,13 @@ async function setup(t, executable = native) {
   process.env.BIT_RUST_WORKSPACE_MATERIALIZATION = 'on';
   const originalSpawn = cp.spawn;
   const acknowledgements = [];
+  const spawns = [];
   cp.spawn = (...args) => {
     const child = originalSpawn(...args);
-    if (args[0] === executable) child.stdout.on('data', (data) => acknowledgements.push(data.toString()));
+    if (args[0] === executable) {
+      spawns.push(args);
+      child.stdout.on('data', (data) => acknowledgements.push(data.toString()));
+    }
     return child;
   };
   t.after(async () => {
@@ -42,7 +46,7 @@ async function setup(t, executable = native) {
     }
     await fs.rm(directory, { recursive: true, force: true });
   });
-  return { directory, acknowledgements };
+  return { directory, acknowledgements, spawns };
 }
 function file(directory, name, contents, overwrite = true) {
   const vinyl = new AbstractVinyl({
@@ -118,7 +122,7 @@ test('deletions finish before Rust writes and link hooks run after complete mate
   assert.equal(frames(acknowledgements)[0].completed, 1);
 });
 test('custom writes and atomic JsonVinyl retain their entire canonical concurrency chunk', async (t) => {
-  const { directory, acknowledgements } = await setup(t);
+  const { directory, acknowledgements, spawns } = await setup(t);
   const data = new DataToPersist();
   data.addFile(file(directory, 'first', 'first'));
   const custom = file(directory, 'custom', 'custom');
@@ -135,6 +139,7 @@ test('custom writes and atomic JsonVinyl retain their entire canonical concurren
   assert.equal(await fs.readFile(custom.path, 'utf8'), 'custom hook');
   assert.deepEqual(JSON.parse(await fs.readFile(path.join(directory, 'config.json'), 'utf8')), { test: true });
   assert.deepEqual(frames(acknowledgements), []);
+  assert.equal(spawns.length, 0, 'fully canonical operations must not launch idle helpers');
 });
 test('native filesystem failure replays the failed file with canonical error identity', async (t) => {
   const { directory, acknowledgements } = await setup(t);
@@ -333,7 +338,8 @@ test('prototype hooks installed before materializer loading retain their write b
   delete require.cache[modulePath];
   try {
     const fresh = require(modulePath);
-    await fresh.persistWorkspaceFiles([file(directory, 'hooked', 'original')], 100);
+    const hooked = file(directory, 'hooked', 'original');
+    if (!(await fresh.persistWorkspaceFiles([hooked], 100))) await hooked.write();
     assert.equal(called, 1);
     assert.equal(await fs.readFile(path.join(directory, 'hooked'), 'utf8'), 'prototype hook');
     assert.deepEqual(frames(acknowledgements), []);

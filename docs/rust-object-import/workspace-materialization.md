@@ -35,7 +35,8 @@ the canonical concurrency of their entire I/O chunk; native runs can resume on
 later eligible chunks. Oversized or unrepresentable files also use their existing
 writer.
 
-Each persistence operation owns a helper, with at most four helpers active across
+An operation containing an eligible chunk owns a helper; fully canonical operations
+launch none. Each helper uses one worker, with at most four helpers active across
 operations. Frames remain within the caller's configured I/O concurrency chunks:
 a failed chunk never starts files in the next chunk. The file list is snapshotted
 before processing, matching the canonical pool. Rust acknowledges a completed
