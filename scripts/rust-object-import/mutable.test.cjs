@@ -168,3 +168,106 @@ test('singleton and parallel mutable writes produce identical bytes and recover 
   assert.deepEqual(zlib.inflateSync(await fs.readFile(filename(single.directory, replacement))), replacement.buffer);
   assert.equal(single.writer.unavailableReason, undefined);
 });
+
+test('queued distinct mutable requests share a bounded frame and retain caller slices', async (t) => {
+  const { directory, writer } = await setup(t);
+  const objects = Array.from({ length: 33 }, (_, index) => item('Version', { index }, index + 100));
+  const results = await Promise.all(objects.map((object) => writer.persistMetadata([object])));
+  assert.equal(writer.stats.mutableBatches, 3);
+  assert.equal(writer.stats.mutableSubmitted, objects.length);
+  for (const [index, object] of objects.entries()) {
+    const compressed = await fs.readFile(filename(directory, object));
+    assert.deepEqual(results[index], [compressed.length]);
+    assert.deepEqual(zlib.inflateSync(compressed), object.buffer);
+  }
+});
+
+test('duplicate mutable identities retain FIFO replacement boundaries', async (t) => {
+  const { directory, writer } = await setup(t);
+  const values = [item('Version', { first: true }, 200), item('Version', { second: true }, 200)];
+  const other = item('LaneHistory', { independent: true }, 201);
+  const results = await Promise.all([...values, other].map((object) => writer.persistMetadata([object])));
+  assert.ok(results.every((result) => result?.[0]));
+  assert.equal(writer.stats.mutableBatches, 2);
+  assert.deepEqual(zlib.inflateSync(await fs.readFile(filename(directory, values[1]))), values[1].buffer);
+  assert.deepEqual(zlib.inflateSync(await fs.readFile(filename(directory, other))), other.buffer);
+});
+
+test('coalesced rejection affects only its caller and multi-object slices remain ordered', async (t) => {
+  const { directory, writer } = await setup(t);
+  const valid = item('Version', { valid: true }, 220);
+  const invalid = item('Source', {}, 221);
+  const pair = Object.freeze([
+    item('VersionHistory', { first: true }, 222),
+    item('LaneHistory', { second: true }, 223),
+  ]);
+  const [first, rejected, last] = await Promise.all([
+    writer.persistMetadata(Object.freeze([valid])),
+    writer.persistMetadata(Object.freeze([invalid])),
+    writer.persistMetadata(pair),
+  ]);
+  assert.equal(writer.stats.mutableBatches, 1);
+  assert.deepEqual(rejected, [null]);
+  assert.deepEqual(first, [(await fs.stat(filename(directory, valid))).size]);
+  assert.deepEqual(
+    last,
+    await Promise.all(pair.map(async (object) => (await fs.stat(filename(directory, object))).size))
+  );
+  assert.equal(writer.stats.mutableFallbacks, 1);
+});
+
+test('validation operations separate queued mutable groups', async (t) => {
+  const { directory, writer } = await setup(t);
+  const first = item('Version', { first: true }, 240);
+  const second = item('Version', { second: true }, 241);
+  const a = writer.persistMetadata([first]);
+  const barrier = writer.importBatch(
+    [],
+    async () => [],
+    async () => undefined
+  );
+  const b = writer.persistMetadata([second]);
+  await Promise.all([a, barrier, b]);
+  assert.equal(writer.stats.mutableBatches, 2);
+  assert.deepEqual(zlib.inflateSync(await fs.readFile(filename(directory, first))), first.buffer);
+  assert.deepEqual(zlib.inflateSync(await fs.readFile(filename(directory, second))), second.buffer);
+});
+
+test('coalesced admission retains the 64-object bound', async (t) => {
+  const { writer } = await setup(t);
+  const objects = Array.from({ length: 80 }, (_, index) => item('Version', { index }, index + 300));
+  const results = await Promise.all(objects.map((object) => writer.persistMetadata([object])));
+  assert.ok(results.slice(0, 64).every((result) => result?.[0]));
+  assert.ok(results.slice(64).every((result) => result === undefined));
+  assert.equal(writer.stats.mutableBatches, 4);
+  assert.equal(writer.stats.mutableSubmitted, 64);
+  assert.equal(writer.count, 0);
+});
+
+test('disposal settles every queued caller without spawning or writing', async (t) => {
+  const { directory, writer } = await setup(t);
+  const a = writer.persistMetadata([item('Version', {}, 400)]);
+  const b = writer.persistMetadata([item('VersionHistory', {}, 401)]);
+  await writer.disposeAndWait();
+  assert.deepEqual(await Promise.all([a, b]), [undefined, undefined]);
+  assert.equal(writer.count, 0);
+  assert.equal(writer.child, undefined);
+  assert.deepEqual(await fs.readdir(directory), []);
+});
+
+test('coalesced timeout settles all callers only after the helper exits', async (t) => {
+  const scriptDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-coalesced-timeout-'));
+  t.after(() => fs.rm(scriptDirectory, { recursive: true, force: true }));
+  const script = path.join(scriptDirectory, 'idle.cjs');
+  await fs.writeFile(script, 'process.stdin.resume();setInterval(()=>{},1000);process.on("SIGTERM",()=>{});');
+  const { writer } = await setup(t, process.execPath, 100, [script]);
+  const results = await Promise.all([
+    writer.persistMetadata([item('Version', {}, 500)]),
+    writer.persistMetadata([item('VersionHistory', {}, 501)]),
+  ]);
+  assert.deepEqual(results, [undefined, undefined]);
+  assert.ok(writer.child.exitCode !== null || writer.child.signalCode !== null);
+  assert.equal(writer.count, 0);
+  assert.equal(writer.stats.mutableBatches, 1);
+  assert.equal(writer.stats.mutableFallbacks, 2);
+});

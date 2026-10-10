@@ -24,6 +24,7 @@ const metrics = {
     metadata: 0,
     persisted: 0,
     writeFallbacks: 0,
+    mutableBatches: 0,
     mutableSubmitted: 0,
     mutablePersisted: 0,
     mutableFallbacks: 0,
@@ -146,6 +147,7 @@ Module._load = function (request, parent, isMain) {
         'mutableFallbacks',
       ])
         metrics.native[key] += this.stats[key];
+      metrics.native.mutableBatches = (metrics.native.mutableBatches || 0) + (this.stats.mutableBatches || 0);
     });
   }
   if (value?.importTarStream)

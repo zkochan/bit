@@ -240,6 +240,7 @@ async function workspace(directory, manifest) {
         ['large-binary', { components: 16, files: 2, bytes: 4 * 1024 * 1024, versions: 2, binary: true }],
         ['mutable-heavy', { components: 400, files: 1, bytes: 1024, versions: 8 }],
         ['multi-remote', { components: 8, files: 2, bytes: 8 * 1024 * 1024, versions: 2, remotes: 2 }],
+        ['concurrent-mutable', { components: 100, files: 1, bytes: 1024, versions: 8, remotes: 4 }],
       ];
   for (const [name, options] of cases) {
     if (selectedCases && !selectedCases.includes(name)) continue;

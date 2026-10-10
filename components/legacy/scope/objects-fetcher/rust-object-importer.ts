@@ -6,6 +6,11 @@ export type NativeSourceStoreOptions = { objectsDirectory: string; owner?: { uid
 export type MetadataValidation = { inflatedBytes: number; metadata: string };
 type ObjectValidation = SourceValidation | MetadataValidation;
 export type NativeObjectInput = { ref: { toString(): string }; buffer: Buffer };
+type MutableGroup = {
+  objects: NativeObjectInput[];
+  hashes: Set<string>;
+  operation: Promise<(number | null)[] | undefined>;
+};
 type Pending = {
   parse: (response: any) => unknown;
   resolve: (value?: any) => void;
@@ -25,6 +30,7 @@ export class RustObjectImporter {
     metadata: 0,
     persisted: 0,
     writeFallbacks: 0,
+    mutableBatches: 0,
     mutableSubmitted: 0,
     mutablePersisted: 0,
     mutableFallbacks: 0,
@@ -37,6 +43,7 @@ export class RustObjectImporter {
   private tail: Promise<unknown> = Promise.resolve();
   private bytes = 0;
   private count = 0;
+  private mutableGroup?: MutableGroup;
   private id = 0;
   private stopped: Promise<void> = Promise.resolve();
   constructor(
@@ -48,67 +55,96 @@ export class RustObjectImporter {
 
   /** Use a separate operation session: a validation session may be awaiting its Source commit. */
   async persistMetadata(objects: NativeObjectInput[]): Promise<(number | null)[] | undefined> {
+    if (!objects.length || objects.length > 16 || this.count + objects.length > 64 || this.unavailableReason)
+      return undefined;
+    const identities = objects.map((object) => object.ref.toString());
+    const hashes = new Set(identities);
     if (
-      !objects.length ||
-      objects.length > 16 ||
-      this.count + objects.length > 64 ||
-      this.unavailableReason ||
-      new Set(objects.map((object) => object.ref.toString())).size !== objects.length ||
+      hashes.size !== objects.length ||
       objects.some(
-        (object) =>
-          !/^[a-f0-9]{40}$/.test(object.ref.toString()) ||
-          !object.buffer.length ||
-          object.buffer.length > MAX_MUTABLE_BYTES
+        (object, index) =>
+          !/^[a-f0-9]{40}$/.test(identities[index]) || !object.buffer.length || object.buffer.length > MAX_MUTABLE_BYTES
       )
     )
       return undefined;
     this.count += objects.length;
-    const operation = this.tail.then(async () => {
-      const id = ++this.id;
-      if (id > 0xffffffff) this.fail('request ID exhausted');
-      const header = Buffer.alloc(12);
-      header.write('BMP1');
-      header.writeUInt32BE(id, 4);
-      header.writeUInt32BE(objects.length, 8);
-      const vectors: Buffer[] = [header];
-      for (const object of objects) {
-        const entry = Buffer.alloc(24);
-        Buffer.from(object.ref.toString(), 'hex').copy(entry);
-        entry.writeUInt32BE(object.buffer.length, 20);
-        vectors.push(entry, object.buffer);
-      }
-      const result = await this.request(vectors, (response) => {
-        if (
-          response.version !== 1 ||
-          response.id !== id ||
-          !Array.isArray(response.sizes) ||
-          response.sizes.length !== objects.length ||
-          response.sizes.some(
-            (size: unknown) =>
-              size !== null &&
-              (!Number.isSafeInteger(size) || Number(size) <= 0 || Number(size) > MAX_MUTABLE_BYTES + 1024)
-          )
-        )
-          throw new Error('invalid mutable write response');
-        return response.sizes as (number | null)[];
-      });
-      // Never race a timed-out native rename with a canonical mutable-object retry.
-      if (!result) await this.stopped;
-      this.stats.mutableSubmitted += objects.length;
-      const persisted = (result as (number | null)[] | undefined)?.filter((size) => size !== null).length || 0;
-      this.stats.mutablePersisted += persisted;
-      this.stats.mutableFallbacks += objects.length - persisted;
-      return result as (number | null)[] | undefined;
-    });
-    this.tail = operation.then(
-      () => undefined,
-      () => this.fail('mutable batch processing failed')
-    );
+    const pending = this.mutableGroup;
+    let group: MutableGroup;
+    let offset = 0;
+    if (
+      !pending ||
+      pending.objects.length + objects.length > 16 ||
+      identities.some((hash) => pending.hashes.has(hash))
+    ) {
+      const next: MutableGroup = {
+        objects,
+        hashes,
+        operation: this.tail.then(() => {
+          if (this.mutableGroup === next) this.mutableGroup = undefined;
+          return this.persistMutableBatch(next.objects);
+        }),
+      };
+      this.tail = next.operation.then(
+        () => undefined,
+        () => this.fail('mutable batch processing failed')
+      );
+      this.mutableGroup = next;
+      group = next;
+    } else {
+      group = pending;
+      offset = group.objects.length;
+      // Never mutate a caller's input array when a later request joins its queued frame.
+      group.objects = group.objects.concat(objects);
+      for (const hash of identities) group.hashes.add(hash);
+    }
     try {
-      return await operation;
+      const result = await group.operation;
+      return offset === 0 && group.objects.length === objects.length
+        ? result
+        : result?.slice(offset, offset + objects.length);
     } finally {
       this.count -= objects.length;
     }
+  }
+
+  /** Coalesce only requests already queued; callers still await their own persisted slice. */
+  private async persistMutableBatch(objects: NativeObjectInput[]): Promise<(number | null)[] | undefined> {
+    this.stats.mutableBatches += 1;
+    const id = ++this.id;
+    if (id > 0xffffffff) this.fail('request ID exhausted');
+    const header = Buffer.alloc(12);
+    header.write('BMP1');
+    header.writeUInt32BE(id, 4);
+    header.writeUInt32BE(objects.length, 8);
+    const vectors: Buffer[] = [header];
+    for (const object of objects) {
+      const entry = Buffer.alloc(24);
+      Buffer.from(object.ref.toString(), 'hex').copy(entry);
+      entry.writeUInt32BE(object.buffer.length, 20);
+      vectors.push(entry, object.buffer);
+    }
+    const result = await this.request(vectors, (response) => {
+      if (
+        response.version !== 1 ||
+        response.id !== id ||
+        !Array.isArray(response.sizes) ||
+        response.sizes.length !== objects.length ||
+        response.sizes.some(
+          (size: unknown) =>
+            size !== null &&
+            (!Number.isSafeInteger(size) || Number(size) <= 0 || Number(size) > MAX_MUTABLE_BYTES + 1024)
+        )
+      )
+        throw new Error('invalid mutable write response');
+      return response.sizes as (number | null)[];
+    });
+    // Never race a timed-out native rename with a canonical mutable-object retry.
+    if (!result) await this.stopped;
+    this.stats.mutableSubmitted += objects.length;
+    const persisted = (result as (number | null)[] | undefined)?.filter((size) => size !== null).length || 0;
+    this.stats.mutablePersisted += persisted;
+    this.stats.mutableFallbacks += objects.length - persisted;
+    return result as (number | null)[] | undefined;
   }
 
   async importBatch(
@@ -116,6 +152,8 @@ export class RustObjectImporter {
     select: (values: (ObjectValidation | undefined)[]) => Promise<number[]>,
     finish: (selected: number[], persisted?: Set<number>) => Promise<void>
   ): Promise<void> {
+    // Validation/select/commit is an ordering barrier between mutable request groups.
+    this.mutableGroup = undefined;
     const bytes = objects.reduce((total, object) => total + object.buffer.length, 0);
     const eligible =
       objects.length > 0 &&
