@@ -184,6 +184,77 @@ test('fine merge/index diagnostics preserve synchronous values/errors and count 
   assert.equal(actual.stages.versionHistoryMergePolicy.calls, 1);
 });
 
+test('Version diagnostics separate persistence parsing without changing eligibility or errors', (t) => {
+  const files = fixture(t);
+  fs.writeFileSync(
+    files.module,
+    `
+    class BitObject { serialize(){return this.toBuffer();} compressWithSize(){return this.serialize();} }
+    class Version extends BitObject {
+      constructor(value){super();this.value=value;this.validateVersion();}
+      static parse(value){if(value==='bad')throw global.originalError;return new Version(value);}
+      validateVersion(){}
+      validate(){}
+      toObject(){return {value:this.value};}
+      validateBeforePersisting(value){const parsed=Version.parse(value);parsed.validate();}
+      toBuffer(){const value=JSON.stringify(this.toObject());this.validateBeforePersisting(value);return Buffer.from(value);}
+    }
+    module.exports={BitObject,Version};
+  `
+  );
+  const actual = execute(
+    files,
+    `
+    const assert=require('node:assert/strict');
+    const {BitObject,Version}=require(${JSON.stringify(files.module)});
+    require(${JSON.stringify(files.module)});
+    const version=Version.parse('data');
+    assert.equal(version.serialize,BitObject.prototype.serialize);
+    assert.equal(version.compressWithSize,BitObject.prototype.compressWithSize);
+    assert.deepEqual(version.serialize(),Buffer.from('{"value":"data"}'));
+    global.originalError=new Error('original parse error');
+    assert.throws(()=>version.validateBeforePersisting('bad'),error=>error===global.originalError);
+    assert.throws(()=>Version.parse('bad'),error=>error===global.originalError);
+    assert.ok(Version.parse('after error') instanceof Version);
+  `
+  );
+  assert.equal(actual.stages.versionParseForPersistence.calls, 2);
+  assert.equal(actual.stages.versionParseOther.calls, 3);
+  assert.equal(actual.stages.versionPersistValidation.calls, 2);
+  assert.equal(actual.stages.versionSerialization.calls, 1);
+  assert.equal(actual.stages.versionFullValidation.calls, 1);
+  assert.equal(actual.version.serializedObjects, 1);
+  assert.equal(actual.version.serializedBytes, 16);
+});
+
+test('mutable frame diagnostics count frame sizes rather than queued caller requests', (t) => {
+  const files = fixture(t);
+  fs.writeFileSync(
+    files.module,
+    `
+    class RustObjectImporter {
+      async persistMetadata(objects){return this.persistMutableBatch(objects);}
+      async persistMutableBatch(objects){return objects.map(object=>object.buffer.length);}
+    }
+    module.exports={RustObjectImporter};
+  `
+  );
+  const actual = execute(
+    files,
+    `
+    const assert=require('node:assert/strict');
+    const {RustObjectImporter}=require(${JSON.stringify(files.module)});
+    (async()=>{
+      const writer=new RustObjectImporter();const object={buffer:Buffer.from('abc')};
+      assert.deepEqual(await writer.persistMetadata([object]),[3]);
+      assert.deepEqual(await writer.persistMetadata([object,object]),[3,3]);
+    })().catch(error=>{console.error(error);process.exitCode=1;});
+  `
+  );
+  assert.deepEqual(actual.mutableFrames, { counts: { 1: 1, 2: 1 }, serializedBytes: 9 });
+  assert.equal(actual.stages.nativeMutableFrame.calls, 2);
+});
+
 test('CPU profile belongs to the command and forked children cannot overwrite it', (t) => {
   const files = fixture(t);
   const profile = path.join(files.directory, 'command.cpuprofile');

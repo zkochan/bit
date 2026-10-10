@@ -6,6 +6,8 @@ const output = process.env.BIT_IMPORT_TRACE;
 process.env.BIT_IMPORT_TRACE_OWNER ??= String(process.pid);
 const owner = Number(process.env.BIT_IMPORT_TRACE_OWNER);
 const asyncHooks = require('node:async_hooks');
+const versionParseContext = new asyncHooks.AsyncLocalStorage();
+const versionClasses = new WeakSet();
 const asyncTypes = new Map();
 const metrics = {
   schemaVersion: 1,
@@ -13,6 +15,8 @@ const metrics = {
   asyncResources: {},
   objectTypes: {},
   lookupResults: { repository: { found: 0, missing: 0 }, component: { found: 0, missing: 0 } },
+  version: { serializedBytes: 0, serializedObjects: 0 },
+  mutableFrames: { counts: {}, serializedBytes: 0 },
   inflation: { incoming: 0, repository: 0 },
   receivedObjects: 0,
   receivedCompressedBytes: 0,
@@ -62,9 +66,10 @@ function wrap(target, key, stage, inspect) {
   keys.add(key);
   const original = target[key];
   target[key] = function (...args) {
+    const stageName = typeof stage === 'function' ? stage.call(this, args) : stage;
     const started = process.hrtime.bigint();
     const record = () => {
-      const data = (metrics.stages[stage] ||= { calls: 0, summedInclusiveMs: 0 });
+      const data = (metrics.stages[stageName] ||= { calls: 0, summedInclusiveMs: 0 });
       data.calls++;
       data.summedInclusiveMs += Number(process.hrtime.bigint() - started) / 1e6;
     };
@@ -97,9 +102,33 @@ Module._load = function (request, parent, isMain) {
   if (
     !output ||
     process.pid !== owner ||
-    !/objects|scope|repositories|component.*merger|remote-lanes|source-validator|object-importer|rust-tar/.test(request)
+    !/objects|scope|version|repositories|component.*merger|remote-lanes|source-validator|object-importer|rust-tar/.test(
+      request
+    )
   )
     return value;
+  const Version = value?.Version || (value?.default?.name === 'Version' ? value.default : undefined);
+  if (Version && !versionClasses.has(Version)) {
+    versionClasses.add(Version);
+    const validate = Version.prototype.validateBeforePersisting;
+    if (typeof validate === 'function') {
+      Version.prototype.validateBeforePersisting = function (...args) {
+        return versionParseContext.run('persist-validation', () => validate.apply(this, args));
+      };
+    }
+    wrap(Version, 'parse', () =>
+      versionParseContext.getStore() === 'persist-validation' ? 'versionParseForPersistence' : 'versionParseOther'
+    );
+    wrap(Version.prototype, 'validateBeforePersisting', 'versionPersistValidation');
+    wrap(Version.prototype, 'validateVersion', 'versionConstructorChecks');
+    wrap(Version.prototype, 'validate', 'versionFullValidation');
+    wrap(Version.prototype, 'toObject', 'versionObjectProjection');
+    wrap(Version.prototype, 'toBuffer', 'versionSerialization', function (buffer) {
+      metrics.version.serializedObjects++;
+      metrics.version.serializedBytes += buffer.byteLength;
+    });
+    // Keep serialize/compressWithSize identities intact: native eligibility compares them to BitObject's methods.
+  }
   if (value?.Repository) {
     wrap(value.Repository.prototype, 'load', 'repositoryObjectLoad', function (result) {
       metrics.lookupResults.repository[result ? 'found' : 'missing']++;
@@ -163,6 +192,11 @@ Module._load = function (request, parent, isMain) {
   if (value?.RustObjectImporter) {
     wrap(value.RustObjectImporter.prototype, 'importBatch', 'nativeBatchValidationAndPersistence');
     wrap(value.RustObjectImporter.prototype, 'persistMetadata', 'nativeMutableCompressionAndPersistence');
+    wrap(value.RustObjectImporter.prototype, 'persistMutableBatch', 'nativeMutableFrame', function (_, args) {
+      const objects = args[0];
+      metrics.mutableFrames.counts[objects.length] = (metrics.mutableFrames.counts[objects.length] || 0) + 1;
+      metrics.mutableFrames.serializedBytes += objects.reduce((sum, object) => sum + object.buffer.byteLength, 0);
+    });
     wrap(value.RustObjectImporter.prototype, 'dispose', 'nativeImporterDisposal', function () {
       if (this.child) metrics.native.instances++;
       for (const key of [
@@ -199,9 +233,10 @@ Module._load = function (request, parent, isMain) {
     value?.MultipleComponentMerger ||
     value?.ModelComponentMerger ||
     value?.VersionHistory ||
+    value?.Version ||
     value?.LaneHistory ||
     value?.RemoteLanes ||
-    ['SourceRepository', 'VersionHistory', 'LaneHistory'].includes(value?.default?.name) ||
+    ['SourceRepository', 'Version', 'VersionHistory', 'LaneHistory'].includes(value?.default?.name) ||
     value?.ObjectFetcher ||
     value?.RustSourceValidator ||
     value?.RustObjectImporter ||
