@@ -157,3 +157,5 @@ Production progressive HTTP staging, replay and command qualification: [progress
 Detailed merge/index attribution, CPU profiling and local-overlap qualification gaps: [merge-index-profile.md](./merge-index-profile.md).
 
 Seeded origin/local-state HTTP imports, cached-policy repository regressions and conflict-prefix qualification: [local-overlap.md](./local-overlap.md).
+
+Shared origin/cache identities, arrival-sensitive histories and interrupted HTTP prefixes: [shared-history.md](./shared-history.md).
