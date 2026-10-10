@@ -196,7 +196,8 @@ async function verifyWorkspace(directory, manifest) {
   const bitmap = load('comment-json').parse(await fs.readFile(path.join(directory, '.bitmap'), 'utf8'));
   const contents = [];
   for (const [id, expected] of Object.entries(manifest.components)) {
-    const entry = bitmap[id];
+    // Bitmap keys may omit the scope when names are unique in the workspace.
+    const entry = Object.values(bitmap).find((value) => value && `${value.scope}/${value.name}` === id);
     assert.ok(entry?.rootDir && entry.mainFile === 'index.js', `missing checkout entry ${id}`);
     for (const file of expected.files) {
       const filename = path.join(directory, entry.rootDir, file.relativePath);
