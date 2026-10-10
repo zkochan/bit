@@ -116,7 +116,9 @@ async function persist(files: AbstractVinyl[], concurrency: number, session: Mat
   // files in the next configured concurrency chunk.
   const width = Number.isFinite(concurrency) ? Math.floor(concurrency) : files.length;
   for (let start = 0; start < files.length; start += width) {
-    await persistChunk(files.slice(start, start + width), concurrency, session);
+    const chunk = files.slice(start, start + width);
+    if (chunk.every(eligible)) await persistChunk(chunk, concurrency, session);
+    else await pMapPool(chunk, (file) => file.write(), { concurrency });
   }
 }
 
@@ -162,6 +164,22 @@ function projectBatch(files: AbstractVinyl[], start: number): ProjectedFile[] {
 }
 
 function project(file: AbstractVinyl): ProjectedFile | undefined {
+  if (!eligible(file)) return undefined;
+  const filename = Buffer.from(file.path);
+  // Keep the established isbinaryfile and host newline policy byte-for-byte.
+  const contents = eol.auto(file.contents) as Buffer;
+  return { filename, contents, overwrite: file.override };
+}
+
+function eligible(file: AbstractVinyl): boolean {
+  try {
+    return ordinaryFile(file);
+  } catch {
+    return false;
+  }
+}
+
+function ordinaryFile(file: AbstractVinyl): boolean {
   if (
     !(file instanceof AbstractVinyl) ||
     file.write !== defaultVinylWrite ||
@@ -169,19 +187,17 @@ function project(file: AbstractVinyl): ProjectedFile | undefined {
     typeof file.override !== 'boolean' ||
     typeof file.verbose !== 'boolean'
   )
-    return undefined;
+    return false;
   const filename = Buffer.from(file.path);
   if (
     !path.isAbsolute(file.path) ||
     file.path.includes('\0') ||
     filename.toString() !== file.path ||
     filename.length > MAX_PATH ||
-    file.contents.length > MAX_BYTES
+    file.contents.length + filename.length > MAX_BYTES
   )
-    return undefined;
-  // Keep the established isbinaryfile and host newline policy byte-for-byte.
-  const contents = eol.auto(file.contents) as Buffer;
-  return { filename, contents, overwrite: file.override };
+    return false;
+  return true;
 }
 
 function frame(id: number, files: ProjectedFile[]): Buffer {

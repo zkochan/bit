@@ -30,9 +30,10 @@ check and skips existing targets. Empty and binary files are supported.
 Node retains Bit's exact `isbinaryfile` classification and host newline conversion
 before transferring bytes. File selection, nested-component ownership, bitmap
 updates and model hydration remain in their existing layers. Files with custom
-write methods, including atomic `JsonVinyl` and `License`, retain those methods;
-native runs can resume after them. Oversized or unrepresentable files also use
-their existing writer.
+write methods, including atomic `JsonVinyl` and `License`, retain those methods and
+the canonical concurrency of their entire I/O chunk; native runs can resume on
+later eligible chunks. Oversized or unrepresentable files also use their existing
+writer.
 
 Each persistence operation owns a helper, with at most four helpers active across
 operations. Frames remain within the caller's configured I/O concurrency chunks:

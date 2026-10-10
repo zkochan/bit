@@ -117,7 +117,7 @@ test('deletions finish before Rust writes and link hooks run after complete mate
   assert.equal(linked, true);
   assert.equal(frames(acknowledgements)[0].completed, 1);
 });
-test('custom writes and atomic JsonVinyl stay canonical between native runs', async (t) => {
+test('custom writes and atomic JsonVinyl retain their entire canonical concurrency chunk', async (t) => {
   const { directory, acknowledgements } = await setup(t);
   const data = new DataToPersist();
   data.addFile(file(directory, 'first', 'first'));
@@ -134,10 +134,7 @@ test('custom writes and atomic JsonVinyl stay canonical between native runs', as
   assert.equal(called, 1);
   assert.equal(await fs.readFile(custom.path, 'utf8'), 'custom hook');
   assert.deepEqual(JSON.parse(await fs.readFile(path.join(directory, 'config.json'), 'utf8')), { test: true });
-  assert.deepEqual(
-    frames(acknowledgements).map((frame) => frame.completed),
-    [1, 1]
-  );
+  assert.deepEqual(frames(acknowledgements), []);
 });
 test('native filesystem failure replays the failed file with canonical error identity', async (t) => {
   const { directory, acknowledgements } = await setup(t);
@@ -344,6 +341,42 @@ test('prototype hooks installed before materializer loading retain their write b
     AbstractVinyl.prototype.write = original;
     require.cache[modulePath] = cached;
   }
+});
+
+test('custom writers separated by ordinary files retain concurrent execution and native writes resume on the next chunk', async (t) => {
+  const { directory, acknowledgements } = await setup(t);
+  let release;
+  let reject;
+  const gate = new Promise((resolve, fail) => {
+    release = resolve;
+    reject = fail;
+  });
+  const first = file(directory, 'first', 'first');
+  first.write = async () => {
+    const deadline = setTimeout(() => reject(new Error('custom writers were serialized')), 500);
+    try {
+      await gate;
+    } finally {
+      clearTimeout(deadline);
+    }
+    await fs.writeFile(first.path, 'first hook');
+  };
+  const second = file(directory, 'second', 'second');
+  second.write = async () => {
+    release();
+    await fs.writeFile(second.path, 'second hook');
+  };
+  await persistWorkspaceFiles(
+    [first, file(directory, 'ordinary', 'ordinary'), second, file(directory, 'next-chunk', 'next')],
+    3
+  );
+  assert.equal(await fs.readFile(first.path, 'utf8'), 'first hook');
+  assert.equal(await fs.readFile(second.path, 'utf8'), 'second hook');
+  assert.equal(await fs.readFile(path.join(directory, 'next-chunk'), 'utf8'), 'next');
+  assert.deepEqual(
+    frames(acknowledgements).map((frame) => frame.completed),
+    [1]
+  );
 });
 
 test('failed materialization does not start the link phase', async (t) => {
