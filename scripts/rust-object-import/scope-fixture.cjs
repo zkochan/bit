@@ -81,6 +81,80 @@ async function createFixture(cliRoot, directory, options) {
         versions: versions.map((v) => ({ hash: v.hash(), parents: v.parents })),
         graphCompleteRefs: versions.map((v) => v.hash().toString()),
       });
+      let expected = {
+        hash: component.hash().toString(),
+        head: component.head.toString(),
+        tags: Object.fromEntries(Object.entries(tags).map(([tag, ref]) => [tag, ref.toString()])),
+      };
+      if (options.overlap) {
+        assert.ok(['origin', 'local', 'conflict'].includes(options.overlap));
+        manifest.seedObjects ||= [];
+        manifest.localHashes ||= {};
+        const localVersions = [0, 1, 2].map((index) => {
+          const version = new Version({
+            mainFile: 'index.js',
+            files: versions[0].files,
+            log: {
+              message: `local ${index}`,
+              date: String(1700001000000 + index),
+              username: 'local',
+              email: 'local@example.invalid',
+            },
+            parents: [versions[0].hash()],
+          });
+          version._hash = version.calculateHash().toString();
+          version.validate();
+          return version;
+        });
+        const conflict = options.overlap === 'conflict';
+        const local = options.overlap === 'local' || conflict;
+        const state = local
+          ? { versions: { '1.0.90': { local: true }, ...(conflict ? { '1.0.0': { local: true } } : {}) } }
+          : {};
+        const seed = ModelComponent.from({
+          name,
+          scope: scopeName,
+          versions: {
+            '1.0.0': local && !conflict ? versions[0].hash() : localVersions[0].hash(),
+            '1.0.90': localVersions[1].hash(),
+          },
+          orphanedVersions: { '1.0.91': localVersions[2].hash() },
+          state,
+          head: local ? localVersions[1].hash() : versions[0].hash(),
+        });
+        seed.validate();
+        const seedHistory = new VersionHistory({
+          name,
+          scope: scopeName,
+          versions: [versions[0], ...localVersions].map((v) => ({ hash: v.hash(), parents: v.parents })),
+          graphCompleteRefs: localVersions.map((v) => v.hash().toString()),
+        });
+        for (const object of [versions[0], ...localVersions, seedHistory, seed]) {
+          manifest.seedObjects.push((await object.compress()).toString('base64'));
+        }
+        for (const version of localVersions) manifest.localHashes[version.hash().toString()] = { type: 'Version' };
+        const orphaned = { '1.0.91': localVersions[2].hash().toString() };
+        const expectedTags = conflict
+          ? Object.fromEntries(Object.entries(seed.versions).map(([tag, ref]) => [tag, ref.toString()]))
+          : { ...expected.tags };
+        if (local) expectedTags['1.0.90'] = localVersions[1].hash().toString();
+        else orphaned['1.0.90'] = localVersions[1].hash().toString();
+        expected = {
+          ...expected,
+          head: local ? seed.head.toString() : expected.head,
+          tags: expectedTags,
+          orphaned,
+          state,
+          remoteHead: conflict ? undefined : component.head.toString(),
+          history: {
+            hash: history.hash().toString(),
+            versions: Object.fromEntries(
+              [...versions, ...localVersions].map((v) => [v.hash().toString(), v.parents.map((p) => p.toString())])
+            ),
+            retainedCompleteRefs: seedHistory.graphCompleteRefs,
+          },
+        };
+      }
       await scope.objects.writeObjectsToTheFS([
         ...sources.map(({ source }) => source),
         ...versions,
@@ -90,11 +164,7 @@ async function createFixture(cliRoot, directory, options) {
       manifest.hashes[component.hash().toString()] = { type: 'Component' };
       manifest.hashes[history.hash().toString()] = { type: 'VersionHistory' };
       manifest.ids.push(`${scopeName}/${name}`);
-      manifest.components[`${scopeName}/${name}`] = {
-        hash: component.hash().toString(),
-        head: component.head.toString(),
-        tags: Object.fromEntries(Object.entries(tags).map(([tag, ref]) => [tag, ref.toString()])),
-      };
+      manifest.components[`${scopeName}/${name}`] = expected;
     }
   }
   Scope.scopeCache = {};
@@ -110,6 +180,22 @@ async function destination(cliRoot, directory, manifest) {
   await scope.scopeJson.write();
   return scope;
 }
+async function seedDestination(cliRoot, directory, manifest) {
+  if (!manifest.seedObjects) return;
+  const load = createRequire(path.join(cliRoot, 'package.json'));
+  const { Scope } = load('@teambit/legacy.scope');
+  const { BitObject } = load('@teambit/objects');
+  const scope = await Scope.load(directory, false);
+  try {
+    const objects = await Promise.all(
+      manifest.seedObjects.map((buffer) => BitObject.parseObject(Buffer.from(buffer, 'base64')))
+    );
+    await scope.objects.writeObjectsToTheFS(objects);
+  } finally {
+    scope.objects.clearObjectsFromCache();
+    delete Scope.scopeCache[scope.path];
+  }
+}
 async function verify(cliRoot, directory, manifest) {
   const load = createRequire(path.join(cliRoot, 'package.json'));
   const { Scope } = load('@teambit/legacy.scope');
@@ -118,7 +204,7 @@ async function verify(cliRoot, directory, manifest) {
   try {
     const found = {};
     const models = {};
-    for (const [hash, expected] of Object.entries(manifest.hashes)) {
+    for (const [hash, expected] of Object.entries({ ...manifest.hashes, ...manifest.localHashes })) {
       const obj = await scope.objects.load(new Ref(hash));
       assert.ok(obj, `missing ${expected.type} ${hash}`);
       assert.equal(obj.getType(), expected.type);
@@ -137,6 +223,24 @@ async function verify(cliRoot, directory, manifest) {
         Object.fromEntries(Object.entries(component.versions).map(([tag, ref]) => [tag, ref.toString()])),
         expected.tags
       );
+      if (expected.history) {
+        const refs = (values) => Object.fromEntries(Object.entries(values).map(([tag, ref]) => [tag, ref.toString()]));
+        assert.deepEqual(refs(component.orphanedVersions), expected.orphaned);
+        assert.deepEqual(component.state, expected.state);
+        const history = await scope.objects.load(new Ref(expected.history.hash));
+        assert.deepEqual(
+          Object.fromEntries(history.versions.map((v) => [v.hash.toString(), v.parents.map((p) => p.toString())])),
+          expected.history.versions
+        );
+        for (const ref of expected.history.retainedCompleteRefs)
+          assert.ok(history.graphCompleteRefs.includes(ref), 'local complete-history marker lost');
+        const { LaneId } = load('@teambit/lane-id');
+        const remote = await scope.objects.remoteLanes.getRef(
+          LaneId.from('main', component.scope),
+          component.toComponentId()
+        );
+        assert.equal(remote?.toString(), expected.remoteHead, 'remote head must track incoming origin');
+      }
       assert.ok(scope.objects.scopeIndex.find(expected.hash), `component not indexed: ${id}`);
     }
     return {
@@ -149,7 +253,7 @@ async function verify(cliRoot, directory, manifest) {
     delete Scope.scopeCache[scope.path];
   }
 }
-module.exports = { createFixture, destination, verify };
+module.exports = { createFixture, destination, seedDestination, verify };
 if (require.main === module)
   (async () => {
     const [cliRoot, directory] = process.argv.slice(2);
