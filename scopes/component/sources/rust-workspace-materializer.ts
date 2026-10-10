@@ -3,13 +3,12 @@ import path from 'path';
 import { pMapPool } from '@teambit/toolbox.promise.map-pool';
 import { resolveRustObjectImportExecutable } from '@teambit/objects';
 import * as eol from '@teambit/toolbox.string.eol';
-import AbstractVinyl, { logFileWrite } from './abstract-vinyl';
+import AbstractVinyl, { defaultVinylWrite, logFileWrite } from './abstract-vinyl';
 
 const MAX_FILES = 64;
 const MAX_BYTES = 32 * 1024 * 1024;
 const MAX_PATH = 32768;
 const MAX_RESPONSE = 65536;
-const canonicalWrite = AbstractVinyl.prototype.write;
 let active = 0;
 
 type ProjectedFile = { filename: Buffer; contents: Buffer; overwrite: boolean };
@@ -165,7 +164,7 @@ function projectBatch(files: AbstractVinyl[], start: number): ProjectedFile[] {
 function project(file: AbstractVinyl): ProjectedFile | undefined {
   if (
     !(file instanceof AbstractVinyl) ||
-    file.write !== canonicalWrite ||
+    file.write !== defaultVinylWrite ||
     !Buffer.isBuffer(file.contents) ||
     typeof file.override !== 'boolean' ||
     typeof file.verbose !== 'boolean'

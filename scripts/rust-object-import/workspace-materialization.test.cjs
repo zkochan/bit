@@ -321,6 +321,31 @@ test('custom writers adding files do not change the in-progress file-list snapsh
   await assert.rejects(fs.stat(path.join(directory, 'added-later')), { code: 'ENOENT' });
 });
 
+test('prototype hooks installed before materializer loading retain their write behavior', async (t) => {
+  const { directory, acknowledgements } = await setup(t);
+  const modulePath = compiled
+    ? path.join(path.dirname(installed.resolve('@teambit/component.sources')), 'rust-workspace-materializer.js')
+    : path.join(root, 'scopes/component/sources/rust-workspace-materializer.ts');
+  const cached = require.cache[modulePath];
+  const original = AbstractVinyl.prototype.write;
+  let called = 0;
+  AbstractVinyl.prototype.write = async function () {
+    called++;
+    await fs.writeFile(this.path, 'prototype hook');
+  };
+  delete require.cache[modulePath];
+  try {
+    const fresh = require(modulePath);
+    await fresh.persistWorkspaceFiles([file(directory, 'hooked', 'original')], 100);
+    assert.equal(called, 1);
+    assert.equal(await fs.readFile(path.join(directory, 'hooked'), 'utf8'), 'prototype hook');
+    assert.deepEqual(frames(acknowledgements), []);
+  } finally {
+    AbstractVinyl.prototype.write = original;
+    require.cache[modulePath] = cached;
+  }
+});
+
 test('failed materialization does not start the link phase', async (t) => {
   const { directory } = await setup(t);
   await fs.mkdir(path.join(directory, 'blocked'));

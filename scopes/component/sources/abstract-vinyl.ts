@@ -103,3 +103,6 @@ export function logFileWrite(filePath: string, override: boolean, verbose: boole
   }
   logger.debug(msg);
 }
+
+// Capture before other modules can replace the prototype method with a hook.
+export const defaultVinylWrite = AbstractVinyl.prototype.write;
