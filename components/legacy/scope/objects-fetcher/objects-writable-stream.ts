@@ -2,7 +2,17 @@ import { Writable } from 'stream';
 import { logger } from '@teambit/legacy.logger';
 import { deflate } from '@teambit/legacy.utils';
 import type { ObjectItem, Repository } from '@teambit/objects';
-import { BitObject, Lane, LaneHistory, ModelComponent, ObjectList, Version, VersionHistory } from '@teambit/objects';
+import {
+  BitObject,
+  Lane,
+  LaneHistory,
+  ModelComponent,
+  ObjectList,
+  Version,
+  VersionHistory,
+  nativeIndices,
+  nativeSelections,
+} from '@teambit/objects';
 import type { WriteObjectsQueue } from './write-objects-queue';
 import type { ComponentsPerRemote } from '../component-ops/multiple-component-merger';
 import type { RustObjectImporter, MetadataValidation } from './rust-object-importer';
@@ -26,6 +36,7 @@ const MAX_NATIVE_MUTABLE_BYTES = 16 * 1024;
 export class ObjectsWritable extends Writable {
   private timeoutId: NodeJS.Timeout;
   private intervalCounter = 0;
+  private sequentialMetadata?: { object: Version; buffer: Buffer; ref: ReturnType<Version['hash']> }[];
   constructor(
     private repo: Repository,
     private remoteName: string,
@@ -101,10 +112,12 @@ export class ObjectsWritable extends Writable {
       objects,
       async (values) => {
         const selected: number[] = [];
+        this.beginSequentialMetadata();
         for (let index = 0; index < objects.length; index += 1) {
           try {
             const value = values[index];
             if (value && !('metadata' in value)) {
+              await this.flushSequentialMetadata();
               if (this.objectsQueue.reserveNativeSource(objects[index].ref.toString())) selected.push(index);
             } else {
               await this.writeObjectToFs(
@@ -118,6 +131,12 @@ export class ObjectsWritable extends Writable {
             break;
           }
         }
+        try {
+          await this.flushSequentialMetadata();
+        } catch (error) {
+          legacyError = error;
+        }
+        this.sequentialMetadata = undefined;
         return selected;
       },
       async (selected, persisted) => {
@@ -149,6 +168,7 @@ export class ObjectsWritable extends Writable {
     let processed = 0;
     const initialEligibility = this.nativeStoreEligibility();
     const native = typeof initialEligibility === 'boolean' ? initialEligibility : await initialEligibility;
+    this.beginSequentialMetadata();
     for (let index = 0; index < entries.length; index += 1) {
       try {
         signal?.throwIfAborted();
@@ -158,6 +178,7 @@ export class ObjectsWritable extends Writable {
         }
         const object = ObjectList.extractScopeAndHash(entry.name);
         if (native && entry.sourceHash === object.ref.toString() && /^[a-f0-9]{40}$/.test(entry.sourceHash)) {
+          await this.flushSequentialMetadata();
           if (this.objectsQueue.reserveNativeSource(entry.sourceHash)) reserved.set(index, object);
         } else {
           // Hydrate through the canonical parser, rechecking eligibility after earlier policy.
@@ -175,6 +196,12 @@ export class ObjectsWritable extends Writable {
         break;
       }
     }
+    try {
+      await this.flushSequentialMetadata();
+    } catch (cause) {
+      error = cause;
+    }
+    this.sequentialMetadata = undefined;
     // Metadata policy may change hooks or methods. Downgrade reserved Sources before native commit.
     let selected: number[] = [];
     try {
@@ -232,6 +259,7 @@ export class ObjectsWritable extends Writable {
         ? validation.result
         : await this.sourceValidator.validate(obj.ref.toString(), obj.buffer);
       if (validated) {
+        await this.flushSequentialMetadata();
         await this.objectsQueue.addImmutableObject(obj.ref.toString(), () =>
           this.repo.writeValidatedSourceToFS(obj.ref, obj.buffer)
         );
@@ -239,6 +267,7 @@ export class ObjectsWritable extends Writable {
       }
       logger.debug(`Rust Source import fallback: ${this.sourceValidator.unavailableReason || 'legacy object'}`);
     }
+    if (!metadata || !metadata.metadata.startsWith('Version ')) await this.flushSequentialMetadata();
     const { object: bitObject, inflatedSize } = metadata
       ? BitObject.parseInflatedObjectWithSize(Buffer.from(metadata.metadata, 'utf8'))
       : await BitObject.parseObjectWithSize(obj.buffer);
@@ -294,7 +323,31 @@ export class ObjectsWritable extends Writable {
   private async mergeVersionHistory(versionHistory: VersionHistory) {
     const existingVersionHistory = (await this.repo.load(versionHistory.hash())) as VersionHistory | undefined;
     if (existingVersionHistory) {
-      existingVersionHistory.merge(versionHistory);
+      const operation = this.repo.getNativeImportOperation?.();
+      const existing = existingVersionHistory.versions;
+      const plan =
+        existingVersionHistory.merge === VersionHistory.prototype.merge &&
+        versionHistory.merge === VersionHistory.prototype.merge &&
+        Object.getPrototypeOf(existingVersionHistory) === VersionHistory.prototype &&
+        Object.getPrototypeOf(versionHistory) === VersionHistory.prototype &&
+        existingVersionHistory.mergeNative === VersionHistory.prototype.mergeNative &&
+        existingVersionHistory.getAllHashesAsString === VersionHistory.prototype.getAllHashesAsString &&
+        versionHistory.getAllHashesAsString === VersionHistory.prototype.getAllHashesAsString
+          ? await operation?.plan(
+              () => ({
+                kind: 'versionHistory',
+                existing: existingVersionHistory.versions.map((v) => v.hash.toString()),
+                incoming: versionHistory.getAllHashesAsString(),
+                stored: existingVersionHistory.getAllHashesAsString(),
+              }),
+              (value) => nativeIndices(value, existing.length)
+            )
+          : undefined;
+      const applied = plan?.apply((retained) => {
+        existingVersionHistory.mergeNative(versionHistory, retained);
+        return true;
+      });
+      if (!applied) existingVersionHistory.merge(versionHistory);
       await this.writeMutableObject(existingVersionHistory);
     } else {
       await this.writeMutableObject(versionHistory);
@@ -304,7 +357,31 @@ export class ObjectsWritable extends Writable {
   private async mergeLaneHistory(laneHistory: LaneHistory) {
     const existingLaneHistory = (await this.repo.load(laneHistory.hash())) as LaneHistory | undefined;
     if (existingLaneHistory) {
-      existingLaneHistory.merge(laneHistory);
+      const operation = this.repo.getNativeImportOperation?.();
+      const existing = Object.keys(existingLaneHistory.getHistory());
+      const incoming = Object.keys(laneHistory.getHistory());
+      const plan =
+        existingLaneHistory.merge === LaneHistory.prototype.merge &&
+        laneHistory.merge === LaneHistory.prototype.merge &&
+        Object.getPrototypeOf(existingLaneHistory) === LaneHistory.prototype &&
+        Object.getPrototypeOf(laneHistory) === LaneHistory.prototype &&
+        existingLaneHistory.mergeNative === LaneHistory.prototype.mergeNative &&
+        existingLaneHistory.getHistory === LaneHistory.prototype.getHistory &&
+        laneHistory.getHistory === LaneHistory.prototype.getHistory
+          ? await operation?.plan(
+              () => ({
+                kind: 'laneHistory',
+                existing: Object.keys(existingLaneHistory.getHistory()),
+                incoming: Object.keys(laneHistory.getHistory()),
+              }),
+              (value) => nativeSelections(value, [existing.length, incoming.length])
+            )
+          : undefined;
+      const applied = plan?.apply((selections) => {
+        existingLaneHistory.mergeNative(laneHistory, selections);
+        return true;
+      });
+      if (!applied) existingLaneHistory.merge(laneHistory);
       await this.writeMutableObject(existingLaneHistory);
     } else {
       await this.writeMutableObject(laneHistory);
@@ -313,7 +390,28 @@ export class ObjectsWritable extends Writable {
 
   private async mergeVersionObject(version: Version) {
     const existingVersion = (await this.repo.load(version.hash())) as Version | undefined;
-    const isExistingNewer = existingVersion && existingVersion.lastModified() > version.lastModified();
+    let isExistingNewer: boolean | undefined;
+    if (existingVersion) {
+      const oldDate = existingVersion.lastModified();
+      const newDate = version.lastModified();
+      const operation =
+        existingVersion.lastModified === Version.prototype.lastModified &&
+        version.lastModified === Version.prototype.lastModified
+          ? this.repo.getNativeImportOperation?.()
+          : undefined;
+      const plan =
+        typeof oldDate === 'string' && typeof newDate === 'string'
+          ? await operation?.plan(
+              () => ({ kind: 'version', existing: existingVersion.lastModified(), incoming: version.lastModified() }),
+              (value) => {
+                if (typeof value !== 'boolean') throw new Error('invalid native Version decision');
+                return value;
+              }
+            )
+          : undefined;
+      isExistingNewer = plan?.apply((value) => value);
+      isExistingNewer ??= operation ? existingVersion.lastModified() > version.lastModified() : oldDate > newDate;
+    }
     if (isExistingNewer) return;
     await this.writeMutableObject(version);
   }
@@ -324,7 +422,45 @@ export class ObjectsWritable extends Writable {
     return eligibility === undefined ? this.repo.getNativeSourceStoreOptions().then(Boolean) : eligibility;
   }
 
+  private beginSequentialMetadata() {
+    if (
+      process.env.BIT_RUST_OBJECT_IMPORT_SEQUENTIAL === 'on' &&
+      this.mutableWriter &&
+      this.repo.getNativeImportOperation?.()
+    )
+      this.sequentialMetadata = [];
+  }
+
+  private async flushSequentialMetadata() {
+    const pending = this.sequentialMetadata;
+    if (!pending?.length) return;
+    this.sequentialMetadata = [];
+    const eligibility = this.nativeStoreEligibility();
+    const sizes = (typeof eligibility === 'boolean' ? eligibility : await eligibility)
+      ? await this.mutableWriter?.persistMetadataSequential(pending)
+      : undefined;
+    for (let index = 0; index < pending.length; index++) {
+      const { object, buffer, ref } = pending[index];
+      if (sizes?.[index]) this.repo.recordNativeObjectWrite(object, buffer.byteLength, sizes[index]!);
+      else
+        await this.repo.writeObjectsToTheFS(
+          [object],
+          new Map([
+            [
+              object,
+              {
+                ref,
+                buffer: await deflate(buffer),
+                inflatedSize: buffer.byteLength,
+              },
+            ],
+          ])
+        );
+    }
+  }
+
   private async writeMutableObject(object: Version | VersionHistory | LaneHistory) {
+    if (!(object instanceof Version)) await this.flushSequentialMetadata();
     const eligibility =
       this.mutableWriter && !this.mutableWriter.unavailableReason ? this.nativeStoreEligibility() : false;
     if (
@@ -336,6 +472,13 @@ export class ObjectsWritable extends Writable {
     ) {
       const buffer = object.serialize();
       const ref = object.hash();
+      if (this.sequentialMetadata && object instanceof Version && buffer.byteLength <= MAX_NATIVE_MUTABLE_BYTES) {
+        if (this.sequentialMetadata.length >= 16 || this.sequentialMetadata.some((entry) => entry.ref.isEqual(ref)))
+          await this.flushSequentialMetadata();
+        this.sequentialMetadata!.push({ object, buffer, ref });
+        return;
+      }
+      await this.flushSequentialMetadata();
       const sizes =
         buffer.byteLength <= MAX_NATIVE_MUTABLE_BYTES
           ? await this.mutableWriter.persistMetadata([{ ref, buffer }])
@@ -360,6 +503,7 @@ export class ObjectsWritable extends Writable {
       );
       return;
     }
+    await this.flushSequentialMetadata();
     await this.repo.writeObjectsToTheFS([object]);
   }
 }

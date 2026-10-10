@@ -175,6 +175,14 @@ export default class VersionHistory extends BitObject {
     this.versionsObj = this.versionParentsToObject(newVersions);
   }
 
+  mergeNative(versionHistory: VersionHistory, retained: number[]) {
+    const existing = this.versions;
+    this.versionsObj = this.versionParentsToObject([
+      ...versionHistory.versions,
+      ...retained.map((index) => existing[index]),
+    ]);
+  }
+
   getAncestor(numOfGenerationsToGoBack: number, ref: Ref): Ref {
     const errorMsg = `unable to get an older parent of ${this.compId.toString()}`;
     const versionData = this.getVersionData(ref);

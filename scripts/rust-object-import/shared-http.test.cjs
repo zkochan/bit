@@ -27,7 +27,7 @@ test(
       timeout: 110000,
     });
     const result = JSON.parse(await fs.readFile(report));
-    assert.equal(result.runs.length, 8);
+    assert.equal(result.runs.length, 12);
     for (const run of result.runs) {
       assert.equal(run.code, run.scenario === 'success' ? 0 : 1);
       assert.equal(run.verification.contentsAndModelsVerified, true);

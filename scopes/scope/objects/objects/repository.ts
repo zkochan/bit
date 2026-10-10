@@ -9,7 +9,7 @@ import { userInfo } from 'os';
 import { pMapPool } from '@teambit/toolbox.promise.map-pool';
 import { OBJECTS_DIR } from '@teambit/legacy.constants';
 import { logger } from '@teambit/legacy.logger';
-import type { PathOsBasedAbsolute } from '@teambit/legacy.utils';
+import { deflate, type PathOsBasedAbsolute } from '@teambit/legacy.utils';
 import { glob } from 'glob';
 import { removeEmptyDir } from '@teambit/toolbox.fs.remove-empty-dir';
 import { concurrentIOLimit } from '@teambit/harmony.modules.concurrency';
@@ -30,6 +30,8 @@ import { ObjectList } from './object-list';
 import BitRawObject from './raw-object';
 import Ref from './ref';
 import { nativeObjectDirectory, nativeTraversalEnabled } from './rust-object-directory';
+import { NativeImportOperation } from './rust-object-operation';
+import { resolveRustObjectImportExecutable } from './rust-object-discovery';
 import { nativeInventoryEnabled, nativeObjectExists } from './rust-object-inventory';
 import {
   nativeObjectBuffers,
@@ -74,6 +76,9 @@ export default class Repository {
   scopeIndex: ScopeIndex;
   protected cache: InMemoryCache<BitObject>;
   private liveObjects = new LiveObjects();
+  private nativeImportOperation?: NativeImportOperation;
+  private nativeImportGroupName?: string;
+  private nativeImportDepth = 0;
   remoteLanes!: RemoteLanes;
   unmergedComponents!: UnmergedComponents;
   _persistMutex?: Mutex;
@@ -256,6 +261,24 @@ export default class Repository {
     if (cached) {
       return cached;
     }
+    const operation =
+      !throws &&
+      process.env.BIT_RUST_OBJECT_IMPORT_MISSING === 'on' &&
+      this.load === Repository.prototype.load &&
+      this.getCache === Repository.prototype.getCache
+        ? this.getNativeImportOperation()
+        : undefined;
+    const generation = operation?.writeGeneration;
+    if (
+      operation &&
+      (await operation.revalidateMissing(ref.toString())) === false &&
+      this.getNativeImportOperation() === operation
+    ) {
+      const nowCached = this.objects[ref.hash.toString()] || this.getCache(ref);
+      if (nowCached) return nowCached;
+      // @ts-ignore @todo: fix! it should return BitObject | null.
+      return null;
+    }
     let fileContentsRaw: Buffer;
     const objectPath = this.objectPath(ref);
     try {
@@ -265,6 +288,7 @@ export default class Repository {
         logger.error(`Failed reading a ref file ${objectPath}. Error: ${err.message}`);
         throw err;
       }
+      if (operation && generation !== undefined) operation.rememberMissing(ref.toString(), generation);
       logger.trace(`Failed finding a ref file ${objectPath}.`);
       if (throws) {
         // if we just `throw err` we loose the stack trace.
@@ -686,6 +710,7 @@ export default class Repository {
   }
 
   removeFromCache(ref: Ref) {
+    this.nativeImportOperation?.invalidateMissing(ref.toString());
     this.cache.delete(ref.toString());
     this.liveObjects.delete(ref.toString());
   }
@@ -697,6 +722,7 @@ export default class Repository {
   }
   clearObjectsFromCache() {
     logger.debug('repository.clearObjectsFromCache');
+    this.nativeImportOperation?.invalidateMissing();
     this.cache.deleteAll();
     this.liveObjects.clear();
   }
@@ -891,11 +917,94 @@ export default class Repository {
     logger.trace(`Repository.writeObjectsToTheFS: started writing ${count} objects`);
     const concurrency = concurrentIOLimit();
     const chownOptions = await this.getChownOptions();
-    await pMapPool(objects, (obj) => this._writeOne(obj, rawObjects?.get(obj), chownOptions), { concurrency });
+    await pMapPool(
+      objects,
+      async (obj) => {
+        const operation = this.getNativeImportOperation();
+        if (
+          operation &&
+          !rawObjects?.get(obj) &&
+          (obj instanceof ModelComponent || obj instanceof Lane || obj instanceof ScopeMeta) &&
+          obj.serialize === BitObject.prototype.serialize &&
+          obj.compressWithSize === BitObject.prototype.compressWithSize
+        ) {
+          const buffer = obj.serialize();
+          const size =
+            buffer.length <= 16 * 1024
+              ? await operation.request(
+                  { kind: 'persist', hash: obj.hash().toString(), serialized: buffer.toString('hex') },
+                  (value) => {
+                    if (value !== null && (!Number.isSafeInteger(value) || value < 1 || value > 513 * 1024))
+                      throw new Error('invalid native model size');
+                    return value as number | null;
+                  }
+                )
+              : undefined;
+          if (size) {
+            this.recordNativeObjectWrite(obj, buffer.length, size);
+            operation.stats.persisted++;
+            return;
+          }
+          const compressed = await deflate(buffer);
+          await this._writeOne(obj, { buffer: compressed, inflatedSize: buffer.length, ref: obj.hash() }, chownOptions);
+          return;
+        }
+        await this._writeOne(obj, rawObjects?.get(obj), chownOptions);
+      },
+      { concurrency }
+    );
     logger.trace(`Repository.writeObjectsToTheFS: completed writing ${count} objects`);
 
-    const added = this.scopeIndex.addMany(objects);
+    const added = await this.scopeIndex.addManyForImport(objects, this.getNativeImportOperation());
     if (added) await this.scopeIndex.write();
+  }
+
+  async withNativeImportOperation<T>(run: () => Promise<T>): Promise<T> {
+    if (
+      !this.nativeImportOperation &&
+      process.env.BIT_RUST_OBJECT_IMPORT_OPERATION === 'on' &&
+      this.canWriteMutableObjectsNatively() &&
+      this.getNativeSourceStoreOptions === Repository.prototype.getNativeSourceStoreOptions &&
+      this.getChownOptions === Repository.prototype.getChownOptions &&
+      this.getPath === Repository.prototype.getPath
+    ) {
+      const groupName = this.scopeJson.groupName;
+      const executable = resolveRustObjectImportExecutable('import');
+      const options = executable ? await this.getNativeSourceStoreOptions() : undefined;
+      if (options && !this.nativeImportOperation && groupName === this.scopeJson.groupName) {
+        this.nativeImportGroupName = groupName;
+        this.nativeImportOperation = new NativeImportOperation(executable!, options);
+      }
+    }
+    this.nativeImportDepth++;
+    try {
+      return await run();
+    } finally {
+      this.nativeImportDepth--;
+      if (!this.nativeImportDepth) {
+        const operation = this.nativeImportOperation;
+        this.nativeImportOperation = undefined;
+        this.scopeIndex.nativeImportOperation = undefined;
+        await operation?.disposeAndWait();
+      }
+    }
+  }
+
+  getNativeImportOperation(): NativeImportOperation | undefined {
+    if (
+      !this.nativeImportOperation ||
+      this.nativeImportOperation.unavailableReason ||
+      !this.isNativeSourceStoreEligible() ||
+      !this.canWriteMutableObjectsNatively() ||
+      this.scopeIndex.indexPath !== path.join(this.scopePath, 'index.json') ||
+      this.nativeImportOperation.objectsDirectory !== path.resolve(this.getPath()) ||
+      this.scopeJson.groupName !== this.nativeImportGroupName
+    ) {
+      this.scopeIndex.nativeImportOperation = undefined;
+      return undefined;
+    }
+    this.scopeIndex.nativeImportOperation = this.nativeImportOperation;
+    return this.nativeImportOperation;
   }
 
   /** Recheck live policy without allocating options when the default store needs no ownership lookup. */
@@ -913,7 +1022,9 @@ export default class Repository {
   private isNativeSourceStoreEligible(): boolean {
     // Custom transforms stay in JavaScript. Native writes are currently qualified on Unix hosts.
     return (
-      (process.platform === 'linux' || process.platform === 'darwin') &&
+      (process.platform === 'linux' ||
+        process.platform === 'darwin' ||
+        (process.platform === 'win32' && process.env.BIT_RUST_OBJECT_IMPORT_WINDOWS_WRITES === 'on')) &&
       this.onPersist === this.defaultOnPersist &&
       this.onRead === this.defaultOnRead &&
       !(Repository.hasPreObjectPersistTransformer
@@ -934,6 +1045,7 @@ export default class Repository {
       this._writeOne === Repository.prototype._writeOne &&
       this.scopeIndex.addMany === ScopeIndex.prototype.addMany &&
       this.scopeIndex.addOne === ScopeIndex.prototype.addOne &&
+      this.scopeIndex.write === ScopeIndex.prototype.write &&
       this.objectPath === Repository.prototype.objectPath &&
       this.writeObjectFile === Repository.prototype.writeObjectFile &&
       this.hashPath === Repository.prototype.hashPath
@@ -943,6 +1055,7 @@ export default class Repository {
   /** Acknowledged native writes retain the canonical hydrated instance and cache size policy. */
   recordNativeObjectWrite(object: BitObject, inflatedSize: number, compressedSize: number) {
     const hash = object.hash().toString();
+    this.nativeImportOperation?.invalidateMissing(hash);
     if (this.cache.has(hash)) this.cache.set(hash, object, inflatedSize);
     this.liveObjects.set(hash, object, inflatedSize, compressedSize < MAX_COMPRESSED_SIZE_TO_CACHE);
   }
@@ -986,6 +1099,7 @@ export default class Repository {
     logger.trace(`repository._writeOne: ${objectPath}`);
     // Run hook to transform content pre persisting
     const transformedContent = this.onPersist(contents);
+    this.nativeImportOperation?.invalidateMissing(hash.toString());
     await this.writeObjectFile(objectPath, transformedContent, options);
     // once written, the object is the up-to-date one. this also replaces the size-estimate of objects that
     // were cached by `add()`.

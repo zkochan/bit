@@ -53,6 +53,7 @@ async function createFixture(cliRoot, directory, options) {
       const versions = [];
       for (let versionIndex = 0; versionIndex < (options.versions || 2); versionIndex++) {
         const version = new Version({
+          ...(options.harmony ? { schema: '1.0.0' } : {}),
           mainFile: 'index.js',
           files: sources.map(({ source, relativePath }) => ({
             name: path.basename(relativePath),
@@ -85,6 +86,10 @@ async function createFixture(cliRoot, directory, options) {
         hash: component.hash().toString(),
         head: component.head.toString(),
         tags: Object.fromEntries(Object.entries(tags).map(([tag, ref]) => [tag, ref.toString()])),
+        files: sources.map(({ source, relativePath }) => ({
+          relativePath,
+          contentSha256: manifest.hashes[source.hash().toString()].contentSha256,
+        })),
       };
       if (options.overlap) {
         assert.ok(['origin', 'local', 'conflict'].includes(options.overlap));
@@ -96,6 +101,7 @@ async function createFixture(cliRoot, directory, options) {
         const orphanTag = versions.length > 91 ? '9.0.91' : '1.0.91';
         const localVersions = Array.from({ length: localCount }, (_, index) => {
           const version = new Version({
+            ...(options.harmony ? { schema: '1.0.0' } : {}),
             mainFile: 'index.js',
             files: versions[0].files,
             log: {

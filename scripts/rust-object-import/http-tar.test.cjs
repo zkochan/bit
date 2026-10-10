@@ -14,7 +14,7 @@ const native =
   process.env.BIT_TEST_OBJECT_IMPORT || path.resolve(__dirname, '../../native/target/debug/bit-object-import');
 const unix = process.platform === 'linux' || process.platform === 'darwin';
 const hasNative = unix && require('node:fs').existsSync(native);
-async function setup(t, { enabled = true, executable = native, abortAfterBytes } = {}) {
+async function setup(t, { enabled = true, executable = native, abortAfterBytes, operation = false, signal, delayMs = 0, hold = false } = {}) {
   const getToken = Http.getToken;
   Http.getToken = () => 'fixture-token';
   t.after(() => {
@@ -43,11 +43,13 @@ async function setup(t, { enabled = true, executable = native, abortAfterBytes }
     assert.equal(request.url, '/api/scope/fetch');
     assert.equal(request.headers.authorization, 'Bearer fixture-token');
     request.resume();
-    response.writeHead(200, { 'Content-Length': archive.length });
+    response.writeHead(200, hold ? {} : { 'Content-Length': archive.length });
     if (abortAfterBytes !== undefined) {
       response.write(archive.subarray(0, abortAfterBytes));
       setTimeout(() => response.destroy(), 20);
-    } else response.end(archive);
+    } else if (hold) response.write(archive);
+    else if (delayMs) setTimeout(() => response.end(archive), delayMs);
+    else response.end(archive);
   });
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -61,10 +63,11 @@ async function setup(t, { enabled = true, executable = native, abortAfterBytes }
     undefined,
     { fetchRetries: 0 }
   );
-  const names = ['BIT_RUST_OBJECT_TAR', 'BIT_RUST_OBJECT_IMPORT'];
+  const names = ['BIT_RUST_OBJECT_TAR', 'BIT_RUST_OBJECT_IMPORT', 'BIT_RUST_OBJECT_IMPORT_OPERATION'];
   const previous = names.map((name) => process.env[name]);
   process.env.BIT_RUST_OBJECT_TAR = enabled ? 'on' : 'off';
   process.env.BIT_RUST_OBJECT_IMPORT = executable;
+  process.env.BIT_RUST_OBJECT_IMPORT_OPERATION = operation ? 'on' : 'off';
   const prepare = ObjectsWritable.prototype.prepareTarBatch;
   ObjectsWritable.prototype.prepareTarBatch = function (entries, ...args) {
     nativeSources += entries.filter((entry) => entry.sourceHash).length;
@@ -85,8 +88,8 @@ async function setup(t, { enabled = true, executable = native, abortAfterBytes }
     { sources: {} },
     {
       resolve: async () => ({
-        fetch: async (ids, options) => {
-          const stream = await client.fetch(ids, options);
+        fetch: async (ids, options, context) => {
+          const stream = await client.fetch(ids, options, context);
           deferred = Boolean(stream.claimTarInput);
           if (stream.claimTarInput) {
             const claim = stream.claimTarInput.bind(stream);
@@ -104,7 +107,9 @@ async function setup(t, { enabled = true, executable = native, abortAfterBytes }
     undefined,
     undefined,
     true,
-    { remote: objects.map((object) => object.hash().toString()) }
+    { remote: objects.map((object) => object.hash().toString()) },
+    'HTTP qualification',
+    signal
   );
   return {
     repo,
@@ -211,3 +216,21 @@ test(
     assert.equal(state.nativeSources(), 2);
   }
 );
+test('operation-level native transfer preserves authenticated delayed HTTP import', { skip: !hasNative }, async (t) => {
+  const state = await setup(t, { operation: true, delayMs: 50 }); await verify(state); assert.equal(state.nativeSources(), 2);
+});
+test('external cancellation aborts authenticated HTTP before response headers without retrying', { skip: !hasNative }, async (t) => {
+  const controller = new AbortController(); const reason = new Error('caller HTTP cancellation');
+  const state = await setup(t, { operation: true, signal: controller.signal, delayMs: 500 }); const pending = state.fetcher.fetchFromRemoteAndWrite();
+  const rejected = assert.rejects(pending, (error) => error === reason);
+  const started = Date.now(); while (!state.requests()) { assert.ok(Date.now() - started < 5000); await new Promise((resolve) => setTimeout(resolve, 5)); }
+  controller.abort(reason); await rejected; assert.equal(state.requests(), 1); assert.equal(await state.repo.load(state.values[0].hash()), null);
+});
+test('external cancellation during native intake retains committed Source prefix and finishes helper cleanup', { skip: !hasNative }, async (t) => {
+  const controller = new AbortController(); const reason = new Error('caller active intake cancellation');
+  const state = await setup(t, { operation: true, signal: controller.signal, hold: true }); const pending = state.fetcher.fetchFromRemoteAndWrite(); const rejected = assert.rejects(pending, (error) => error === reason);
+  const started = Date.now(); for (;;) {
+    try { await fs.access(state.repo.objectPath(state.values[0].hash())); break; } catch { assert.ok(Date.now() - started < 5000, 'Source must commit before transport EOF'); await new Promise((resolve) => setTimeout(resolve, 5)); }
+  }
+  controller.abort(reason); await rejected; assert.equal(state.requests(), 1); assert.deepEqual((await state.repo.load(state.values[0].hash())).contents, state.values[0].contents);
+});

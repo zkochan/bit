@@ -1,5 +1,6 @@
 import assert from 'assert';
 import fs from 'fs';
+import path from 'path';
 import { Readable } from 'stream';
 
 export type TarStageState = {
@@ -9,6 +10,10 @@ export type TarStageState = {
   replayable: boolean;
   pending?: Uint8Array;
   failure?: Error;
+};
+export type NativeSpool = {
+  appendArchive(offset: number, buffer: Buffer, maxBytes: number): Promise<number | undefined>;
+  disposeAndWait(): Promise<void>;
 };
 
 function aborted(signal: AbortSignal) {
@@ -43,8 +48,14 @@ async function nextChunk(input: Readable, signal: AbortSignal, state: TarStageSt
     });
   }
 }
-export async function transfer(input: Readable, state: TarStageState, maxBytes: number, signal: AbortSignal) {
-  for await (const _update of transferProgressively(input, state, maxBytes, signal)) {
+export async function transfer(
+  input: Readable,
+  state: TarStageState,
+  maxBytes: number,
+  signal: AbortSignal,
+  spool?: (directory: string) => NativeSpool
+) {
+  for await (const _update of transferProgressively(input, state, maxBytes, signal, false, spool)) {
     // Complete-transfer callers deliberately wait for EOF.
   }
 }
@@ -53,10 +64,19 @@ export async function* transferProgressively(
   state: TarStageState,
   maxBytes: number,
   signal: AbortSignal,
-  existing = false
+  existing = false,
+  spool?: (directory: string) => NativeSpool
 ) {
   const handle = await fs.promises.open(state.archive!, existing ? 'r+' : 'wx', 0o600);
+  let native: NativeSpool | undefined;
+  let active: NativeSpool | undefined;
+  const abort = () => {
+    void native?.disposeAndWait();
+  };
+  signal.addEventListener('abort', abort, { once: true });
   try {
+    native = spool?.(path.dirname(state.archive!));
+    active = native;
     for (;;) {
       const chunk = await nextChunk(input, signal, state);
       if (chunk === null) return;
@@ -72,6 +92,39 @@ export async function* transferProgressively(
       while (state.offset < state.pending.byteLength) {
         signal.throwIfAborted();
         const remaining = state.pending.byteLength - state.offset;
+        if (active) {
+          const count = Math.min(remaining, 1024 * 1024);
+          const pending = Buffer.from(state.pending.buffer, state.pending.byteOffset + state.offset, count);
+          const acknowledged = await active.appendArchive(state.bytes, pending, maxBytes);
+          signal.throwIfAborted();
+          if (acknowledged !== undefined) {
+            state.offset += count;
+            state.bytes = acknowledged;
+            continue;
+          }
+          // Reaped helper may have written an unacknowledged prefix. Verify it before continuing.
+          const stat = await handle.stat();
+          const written = stat.size - state.bytes;
+          if (written < 0 || written > count) state.replayable = false;
+          assert.ok(written >= 0 && written <= count, 'native spool changed the staged prefix');
+          if (written) {
+            const found = Buffer.alloc(written);
+            const read = await fs.promises.open(state.archive!, 'r');
+            let bytesRead: number;
+            try {
+              ({ bytesRead } = await read.read(found, 0, written, state.bytes));
+            } finally {
+              await read.close();
+            }
+            const valid = bytesRead === written && found.equals(pending.subarray(0, written));
+            if (!valid) state.replayable = false;
+            assert.ok(valid, 'native spool changed pending bytes');
+            state.offset += written;
+            state.bytes += written;
+          }
+          active = undefined;
+          continue;
+        }
         const { bytesWritten } = await handle.write(state.pending, state.offset, remaining, state.bytes);
         assert.ok(bytesWritten > 0 && bytesWritten <= remaining, 'invalid staging write progress');
         state.offset += bytesWritten;
@@ -81,6 +134,8 @@ export async function* transferProgressively(
       yield { bytes: state.bytes };
     }
   } finally {
+    signal.removeEventListener('abort', abort);
+    await native?.disposeAndWait();
     await handle.close();
   }
 }

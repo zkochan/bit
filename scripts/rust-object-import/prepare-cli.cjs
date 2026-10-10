@@ -6,7 +6,8 @@ const path = require('node:path');
 const cp = require('node:child_process');
 const { createHash } = require('node:crypto');
 const root = path.resolve(__dirname, '../..');
-const [installedArg, targetArg] = process.argv.slice(2);
+const [installedArg, targetArg, refresh] = process.argv.slice(2);
+assert.ok(refresh === undefined || refresh === '--refresh');
 assert.ok(installedArg && targetArg, 'usage: prepare-cli.cjs <prepared-private-cli> <new-private-copy>');
 const installed = fs.realpathSync(installedArg);
 const target = path.resolve(targetArg);
@@ -15,13 +16,16 @@ assert.ok(
   'output must be a disposable temporary copy'
 );
 assert.equal(fs.realpathSync(path.dirname(target)), path.dirname(target));
-assert.ok(!fs.existsSync(target) && !target.startsWith(installed + path.sep));
+assert.ok(!target.startsWith(installed + path.sep));
+assert.ok(refresh ? fs.existsSync(path.join(target, '.bit-object-import-build.json')) : !fs.existsSync(target));
 const previous = JSON.parse(fs.readFileSync(path.join(installed, '.bit-rust-private-build.json')));
 const hash = (file) => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 for (const module of previous.compiledModules)
   assert.equal(hash(path.join(installed, 'node_modules/@teambit', module.path)), module.sha256);
-fs.mkdirSync(target);
-cp.execFileSync('cp', ['-a', '--reflink=auto', installed + '/.', target]);
+if (!refresh) {
+  fs.mkdirSync(target);
+  cp.execFileSync('cp', ['-a', '--reflink=auto', installed + '/.', target]);
+}
 let rerouted = 0;
 function links(directory) {
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
@@ -48,6 +52,7 @@ function links(directory) {
 links(target);
 const files = [
   'components/legacy/scope/objects-fetcher/objects-fetcher.ts',
+  'components/legacy/scope/objects-fetcher/import-cancellation.ts',
   'components/legacy/scope/objects-fetcher/objects-writable-stream.ts',
   'components/legacy/scope/objects-fetcher/write-objects-queue.ts',
   'components/legacy/scope/objects-fetcher/rust-source-validator.ts',
@@ -68,10 +73,16 @@ const files = [
   'scopes/scope/objects/objects/rust-object-directory.ts',
   'scopes/scope/objects/objects/rust-object-discovery.ts',
   'scopes/scope/objects/objects/rust-object-package.ts',
+  'scopes/scope/objects/objects/rust-object-operation.ts',
+  'scopes/scope/objects/objects/scope-index.ts',
   'scopes/scope/objects/index.ts',
   'scopes/scope/objects/models/version-history.ts',
+  'scopes/scope/objects/models/lane-history.ts',
+  'scopes/scope/objects/models/detach-heads.ts',
   'scopes/scope/objects/models/version-history.spec.ts',
   'components/legacy/scope/component-ops/scope-components-importer.ts',
+  'components/legacy/scope/component-ops/model-components-merger.ts',
+  'components/legacy/scope/component-ops/multiple-component-merger.ts',
   'scopes/scope/scope/scope.main.runtime.ts',
 ];
 for (const file of files) fs.copyFileSync(path.join(root, file), path.join(target, file));
@@ -104,6 +115,7 @@ for (const component of compilation)
   for (const file of component.buildResults) assert.ok(fs.realpathSync(file).startsWith(target + path.sep));
 const modules = [
   'legacy.scope/dist/objects-fetcher/objects-fetcher.js',
+  'legacy.scope/dist/objects-fetcher/import-cancellation.js',
   'legacy.scope/dist/objects-fetcher/objects-writable-stream.js',
   'legacy.scope/dist/objects-fetcher/write-objects-queue.js',
   'legacy.scope/dist/objects-fetcher/rust-source-validator.js',
@@ -123,9 +135,15 @@ const modules = [
   'objects/dist/objects/rust-object-directory.js',
   'objects/dist/objects/rust-object-discovery.js',
   'objects/dist/objects/rust-object-package.js',
+  'objects/dist/objects/rust-object-operation.js',
+  'objects/dist/objects/scope-index.js',
   'objects/dist/index.js',
   'objects/dist/models/version-history.js',
+  'objects/dist/models/lane-history.js',
+  'objects/dist/models/detach-heads.js',
   'legacy.scope/dist/component-ops/scope-components-importer.js',
+  'legacy.scope/dist/component-ops/model-components-merger.js',
+  'legacy.scope/dist/component-ops/multiple-component-merger.js',
   'scope/dist/scope.main.runtime.js',
 ];
 const provenance = {

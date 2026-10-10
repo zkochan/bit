@@ -4,7 +4,7 @@ import syncFs from 'fs';
 import os from 'os';
 import path from 'path';
 import { transfer, transferProgressively, replay } from './rust-tar-transfer';
-import type { TarStageState } from './rust-tar-transfer';
+import type { TarStageState, NativeSpool } from './rust-tar-transfer';
 import type { TarProgressProducer } from './rust-tar-client';
 import type { Readable } from 'stream';
 const MAX_ARCHIVE = 2 * 1024 * 1024 * 1024;
@@ -18,6 +18,7 @@ export type TarStageOptions<T> = {
   timeoutMs?: number;
   directory?: string;
   signal?: AbortSignal;
+  spool?: (directory: string) => NativeSpool;
   progressive?: (stage: {
     archive: string;
     signal: AbortSignal;
@@ -115,7 +116,8 @@ export async function withStagedArchive<T>(
       const result = await options.progressive({
         archive: state.archive,
         signal,
-        progress: (producerSignal) => transferProgressively(input, state, maxBytes, producerSignal, true),
+        progress: (producerSignal) =>
+          transferProgressively(input, state, maxBytes, producerSignal, true, options.spool),
         continuation: () => {
           assert.ok(state.replayable, 'tar input cannot be replayed');
           if (!inputFailure && input.destroyed && !input.readableEnded)
@@ -133,7 +135,7 @@ export async function withStagedArchive<T>(
         );
       return result;
     }
-    await transfer(input, state, maxBytes, signal);
+    await transfer(input, state, maxBytes, signal, options.spool);
     if (inputFailure) throw inputFailure;
     signal.throwIfAborted();
     consumed = true;

@@ -1,4 +1,5 @@
 import type { Readable } from 'stream';
+import { NativeImportOperation } from '@teambit/objects';
 import type { ObjectsWritable } from './objects-writable-stream';
 import type { TarOptions } from './rust-tar-client';
 import { importCanonicalTar, importStagedTar } from './rust-tar-importer';
@@ -16,6 +17,10 @@ export async function importTarStream(
     {
       signal: options.signal,
       timeoutMs: options.timeoutMs,
+      spool:
+        process.env.BIT_RUST_OBJECT_IMPORT_OPERATION === 'on'
+          ? (directory) => new NativeImportOperation(executable, { objectsDirectory: directory }, options.timeoutMs)
+          : undefined,
       progressive:
         process.env.BIT_RUST_OBJECT_TAR_PROGRESSIVE === 'off'
           ? undefined

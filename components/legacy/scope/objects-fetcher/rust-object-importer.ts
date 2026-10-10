@@ -107,13 +107,46 @@ export class RustObjectImporter {
     }
   }
 
+  /** One remote's accepted metadata prefix must stop at its first filesystem failure. */
+  async persistMetadataSequential(objects: NativeObjectInput[]): Promise<(number | null)[] | undefined> {
+    if (
+      !objects.length ||
+      objects.length > 16 ||
+      this.count + objects.length > 64 ||
+      this.unavailableReason ||
+      new Set(objects.map((object) => object.ref.toString())).size !== objects.length ||
+      objects.some(
+        (object) =>
+          !/^[a-f0-9]{40}$/.test(object.ref.toString()) ||
+          !object.buffer.length ||
+          object.buffer.length > MAX_MUTABLE_BYTES
+      )
+    )
+      return undefined;
+    this.mutableGroup = undefined;
+    this.count += objects.length;
+    const operation = this.tail.then(() => this.persistMutableBatch(objects, true));
+    this.tail = operation.then(
+      () => undefined,
+      () => this.fail('ordered mutable processing failed')
+    );
+    try {
+      return await operation;
+    } finally {
+      this.count -= objects.length;
+    }
+  }
+
   /** Coalesce only requests already queued; callers still await their own persisted slice. */
-  private async persistMutableBatch(objects: NativeObjectInput[]): Promise<(number | null)[] | undefined> {
+  private async persistMutableBatch(
+    objects: NativeObjectInput[],
+    sequential = false
+  ): Promise<(number | null)[] | undefined> {
     this.stats.mutableBatches += 1;
     const id = ++this.id;
     if (id > 0xffffffff) this.fail('request ID exhausted');
     const header = Buffer.alloc(12);
-    header.write('BMP1');
+    header.write(sequential ? 'BMS1' : 'BMP1');
     header.writeUInt32BE(id, 4);
     header.writeUInt32BE(objects.length, 8);
     const vectors: Buffer[] = [header];

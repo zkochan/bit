@@ -2,6 +2,7 @@ mod directory;
 mod inventory;
 mod metadata;
 mod mutable_store;
+mod operation;
 mod protocol;
 mod read_store;
 mod store;

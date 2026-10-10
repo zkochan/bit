@@ -35,7 +35,7 @@ const sha = (buffer) => createHash('sha256').update(buffer).digest('hex');
   try {
     for (const scenario of ['success', 'interrupted'])
       for (const first of ['origin', 'cache'])
-        for (const mode of ['legacy', 'tar']) {
+        for (const mode of ['legacy', 'tar', 'tar-operation']) {
           const directory = path.join(temporary, `${scenario}-${first}-${mode}`);
           await fs.mkdir(directory);
           const manifest = await createSharedFixture(cli, path.join(directory, 'remotes'), first);
@@ -104,11 +104,12 @@ const sha = (buffer) => createHash('sha256').update(buffer).digest('hex');
             const env = {
               ...process.env,
               CI: '1',
-              BIT_RUST_OBJECT_IMPORT: mode === 'tar' ? helper : 'off',
-              BIT_RUST_OBJECT_TAR: mode === 'tar' ? 'on' : 'off',
+              BIT_RUST_OBJECT_IMPORT: mode !== 'legacy' ? helper : 'off',
+              BIT_RUST_OBJECT_TAR: mode !== 'legacy' ? 'on' : 'off',
               BIT_RUST_OBJECT_TAR_PROGRESSIVE: 'on',
               BIT_RUST_OBJECT_IMPORT_METADATA: 'on',
               BIT_RUST_OBJECT_IMPORT_MUTABLE: 'on',
+              BIT_RUST_OBJECT_IMPORT_OPERATION: mode === 'tar-operation' ? 'on' : 'off',
               BIT_IMPORT_TRACE: traceFile,
             };
             delete env.BIT_IMPORT_TRACE_OWNER;
@@ -136,7 +137,11 @@ const sha = (buffer) => createHash('sha256').update(buffer).digest('hex');
             let hashes;
             const trace = JSON.parse(await fs.readFile(traceFile));
             assert.deepEqual(released, [manifest.waitingRemote]);
-            assert.equal(trace.stages.versionHistoryMergePolicy.calls, 4);
+            assert.equal(
+              (trace.stages.versionHistoryMergePolicy?.calls || 0) +
+                (trace.stages.versionHistoryNativeApply?.calls || 0),
+              4
+            );
             if (scenario === 'interrupted') {
               assert.notEqual(code, 0, 'partial second response must reject the fetch');
               assert.deepEqual(interrupted, [manifest.waitingRemote]);
@@ -148,7 +153,7 @@ const sha = (buffer) => createHash('sha256').update(buffer).digest('hex');
               assert.equal(new Set(hashes).size, hashes.length, 'shared queue must reserve each hash once');
               assert.equal(trace.stages.modelComponentMergePolicy.calls, 4);
             }
-            if (mode === 'tar') {
+            if (mode !== 'legacy') {
               assert.equal(trace.tar.nativeSources, 4);
               assert.equal(trace.native.mutableSubmitted, trace.native.mutablePersisted);
               assert.equal(trace.native.mutablePersisted, scenario === 'success' ? 40 : first === 'cache' ? 16 : 36);
@@ -169,11 +174,13 @@ const sha = (buffer) => createHash('sha256').update(buffer).digest('hex');
     for (const scenario of ['success', 'interrupted'])
       for (const first of ['origin', 'cache']) {
         const pair = runs.filter((run) => run.first === first && run.scenario === scenario);
-        assert.equal(pair[0].verification.modelsSha256, pair[1].verification.modelsSha256);
+        for (const run of pair.slice(1)) assert.equal(pair[0].verification.modelsSha256, run.verification.modelsSha256);
       }
     assert.notEqual(
-      runs[0].verification.modelsSha256,
-      runs[2].verification.modelsSha256,
+      runs.find((run) => run.scenario === 'success' && run.first === 'origin' && run.mode === 'legacy').verification
+        .modelsSha256,
+      runs.find((run) => run.scenario === 'success' && run.first === 'cache' && run.mode === 'legacy').verification
+        .modelsSha256,
       'arrival-sensitive histories must actually differ'
     );
     await guard();

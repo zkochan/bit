@@ -328,3 +328,29 @@ test('three-object direct byte boundary preserves compressed bytes and per-objec
   for (const object of [valid, history])
     assert.deepEqual(zlib.inflateSync(await fs.readFile(filename(batch.directory, object))), object.buffer);
 });
+
+test('ordered mutable prefixes stop before later entries after a filesystem failure', async (t) => {
+  const { directory, writer } = await setup(t);
+  const first = item('Version', { log: { date: '10' } }, 601);
+  const blocked = item('Version', {}, 602);
+  const later = item('Version', {}, 603);
+  await fs.mkdir(filename(directory, blocked), { recursive: true });
+  const sizes = await writer.persistMetadataSequential([first, blocked, later]);
+  assert.ok(sizes[0]);
+  assert.deepEqual(sizes.slice(1), [null, null]);
+  assert.deepEqual(zlib.inflateSync(await fs.readFile(filename(directory, first))), first.buffer);
+  await assert.rejects(fs.access(filename(directory, later)), { code: 'ENOENT' });
+});
+
+test('ordered requests seal independent coalescing and preserve canonical serialized bytes', async (t) => {
+  const { directory, writer } = await setup(t);
+  const objects = Array.from({ length: 16 }, (_, index) =>
+    item('Version', { dependencies: [], log: { date: String(index) } }, 700 + index)
+  );
+  const sizes = await writer.persistMetadataSequential(objects);
+  assert.ok(sizes.every(Boolean));
+  assert.equal(writer.stats.mutableBatches, 1);
+  for (const object of objects)
+    assert.deepEqual(zlib.inflateSync(await fs.readFile(filename(directory, object))), object.buffer);
+  assert.equal(await writer.persistMetadataSequential([objects[0], objects[0]]), undefined);
+});

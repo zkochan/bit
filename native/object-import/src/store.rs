@@ -62,7 +62,7 @@ impl Store {
         let counter = self.counter.fetch_add(1, Ordering::Relaxed);
         let temporary =
             path.with_file_name(format!(".{}.{}.{}", &hash[2..], std::process::id(), counter));
-        let result = self.atomic_write(&path, &temporary, compressed);
+        let result = Self::atomic_write(&path, &temporary, compressed, self.owner);
         if result.is_err() {
             let _cleanup = fs::remove_file(&temporary);
         }
@@ -90,7 +90,50 @@ impl Store {
         Ok(())
     }
 
-    fn atomic_write(&self, path: &Path, temporary: &Path, compressed: &[u8]) -> io::Result<()> {
+    pub(crate) fn write_index(&self, contents: &[u8]) -> io::Result<()> {
+        let scope = self.directory.parent().ok_or_else(|| io::Error::other("missing scope"))?;
+        let path = scope.join("index.json");
+        let counter = self.counter.fetch_add(1, Ordering::Relaxed);
+        let temporary = scope.join(format!(".index.json.{}.{}", std::process::id(), counter));
+        let result = Self::atomic_index(&path, &temporary, contents);
+        if result.is_err() {
+            let _cleanup = fs::remove_file(&temporary);
+        }
+        result
+    }
+
+    fn atomic_index(path: &Path, temporary: &Path, contents: &[u8]) -> io::Result<()> {
+        #[cfg(target_os = "linux")]
+        {
+            let original = open_index(path)?;
+            let metadata = original
+                .as_ref()
+                .map(fs::File::metadata)
+                .transpose()?;
+            let mut file = create(temporary, metadata.as_ref())?;
+            file.write_all(contents)?;
+            apply_metadata(temporary, metadata.as_ref(), None, caller_is_non_root(&file)?)?;
+            if let Some(original) = original {
+                copy_index_attributes(&original, &file)?;
+            }
+            check_index_metadata(&file, metadata.as_ref())?;
+            file.sync_all()?;
+            drop(file);
+            fs::rename(temporary, path)
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _arguments = (path, temporary, contents);
+            Err(io::Error::other("index ACL preservation is supported on Linux"))
+        }
+    }
+
+    fn atomic_write(
+        path: &Path,
+        temporary: &Path,
+        compressed: &[u8],
+        owner: Option<(u32, u32)>,
+    ) -> io::Result<()> {
         let existing = fs::metadata(path).ok();
         let mut file = match create(temporary, existing.as_ref()) {
             Ok(file) => file,
@@ -103,7 +146,7 @@ impl Store {
             Err(error) => return Err(error),
         };
         file.write_all(compressed)?;
-        apply_metadata(temporary, existing.as_ref(), self.owner, caller_is_non_root(&file)?)?;
+        apply_metadata(temporary, existing.as_ref(), owner, caller_is_non_root(&file)?)?;
         drop(file);
         fs::rename(temporary, path)
     }
@@ -175,3 +218,61 @@ fn apply_metadata(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(target_os = "linux")]
+fn open_index(path: &Path) -> io::Result<Option<fs::File>> {
+    use std::os::unix::fs::MetadataExt;
+    match fs::symlink_metadata(path) {
+        Ok(metadata) => {
+            if !metadata.is_file() || metadata.nlink() != 1 {
+                return Err(io::Error::other("non-canonical index file"));
+            }
+            Ok(Some(OpenOptions::new().write(true).open(path)?))
+        }
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+#[cfg(target_os = "linux")]
+fn copy_index_attributes(original: &fs::File, file: &fs::File) -> io::Result<()> {
+    use xattr::FileExt;
+    let mut attributes: Vec<_> = original.list_xattr()?.collect();
+    let acl = std::ffi::OsString::from("system.posix_acl_access");
+    if !attributes.contains(&acl) {
+        attributes.push(acl);
+    }
+    if attributes.len() > 64 {
+        return Err(io::Error::other("index attribute count"));
+    }
+    let mut bytes = 0;
+    for name in attributes {
+        let Some(value) = original.get_xattr(&name)? else {
+            if file.get_xattr(&name)?.is_some() {
+                file.remove_xattr(name)?;
+            }
+            continue;
+        };
+        bytes += value.len();
+        if bytes > 1024 * 1024 {
+            return Err(io::Error::other("index attribute bounds"));
+        }
+        file.set_xattr(name, &value)?;
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn check_index_metadata(file: &fs::File, existing: Option<&fs::Metadata>) -> io::Result<()> {
+    use std::os::unix::fs::MetadataExt;
+    let Some(existing) = existing else {
+        return Ok(());
+    };
+    let current = file.metadata()?;
+    if current.uid() != existing.uid()
+        || current.gid() != existing.gid()
+        || current.mode() != existing.mode()
+    {
+        return Err(io::Error::other("index metadata could not be preserved"));
+    }
+    Ok(())
+}
