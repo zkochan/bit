@@ -6,7 +6,7 @@ const path = require('node:path');
 const cp = require('node:child_process');
 const { performance } = require('node:perf_hooks');
 const { createHash } = require('node:crypto');
-const { createFixture, verify } = require('./scope-fixture.cjs');
+const { createFixture, seedDestination, verify } = require('./scope-fixture.cjs');
 const { createProcessTreeMemorySampler } = require('../rust-dependency-analysis/process-tree-memory.cjs');
 const { createBenchmarkProcessControl } = require('../rust-dependency-analysis/process-tree-memory-control.cjs');
 const { benchmarkGlobals } = require('../rust-dependency-analysis/command-workspace.cjs');
@@ -182,6 +182,7 @@ async function workspace(directory, manifest) {
   const json = JSON.parse(await fs.readFile(file, 'utf8'));
   json.remotes = manifest.remotes;
   await fs.writeFile(file, JSON.stringify(json, null, 2));
+  await seedDestination(cliRoot, path.join(directory, '.bit'), manifest);
 }
 (async () => {
   assert.equal(process.platform, 'linux', 'GNU time and process-tree measurements require Linux');
@@ -263,6 +264,13 @@ async function workspace(directory, manifest) {
         ['multi-remote', { components: 8, files: 2, bytes: 8 * 1024 * 1024, versions: 2, remotes: 2 }],
         ['concurrent-mutable', { components: 100, files: 1, bytes: 1024, versions: 8, remotes: 4 }],
       ];
+  if (selectedCases) {
+    for (const overlap of ['origin', 'local']) {
+      const name = `overlap-${overlap}`;
+      if (selectedCases.includes(name))
+        cases.push([name, { components: 64, files: 1, bytes: 1024, versions: 8, remotes: 2, overlap }]);
+    }
+  }
   for (const [name, options] of cases) {
     if (selectedCases && !selectedCases.includes(name)) continue;
     const directory = path.join(temporary, name);
@@ -297,7 +305,7 @@ async function workspace(directory, manifest) {
       const data = (report.cases[name] = {
         options,
         sourceBytes: manifest.sourceBytes,
-        expectedObjects: Object.keys(manifest.hashes).length,
+        expectedObjects: Object.keys({ ...manifest.hashes, ...manifest.localHashes }).length,
         runs: [],
         diagnostics: [],
         profiles: [],
@@ -405,6 +413,16 @@ async function workspace(directory, manifest) {
         }
         if (mode === 'missing' || mode === 'crash' || mode === 'packaged-fallback')
           assert.equal(cold.trace.native.sources, 0);
+        if (options.overlap) {
+          assert.ok(
+            cold.trace.stages.modelComponentMergePolicy?.calls >= options.components * options.remotes,
+            'seeded model merge policy must actually run'
+          );
+          assert.ok(
+            cold.trace.stages.versionHistoryMergePolicy?.calls >= options.components * options.remotes,
+            'seeded history merge policy must actually run'
+          );
+        }
         data.diagnostics.push({ mode, cold, warm });
         await fs.rm(destination, { recursive: true, force: true });
       }
