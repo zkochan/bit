@@ -31,7 +31,7 @@ pub(crate) fn serve(
     let id = protocol::word(reader)?;
     let inputs = request(reader)?;
     let sizes = if inputs.len() == 1
-        || (inputs.len() == 2
+        || (inputs.len() <= 3
             && inputs
                 .iter()
                 .map(|input| input.serialized.len())
