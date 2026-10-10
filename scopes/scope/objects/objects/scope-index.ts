@@ -155,7 +155,19 @@ export class ScopeIndex {
       this.find !== ScopeIndex.prototype.find ||
       this._exist !== ScopeIndex.prototype._exist ||
       !objects.length ||
-      objects.some((object) => object instanceof Lane && object.toLaneId !== Lane.prototype.toLaneId)
+      objects.some(
+        (object) =>
+          object instanceof Lane &&
+          (object.toLaneId !== Lane.prototype.toLaneId ||
+            typeof object.scope !== 'string' ||
+            typeof object.name !== 'string')
+      ) ||
+      this.index.lanes.some(
+        (item) =>
+          item.toLaneId !== LaneItem.prototype.toLaneId ||
+          typeof item.id.name !== 'string' ||
+          (item.id.scope && typeof item.id.scope !== 'string')
+      )
     )
       return this.addMany(bitObjects);
     const projected = objects.map((object) => ({
@@ -168,7 +180,10 @@ export class ScopeIndex {
       () => ({
         kind: 'index',
         components: this.index.components,
-        lanes: this.index.lanes,
+        lanes: this.index.lanes.map((item) => ({
+          hash: item.hash,
+          id: { scope: item.id.scope || null, name: item.id.name },
+        })),
         objects: objects.map((object) => ({
           hash: object.hash().toString(),
           id: { scope: (object as ModelComponent).scope || null, name: (object as ModelComponent).name },

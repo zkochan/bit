@@ -471,3 +471,41 @@ test('arbitrary eight-remote history interleavings preserve every shared entry a
   assert.equal(operation.stats.operations, 200);
   assert.ok(operation.stats.stalePlans > 0);
 });
+
+test('actual lane index identities, missing scopes and rename-back sequences match canonical indexing', async (t) => {
+  const { ScopeIndex, Lane } = installed('@teambit/objects');
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-lane-index-'));
+  const operation = new NativeImportOperation(native, { objectsDirectory: directory });
+  t.after(async () => {
+    await operation.disposeAndWait();
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+  for (const scope of ['scope', '']) {
+    const canonical = ScopeIndex.create(directory),
+      candidate = ScopeIndex.create(directory);
+    const lane = (name) => new Lane({ name, scope, hash: '5'.repeat(40) });
+    const first = lane('first');
+    canonical.addMany([first]);
+    candidate.addMany([first]);
+    canonical.index.lanes[0].id = { ...canonical.index.lanes[0].id };
+    candidate.index.lanes[0].id = { ...candidate.index.lanes[0].id };
+    // File-loaded IDs can have no scope property; LaneId treats both absent and empty scopes equally.
+    if (!scope) {
+      delete canonical.index.lanes[0].id.scope;
+      delete candidate.index.lanes[0].id.scope;
+    }
+    candidate.index.lanes[0].id.legacyField = 'ignored';
+    for (const names of [['first'], ['second', 'first'], ['third']]) {
+      const objects = names.map(lane);
+      const original = candidate.index.lanes[0].id;
+      const expected = canonical.addMany(objects);
+      assert.equal(await candidate.addManyForImport(objects, operation), expected);
+      assert.deepEqual(
+        candidate.index.lanes.map((item) => item.toLaneId().toObject()),
+        canonical.index.lanes.map((item) => item.toLaneId().toObject())
+      );
+      if (!expected) assert.equal(candidate.index.lanes[0].id, original);
+    }
+  }
+  assert.equal(operation.stats.operations, 6);
+});
