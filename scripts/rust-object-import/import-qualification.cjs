@@ -23,6 +23,16 @@ const smoke = process.env.BIT_IMPORT_QUALIFICATION_SMOKE === '1';
 const packaged = process.env.BIT_IMPORT_QUALIFICATION_PACKAGED === '1';
 const transport = process.env.BIT_IMPORT_QUALIFICATION_TRANSPORT || 'file';
 assert.ok(['file', 'http'].includes(transport));
+const cpuProfileDirectory = process.env.BIT_IMPORT_QUALIFICATION_CPU_PROFILE_DIR
+  ? path.resolve(process.env.BIT_IMPORT_QUALIFICATION_CPU_PROFILE_DIR)
+  : undefined;
+if (cpuProfileDirectory) {
+  const repository = path.resolve(__dirname, '../..');
+  assert.ok(
+    cpuProfileDirectory !== repository && !cpuProfileDirectory.startsWith(repository + path.sep),
+    'profiles must stay outside Git'
+  );
+}
 const selectedCases = process.env.BIT_IMPORT_QUALIFICATION_CASES?.split(',');
 const modes = process.env.BIT_IMPORT_QUALIFICATION_MODES?.split(',') || [
   'legacy',
@@ -56,7 +66,7 @@ assert.ok(
   'tar qualification requires actual HTTP'
 );
 assert.ok(!modes.includes('tar-baseline') || baselineCli, 'tar-baseline requires a separate compiled baseline CLI');
-async function command(directory, ids, requestedMode, allHistory, traceFile) {
+async function command(directory, ids, requestedMode, allHistory, traceFile, cpuProfileFile) {
   const commandRoot = requestedMode === 'tar-baseline' ? baselineCli : cliRoot;
   const mode = requestedMode === 'tar-baseline' ? 'tar' : requestedMode;
   const commandHelper = requestedMode === 'tar-baseline' ? baselineHelper : helper;
@@ -71,6 +81,7 @@ async function command(directory, ids, requestedMode, allHistory, traceFile) {
     '--safe-mode',
   ];
   if (allHistory) args.push('--all-history');
+  if (cpuProfileFile) args.unshift('--require', path.join(__dirname, 'import-cpu-profile.cjs'));
   if (traceFile) args.unshift('--require', path.join(__dirname, 'import-trace.cjs'));
   const env = {
     ...process.env,
@@ -102,6 +113,9 @@ async function command(directory, ids, requestedMode, allHistory, traceFile) {
     BIT_RUST_OBJECT_IMPORT_MUTABLE: mode === 'store' || mode === 'mutable-control' ? 'off' : 'on',
     CI: '1',
   };
+  delete env.BIT_IMPORT_CPU_PROFILE;
+  delete env.BIT_IMPORT_CPU_PROFILE_OWNER;
+  if (cpuProfileFile) env.BIT_IMPORT_CPU_PROFILE = cpuProfileFile;
   delete env.BIT_IMPORT_TRACE;
   delete env.BIT_IMPORT_TRACE_OWNER;
   if (traceFile) env.BIT_IMPORT_TRACE = traceFile;
@@ -220,9 +234,16 @@ async function workspace(directory, manifest) {
     smoke,
     transport,
     packaged,
+    cpuProfileDirectory,
     serverCpuAndMemoryIncluded: false,
     harnessSha256: Object.fromEntries(
-      ['import-qualification.cjs', 'import-trace.cjs', 'http-fixture.cjs', 'scope-fixture.cjs'].map((name) => [
+      [
+        'import-qualification.cjs',
+        'import-trace.cjs',
+        'import-cpu-profile.cjs',
+        'http-fixture.cjs',
+        'scope-fixture.cjs',
+      ].map((name) => [
         name,
         createHash('sha256')
           .update(require('node:fs').readFileSync(path.join(__dirname, name)))
@@ -279,6 +300,7 @@ async function workspace(directory, manifest) {
         expectedObjects: Object.keys(manifest.hashes).length,
         runs: [],
         diagnostics: [],
+        profiles: [],
       });
       let expectedModels;
       function checkModels(verification) {
@@ -305,6 +327,27 @@ async function workspace(directory, manifest) {
           if (round >= 0) data.runs.push({ round, cold, warm });
           console.log(JSON.stringify({ name, round, mode, coldMs: cold.elapsedMs, warmMs: warm.elapsedMs }));
           await fs.rm(destination, { recursive: true, force: true });
+        }
+      }
+      if (cpuProfileDirectory) {
+        for (const mode of modes) {
+          const destination = path.join(directory, `profile-${mode}`);
+          await workspace(destination, manifest);
+          const coldFile = path.join(cpuProfileDirectory, `${name}-${mode}-cold.cpuprofile`);
+          const warmFile = path.join(cpuProfileDirectory, `${name}-${mode}-warm.cpuprofile`);
+          const cold = await command(destination, manifest.ids, mode, true, undefined, coldFile);
+          cold.verification = await verify(cliRoot, path.join(destination, '.bit'), manifest);
+          checkModels(cold.verification);
+          const warm = await command(destination, manifest.ids, mode, false, undefined, warmFile);
+          warm.verification = await verify(cliRoot, path.join(destination, '.bit'), manifest);
+          checkModels(warm.verification);
+          for (const filename of [coldFile, warmFile]) {
+            const profile = JSON.parse(await fs.readFile(filename, 'utf8'));
+            assert.ok(profile.nodes?.length && profile.samples?.length, 'owning command must produce a CPU profile');
+          }
+          data.profiles.push({ coldFile, warmFile, cold, warm });
+          await fs.rm(destination, { recursive: true, force: true });
+          global.gc?.();
         }
       }
       for (const mode of [...modes, ...(smoke ? ['missing', 'crash'] : [])]) {

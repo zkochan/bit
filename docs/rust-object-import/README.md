@@ -153,3 +153,5 @@ Bounded Rust metadata inflation for staged HTTP imports: [tar-metadata.md](./tar
 Progressive append-only Rust tar intake: [progressive-tar.md](./progressive-tar.md).
 
 Production progressive HTTP staging, replay and command qualification: [progressive-http.md](./progressive-http.md).
+
+Detailed merge/index attribution, CPU profiling and local-overlap qualification gaps: [merge-index-profile.md](./merge-index-profile.md).

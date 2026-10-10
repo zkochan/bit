@@ -142,3 +142,77 @@ test('tar intake inflation attribution separates later canonical repository read
   assert.equal(actual.stages.legacyParse.calls, 2);
   assert.deepEqual(actual.objectTypes, { Version: 2 });
 });
+
+test('fine merge/index diagnostics preserve synchronous values/errors and count policy work separately', (t) => {
+  const files = fixture(t);
+  fs.writeFileSync(
+    files.module,
+    `
+    class ScopeIndex { addMany(value) { if(value instanceof Error) throw value; return value; } async write() { return 7; } }
+    class ModelComponentMerger { async merge() { return 9; } }
+    class VersionHistory { merge(value) { return value; } }
+    class SourceRepository { async _findComponent(value) { return value; } }
+    class Repository { async load(value) { return value; } }
+    module.exports = { ScopeIndex, ModelComponentMerger, VersionHistory, SourceRepository, Repository };
+  `
+  );
+  const actual = execute(
+    files,
+    `
+    const assert=require('node:assert/strict');
+    const {ScopeIndex,ModelComponentMerger,VersionHistory,SourceRepository,Repository}=require(${JSON.stringify(files.module)});
+    (async()=>{
+      const sources=new SourceRepository(), repo=new Repository();
+      assert.equal(await sources._findComponent(undefined),undefined);
+      assert.equal(await sources._findComponent(42),42);
+      assert.equal(await repo.load(undefined),undefined);
+      assert.equal(await repo.load(42),42);
+      const index=new ScopeIndex();
+      assert.equal(index.addMany(false),false);
+      const error=new Error('index failure');
+      assert.throws(()=>index.addMany(error), actual=>actual===error);
+      assert.equal(await index.write(),7);
+      assert.equal(await new ModelComponentMerger().merge(),9);
+      const input={versions:[]};assert.equal(new VersionHistory().merge(input),input);
+    })().catch(error=>{console.error(error);process.exitCode=1;});
+  `
+  );
+  assert.deepEqual(actual.lookupResults, { repository: { found: 1, missing: 1 }, component: { found: 1, missing: 1 } });
+  assert.equal(actual.stages.scopeIndexAdd.calls, 2);
+  assert.equal(actual.stages.scopeIndexWrite.calls, 1);
+  assert.equal(actual.stages.modelComponentMergePolicy.calls, 1);
+  assert.equal(actual.stages.versionHistoryMergePolicy.calls, 1);
+});
+
+test('CPU profile belongs to the command and forked children cannot overwrite it', (t) => {
+  const files = fixture(t);
+  const profile = path.join(files.directory, 'command.cpuprofile');
+  const preload = path.join(__dirname, 'import-cpu-profile.cjs');
+  const child = path.join(files.directory, 'child.cjs');
+  fs.writeFileSync(
+    child,
+    'function childOnlyWork(){const end=Date.now()+50;while(Date.now()<end){Math.sqrt(Math.random());}} childOnlyWork();'
+  );
+  const env = { ...process.env, BIT_IMPORT_CPU_PROFILE: profile };
+  delete env.BIT_IMPORT_CPU_PROFILE_OWNER;
+  const run = spawnSync(
+    process.execPath,
+    [
+      '--require',
+      preload,
+      '-e',
+      `
+    function owningCommandWork(){const end=Date.now()+100;while(Date.now()<end){Math.sqrt(Math.random());}}
+    owningCommandWork();
+    require('node:child_process').fork(${JSON.stringify(child)},[],{stdio:'ignore'});
+  `,
+    ],
+    { env, encoding: 'utf8' }
+  );
+  assert.equal(run.status, 0, run.stderr);
+  const actual = JSON.parse(fs.readFileSync(profile));
+  assert.ok(actual.samples.length);
+  assert.equal(actual.samples.length, actual.timeDeltas.length);
+  assert.ok(actual.nodes.some((node) => node.callFrame.functionName === 'owningCommandWork'));
+  assert.ok(!actual.nodes.some((node) => node.callFrame.functionName === 'childOnlyWork'));
+});
