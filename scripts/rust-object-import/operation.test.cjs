@@ -313,7 +313,11 @@ test(
       cp.execFileSync('setfacl', ['-m', 'd:u:65534:r--', scope]);
       const plain = cp.execFileSync('getfacl', ['-cp', index], { encoding: 'utf8' });
       assert.equal(await operation.request({ kind: 'indexWrite', contents }, identity), true);
-      assert.equal(cp.execFileSync('getfacl', ['-cp', index], { encoding: 'utf8' }), plain, 'new parent default ACL must not change an existing index');
+      assert.equal(
+        cp.execFileSync('getfacl', ['-cp', index], { encoding: 'utf8' }),
+        plain,
+        'new parent default ACL must not change an existing index'
+      );
     }
     const linked = path.join(scope, 'linked');
     await fs.link(index, linked);

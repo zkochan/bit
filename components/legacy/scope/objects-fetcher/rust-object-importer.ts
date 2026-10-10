@@ -169,6 +169,11 @@ export class RustObjectImporter {
         )
       )
         throw new Error('invalid mutable write response');
+      if (sequential) {
+        const failed = response.sizes.indexOf(null);
+        if (failed >= 0 && response.sizes.slice(failed).some((size: unknown) => size !== null))
+          throw new Error('invalid ordered mutable prefix');
+      }
       return response.sizes as (number | null)[];
     });
     // Never race a timed-out native rename with a canonical mutable-object retry.

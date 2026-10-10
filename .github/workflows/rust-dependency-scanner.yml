@@ -444,4 +444,6 @@ jobs:
       - name: Differential canonical merge and OS metadata qualification
         env:
           BIT_LEGACY_ROOT: ${{ github.workspace }}
-        run: node --test scripts/rust-object-import/operation-model.test.cjs scripts/rust-object-import/platform-metadata.test.cjs
+        run: |
+          node --test scripts/rust-object-import/operation-model.test.cjs scripts/rust-object-import/platform-metadata.test.cjs
+          node scripts/rust-object-import/canonical-model-tests.cjs

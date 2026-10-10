@@ -354,3 +354,17 @@ test('ordered requests seal independent coalescing and preserve canonical serial
     assert.deepEqual(zlib.inflateSync(await fs.readFile(filename(directory, object))), object.buffer);
   assert.equal(await writer.persistMetadataSequential([objects[0], objects[0]]), undefined);
 });
+
+test('ordered mutable acknowledgements reject a success after a failed prefix', async (t) => {
+  const { directory } = await setup(t);
+  const script = path.join(directory, 'bad-prefix.cjs');
+  await fs.writeFile(
+    script,
+    `process.stdin.once('data',()=>process.stdout.write('{"version":1,"id":1,"sizes":[null,1]}\\n'));`
+  );
+  const writer = new RustObjectImporter(process.execPath, { objectsDirectory: directory }, 1000, [script]);
+  t.after(() => writer.disposeAndWait());
+  assert.equal(await writer.persistMetadataSequential([item('Version', {}, 801), item('Version', {}, 802)]), undefined);
+  assert.match(writer.unavailableReason, /ordered mutable prefix/);
+  assert.equal(writer.stats.mutablePersisted, 0);
+});

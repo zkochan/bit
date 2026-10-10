@@ -14,7 +14,10 @@ const native =
   process.env.BIT_TEST_OBJECT_IMPORT || path.resolve(__dirname, '../../native/target/debug/bit-object-import');
 const unix = process.platform === 'linux' || process.platform === 'darwin';
 const hasNative = unix && require('node:fs').existsSync(native);
-async function setup(t, { enabled = true, executable = native, abortAfterBytes, operation = false, signal, delayMs = 0, hold = false } = {}) {
+async function setup(
+  t,
+  { enabled = true, executable = native, abortAfterBytes, operation = false, signal, delayMs = 0, hold = false } = {}
+) {
   const getToken = Http.getToken;
   Http.getToken = () => 'fixture-token';
   t.after(() => {
@@ -217,20 +220,52 @@ test(
   }
 );
 test('operation-level native transfer preserves authenticated delayed HTTP import', { skip: !hasNative }, async (t) => {
-  const state = await setup(t, { operation: true, delayMs: 50 }); await verify(state); assert.equal(state.nativeSources(), 2);
+  const state = await setup(t, { operation: true, delayMs: 50 });
+  await verify(state);
+  assert.equal(state.nativeSources(), 2);
 });
-test('external cancellation aborts authenticated HTTP before response headers without retrying', { skip: !hasNative }, async (t) => {
-  const controller = new AbortController(); const reason = new Error('caller HTTP cancellation');
-  const state = await setup(t, { operation: true, signal: controller.signal, delayMs: 500 }); const pending = state.fetcher.fetchFromRemoteAndWrite();
-  const rejected = assert.rejects(pending, (error) => error === reason);
-  const started = Date.now(); while (!state.requests()) { assert.ok(Date.now() - started < 5000); await new Promise((resolve) => setTimeout(resolve, 5)); }
-  controller.abort(reason); await rejected; assert.equal(state.requests(), 1); assert.equal(await state.repo.load(state.values[0].hash()), null);
-});
-test('external cancellation during native intake retains committed Source prefix and finishes helper cleanup', { skip: !hasNative }, async (t) => {
-  const controller = new AbortController(); const reason = new Error('caller active intake cancellation');
-  const state = await setup(t, { operation: true, signal: controller.signal, hold: true }); const pending = state.fetcher.fetchFromRemoteAndWrite(); const rejected = assert.rejects(pending, (error) => error === reason);
-  const started = Date.now(); for (;;) {
-    try { await fs.access(state.repo.objectPath(state.values[0].hash())); break; } catch { assert.ok(Date.now() - started < 5000, 'Source must commit before transport EOF'); await new Promise((resolve) => setTimeout(resolve, 5)); }
+test(
+  'external cancellation aborts authenticated HTTP before response headers without retrying',
+  { skip: !hasNative },
+  async (t) => {
+    const controller = new AbortController();
+    const reason = new Error('caller HTTP cancellation');
+    const state = await setup(t, { operation: true, signal: controller.signal, delayMs: 500 });
+    const pending = state.fetcher.fetchFromRemoteAndWrite();
+    const rejected = assert.rejects(pending, (error) => error === reason);
+    const started = Date.now();
+    while (!state.requests()) {
+      assert.ok(Date.now() - started < 5000);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    controller.abort(reason);
+    await rejected;
+    assert.equal(state.requests(), 1);
+    assert.equal(await state.repo.load(state.values[0].hash()), null);
   }
-  controller.abort(reason); await rejected; assert.equal(state.requests(), 1); assert.deepEqual((await state.repo.load(state.values[0].hash())).contents, state.values[0].contents);
-});
+);
+test(
+  'external cancellation during native intake retains committed Source prefix and finishes helper cleanup',
+  { skip: !hasNative },
+  async (t) => {
+    const controller = new AbortController();
+    const reason = new Error('caller active intake cancellation');
+    const state = await setup(t, { operation: true, signal: controller.signal, hold: true });
+    const pending = state.fetcher.fetchFromRemoteAndWrite();
+    const rejected = assert.rejects(pending, (error) => error === reason);
+    const started = Date.now();
+    for (;;) {
+      try {
+        await fs.access(state.repo.objectPath(state.values[0].hash()));
+        break;
+      } catch {
+        assert.ok(Date.now() - started < 5000, 'Source must commit before transport EOF');
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+    }
+    controller.abort(reason);
+    await rejected;
+    assert.equal(state.requests(), 1);
+    assert.deepEqual((await state.repo.load(state.values[0].hash())).contents, state.values[0].contents);
+  }
+);

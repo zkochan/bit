@@ -57,7 +57,8 @@ export class DetachedHeads {
       this.mergeNative === DetachedHeads.prototype.mergeNative &&
       [...this.heads, ...this.deleted].every(
         (ref) =>
-          Boolean(ref) && Object.getPrototypeOf(ref) === Ref.prototype &&
+          Boolean(ref) &&
+          Object.getPrototypeOf(ref) === Ref.prototype &&
           ref.toString === Ref.prototype.toString &&
           typeof ref.hash === 'string'
       )

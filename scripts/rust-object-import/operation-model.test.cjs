@@ -424,3 +424,50 @@ test('sequential tar metadata preserves accepted prefix before malformed metadat
     await decision.settle(new Set());
   });
 });
+
+test('arbitrary eight-remote history interleavings preserve every shared entry and live Ref', async (t) => {
+  const { VersionHistory } = installed('@teambit/objects');
+  const { ObjectsWritable } = installed('@teambit/legacy.scope/dist/objects-fetcher/objects-writable-stream.js');
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-interleaved-history-'));
+  const operation = new NativeImportOperation(native, { objectsDirectory: directory });
+  t.after(async () => {
+    await operation.disposeAndWait();
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+  const request = operation.request.bind(operation);
+  const next = random(33);
+  operation.request = async (...args) => {
+    const turns = next() % 4;
+    for (let count = 0; count < turns; count++) await new Promise((resolve) => setImmediate(resolve));
+    return request(...args);
+  };
+  for (let round = 0; round < 25; round++) {
+    const original = { hash: new Ref(`old-${round}`), parents: [] };
+    const entries = Array.from({ length: 8 }, (_, remote) => ({
+      hash: new Ref(`${round}-${remote}`),
+      parents: [original.hash],
+    }));
+    const history = (versions) => new VersionHistory({ name: 'component', scope: 'scope', versions });
+    const existing = history([original]);
+    const writer = new ObjectsWritable(
+      { load: async () => existing, getNativeImportOperation: () => operation },
+      'remote',
+      {},
+      {}
+    );
+    writer.writeMutableObject = async () => undefined;
+    try {
+      await Promise.all(entries.map((entry) => writer.mergeVersionHistory(history([entry]))));
+      assert.deepEqual(new Set(existing.versions), new Set([original, ...entries]));
+      assert.deepEqual(
+        new Set(existing.versions.map((entry) => entry.hash)),
+        new Set([original.hash, ...entries.map((entry) => entry.hash)])
+      );
+      assert.equal(new Set(existing.getAllHashesAsString()).size, 9);
+    } finally {
+      writer.destroy();
+    }
+  }
+  assert.equal(operation.stats.operations, 200);
+  assert.ok(operation.stats.stalePlans > 0);
+});

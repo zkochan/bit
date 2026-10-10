@@ -297,6 +297,7 @@ async function workspace(directory, manifest) {
     rounds,
     smoke,
     transport,
+    controlledHttpDelayMs: Number(process.env.BIT_IMPORT_QUALIFICATION_HTTP_DELAY_MS || 0),
     packaged,
     cpuProfileDirectory,
     serverCpuAndMemoryIncluded: false,
@@ -462,9 +463,14 @@ async function workspace(directory, manifest) {
           );
           const { persist: backpressure = 0, ...fallbacks } = cold.trace.operation.fallbackKinds;
           assert.deepEqual(fallbacks, {}, 'ordinary fixture must not hide native operation failure');
-          assert.equal(cold.trace.operation.kinds.persist + backpressure, options.components * (options.remotes || 1));
+          const modelRequests = cold.trace.operation.kinds.persist + backpressure;
+          const components = options.components * (options.remotes || 1);
           assert.ok(
-            backpressure <= Math.max(0, options.components * (options.remotes || 1) - 64),
+            modelRequests >= components && modelRequests <= components + (options.remotes || 1),
+            'all components and per-scope metadata must submit native persistence'
+          );
+          assert.ok(
+            backpressure <= Math.max(0, modelRequests - 64),
             'only model requests exceeding the bounded outstanding queue may fall back'
           );
           if (options.overlap)
