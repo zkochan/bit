@@ -319,6 +319,14 @@ test(
         'new parent default ACL must not change an existing index'
       );
     }
+    await fs.chmod(index, 0o4640);
+    assert.equal(
+      await operation.request({ kind: 'indexWrite', contents: '{}' }, identity),
+      false,
+      'special mode bits need canonical in-place writes that clear them'
+    );
+    assert.equal(await fs.readFile(index, 'utf8'), contents);
+    await fs.chmod(index, 0o640);
     const linked = path.join(scope, 'linked');
     await fs.link(index, linked);
     assert.equal(await operation.request({ kind: 'indexWrite', contents: '{}' }, identity), false);

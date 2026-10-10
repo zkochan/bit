@@ -224,7 +224,7 @@ fn open_index(path: &Path) -> io::Result<Option<fs::File>> {
     use std::os::unix::fs::MetadataExt;
     match fs::symlink_metadata(path) {
         Ok(metadata) => {
-            if !metadata.is_file() || metadata.nlink() != 1 {
+            if !metadata.is_file() || metadata.nlink() != 1 || metadata.mode() & 0o6000 != 0 {
                 return Err(io::Error::other("non-canonical index file"));
             }
             Ok(Some(OpenOptions::new().write(true).open(path)?))

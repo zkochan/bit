@@ -1,10 +1,12 @@
-// BVM's Windows link is a directory, rather than a POSIX executable shim on PATH.
+// Resolve BVM's Windows linked package entry; its command shim lives outside the POSIX bin directory.
 const fs = require('node:fs');
 const path = require('node:path');
 const cp = require('node:child_process');
 const windows = process.platform === 'win32';
 const executable = windows ? process.execPath : 'bbit';
-const prefix = windows ? [path.join(process.env.LOCALAPPDATA, '.bvm', 'bbit', 'bin', 'bit.js')] : [];
+const prefix = windows
+  ? [path.join(process.env.LOCALAPPDATA, '.bvm', 'links', 'bbit', 'node_modules', '@teambit', 'bit', 'bin', 'bit')]
+  : [];
 if (windows && !fs.statSync(prefix[0]).isFile()) throw new Error('missing BVM canonical Bit CLI');
 for (const args of [
   ['config', 'set', 'analytics_reporting', 'false'],

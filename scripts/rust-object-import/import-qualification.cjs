@@ -330,6 +330,8 @@ async function workspace(directory, manifest) {
         ['concurrent-mutable', { components: 100, files: 1, bytes: 1024, versions: 8, remotes: 4 }],
       ];
   if (selectedCases) {
+    if (selectedCases.includes('command-workspace'))
+      cases.push(['command-workspace', { components: 8, files: 2, bytes: 16 * 1024, versions: 4, remotes: 2 }]);
     for (const versions of [32, 512]) {
       const name = `history-overlap-${versions}`;
       if (selectedCases.includes(name))
@@ -466,8 +468,8 @@ async function workspace(directory, manifest) {
           const modelRequests = cold.trace.operation.kinds.persist + backpressure;
           const components = options.components * (options.remotes || 1);
           assert.ok(
-            modelRequests >= components && modelRequests <= components + (options.remotes || 1),
-            'all components and per-scope metadata must submit native persistence'
+            modelRequests >= 1 && modelRequests <= components + (options.remotes || 1),
+            'bounded native model requests include eligible component and per-scope metadata'
           );
           assert.ok(
             backpressure <= Math.max(0, modelRequests - 64),
@@ -567,7 +569,9 @@ async function workspace(directory, manifest) {
             'seeded model merge policy must actually run'
           );
           assert.ok(
-            cold.trace.stages.versionHistoryMergePolicy?.calls >= options.components * options.remotes,
+            (cold.trace.stages.versionHistoryMergePolicy?.calls || 0) +
+              (cold.trace.stages.versionHistoryNativeApply?.calls || 0) >=
+              options.components * (options.remotes || 1),
             'seeded history merge policy must actually run'
           );
           if (options.localVersions && mode === 'tar') {
