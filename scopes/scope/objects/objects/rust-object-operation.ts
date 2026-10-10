@@ -78,13 +78,24 @@ export class NativeImportOperation {
   /** Check and apply synchronously: another remote cannot interleave between these steps. */
   async plan<T>(project: () => object, parse: (value: any) => T): Promise<NativePlan<T> | undefined> {
     if (this.unavailableReason || this.count >= 64) return undefined;
-    const operation = project();
-    const snapshot = JSON.stringify(operation);
+    let operation: object;
+    let snapshot: string;
+    try {
+      operation = project();
+      snapshot = JSON.stringify(operation);
+    } catch {
+      return undefined;
+    }
     const result = await this.request(operation, parse);
     if (result === undefined) return undefined;
     return {
       apply: <R>(run: (value: T) => R): R | undefined => {
-        if (JSON.stringify(project()) !== snapshot) {
+        try {
+          if (JSON.stringify(project()) !== snapshot) {
+            this.stats.stalePlans++;
+            return undefined;
+          }
+        } catch {
           this.stats.stalePlans++;
           return undefined;
         }

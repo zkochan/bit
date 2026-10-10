@@ -353,3 +353,33 @@ test('plans based on stale live values fall back before application', async (t) 
     ]
   );
 });
+
+test('unsupported projections select canonical policy without submitting or breaking a healthy session', async (t) => {
+  const { operation } = await setup(t);
+  const cyclic = {};
+  cyclic.self = cyclic;
+  for (const project of [
+    () => cyclic,
+    () => ({ value: 1n }),
+    () => {
+      throw new Error('unsupported projection');
+    },
+  ])
+    assert.equal(await operation.plan(project, identity), undefined);
+  assert.equal(operation.stats.frames, 0);
+  let changed = false;
+  const plan = await operation.plan(() => {
+    if (changed) throw new Error('changed projection');
+    return { kind: 'version', existing: '9', incoming: '10' };
+  }, identity);
+  changed = true;
+  assert.equal(
+    plan.apply(() => {
+      throw new Error('stale plan must not apply');
+    }),
+    undefined
+  );
+  assert.equal(operation.stats.stalePlans, 1);
+  assert.equal(await operation.request({ kind: 'version', existing: '9', incoming: '10' }, identity), true);
+  assert.equal(operation.unavailableReason, undefined);
+});
