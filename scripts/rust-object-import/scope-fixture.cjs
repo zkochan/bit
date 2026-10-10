@@ -90,7 +90,11 @@ async function createFixture(cliRoot, directory, options) {
         assert.ok(['origin', 'local', 'conflict'].includes(options.overlap));
         manifest.seedObjects ||= [];
         manifest.localHashes ||= {};
-        const localVersions = [0, 1, 2].map((index) => {
+        const localCount = options.localVersions ?? 3;
+        assert.ok(Number.isInteger(localCount) && localCount >= 3 && localCount <= 4096);
+        const localTag = versions.length > 90 ? '9.0.90' : '1.0.90';
+        const orphanTag = versions.length > 91 ? '9.0.91' : '1.0.91';
+        const localVersions = Array.from({ length: localCount }, (_, index) => {
           const version = new Version({
             mainFile: 'index.js',
             files: versions[0].files,
@@ -109,16 +113,16 @@ async function createFixture(cliRoot, directory, options) {
         const conflict = options.overlap === 'conflict';
         const local = options.overlap === 'local' || conflict;
         const state = local
-          ? { versions: { '1.0.90': { local: true }, ...(conflict ? { '1.0.0': { local: true } } : {}) } }
+          ? { versions: { [localTag]: { local: true }, ...(conflict ? { '1.0.0': { local: true } } : {}) } }
           : {};
         const seed = ModelComponent.from({
           name,
           scope: scopeName,
           versions: {
             '1.0.0': local && !conflict ? versions[0].hash() : localVersions[0].hash(),
-            '1.0.90': localVersions[1].hash(),
+            [localTag]: localVersions[1].hash(),
           },
-          orphanedVersions: { '1.0.91': localVersions[2].hash() },
+          orphanedVersions: { [orphanTag]: localVersions[2].hash() },
           state,
           head: local ? localVersions[1].hash() : versions[0].hash(),
         });
@@ -133,12 +137,12 @@ async function createFixture(cliRoot, directory, options) {
           manifest.seedObjects.push((await object.compress()).toString('base64'));
         }
         for (const version of localVersions) manifest.localHashes[version.hash().toString()] = { type: 'Version' };
-        const orphaned = { '1.0.91': localVersions[2].hash().toString() };
+        const orphaned = { [orphanTag]: localVersions[2].hash().toString() };
         const expectedTags = conflict
           ? Object.fromEntries(Object.entries(seed.versions).map(([tag, ref]) => [tag, ref.toString()]))
           : { ...expected.tags };
-        if (local) expectedTags['1.0.90'] = localVersions[1].hash().toString();
-        else orphaned['1.0.90'] = localVersions[1].hash().toString();
+        if (local) expectedTags[localTag] = localVersions[1].hash().toString();
+        else orphaned[localTag] = localVersions[1].hash().toString();
         expected = {
           ...expected,
           head: local ? seed.head.toString() : expected.head,
@@ -154,6 +158,15 @@ async function createFixture(cliRoot, directory, options) {
             retainedCompleteRefs: seedHistory.graphCompleteRefs,
           },
         };
+        if (options.localVersions) {
+          const mergedHistory = new VersionHistory({
+            name,
+            scope: scopeName,
+            versions: [...versions, ...localVersions].map((v) => ({ hash: v.hash(), parents: v.parents })),
+            graphCompleteRefs: seedHistory.graphCompleteRefs,
+          });
+          expected.history.serializedBytes = mergedHistory.serialize().byteLength;
+        }
       }
       await scope.objects.writeObjectsToTheFS([
         ...sources.map(({ source }) => source),
@@ -228,6 +241,8 @@ async function verify(cliRoot, directory, manifest) {
         assert.deepEqual(refs(component.orphanedVersions), expected.orphaned);
         assert.deepEqual(component.state, expected.state);
         const history = await scope.objects.load(new Ref(expected.history.hash));
+        if (expected.history.serializedBytes)
+          assert.equal(history.serialize().byteLength, expected.history.serializedBytes);
         assert.deepEqual(
           Object.fromEntries(history.versions.map((v) => [v.hash.toString(), v.parents.map((p) => p.toString())])),
           expected.history.versions
