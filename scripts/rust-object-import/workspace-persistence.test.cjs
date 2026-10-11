@@ -55,6 +55,19 @@ function vinyl(directory, name, contents = 'new\r\n') {
   result.override = true;
   return result;
 }
+function overrideConcurrency(t, value) {
+  const concurrency = require(
+    path.join(path.dirname(installed.resolve('@teambit/harmony.modules.concurrency')), 'concurrency.js')
+  );
+  const previous = concurrency.concurrentIOLimit;
+  concurrency.concurrentIOLimit = () => value;
+  t.after(() => {
+    concurrency.concurrentIOLimit = previous;
+  });
+  return (next) => {
+    value = next;
+  };
+}
 function frames(values) {
   return values.join('').trim().split('\n').filter(Boolean).map(JSON.parse);
 }
@@ -65,6 +78,55 @@ async function closed(children) {
   for (const child of children)
     assert.ok(child.exitCode !== null || child.signalCode !== null, 'helper must be reaped before completion');
 }
+
+test('negative and sub-unit concurrency retain canonical skipping without launching helpers', async (t) => {
+  const { directory, children } = await setup(t);
+  const setConcurrency = overrideConcurrency(t, -1);
+  for (const concurrency of [-1, 0.5, NaN, -Infinity]) {
+    setConcurrency(concurrency);
+    const existing = path.join(directory, `existing-${String(concurrency)}`);
+    await fs.writeFile(existing, 'retained');
+    const data = new DataToPersist();
+    data.removePath(new RemovePath(existing));
+    const file = vinyl(directory, `new-${String(concurrency)}`);
+    data.addFile(file);
+    await data.persistAllToFS();
+    assert.equal(await fs.readFile(existing, 'utf8'), 'retained');
+    await absent(file.path);
+  }
+  assert.equal(children.length, 0);
+});
+
+test('invalid cleanup concurrency rejects before deleting any path', async (t) => {
+  const { directory, children } = await setup(t);
+  const setConcurrency = overrideConcurrency(t, -1);
+  for (const concurrency of [-1, 0.5, 1.5, NaN, -Infinity]) {
+    setConcurrency(concurrency);
+    const existing = path.join(directory, `cleanup-${String(concurrency)}`);
+    await fs.writeFile(existing, 'retained');
+    const data = new DataToPersist();
+    data.removePath(new RemovePath(existing, true));
+    await assert.rejects(data.persistAllToFS(), TypeError);
+    assert.equal(await fs.readFile(existing, 'utf8'), 'retained');
+  }
+  assert.equal(children.length, 0);
+});
+
+test('file phase uses concurrency changed by a custom deletion hook', async (t) => {
+  const { directory, children } = await setup(t);
+  const setConcurrency = overrideConcurrency(t, 2);
+  const data = new DataToPersist();
+  const removal = new RemovePath(path.join(directory, 'hook'));
+  removal.persistToFS = async () => {
+    setConcurrency(-1);
+  };
+  data.removePath(removal);
+  const file = vinyl(directory, 'skipped');
+  data.addFile(file);
+  await data.persistAllToFS();
+  await absent(file.path);
+  assert.equal(children.length, 0);
+});
 
 test('one native helper persists deletion, ordinary writes and links in phase order', async (t) => {
   const { directory, children, acknowledgements } = await setup(t);

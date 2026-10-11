@@ -142,6 +142,7 @@ export function acquireWorkspaceSession():
 }
 
 export function hasNativeChunk(files: AbstractVinyl[], concurrency: number): boolean {
+  if (!(concurrency >= 1)) return false;
   const width = Number.isFinite(concurrency) ? Math.floor(concurrency) : files.length;
   for (let start = 0; start < files.length; start += width) {
     if (files.slice(start, start + width).every(eligible)) return true;
@@ -154,6 +155,10 @@ export async function persistFilesInSession(
   concurrency: number,
   session: MaterializationSession
 ) {
+  if (!(concurrency >= 1)) {
+    await pMapPool(files, (file) => file.write(), { concurrency });
+    return;
+  }
   // Preserve pMapPool's failure boundary: a rejected chunk must never start
   // files in the next configured concurrency chunk.
   const width = Number.isFinite(concurrency) ? Math.floor(concurrency) : files.length;

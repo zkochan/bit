@@ -103,10 +103,15 @@ async function removePaths(paths: RemovePath[], getSession: () => Materializatio
   const cleanup = paths.filter((item) => item.removeItsDirIfEmpty).map((item) => item.path);
   const ordinary = paths.filter((item) => !item.removeItsDirIfEmpty);
   if (cleanup.length) {
-    if (!cleanup.every(validPath)) await removeFilesAndEmptyDirsRecursively(cleanup);
+    const cleanupConcurrency = concurrentIOLimit();
+    if (
+      !cleanup.every(validPath) ||
+      (cleanupConcurrency !== Infinity && (!Number.isInteger(cleanupConcurrency) || cleanupConcurrency < 1))
+    )
+      await removeFilesAndEmptyDirsRecursively(cleanup);
     else {
       logger.info(`remove-files-and-empty-dirs-recursively deleting the following paths: ${cleanup.join(', ')}`);
-      const concurrency = concurrentIOLimit();
+      const concurrency = cleanupConcurrency;
       await perform(
         cleanup.map((first) => ({ kind: 0, first, second: '' })),
         concurrency,
@@ -128,6 +133,10 @@ async function removePaths(paths: RemovePath[], getSession: () => Materializatio
     }
   }
   const concurrency = concurrentIOLimit();
+  if (!(concurrency >= 1)) {
+    await pMapPool(ordinary, (item) => item.persistToFS(), { concurrency });
+    return;
+  }
   const width = Number.isFinite(concurrency) ? Math.floor(concurrency) : Math.max(ordinary.length, 1);
   for (let start = 0; start < ordinary.length; start += width) {
     const chunk = ordinary.slice(start, start + width);
