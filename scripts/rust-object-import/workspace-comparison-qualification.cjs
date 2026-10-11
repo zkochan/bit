@@ -189,6 +189,9 @@ async function runQualification(cliRoot, helper, options = {}) {
         );
         diagnostics[kind] = JSON.parse(await fs.readFile(traceFile, 'utf8'));
         const metrics = diagnostics[kind].workspace;
+        assert.equal(diagnostics[kind].persistence.helpers, 1, `${kind} must reuse one operation helper`);
+        assert.ok(metrics.scan.frames > 0, `${kind} must scan within its operation scope`);
+        assert.equal(metrics.scan.failed, 0);
         assert.ok(metrics.read.files > 0, `${kind} must use native workspace reads`);
         assert.equal(metrics.read.completed, metrics.read.files);
         assert.equal(metrics.read.failed, 0);

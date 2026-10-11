@@ -1,6 +1,6 @@
 import * as path from 'path';
 import globby from 'globby';
-import { scanRustWorkspace } from '@teambit/component.sources';
+import { scanRustWorkspace, isWorkspacePersistenceScope } from '@teambit/component.sources';
 import ignore from 'ignore';
 import { pickBy, isNil, sortBy, isEmpty } from 'lodash';
 import type { ComponentID } from '@teambit/component-id';
@@ -579,7 +579,7 @@ export async function getFilesByDir(
   trackAllFiles = false
 ): Promise<ComponentMapFile[]> {
   const native =
-    process.env.BIT_RUST_CLIENT_VCS === 'on' && !/[!*?{}[\]\\]/.test(dir)
+    process.env.BIT_RUST_CLIENT_VCS === 'on' && isWorkspacePersistenceScope() && !/[!*?{}[\]\\]/.test(dir)
       ? await scanRustWorkspace(
           path.resolve(consumerPath, dir),
           excludeDirs.map((excluded) => path.resolve(consumerPath, excluded)),

@@ -514,6 +514,28 @@ test('component inventories preserve root rules, nested ignore precedence and li
       await fs.writeFile(filename, contents);
     })
   );
+  const cp = require('node:child_process');
+  const originalSpawn = cp.spawn;
+  let scans = 0;
+  cp.spawn = function (executable, ...args) {
+    const child = originalSpawn.call(this, executable, ...args);
+    if (executable === path.toNamespacedPath(helper)) {
+      const originalWrite = child.stdin.write;
+      child.stdin.write = function (bytes, ...writeArgs) {
+        if (
+          Buffer.isBuffer(bytes) &&
+          bytes.subarray(0, 4).toString() === 'BWS1' &&
+          JSON.parse(bytes.subarray(12).toString()).kind === 'scan'
+        )
+          scans++;
+        return originalWrite.call(this, bytes, ...writeArgs);
+      };
+    }
+    return child;
+  };
+  t.after(() => {
+    cp.spawn = originalSpawn;
+  });
   for (const [dir, excludes, trackAllFiles] of [
     ['.', ['owned/[slug]', 'component'], false],
     ['component', [], false],
@@ -523,8 +545,14 @@ test('component inventories preserve root rules, nested ignore precedence and li
     process.env.BIT_RUST_CLIENT_VCS = 'off';
     const expected = await bitmap.getFilesByDir(dir, directory, ignore, excludes, trackAllFiles);
     process.env.BIT_RUST_CLIENT_VCS = 'on';
-    const actual = await bitmap.getFilesByDir(dir, directory, ignore, excludes, trackAllFiles);
+    const scansBefore = scans;
+    assert.deepEqual(await bitmap.getFilesByDir(dir, directory, ignore, excludes, trackAllFiles), expected);
+    assert.equal(scans, scansBefore, 'bootstrap inventory must avoid an unowned helper');
+    const actual = await installed('@teambit/component.sources').withWorkspacePersistence(() =>
+      bitmap.getFilesByDir(dir, directory, ignore, excludes, trackAllFiles)
+    );
     assert.deepEqual(actual, expected);
+    assert.equal(scans, scansBefore + 1, 'owned inventory must actually use the native scanner');
     const names = actual.map((entry) => entry.relativePath);
     assert.deepEqual(names, [...names].sort());
     assert.ok(!names.some((name) => name.endsWith('drop.js') || name.endsWith('drop.tmp')));

@@ -17,7 +17,11 @@ export {
 } from './rust-workspace-reader';
 export { PackageJsonFile } from './package-json-file';
 export { DataToPersist } from './data-to-persist';
-export { withWorkspacePersistence, withWorkspaceSession } from './rust-workspace-persistence';
+export {
+  withWorkspacePersistence,
+  withWorkspaceSession,
+  isWorkspacePersistenceScope,
+} from './rust-workspace-persistence';
 export {
   createRustCheckoutSourceFile,
   getRustCheckoutSourceDescriptor,

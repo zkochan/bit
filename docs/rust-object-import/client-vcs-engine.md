@@ -98,3 +98,59 @@ SHA-256 `8cdfa8432c68f91714cf2c0ecf41ace5b65aa17155c178571e2255e88bf425e2`.
 Complete-command measurements determine rollout separately from migration.
 Moving code into Rust does not establish a speedup; current-file loading and
 modified-state detection still contribute Node work.
+
+## Workspace inventory, status and diff
+
+The next operation chunk starts from merged #74. The same opt-in
+`BIT_RUST_CLIENT_VCS=on` enables the read-only `BWS1` engine:
+
+- **Scan** enumerates ordinary candidate files, subtracts literal component roots,
+  and excludes Bit/Git internals. TypeScript applies hierarchical ignore rules,
+  workspace-root bitmap protection and generated-file policy. Both native and
+  canonical inventories now sort final paths using `ComponentMap.sort` order;
+  asynchronous directory enumeration no longer determines presentation order.
+- **Read** reads complete workspace file sets, computes raw disk SHA-1 and
+  canonical Linux-EOL Source identities, and strips only the UTF-8 BOM from the
+  public file contents as the canonical Vinyl reader does. The adapter preserves
+  `cwd`, `base`, file statistics, test metadata and public missing-file errors.
+- **Compare** compares canonical Version identity hashes for modified-state
+  detection. TypeScript still constructs the identity projection and performs
+  its existing metadata alignment, sorting, temporary bitmap filtering and
+  cached-state updates. Debug logging and custom hashing hooks retain canonical
+  comparison.
+- **Diff** reads verified repository Sources and workspace files directly, checks
+  disk files against their captured raw identities, and runs bounded parallel
+  `git diff --no-index` processes. Git compares original bytes after the same
+  EOL-normalized equality check. TypeScript retains labels, color formatting,
+  file statuses, metadata/dependency diffs and existing binary/empty-file behavior.
+
+An awaited status, mini-status, diff or checkout operation shares the bounded
+helper pool. Inventory scans during Harmony bootstrap retain canonical loading
+until an operation owns the helper lifetime. Stored Sources can remain deferred
+inside supported status/diff scopes; checkout fallback paths keep their existing
+reader behavior. Workspace bytes still enter Node because component loading,
+docs, dependency analysis and extension hooks consume them; repository Sources
+and verified disk files do not make a body round trip solely to run Git.
+
+Requests are bounded to 4 MiB, 4096 files and 8 MiB of aggregate raw file bodies.
+Responses are bounded to 32 MiB. Scan traversal additionally bounds examined
+entries and queued path bytes. Diff uses at most four Git workers, bounds each
+stdout stream, and cleans temporary files and child processes. Unsupported
+symlinks, non-UTF-8 paths, changed files, custom readers/converters/hashing hooks,
+invalid acknowledgements and unavailable helpers fall back before exposing a
+partial native result. Retained buffer copies detect in-place mutations; array,
+path and provenance checks reject changes across asynchronous native work.
+The deferred object-store availability boundary described above still applies.
+
+The workspace comparison qualification driver runs real `status --json` and
+`diff --json` against a local remote and two stored versions. It compares clean
+and modified output across Node, native, missing-helper and crashed-helper modes,
+including file additions, deletions, renames and dependency metadata changes.
+Separate diagnostics require successful scan/read/compare/diff acknowledgements.
+`BIT_WORKSPACE_COMPARISON_ROUNDS` controls alternating Node/native pairs with
+excluded warmups; `BIT_WORKSPACE_COMPARISON_EXTRA_FILES` extends the fixture with
+4 KiB files. Reports fingerprint source, compiled modules, the helper and both
+qualification harnesses before and after the run. Timing, CPU and simultaneous
+process-tree RSS include the complete command, with setup and diagnostics
+excluded. Source and physically compiled differential tests run in the existing
+Linux/macOS/Windows canonical-model CI matrix.
