@@ -65,3 +65,40 @@ deletion/link acknowledgements and count actual helper launches. Ordinary import
 fixtures exercise writes and links; deletion semantics are exercised directly by
 the persistence suites. Generated reports, binaries and private compiled CLIs stay
 outside Git in `$HOME/bit-workspace-persistence-evidence-2026-10-11`.
+
+The final implementation passed 305 applicable Node tests (two platform skips),
+44 physically compiled persistence/materialization tests, 74 Rust tests and 69
+canonical model/index tests. Canonical TypeScript lint, rustfmt, warning-denied
+Clippy, perfectionist Dylint and rustdoc passed. All 20 implementation CI jobs
+passed, including the three operating systems.
+
+The retained Linux measurements below are medians in milliseconds, with Node →
+Rust values. Checkout and install used nine alternating paired rounds; the
+many-small-file checkout used three, with 100 components and 2,500 files. Warmups
+and tracing were excluded from timing. CPU and peak simultaneous process-tree RSS
+were also recorded in the reports.
+
+| Command / filesystem     | Cold Node → Rust | Warm Node → Rust |
+| ------------------------ | ---------------: | ---------------: |
+| Checkout / tmpfs         |    328.2 → 326.7 |    299.0 → 300.3 |
+| Checkout / Btrfs         |    329.0 → 329.6 |    301.6 → 303.8 |
+| Install / tmpfs          |  2318.3 → 4511.7 |  1339.3 → 1387.5 |
+| Install / Btrfs          |  1622.9 → 1604.7 |  1169.9 → 1208.5 |
+| Many small files / tmpfs |    801.0 → 827.6 |    724.8 → 746.2 |
+| Many small files / Btrfs |    887.3 → 901.8 |    774.9 → 782.5 |
+
+These results do not establish a performance improvement. The tmpfs cold install
+was particularly variable: Node ranged from 1519–5171 ms and Rust from
+1602–10717 ms; all completed retained rounds are included. Rust's cold peak RSS
+was also slightly higher in every case. Persistence therefore remains opt-in.
+
+The evidence directory contains the six reports and
+`final-provenance-audit.json`. The audit checks source, compiled-module, harness
+and helper hashes, expected round counts, successful native acknowledgements and
+bounded helper launches. After rebuilding the private CLI, its affected compiled
+modules matched the earlier reports byte for byte. Interrupted and superseded
+runs are preserved separately under `exploratory/` and excluded from the table.
+To reproduce, prepare a private CLI with `prepare-cli.cjs`, then run
+`import-qualification.cjs` with `BIT_IMPORT_QUALIFICATION_MODES=persistence-node,persistence-native`,
+`BIT_IMPORT_QUALIFICATION_COMMAND=checkout` or `install`, and the desired scratch
+filesystem and round count. The retained drivers record the full environment.
