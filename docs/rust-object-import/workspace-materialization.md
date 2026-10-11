@@ -81,19 +81,22 @@ Numbers are medians, shown as Node → Rust; CPU and RSS columns describe cold r
 
 | Command / filesystem        | Rounds |  Cold wall (ms) |  Warm wall (ms) |     CPU (s) | Sampled tree RSS (MiB) |
 | --------------------------- | -----: | --------------: | --------------: | ----------: | ---------------------: |
-| Checkout / tmpfs            |      9 |   323.2 → 326.3 |   291.9 → 298.0 | 0.44 → 0.42 |          160.9 → 160.7 |
-| Checkout / Btrfs            |      9 |   322.9 → 322.1 |   293.6 → 305.5 | 0.42 → 0.43 |          160.1 → 160.1 |
-| Import/install / tmpfs      |      9 | 1493.7 → 1559.2 | 1122.8 → 1210.3 | 1.44 → 1.55 |          412.5 → 495.9 |
-| Import/install / Btrfs      |      9 | 1576.6 → 1705.2 | 1176.3 → 1293.5 | 1.50 → 1.62 |          420.3 → 435.1 |
-| 2,500-file checkout / tmpfs |      3 |   832.4 → 848.2 |   767.0 → 752.7 | 1.14 → 1.10 |          296.9 → 301.7 |
-| 2,500-file checkout / Btrfs |      3 |   918.2 → 933.7 |   820.4 → 833.4 | 1.29 → 1.29 |          301.1 → 305.5 |
+| Checkout / tmpfs            |      9 |   330.7 → 325.6 |   355.9 → 302.4 | 0.43 → 0.44 |          160.5 → 160.3 |
+| Checkout / Btrfs            |      9 |   406.2 → 439.9 |   388.3 → 396.2 | 0.55 → 0.60 |          160.9 → 160.6 |
+| Import/install / tmpfs      |      9 | 1800.9 → 1998.4 | 1268.0 → 1524.0 | 1.89 → 1.95 |          413.0 → 482.8 |
+| Import/install / Btrfs      |      9 | 1615.3 → 1729.4 | 1246.0 → 1323.6 | 1.53 → 1.66 |          418.4 → 491.3 |
+| 2,500-file checkout / tmpfs |      3 |   831.8 → 856.3 |   753.7 → 756.1 | 1.13 → 1.13 |          298.3 → 301.5 |
+| 2,500-file checkout / Btrfs |      3 |   932.2 → 929.8 |   804.4 → 815.9 | 1.35 → 1.25 |          299.4 → 305.0 |
 
-Small-workspace cold checkout ranges overlap on both filesystems. Installation
-regresses: tmpfs ranges are 1473.3–1530.7 ms for Node and 1545.3–1604.8 ms for Rust;
-Btrfs ranges are 1536.8–1598.5 and 1631.9–1833.6 ms. The three-round larger-workspace
-runs establish regression coverage, not a performance benefit. These results
-support retaining the opt-in flag and do not justify default activation or a
-memory-saving claim.
+Small-workspace cold checkout ranges overlap on both filesystems: tmpfs ranges
+are 311.9–518.0 ms for Node and 315.4–524.2 ms for Rust; Btrfs ranges are
+324.8–511.3 and 329.5–639.7 ms. Tmpfs installation also has substantial variability,
+including a retained Rust outlier: ranges are 1487.6–2339.7 and 1553.3–5665.2 ms.
+Btrfs installation regresses with disjoint ranges, 1576.0–1632.6 versus
+1685.8–1929.2 ms. All retained observations are included. The three-round larger
+workspace runs establish regression coverage, not a performance benefit. These
+results support retaining the opt-in flag and do not justify default activation or
+a memory-saving claim.
 
 Diagnostics confirm all 32 checkout files reach Rust, all 2,500 larger-workspace
 files reach Rust in 50 frames, and installation writes 288 files in 33 frames,
