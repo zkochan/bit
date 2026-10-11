@@ -29,7 +29,8 @@ async function setup(t, executable = native) {
   const spawns = [];
   cp.spawn = (...args) => {
     const child = originalSpawn(...args);
-    if (args[0] === executable) {
+    // The resolver converts Windows executable paths to the extended-length namespace.
+    if (args[0] === path.toNamespacedPath(executable)) {
       spawns.push(args);
       child.stdout.on('data', (data) => acknowledgements.push(data.toString()));
     }
