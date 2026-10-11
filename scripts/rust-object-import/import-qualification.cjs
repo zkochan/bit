@@ -109,7 +109,11 @@ async function command(directory, ids, requestedMode, allHistory, traceFile, cpu
   const env = {
     ...process.env,
     BIT_RUST_WORKSPACE_MATERIALIZATION: requestedMode === 'workspace-native' ? 'on' : 'off',
-    BIT_RUST_WORKSPACE_PERSISTENCE: requestedMode === 'persistence-native' ? 'on' : 'off',
+    BIT_RUST_WORKSPACE_PERSISTENCE:
+      requestedMode === 'persistence-native' ||
+      (['missing', 'crash'].includes(requestedMode) && modes.includes('persistence-native'))
+        ? 'on'
+        : 'off',
     BIT_RUST_OBJECT_IMPORT:
       mode === 'native' ||
       mode === 'tar' ||
