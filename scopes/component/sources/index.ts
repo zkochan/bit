@@ -4,6 +4,17 @@ import License from './license';
 import SourceFile from './source-file';
 
 export { AbstractVinyl, Dist, License, SourceFile };
+export { withRustSourceReads, isRustSourceReadScope } from './rust-source-read-scope';
+export { canReadWorkspaceFilesNatively, sourceFileFromWorkspaceRead } from './source-file';
+export {
+  scanRustWorkspace,
+  readRustWorkspaceFiles,
+  registerRustWorkspaceFile,
+  getRustWorkspaceFileDescriptor,
+  getRustWorkspaceSource,
+  compareRustVersionIds,
+  getRustFilesDiff,
+} from './rust-workspace-reader';
 export { PackageJsonFile } from './package-json-file';
 export { DataToPersist } from './data-to-persist';
 export { withWorkspacePersistence, withWorkspaceSession } from './rust-workspace-persistence';
