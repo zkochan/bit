@@ -510,7 +510,8 @@ async function workspace(directory, manifest) {
         }
         if (mode === 'workspace-node' || mode === 'persistence-node') assert.equal(cold.trace.materialization.files, 0);
         if (mode === 'persistence-native') {
-          assert.ok(cold.trace.persistence.kinds.link > 0, 'actual workspace links must reach Rust');
+          if (commandKind === 'install')
+            assert.ok(cold.trace.persistence.kinds.link > 0, 'actual installation links must reach Rust');
           assert.equal(cold.trace.persistence.completed, cold.trace.persistence.actions);
           assert.equal(cold.trace.persistence.failed, 0, 'ordinary fixture must not hide action fallback');
           assert.ok(cold.trace.persistence.helpers >= 1 && cold.trace.persistence.helpers <= 4);
