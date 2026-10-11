@@ -154,3 +154,63 @@ qualification harnesses before and after the run. Timing, CPU and simultaneous
 process-tree RSS include the complete command, with setup and diagnostics
 excluded. Source and physically compiled differential tests run in the existing
 Linux/macOS/Windows canonical-model CI matrix.
+
+### Workspace comparison qualification and measurements
+
+Verification passes all 20 new source tests and 20 physically compiled tests,
+94 existing source/model/trace regressions (one additional Windows-only test is
+skipped locally), 64 compiled checkout/persistence regressions, 69 canonical
+model tests and 118 Rust workspace tests. Canonical TypeScript lint, the
+15-component Bit compilation, pinned Rust formatting, warning-denied Clippy,
+perfectionist Dylint and rustdoc pass. Real status/diff and checkout/reset/revert
+commands match across native, Node, missing-helper and crashed-helper runs.
+Diagnostics confirm successful native work and exactly one helper per operation.
+Official package smoke and all 30 artifact/provisioning/discovery tests pass.
+
+Five alternating retained pairs follow excluded warmups for each workload on
+Linux tmpfs (`/tmp`) and Btrfs (home scratch). Fixtures have one component, two
+versions, and either 4 or 260 files per version; the extra files have 4 KiB
+contents. The table reports independent native/Node median ratios, including
+GNU time user+system CPU and sampled simultaneous process-tree peak RSS.
+A value above 1 means the native command used more time or memory.
+
+| Filesystem / files | Command         |  Wall |   CPU | Peak tree RSS |
+| ------------------ | --------------- | ----: | ----: | ------------: |
+| tmpfs / 4          | clean status    | 1.008 | 0.983 |         1.011 |
+| tmpfs / 4          | modified status | 1.023 | 1.017 |         1.019 |
+| tmpfs / 4          | clean diff      | 1.008 | 1.000 |         1.020 |
+| tmpfs / 4          | modified diff   | 0.990 | 0.980 |         1.019 |
+| tmpfs / 260        | clean status    | 1.070 | 1.035 |         1.054 |
+| tmpfs / 260        | modified status | 1.059 | 1.026 |         1.035 |
+| tmpfs / 260        | clean diff      | 1.073 | 1.116 |         1.195 |
+| tmpfs / 260        | modified diff   | 1.085 | 1.113 |         1.207 |
+| Btrfs / 4          | clean status    | 0.987 | 0.947 |         1.015 |
+| Btrfs / 4          | modified status | 1.001 | 1.055 |         1.014 |
+| Btrfs / 4          | clean diff      | 1.027 | 1.044 |         1.040 |
+| Btrfs / 4          | modified diff   | 0.965 | 0.940 |         1.012 |
+| Btrfs / 260        | clean status    | 1.093 | 1.081 |         1.041 |
+| Btrfs / 260        | modified status | 1.069 | 1.013 |         1.027 |
+| Btrfs / 260        | clean diff      | 1.080 | 1.100 |         1.188 |
+| Btrfs / 260        | modified diff   | 1.045 | 1.082 |         1.196 |
+
+Small workloads show broadly similar command performance. The 260-file native
+commands are currently 4.5–9.3% slower by median wall time; native diff uses
+approximately 19–21% more sampled peak process-tree RSS. These results support
+continuing the migration under an opt-in flag, not enabling it as a performance
+improvement. Harmony startup, component hydration, metadata projection and the
+Node-facing workspace bodies remain material parts of the command.
+
+Evidence, absolute medians, command output and trace diagnostics are outside
+Git at `$HOME/bit-workspace-comparison-evidence-2026-10-11`. Source and compiled
+module SHA-256 fingerprints match before and after every run; these identify
+the final lifecycle integration even though the private CLI's base revision
+field records the preceding production commit `4b67210f2b4b`. The benchmark
+helper SHA-256 is
+`b73bcc162ed56ca58633ddcb27bf9e414ca23d8fbae74eb297d69fc4fb33789e`.
+The independently packaged explicit-target release records revision
+`4b67210f2b4b`, native source digest
+`61d7b188c63699d55128956e36e72b57f2dcb2a7afb8eaeb59e77ef5815f79af`,
+and binary SHA-256
+`b2710e1c394ffdd992f7af8b1ef556d66bf4cee2c11d8719505d90ac69760e46`.
+Both release builds use the same native source digest; the package smoke and
+artifact tests additionally validate the official target build.
