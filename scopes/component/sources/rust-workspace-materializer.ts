@@ -241,14 +241,10 @@ function validResult(response: Result, id: number, count: number): boolean {
     typeof response.failed !== 'boolean' ||
     response.failed !== response.completed < count ||
     !Array.isArray(response.skipped) ||
-    response.skipped.length > response.completed
+    response.skipped.length !== 0
   )
     return false;
-  return response.skipped.every(
-    (index, offset) =>
-      Number.isInteger(index) &&
-      index >= 0 &&
-      index < response.completed &&
-      (offset === 0 || index > response.skipped[offset - 1])
-  );
+  // Every submitted file has overwrite=true; a skipped acknowledgement would
+  // silently accept a helper that did not materialize the requested bytes.
+  return true;
 }
