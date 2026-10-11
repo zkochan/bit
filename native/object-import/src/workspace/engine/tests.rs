@@ -99,8 +99,14 @@ fn scans_dotfiles_hard_exclusions_literal_nested_components_and_bitmap_policy() 
     let component =
         response(&json!({"kind":"scan","root":directory.0,"excludeDirs":[],"workspaceRoot":false}));
     let paths = component["data"]["paths"].as_array().unwrap();
-    assert!(!paths.contains(&json!(directory.0.join(".bitmap"))));
-    assert!(paths.contains(&json!(directory.0.join("nested/.bitmap"))));
+    // Windows enumeration uses backslashes while joined relative inputs may contain slashes.
+    let contains = |relative: &str| {
+        paths
+            .iter()
+            .any(|value| Path::new(value.as_str().unwrap()) == directory.0.join(relative))
+    };
+    assert!(!contains(".bitmap"));
+    assert!(contains("nested/.bitmap"));
 }
 #[test]
 fn scan_and_read_fail_whole_batches_on_missing_paths_or_excessive_counts() {
