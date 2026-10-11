@@ -948,7 +948,7 @@ export default class Repository {
     const chownOptions = await this.getChownOptions();
     const completed = await persistRustSnapshotObjects(this, objects, rawObjects, chownOptions);
     await pMapPool(
-      objects.slice(completed || 0),
+      completed ? objects.slice(completed) : objects,
       async (obj) => {
         const operation = this.getNativeImportOperation();
         if (

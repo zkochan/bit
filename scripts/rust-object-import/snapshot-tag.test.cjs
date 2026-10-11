@@ -9,6 +9,7 @@ const adapter = compiled
 const sources = require(
   path.join(path.dirname(installed.resolve('@teambit/component.sources')), 'rust-workspace-persistence.js')
 );
+const Ref = compiled ? installed('@teambit/objects').Ref : source('scopes/scope/objects/objects/ref.ts').default;
 const originalWorkspaceSession = sources.withWorkspaceSession;
 const originalClientVcsFlag = process.env.BIT_RUST_CLIENT_VCS;
 class Version {
@@ -17,7 +18,7 @@ class Version {
     this.body = Buffer.from(body);
   }
   hash() {
-    return { toString: () => this.reference };
+    return new Ref(this.reference);
   }
   id() {
     return this.body.toString();
@@ -171,7 +172,7 @@ test('invalid native plan identities leave tag, head and Version parents untouch
   ]) {
     const { observed } = setup(t, () => ({ completed: 1, failed: false, data: invalid }));
     const changes = [];
-    const head = { toString: () => 'a'.repeat(40) };
+    const head = new Ref('a'.repeat(40));
     const component = {
       canAddSnapshotVersionNatively: () => true,
       getHead: () => head,
@@ -204,7 +205,7 @@ test('model changes during native planning decline before applying parent or tag
   });
   const component = {
     canAddSnapshotVersionNatively: () => true,
-    getHead: () => ({ toString: () => 'a'.repeat(40) }),
+    getHead: () => new Ref('a'.repeat(40)),
     getRef: () => undefined,
     hasTag: () => false,
     toBuffer: () => Buffer.from(modelBody),
@@ -283,4 +284,107 @@ test('hydrated workspace Sources remain eligible for ordinary snapshot bodies af
   assert.equal(projected.workspace, undefined);
   assert.equal(projected.body, Buffer.from('xource\n').toString('hex'));
   assert.equal(projected.hash, sha1(Buffer.from('xource\n')));
+});
+
+function planFixture(head, parent) {
+  const changes = [];
+  const component = {
+    canAddSnapshotVersionNatively: () => true,
+    getHead: () => head,
+    getRef: () => parent,
+    hasTag: () => false,
+    toBuffer: () => Buffer.from('model'),
+    setHead: () => changes.push('head'),
+    setVersion: () => changes.push('tag'),
+    markVersionAsLocal: () => changes.push('local'),
+    detachedHeads: { setHead: () => changes.push('detached'), clearCurrent: () => changes.push('clear') },
+  };
+  const version = object('b');
+  version.isLegacy = false;
+  version.addAsOnlyParent = (reference) => changes.push(reference);
+  return { component, version, changes };
+}
+
+test('snapshot planning rejects custom Ref methods, accessors and subclasses without invoking them', async (t) => {
+  for (const customization of ['ownEqual', 'ownString', 'getter', 'subclass', 'prototypeEqual', 'prototypeString']) {
+    const { observed } = setup(t, () => {
+      throw new Error('custom Ref must decline before invoking the helper');
+    });
+    let calls = 0;
+    const custom = () => {
+      calls++;
+      return 'a'.repeat(40);
+    };
+    const head = new Ref('a'.repeat(40));
+    let parent = new Ref('a'.repeat(40));
+    const originalEqual = Object.getOwnPropertyDescriptor(Ref.prototype, 'isEqual');
+    const originalString = Object.getOwnPropertyDescriptor(Ref.prototype, 'toString');
+    try {
+      if (customization === 'ownEqual') parent.isEqual = custom;
+      if (customization === 'ownString') head.toString = custom;
+      if (customization === 'getter') Object.defineProperty(head, 'toString', { get: custom });
+      if (customization === 'subclass') parent = new (class extends Ref {})('a'.repeat(40));
+      if (customization === 'prototypeEqual') Ref.prototype.isEqual = custom;
+      if (customization === 'prototypeString') Ref.prototype.toString = custom;
+      const { component, version, changes } = planFixture(head, parent);
+      assert.equal(
+        await adapter.withRustSnapshotOperation(() =>
+          adapter.addRustSnapshotVersion(component, version, '1.0.0', undefined, '0.0.1')
+        ),
+        undefined
+      );
+      assert.equal(calls, 0, customization);
+      assert.equal(observed.requests.length, 0, customization);
+      assert.deepEqual(changes, [], customization);
+    } finally {
+      Object.defineProperty(Ref.prototype, 'isEqual', originalEqual);
+      Object.defineProperty(Ref.prototype, 'toString', originalString);
+    }
+  }
+});
+
+test('snapshot planning rechecks Ref methods after awaiting the helper', async (t) => {
+  const head = new Ref('a'.repeat(40));
+  const parent = new Ref('a'.repeat(40));
+  let calls = 0;
+  const { observed } = setup(t, () => {
+    Object.defineProperty(parent, 'isEqual', {
+      get() {
+        calls++;
+        return () => false;
+      },
+    });
+    return { completed: 1, failed: false, data: { parent: 'a'.repeat(40), detached: false, tag: true } };
+  });
+  const { component, version, changes } = planFixture(head, parent);
+  assert.equal(
+    await adapter.withRustSnapshotOperation(() =>
+      adapter.addRustSnapshotVersion(component, version, '1.0.0', undefined, '0.0.1')
+    ),
+    undefined
+  );
+  assert.equal(observed.requests.length, 1);
+  assert.equal(calls, 0);
+  assert.deepEqual(changes, []);
+});
+
+test('snapshot parent policy preserves distinct Ref identity when parent and head hashes match', async (t) => {
+  for (const setHeadAsParent of [true, false]) {
+    const { observed } = setup(t, () => ({
+      completed: 1,
+      failed: false,
+      data: { parent: 'a'.repeat(40), detached: false, tag: true },
+    }));
+    const head = new Ref('a'.repeat(40));
+    const parent = new Ref('a'.repeat(40));
+    const { component, version, changes } = planFixture(head, parent);
+    assert.equal(
+      await adapter.withRustSnapshotOperation(() =>
+        adapter.addRustSnapshotVersion(component, version, '1.0.0', undefined, '0.0.1', { setHeadAsParent })
+      ),
+      '1.0.0'
+    );
+    assert.equal(observed.requests.length, 1);
+    assert.equal(changes[0], setHeadAsParent ? head : parent);
+  }
 });

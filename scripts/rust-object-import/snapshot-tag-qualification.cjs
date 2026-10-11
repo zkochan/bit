@@ -99,7 +99,11 @@ async function runQualification(cliRoot, helper, options = {}) {
     const started = performance.now();
     let tree;
     const result = await new Promise((resolve, reject) => {
-      const child = cp.spawn(process.execPath, nodeArgs, { cwd: directory, env, stdio: ['ignore', 'pipe', 'pipe'] });
+      const child = cp.spawn(
+        linux ? '/usr/bin/time' : process.execPath,
+        linux ? ['-f', '%U %S', '-o', cpuFile, process.execPath, ...nodeArgs] : nodeArgs,
+        { cwd: directory, env, detached: linux, stdio: ['ignore', 'pipe', 'pipe'] }
+      );
       const control = linux ? createBenchmarkProcessControl(child) : undefined;
       const sampler = linux ? createProcessTreeMemorySampler(child.pid, { intervalMs: 10 }) : undefined;
       sampler?.start();

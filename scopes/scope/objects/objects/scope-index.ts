@@ -112,7 +112,9 @@ export class ScopeIndex {
       // Snapshot policy must not bypass extensions installed after module initialization.
       const operation =
         (hasDefaultSnapshotIndexMethods(this) ? this.nativeSnapshotOperation : undefined) || this.nativeImportOperation;
-      const contents = JSON.stringify(this.index, null, 2) + '\n';
+      const snapshot = Boolean(operation && operation === this.nativeSnapshotOperation);
+      const contents =
+        operation && process.platform === 'linux' ? JSON.stringify(this.index, null, 2) + '\n' : undefined;
       const saved =
         operation && process.platform === 'linux'
           ? await operation.request({ kind: 'indexWrite', contents }, (value) => {
@@ -122,8 +124,7 @@ export class ScopeIndex {
           : undefined;
       if (
         saved &&
-        (operation !== this.nativeSnapshotOperation ||
-          (hasDefaultSnapshotIndexMethods(this) && contents === JSON.stringify(this.index, null, 2) + '\n'))
+        (!snapshot || (hasDefaultSnapshotIndexMethods(this) && contents === JSON.stringify(this.index, null, 2) + '\n'))
       ) {
         operation!.stats.indexes++;
         return;

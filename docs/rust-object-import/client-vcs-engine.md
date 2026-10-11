@@ -273,3 +273,64 @@ after excluded warmups. `BIT_SNAPSHOT_QUALIFICATION_EXTRA_FILES` adds unique
 simultaneous 10 ms process-tree RSS include helpers; setup and diagnostics are
 excluded. Reports verify source, physically compiled module, harness, fixture
 preload and release-helper SHA-256 fingerprints before and after each run.
+
+### Snapshot/tag qualification and measurements
+
+Verification passes 12 source and 12 physically compiled snapshot adapter tests,
+23 source and 23 compiled workspace comparison/provenance tests, 94 existing
+regressions (one Windows-only test skipped locally), 64 compiled checkout and
+persistence regressions, 69 canonical model tests and 129 Rust workspace tests.
+Canonical TypeScript lint, the 16-component Bit compilation, pinned Rust
+formatting, warning-denied Clippy, Dylint and rustdoc pass. Official package smoke
+and all 30 artifact/provisioning/discovery tests pass. Snapshot source and compiled
+adapter tests run in the existing Linux/macOS/Windows canonical-model CI matrix.
+
+Five alternating retained pairs follow excluded warmups on Linux tmpfs (`/tmp`)
+and Btrfs (home scratch), with one component, three versions and either 3 or 259
+files per version. Extra files are unique 4 KiB Sources, half changed at each
+stage. The following independent median ratios include the complete persisted
+tag or snap command. Values above 1 mean more native time or memory.
+
+| Filesystem / files | Command       |  Wall |   CPU | Peak tree RSS |
+| ------------------ | ------------- | ----: | ----: | ------------: |
+| tmpfs / 3          | initial tag   | 0.998 | 0.981 |         1.010 |
+| tmpfs / 3          | edited snap   | 1.007 | 1.019 |         1.011 |
+| tmpfs / 3          | following tag | 1.010 | 1.038 |         1.013 |
+| tmpfs / 259        | initial tag   | 1.057 | 0.974 |         1.030 |
+| tmpfs / 259        | edited snap   | 1.059 | 1.026 |         1.058 |
+| tmpfs / 259        | following tag | 1.067 | 1.012 |         1.124 |
+| Btrfs / 3          | initial tag   | 1.029 | 1.082 |         1.010 |
+| Btrfs / 3          | edited snap   | 0.996 | 1.019 |         1.011 |
+| Btrfs / 3          | following tag | 0.992 | 0.981 |         1.014 |
+| Btrfs / 259        | initial tag   | 1.084 | 0.962 |         1.099 |
+| Btrfs / 259        | edited snap   | 1.078 | 1.026 |         1.153 |
+| Btrfs / 259        | following tag | 1.062 | 1.000 |         1.117 |
+
+These measurements qualify production revision `b3495fe39258`, before the final
+custom-Ref guards and canonical fallback cleanup. Those follow-up changes reject
+custom Ref methods/getters before native policy and after asynchronous planning,
+preserve the original fallback object array, and avoid an extra canonical index
+serialization. Final source/compiled adapter tests and real four-mode command
+qualification cover those changes separately; a final 259-file pair verifies
+the updated measurement path and source/compiled fingerprints. The table remains
+the five-pair measurement of the explicitly identified earlier revision.
+
+Small commands are broadly similar. The 259-file native workflow is 5.7–8.4%
+slower by median wall time, with approximately 3–15% more sampled process-tree
+RSS. CPU is broadly similar. This supports continuing the migration behind
+`BIT_RUST_CLIENT_VCS=on`; it does not justify enabling the engine as a performance
+improvement. Harmony startup, dependency analysis, class hydration and canonical
+metadata preparation remain substantial Node work.
+
+Reports, absolute medians, logs and generated artifacts stay outside Git at
+`$HOME/bit-snapshot-tag-evidence-2026-10-11`. The private CLI's original base field
+records `517e93180cc0`; exact source and compiled-module SHA-256 fingerprints
+identify each qualified candidate. The measured helper SHA-256 is
+`85f94a2916ff6be6bdb8e23fdbc228afe451b5df6ae104e6116318dae1444121`.
+The official explicit-target package records revision `b3495fe39258`, native
+source digest `3b99d97934fd86ef6de413f5e8eaa60754c0cd86bf0fc580a0db50f2a9c5cbab`,
+and binary SHA-256
+`4b1bce25a84ae42bfc17bf0a68bfd568cfff6e8152723a64dc2b368e96e76fa6`.
+Both release builds and the final adapter candidate use the same native source
+digest. Real-command results here are local Linux qualification; cross-platform
+adapter and filesystem coverage is provided by CI.

@@ -13,6 +13,7 @@ import type ModelComponent from '../models/model-component';
 import type { AddVersionOpts } from '../models/model-component';
 import type Version from '../models/version';
 import type Lane from '../models/lane';
+import Ref from './ref';
 import { isTag } from '@teambit/component-version';
 
 type Constructor = { prototype: BitObject; name: string };
@@ -22,6 +23,21 @@ const owners = new AsyncLocalStorage<boolean>();
 const MAX_BYTES = 4 * 1024 * 1024;
 const MAX_FILES = 4096;
 const hashString = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{40}$/.test(value);
+const refMethods = { toString: Ref.prototype.toString, isEqual: Ref.prototype.isEqual };
+
+function ordinaryRef(reference: Ref | null | undefined): boolean {
+  if (!reference) return true;
+  if (Object.getPrototypeOf(reference) !== Ref.prototype) return false;
+  const hash = Object.getOwnPropertyDescriptor(reference, 'hash');
+  return (
+    hashString(hash?.value) &&
+    Object.entries(refMethods).every(([name, method]) => {
+      const descriptor =
+        Object.getOwnPropertyDescriptor(reference, name) || Object.getOwnPropertyDescriptor(Ref.prototype, name);
+      return descriptor?.value === method;
+    })
+  );
+}
 const methodNames = ['toBuffer', 'serialize', 'compressWithSize', 'getHeader', 'getType', 'hash', 'id'];
 const policyMethods = [
   'addVersion',
@@ -236,6 +252,12 @@ export async function addRustSnapshotVersion(
   options: AddVersionOpts = {}
 ): Promise<string | undefined> {
   if (!isRustSnapshotOperation() || lane || !component.canAddSnapshotVersionNatively(version)) return undefined;
+  const readReferences = () => {
+    const head = component.getHead();
+    const parent = previouslyUsedVersion ? component.getRef(previouslyUsedVersion) : undefined;
+    return ordinaryRef(head) && ordinaryRef(parent) ? { head, parent } : undefined;
+  };
+  if (!readReferences()) return undefined;
   const projection = () => {
     const head = component.getHead();
     const parent = previouslyUsedVersion ? component.getRef(previouslyUsedVersion) : undefined;
@@ -280,6 +302,7 @@ export async function addRustSnapshotVersion(
   if (
     !result ||
     !component.canAddSnapshotVersionNatively(version) ||
+    !readReferences() ||
     JSON.stringify(projection()) !== JSON.stringify(input) ||
     component.toBuffer(false).toString('hex') !== model ||
     version.toBuffer(false).toString('hex') !== initialVersion ||
