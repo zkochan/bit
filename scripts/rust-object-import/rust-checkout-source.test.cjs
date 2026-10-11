@@ -223,3 +223,19 @@ test('preflight validates all source batches and reaps its helper without loadin
   assert.equal(released, 2);
   assert.equal(fixtureData.reads(), 0);
 });
+
+test('mutating the original Ref cannot redirect hydration away from the validated source hash', () => {
+  const fixtureData = fixture();
+  const file = adapter.createRustCheckoutSourceFile(fixtureData.model, fixtureData.repository, true);
+  const originalHash = fixtureData.hash;
+  const redirectedHash = '1'.repeat(40);
+  fixtureData.model.file.hash = redirectedHash;
+  const requested = [];
+  fixtureData.repository.loadSync = (reference) => {
+    requested.push(reference.toString());
+    return { contents: reference.toString() === originalHash ? fixtureData.contents : Buffer.from('wrong object') };
+  };
+  assert.equal(adapter.getRustCheckoutSourceDescriptor(file), undefined);
+  assert.equal(file.contents, fixtureData.contents);
+  assert.deepEqual(requested, [originalHash]);
+});

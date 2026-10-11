@@ -65,7 +65,8 @@ fn append_path(bytes: &mut Vec<u8>, path: &Path) {
 }
 fn response(bytes: Vec<u8>, preflight: bool) -> Value {
     let mut output = Vec::new();
-    serve(&mut Cursor::new(bytes), &mut output, preflight).unwrap();
+    serve(&mut Cursor::new(bytes), &mut output, preflight, &mut super::cache::State::default())
+        .unwrap();
     serde_json::from_slice(&output).unwrap()
 }
 #[test]
@@ -128,7 +129,15 @@ fn incomplete_or_invalid_frames_never_mutate_destinations() {
     let target = directory.0.join("target");
     let bytes = frame(&directory.0, &[(hash, &target, 1, 0)]);
     for length in 0..bytes.len() {
-        assert!(serve(&mut Cursor::new(&bytes[..length]), &mut Vec::new(), false).is_err());
+        assert!(
+            serve(
+                &mut Cursor::new(&bytes[..length]),
+                &mut Vec::new(),
+                false,
+                &mut super::cache::State::default()
+            )
+            .is_err(),
+        );
         assert!(!target.exists());
     }
     for (path, overwrite, eol) in
@@ -138,7 +147,8 @@ fn incomplete_or_invalid_frames_never_mutate_destinations() {
             serve(
                 &mut Cursor::new(frame(&directory.0, &[(hash, path, overwrite, eol)])),
                 &mut Vec::new(),
-                false
+                false,
+                &mut super::cache::State::default(),
             )
             .is_err(),
         );
@@ -209,4 +219,38 @@ fn in_place_materialization_preserves_inode_modes_hard_links_and_symlink_targets
     assert_eq!(after.mode(), before.mode());
     assert_eq!(fs::read(hard).unwrap(), b"replacement");
     assert_eq!(fs::read_link(link).unwrap(), file);
+}
+
+#[test]
+fn writes_verified_snapshot_after_preflight_without_rereading_repository() {
+    let directory = Directory::new();
+    let hash = store(&directory.0, b"verified snapshot\r\n");
+    let destination = directory.0.join("destination");
+    let mut state = super::cache::State::default();
+    let mut output = Vec::new();
+    serve(
+        &mut Cursor::new(frame(&directory.0, &[(hash, &destination, 1, 1)])),
+        &mut output,
+        true,
+        &mut state,
+    )
+    .unwrap();
+    let identity = crate::validate::hexadecimal(&hash);
+    fs::remove_file(
+        directory.0
+            .join(&identity[..2])
+            .join(&identity[2..]),
+    )
+    .unwrap();
+    output.clear();
+    serve(
+        &mut Cursor::new(frame(&directory.0, &[(hash, &destination, 1, 1)])),
+        &mut output,
+        false,
+        &mut state,
+    )
+    .unwrap();
+    let result: Value = serde_json::from_slice(&output).unwrap();
+    assert_eq!(result["completed"], 1);
+    assert_eq!(fs::read(destination).unwrap(), super::eol::auto(b"verified snapshot\r\n".to_vec()));
 }

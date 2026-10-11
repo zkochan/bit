@@ -22,6 +22,7 @@ const metrics = {
   materialization: { frames: 0, files: 0, bytes: 0, completed: 0, skipped: 0, failed: 0 },
   persistence: { helpers: 0, frames: 0, actions: 0, completed: 0, failed: 0, kinds: {} },
   checkout: {
+    plan: { frames: 0, files: 0, completed: 0, failed: 0 },
     preflight: { frames: 0, files: 0, completed: 0, failed: 0 },
     write: { frames: 0, files: 0, completed: 0, failed: 0 },
   },
@@ -59,7 +60,7 @@ if (output && process.pid === owner) {
     const write = child.stdin.write;
     child.stdin.write = function (bytes, ...rest) {
       const magic = Buffer.isBuffer(bytes) ? bytes.subarray(0, 4).toString() : '';
-      if (['BWM1', 'BWP1', 'BWC0', 'BWC1'].includes(magic)) {
+      if (['BWM1', 'BWP1', 'BWC0', 'BWC1', 'BCK1'].includes(magic)) {
         if (!workspace) metrics.persistence.helpers++;
         workspace = true;
         requests.push(magic);
@@ -67,10 +68,16 @@ if (output && process.pid === owner) {
           metrics.materialization.frames++;
           metrics.materialization.files += bytes.readUInt32BE(8);
           metrics.materialization.bytes += bytes.length;
-        } else if (magic === 'BWC0' || magic === 'BWC1') {
-          const metric = magic === 'BWC0' ? metrics.checkout.preflight : metrics.checkout.write;
+        } else if (magic === 'BWC0' || magic === 'BWC1' || magic === 'BCK1') {
+          const metric =
+            magic === 'BCK1'
+              ? metrics.checkout.plan
+              : magic === 'BWC0'
+                ? metrics.checkout.preflight
+                : metrics.checkout.write;
           metric.frames++;
-          metric.files += bytes.readUInt32BE(8);
+          metric.files +=
+            magic === 'BCK1' ? JSON.parse(bytes.subarray(12).toString()).expectedFiles.length : bytes.readUInt32BE(8);
         } else {
           metrics.persistence.frames++;
           const count = bytes.readUInt32BE(8);
@@ -95,11 +102,13 @@ if (output && process.pid === owner) {
         const metric =
           magic === 'BWM1'
             ? metrics.materialization
-            : magic === 'BWC0'
-              ? metrics.checkout.preflight
-              : magic === 'BWC1'
-                ? metrics.checkout.write
-                : metrics.persistence;
+            : magic === 'BCK1'
+              ? metrics.checkout.plan
+              : magic === 'BWC0'
+                ? metrics.checkout.preflight
+                : magic === 'BWC1'
+                  ? metrics.checkout.write
+                  : metrics.persistence;
         try {
           const response = JSON.parse(pending.slice(0, newline));
           metric.completed += response.completed || 0;

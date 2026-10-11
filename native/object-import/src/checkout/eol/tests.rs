@@ -1,4 +1,3 @@
-
 use super::{binary, normalize};
 #[test]
 fn detects_binary_nuls_pdfs_controls_and_suspicious_byte_density() {

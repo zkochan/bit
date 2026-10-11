@@ -24,6 +24,46 @@ type Action = { kind: number; first: string; second: string };
 type PhaseMethods = Pick<DataToPersist, '_deletePathsFromFS' | '_persistFilesToFS' | '_persistSymlinksToFS'>;
 const scopes = new AsyncLocalStorage<Scope>();
 
+function claimEntry(scope: Scope | undefined): Entry | undefined {
+  if (scope?.closed) return undefined;
+  const executable = resolveRustObjectImportExecutable();
+  if (!executable) return undefined;
+  let entry = scope?.entries.find(
+    (candidate) => !candidate.busy && candidate.lease.session.usable && candidate.lease.executable === executable
+  );
+  if (entry) entry.busy = true;
+  else {
+    const lease = acquireWorkspaceSession();
+    if (lease) {
+      entry = { lease, busy: true };
+      scope?.entries.push(entry);
+    }
+  }
+  return entry;
+}
+
+async function releaseEntry(entry: Entry, scope: Scope | undefined) {
+  if (scope && !scope.closed && entry.lease.session.usable) entry.busy = false;
+  else {
+    await entry.lease.release();
+    if (scope) scope.entries.splice(scope.entries.indexOf(entry), 1);
+  }
+}
+
+/** Share repository planning and materialization within one awaited operation. */
+export async function withWorkspaceSession<T>(
+  action: (session: MaterializationSession) => Promise<T>
+): Promise<T | undefined> {
+  const scope = scopes.getStore();
+  const entry = claimEntry(scope);
+  if (!entry) return undefined;
+  try {
+    return await action(entry.lease.session);
+  } finally {
+    await releaseEntry(entry, scope);
+  }
+}
+
 /** Reuse bounded helpers throughout an awaited import/write operation; reap all of them on exit. */
 export async function withWorkspacePersistence<T>(action: () => Promise<T>): Promise<T> {
   if (
@@ -55,20 +95,7 @@ export async function persistWorkspaceOperation(data: DataToPersist, defaults: P
   const session = () => {
     if (attempted) return entry?.lease.session;
     attempted = true;
-    if (scope?.closed) return undefined;
-    const executable = resolveRustObjectImportExecutable();
-    if (!executable) return undefined;
-    entry = scope?.entries.find(
-      (candidate) => !candidate.busy && candidate.lease.session.usable && candidate.lease.executable === executable
-    );
-    if (entry) entry.busy = true;
-    else {
-      const lease = acquireWorkspaceSession();
-      if (lease) {
-        entry = { lease, busy: true };
-        scope?.entries.push(entry);
-      }
-    }
+    entry = claimEntry(scope);
     return entry?.lease.session;
   };
   try {
@@ -81,13 +108,7 @@ export async function persistWorkspaceOperation(data: DataToPersist, defaults: P
     await linkPaths(data.symlinks, session);
     return true;
   } finally {
-    if (entry) {
-      if (scope && entry.lease.session.usable) entry.busy = false;
-      else {
-        await entry.lease.release();
-        if (scope) scope.entries.splice(scope.entries.indexOf(entry), 1);
-      }
-    }
+    if (entry) await releaseEntry(entry, scope);
   }
 }
 

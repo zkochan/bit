@@ -13,7 +13,14 @@ const MAX_RESPONSE = 65536;
 let active = 0;
 
 type ProjectedFile = { filename: Buffer; contents: Buffer; overwrite: boolean };
-type Result = { version: number; id: number; completed: number; skipped: number[]; failed: boolean };
+type Result = {
+  version: number;
+  id: number;
+  completed: number;
+  skipped: number[];
+  failed: boolean;
+  [key: string]: unknown;
+};
 
 export class MaterializationSession {
   private readonly child: ChildProcessWithoutNullStreams;
@@ -21,7 +28,13 @@ export class MaterializationSession {
   private pending = Buffer.alloc(0);
   private stopped = false;
   private sequence = 0;
-  private waiting?: { id: number; count: number; resolve: (completed?: number) => void };
+  private waiting?: {
+    id: number;
+    count: number;
+    resolve: (completed?: number) => void;
+    validate?: (response: Result) => boolean;
+    maximum: number;
+  };
   private deadline?: NodeJS.Timeout;
   private killTimer?: NodeJS.Timeout;
 
@@ -48,11 +61,16 @@ export class MaterializationSession {
     return this.request((id) => frame(id, files), files.length);
   }
 
-  request(build: (id: number) => Buffer, count: number): Promise<number | undefined> {
+  request(
+    build: (id: number) => Buffer,
+    count: number,
+    validate?: (response: Result) => boolean,
+    maximum = MAX_RESPONSE
+  ): Promise<number | undefined> {
     if (this.stopped) return Promise.resolve(undefined);
     const id = ++this.sequence;
     return new Promise((resolve) => {
-      this.waiting = { id, count, resolve };
+      this.waiting = { id, count, resolve, validate, maximum };
       this.deadline = setTimeout(() => this.stop(), 120000);
       this.child.stdin.write(build(id));
     });
@@ -78,7 +96,7 @@ export class MaterializationSession {
   private accept(data: Buffer) {
     if (this.stopped) return;
     this.pending = Buffer.concat([this.pending, data]);
-    if (this.pending.length > MAX_RESPONSE) return this.stop();
+    if (this.pending.length > (this.waiting?.maximum || MAX_RESPONSE)) return this.stop();
     const newline = this.pending.indexOf(10);
     if (newline < 0) return;
     if (!this.waiting || newline !== this.pending.length - 1) return this.stop();
@@ -89,6 +107,11 @@ export class MaterializationSession {
       return this.stop();
     }
     if (!validResult(response, this.waiting.id, this.waiting.count)) return this.stop();
+    try {
+      if (this.waiting.validate && !this.waiting.validate(response)) return this.stop();
+    } catch {
+      return this.stop();
+    }
     const { resolve } = this.waiting;
     this.waiting = undefined;
     this.pending = Buffer.alloc(0);

@@ -1,4 +1,6 @@
+pub(crate) mod cache;
 pub(crate) mod eol;
+pub(crate) mod plan;
 pub(crate) mod repository;
 
 use std::{
@@ -41,11 +43,12 @@ pub(crate) fn serve(
     reader: &mut impl Read,
     writer: &mut impl Write,
     preflight_only: bool,
+    state: &mut cache::State,
 ) -> io::Result<()> {
     let request = request(reader)?;
     let mut response =
         Response { version: 1, id: request.id, completed: 0, skipped: Vec::new(), failed: false };
-    let Ok(contents) = preflight(&request) else {
+    let Ok(contents) = preflight(&request, state, !preflight_only) else {
         response.failed = true;
         return protocol::respond(writer, &response);
     };
@@ -104,17 +107,30 @@ pub(crate) fn path(reader: &mut impl Read) -> io::Result<PathBuf> {
     Ok(path)
 }
 
-fn preflight(request: &Request) -> io::Result<Vec<Vec<u8>>> {
+fn preflight(
+    request: &Request,
+    state: &mut cache::State,
+    use_cache: bool,
+) -> io::Result<Vec<Vec<u8>>> {
     let mut inflated = 0;
     let mut compressed = 0;
     let mut files = Vec::with_capacity(request.files.len());
     for input in &request.files {
-        let body = repository::source(
-            &request.directory,
-            input.hash,
-            MAX_BYTES - inflated,
-            &mut compressed,
-        )?;
+        let body = if use_cache && state.get(&request.directory, input.hash).is_some() {
+            state
+                .get(&request.directory, input.hash)
+                .expect("checked cache entry")
+                .clone()
+        } else {
+            let body = repository::source(
+                &request.directory,
+                input.hash,
+                MAX_BYTES - inflated,
+                &mut compressed,
+            )?;
+            state.insert(&request.directory, input.hash, body.clone());
+            body
+        };
         let contents = if input.normalize { eol::auto(body) } else { body };
         inflated += contents.len();
         if inflated > MAX_BYTES {

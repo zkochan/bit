@@ -6,7 +6,7 @@ import SourceFile from './source-file';
 export { AbstractVinyl, Dist, License, SourceFile };
 export { PackageJsonFile } from './package-json-file';
 export { DataToPersist } from './data-to-persist';
-export { withWorkspacePersistence } from './rust-workspace-persistence';
+export { withWorkspacePersistence, withWorkspaceSession } from './rust-workspace-persistence';
 export {
   createRustCheckoutSourceFile,
   getRustCheckoutSourceDescriptor,

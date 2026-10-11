@@ -7,9 +7,13 @@ const cp = require('node:child_process');
 const { createRequire } = require('node:module');
 const { createHash } = require('node:crypto');
 const { performance } = require('node:perf_hooks');
+const { createBenchmarkProcessControl } = require('../rust-dependency-analysis/process-tree-memory-control.cjs');
+const { createProcessTreeMemorySampler } = require('../rust-dependency-analysis/process-tree-memory.cjs');
 const { benchmarkGlobals } = require('../rust-dependency-analysis/command-workspace.cjs');
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
-async function createCheckoutFixture(cliRoot, directory) {
+async function createCheckoutFixture(cliRoot, directory, options = {}) {
+  const extraFiles = Number(options.extraFiles || 0);
+  assert.ok(Number.isInteger(extraFiles) && extraFiles >= 0 && extraFiles <= 4092);
   const load = createRequire(path.join(cliRoot, 'package.json'));
   const { Scope } = load('@teambit/legacy.scope');
   const { Source, Version, ModelComponent, VersionHistory } = load('@teambit/objects');
@@ -30,6 +34,15 @@ async function createCheckoutFixture(cliRoot, directory) {
       'binary.bin': Buffer.from([0, 254, 13, 10, 129]),
     },
   ];
+  for (let index = 0; index < extraFiles; index++) {
+    for (let version = 0; version < definitions.length; version++) {
+      // Half the additional files are unchanged; the rest change independently per version.
+      const contents = Buffer.alloc(4096, 97);
+      contents.write(`/* extra ${index} version ${index % 2 ? version : 0} `);
+      contents.write(' */\nexport default 1;\n', contents.length - 22);
+      definitions[version][`extra-${String(index).padStart(4, '0')}.js`] = contents;
+    }
+  }
   const objects = [];
   const versions = [];
   const sourceRefs = {};
@@ -84,6 +97,8 @@ async function createCheckoutFixture(cliRoot, directory) {
 async function runQualification(cliRoot, helper, options = {}) {
   cliRoot = path.resolve(cliRoot);
   helper = path.resolve(helper);
+  const helperSha256 = digest(await fs.readFile(helper));
+  const harnessSha256 = digest(await fs.readFile(__filename));
   const provenance = JSON.parse(await fs.readFile(path.join(cliRoot, '.bit-object-import-build.json'), 'utf8'));
   const repository = path.resolve(__dirname, '../..');
   for (const [filename, expected] of Object.entries(provenance.sourceSha256)) {
@@ -97,7 +112,9 @@ async function runQualification(cliRoot, helper, options = {}) {
     );
   const temporary = await fs.mkdtemp(path.join(options.scratch || os.tmpdir(), 'bit-real-checkout-'));
   const globals = benchmarkGlobals(temporary);
-  const fixture = await createCheckoutFixture(cliRoot, path.join(temporary, 'remote'));
+  const fixture = await createCheckoutFixture(cliRoot, path.join(temporary, 'remote'), {
+    extraFiles: options.extraFiles,
+  });
   const load = createRequire(path.join(cliRoot, 'package.json'));
   const eol = load('@teambit/toolbox.string.eol');
   const baseEnv = {
@@ -111,7 +128,10 @@ async function runQualification(cliRoot, helper, options = {}) {
     BIT_RUST_WORKSPACE_PERSISTENCE: 'off',
     BIT_RUST_CLIENT_VCS: 'off',
   };
+  let commandOrdinal = 0;
+  const measureTree = process.platform === 'linux';
   async function command(cwd, args, native, executable = helper, traceFile) {
+    const cpuFile = path.join(cwd, `cpu-${commandOrdinal++}.txt`);
     const started = performance.now();
     const result = await new Promise((resolve, reject) => {
       const commandArgs = [path.join(cliRoot, 'bin/bit.js'), ...args];
@@ -120,11 +140,18 @@ async function runQualification(cliRoot, helper, options = {}) {
       delete env.BIT_IMPORT_TRACE;
       delete env.BIT_IMPORT_TRACE_OWNER;
       if (traceFile) env.BIT_IMPORT_TRACE = traceFile;
-      const child = cp.spawn(process.execPath, commandArgs, {
-        cwd,
-        env,
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
+      const child = cp.spawn(
+        measureTree ? '/usr/bin/time' : process.execPath,
+        measureTree ? ['-f', '%U %S', '-o', cpuFile, process.execPath, ...commandArgs] : commandArgs,
+        {
+          cwd,
+          env,
+          detached: measureTree,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        }
+      );
+      const sampler = measureTree ? createProcessTreeMemorySampler(child.pid, { intervalMs: 10 }) : undefined;
+      sampler?.start();
       let stdout = '',
         stderr = '';
       child.stdout.on('data', (chunk) => {
@@ -133,14 +160,28 @@ async function runQualification(cliRoot, helper, options = {}) {
       child.stderr.on('data', (chunk) => {
         stderr += chunk;
       });
-      const timer = setTimeout(() => child.kill('SIGKILL'), 120000);
-      child.once('error', reject);
+      const control = measureTree ? createBenchmarkProcessControl(child, { timeoutMs: 120000 }) : undefined;
+      const timer = measureTree ? undefined : setTimeout(() => child.kill('SIGKILL'), 120000);
+      child.once('error', (error) => {
+        sampler?.stop();
+        clearTimeout(timer);
+        reject(error);
+      });
       child.once('close', (code) => {
         clearTimeout(timer);
-        resolve({ code, stdout, stderr, wallMs: performance.now() - started });
+        if (control?.failure) {
+          sampler?.stop();
+          reject(control.failure);
+          return;
+        }
+        resolve({ code, stdout, stderr, wallMs: performance.now() - started, processTree: sampler?.stop() });
       });
     });
     assert.equal(result.code, 0, `${args.join(' ')}\n${result.stdout}\n${result.stderr}`);
+    if (measureTree) {
+      const [user, system] = (await fs.readFile(cpuFile, 'utf8')).trim().split(/\s+/).map(Number);
+      result.cpuSeconds = { user, system, total: user + system };
+    }
     return result;
   }
   async function bitmap(directory) {
@@ -170,8 +211,17 @@ async function runQualification(cliRoot, helper, options = {}) {
     };
   }
   const runs = [];
-  for (const mode of ['node', 'native', 'missing-helper', 'crashed-helper']) {
-    const directory = path.join(temporary, mode);
+  const rounds = Number(options.rounds || 1);
+  assert.ok(Number.isInteger(rounds) && rounds >= 1 && rounds <= 100);
+  const schedule = [];
+  if (rounds > 1) for (const mode of ['node', 'native']) schedule.push({ mode, round: -1, warmup: true });
+  for (let round = 0; round < rounds; round++)
+    for (const mode of round % 2 ? ['native', 'node'] : ['node', 'native'])
+      schedule.push({ mode, round, warmup: false });
+  for (const mode of ['missing-helper', 'crashed-helper'])
+    schedule.push({ mode, round: 0, warmup: false, fallback: true });
+  for (const { mode, round, warmup, fallback } of schedule) {
+    const directory = path.join(temporary, `${mode}-${warmup ? 'warmup' : round}`);
     await fs.mkdir(directory);
     await command(directory, ['init', '--skip-interactive', '--default-scope', 'qualification.destination'], false);
     const scopeFile = path.join(directory, '.bit/scope.json');
@@ -220,7 +270,7 @@ async function runQualification(cliRoot, helper, options = {}) {
     );
     const revertState = await verify(directory, 1, '1.0.0');
     let diagnostic;
-    if (mode === 'native') {
+    if (mode === 'native' && round === 0 && !warmup) {
       // Diagnostic commands are excluded from the measured operations above.
       await command(directory, ['checkout', 'reset', fixture.id, '--skip-dependency-installation'], true);
       const traceFile = path.join(directory, 'checkout-trace.json');
@@ -236,21 +286,63 @@ async function runQualification(cliRoot, helper, options = {}) {
       assert.ok(writes.files > 0, 'actual checkout must write preflighted sources through BWC1');
       assert.equal(writes.completed, writes.files);
       assert.equal(writes.failed, 0);
-      assert.ok(trace.checkout.preflight.files > 0);
+      assert.ok(trace.checkout.plan.files > 0, 'actual checkout must use the BCK1 native plan');
+      assert.equal(trace.checkout.plan.completed, trace.checkout.plan.files);
+      assert.equal(trace.checkout.plan.failed, 0);
+      assert.equal(trace.persistence.helpers, 1, 'checkout planning, removals and source writes must reuse one helper');
       diagnostic = { trace, state: await verify(directory, 1, '1.0.1') };
     }
-    runs.push({ mode, checkout, reset, revert, checkoutState, resetState, revertState, diagnostic });
+    runs.push({
+      mode,
+      round,
+      warmup,
+      fallback: Boolean(fallback),
+      checkout,
+      reset,
+      revert,
+      checkoutState,
+      resetState,
+      revertState,
+      diagnostic,
+    });
   }
   for (const operation of ['checkoutState', 'resetState', 'revertState'])
     for (const run of runs.slice(1))
       assert.deepEqual(run[operation], runs[0][operation], `${run.mode} ${operation} parity`);
+  for (const [filename, expected] of Object.entries(provenance.sourceSha256))
+    assert.equal(
+      digest(await fs.readFile(path.join(repository, filename))),
+      expected,
+      `source changed during qualification ${filename}`
+    );
+  for (const module of provenance.compiledModules)
+    assert.equal(
+      digest(await fs.readFile(path.join(cliRoot, 'node_modules/@teambit', module.path))),
+      module.sha256,
+      `compiled module changed during qualification ${module.path}`
+    );
+  assert.equal(digest(await fs.readFile(helper)), helperSha256, 'helper changed during qualification');
+  assert.equal(digest(await fs.readFile(__filename)), harnessSha256, 'harness changed during qualification');
   const report = {
     schemaVersion: 1,
     temporary,
     node: process.version,
-    helperSha256: digest(await fs.readFile(helper)),
+    helperSha256,
     cliProvenance: provenance,
-    harnessSha256: digest(await fs.readFile(__filename)),
+    harnessSha256,
+    rounds,
+    workload: {
+      components: 1,
+      versions: fixture.definitions.length,
+      filesPerVersion: Object.keys(fixture.definitions[0]).length,
+      extraFiles: Object.keys(fixture.definitions[0]).length - 4,
+      sourceBytesPerVersion: fixture.definitions.map((files) =>
+        Object.values(files).reduce((sum, bytes) => sum + bytes.length, 0)
+      ),
+    },
+    measurement: measureTree
+      ? 'GNU time command CPU; 10ms simultaneous process-tree RSS including helpers; setup, warmups and trace diagnostics excluded from retained runs'
+      : 'wall time only',
     runs,
   };
   if (options.report) await fs.writeFile(options.report, JSON.stringify(report, null, 2));
@@ -261,6 +353,8 @@ if (require.main === module)
   runQualification(process.argv[2], process.argv[3], {
     scratch: process.env.BIT_CHECKOUT_QUALIFICATION_TMPDIR,
     report: process.env.BIT_CHECKOUT_QUALIFICATION_REPORT,
+    rounds: process.env.BIT_CHECKOUT_QUALIFICATION_ROUNDS,
+    extraFiles: process.env.BIT_CHECKOUT_QUALIFICATION_EXTRA_FILES,
   })
     .then((report) => console.log(JSON.stringify({ temporary: report.temporary, runs: report.runs.length })))
     .catch((error) => {

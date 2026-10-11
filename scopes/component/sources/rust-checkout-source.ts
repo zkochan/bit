@@ -25,6 +25,7 @@ export function createRustCheckoutSourceFile(
     return undefined;
   const hash = model.file.toString();
   if (!/^[0-9a-f]{40}$/.test(hash)) return undefined;
+  const snapshotReference = new Ref(hash);
   const file = new SourceFile({ base: '.', path: model.relativePath, contents: Buffer.alloc(0), test: model.test });
   const provenance: Provenance = {
     repository,
@@ -38,8 +39,8 @@ export function createRustCheckoutSourceFile(
     get() {
       // Preserve live in-memory object precedence if it changed since the native plan.
       const content = (repository.objects[hash] ||
-        repository.getCache(model.file) ||
-        repository.loadSync(model.file)) as Source;
+        repository.getCache(snapshotReference) ||
+        repository.loadSync(snapshotReference)) as Source;
       sources.delete(file);
       Reflect.deleteProperty(file, 'contents');
       file.contents = content.contents;

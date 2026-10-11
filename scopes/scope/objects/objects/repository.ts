@@ -332,6 +332,14 @@ export default class Repository {
     );
   }
 
+  /** Metadata plans are checked against the live hydrated model by their caller. */
+  canPlanCheckoutNatively(refs: Ref[]): boolean {
+    return (
+      this.canReadCheckoutSourcesNatively([]) &&
+      refs.every((ref) => /^[a-f0-9]{40}$/.test(ref.toString()) && !this.objects[ref.toString()])
+    );
+  }
+
   /**
    * this is restricted to provide objects according to the given types. Otherwise, big scopes (>1GB) could crush.
    * example usage: `this.list([ModelComponent, Symlink, Lane])`
