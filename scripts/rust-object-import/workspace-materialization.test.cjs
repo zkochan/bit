@@ -86,8 +86,8 @@ test('binary, empty, invalid UTF-8, Unicode and BOM contents match canonical new
   for (const vinyl of data.files) assert.deepEqual(await fs.readFile(vinyl.path), eol.auto(vinyl.contents));
   assert.equal(frames(acknowledgements)[0].completed, contents.length);
 });
-test('overwrite=false skips existing files/directories and creates missing files', async (t) => {
-  const { directory, acknowledgements } = await setup(t);
+test('overwrite=false retains canonical existence handling without launching a potentially partial native writer', async (t) => {
+  const { directory, acknowledgements, spawns } = await setup(t);
   await fs.writeFile(path.join(directory, 'existing'), 'keep');
   await fs.mkdir(path.join(directory, 'existing-dir'));
   const data = new DataToPersist();
@@ -97,7 +97,8 @@ test('overwrite=false skips existing files/directories and creates missing files
   await data.persistAllToFS();
   assert.equal(await fs.readFile(path.join(directory, 'existing'), 'utf8'), 'keep');
   assert.equal(await fs.readFile(path.join(directory, 'new'), 'utf8'), 'create');
-  assert.deepEqual(frames(acknowledgements)[0].skipped, [0, 1]);
+  assert.deepEqual(frames(acknowledgements), []);
+  assert.equal(spawns.length, 0);
 });
 test('deletions finish before Rust writes and link hooks run after complete materialization', async (t) => {
   const { directory, acknowledgements } = await setup(t);

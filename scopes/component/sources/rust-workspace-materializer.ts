@@ -194,7 +194,7 @@ function ordinaryFile(file: AbstractVinyl): boolean {
     !(file instanceof AbstractVinyl) ||
     file.write !== defaultVinylWrite ||
     !Buffer.isBuffer(file.contents) ||
-    typeof file.override !== 'boolean' ||
+    file.override !== true ||
     typeof file.verbose !== 'boolean'
   )
     return false;
