@@ -233,6 +233,20 @@ fn serve_extension(
     pool: &ThreadPool,
     store: Option<&Store>,
 ) -> io::Result<bool> {
+    if magic == *b"BWC0" || magic == *b"BWC1" {
+        crate::checkout::serve(reader, writer, magic == *b"BWC0")?;
+        return Ok(true);
+    }
+    serve_standard_extension(magic, reader, writer, pool, store)
+}
+
+fn serve_standard_extension(
+    magic: [u8; 4],
+    reader: &mut impl Read,
+    writer: &mut impl Write,
+    pool: &ThreadPool,
+    store: Option<&Store>,
+) -> io::Result<bool> {
     match magic {
         value if value == *b"BWM1" => crate::workspace::serve(reader, writer)?,
         value if value == *b"BWP1" => crate::workspace::actions::serve(reader, writer)?,

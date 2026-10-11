@@ -1,8 +1,13 @@
-import type { Consumer } from '@teambit/legacy.consumer';
+import { Consumer } from '@teambit/legacy.consumer';
 import type { ComponentID } from '@teambit/component-id';
-import type { Version } from '@teambit/objects';
+import { ModelComponent, type Version } from '@teambit/objects';
 import type { SourceFile } from '@teambit/component.sources';
-import { RemovePath, DataToPersist } from '@teambit/component.sources';
+import {
+  RemovePath,
+  DataToPersist,
+  prepareRustCheckoutSources,
+  compareRustCheckoutSource,
+} from '@teambit/component.sources';
 import { pathNormalizeToLinux } from '@teambit/legacy.utils';
 import { isWorkspaceMapFile, WORKSPACE_ROOT_DIR } from '@teambit/legacy.bit-map';
 import type { ConsumerComponent } from '@teambit/legacy.consumer-component';
@@ -74,7 +79,9 @@ export async function applyVersion(
     consumer.bitMap.updateComponentId(id);
     return { applyVersionResult: { id, filesStatus } };
   }
-  const component = await consumer.loadComponentFromModelImportIfNeeded(id);
+  const component =
+    (!mergeResults && (await loadRustCheckoutComponent(consumer, id))) ||
+    (await consumer.loadComponentFromModelImportIfNeeded(id));
   const componentMap = componentFromFS && componentFromFS.componentMap;
   if (componentFromFS && !componentMap) throw new BitError('applyVersion: componentMap was not found');
 
@@ -102,10 +109,33 @@ export async function applyVersion(
 export function updateFileStatus(files: SourceFile[], filesStatus: FilesStatus, componentFromFS?: ConsumerComponent) {
   files.forEach((file) => {
     const fileFromFs = componentFromFS?.files.find((f) => f.relative === file.relative);
-    const areFilesEqual = fileFromFs && Buffer.compare(fileFromFs.contents, file.contents) === 0;
+    const areFilesEqual =
+      fileFromFs &&
+      (compareRustCheckoutSource(file, fileFromFs) ?? Buffer.compare(fileFromFs.contents, file.contents) === 0);
     // @ts-ignore
     filesStatus[pathNormalizeToLinux(file.relative)] = areFilesEqual ? FileStatus.unchanged : FileStatus.updated;
   });
+}
+
+async function loadRustCheckoutComponent(consumer: Consumer, id: ComponentID): Promise<ConsumerComponent | undefined> {
+  if (
+    process.env.BIT_RUST_CLIENT_VCS !== 'on' ||
+    !id.version ||
+    consumer.loadComponentFromModelImportIfNeeded !== Consumer.prototype.loadComponentFromModelImportIfNeeded
+  )
+    return undefined;
+  const model = await consumer.scope.getModelComponent(id);
+  if (
+    model.toConsumerComponent !== ModelComponent.prototype.toConsumerComponent ||
+    model.toComponentVersion !== ModelComponent.prototype.toComponentVersion
+  )
+    return undefined;
+  const componentVersion = model.toComponentVersion(id.version);
+  const version = await componentVersion.getVersion(consumer.scope.objects);
+  const files = await prepareRustCheckoutSources(version.files, consumer.scope.objects);
+  if (!files) return undefined;
+  // Keep canonical dependency/configuration metadata and class identities in the adapter.
+  return model.toConsumerComponent(componentVersion.version, model.scope, consumer.scope.objects, files);
 }
 
 /**

@@ -55,6 +55,10 @@ const files = [
   'scopes/component/sources/data-to-persist.ts',
   'scopes/component/sources/rust-workspace-materializer.ts',
   'scopes/component/sources/rust-workspace-persistence.ts',
+  'scopes/component/sources/rust-checkout-source.ts',
+  'scopes/component/checkout/checkout-version.ts',
+  'scopes/component/checkout/checkout.main.runtime.ts',
+  'scopes/scope/objects/models/model-component.ts',
   'scopes/component/sources/remove-path.ts',
   'scopes/component/sources/symlink.ts',
   'scopes/component/sources/index.ts',
@@ -109,6 +113,7 @@ try {
       'teambit.component/sources',
       'teambit.component/component-writer',
       'teambit.scope/importer',
+      'teambit.component/checkout',
       '--json',
       '--safe-mode',
     ],
@@ -128,6 +133,7 @@ assert.deepEqual(
     'teambit.component/sources',
     'teambit.component/component-writer',
     'teambit.scope/importer',
+    'teambit.component/checkout',
   ].sort()
 );
 assert.ok(compilation.every((c) => c.errors.length === 0));
@@ -138,6 +144,10 @@ const modules = [
   'component.sources/dist/data-to-persist.js',
   'component.sources/dist/rust-workspace-materializer.js',
   'component.sources/dist/rust-workspace-persistence.js',
+  'component.sources/dist/rust-checkout-source.js',
+  'checkout/dist/checkout-version.js',
+  'checkout/dist/checkout.main.runtime.js',
+  'objects/dist/models/model-component.js',
   'component.sources/dist/remove-path.js',
   'component.sources/dist/symlink.js',
   'component.sources/dist/index.js',

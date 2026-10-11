@@ -7,6 +7,13 @@ export { AbstractVinyl, Dist, License, SourceFile };
 export { PackageJsonFile } from './package-json-file';
 export { DataToPersist } from './data-to-persist';
 export { withWorkspacePersistence } from './rust-workspace-persistence';
+export {
+  createRustCheckoutSourceFile,
+  getRustCheckoutSourceDescriptor,
+  compareRustCheckoutSource,
+  prepareRustCheckoutSources,
+} from './rust-checkout-source';
+export type { RustCheckoutSourceDescriptor } from './rust-checkout-source';
 export { RemovePath } from './remove-path';
 export { ArtifactVinyl } from './artifact';
 export {

@@ -4,6 +4,7 @@ import { pMapPool } from '@teambit/toolbox.promise.map-pool';
 import { resolveRustObjectImportExecutable } from '@teambit/objects';
 import * as eol from '@teambit/toolbox.string.eol';
 import AbstractVinyl, { defaultVinylWrite, logFileWrite } from './abstract-vinyl';
+import { checkoutSourceFrame, getRustCheckoutSourceDescriptor } from './rust-checkout-source';
 
 const MAX_FILES = 64;
 const MAX_BYTES = 32 * 1024 * 1024;
@@ -172,6 +173,24 @@ export async function persistFilesInSession(
 async function persistChunk(files: AbstractVinyl[], concurrency: number, session: MaterializationSession) {
   let index = 0;
   while (index < files.length) {
+    const source = projectSourceBatch(files, index);
+    if (source) {
+      for (let offset = 0; offset < source.files.length; offset++) {
+        const file = files[index + offset];
+        logFileWrite(file.path, file.override, file.verbose);
+      }
+      const completed = await session.request(
+        (id) => checkoutSourceFrame('BWC1', id, source.objectsDirectory, source.files),
+        source.files.length
+      );
+      if (completed === undefined || completed < source.files.length) {
+        await session.dispose();
+        await pMapPool(files.slice(index + (completed || 0)), (file) => file.write(), { concurrency });
+        return;
+      }
+      index += completed;
+      continue;
+    }
     const batch = projectBatch(files, index);
     if (!batch.length) {
       await pMapPool(files.slice(index), (file) => file.write(), { concurrency });
@@ -193,10 +212,36 @@ async function persistChunk(files: AbstractVinyl[], concurrency: number, session
   }
 }
 
+function projectSourceBatch(files: AbstractVinyl[], start: number) {
+  const first = getRustCheckoutSourceDescriptor(files[start]);
+  if (!first || !ordinarySourceFile(files[start])) return undefined;
+  const batch: { hash: string; destination: string }[] = [];
+  for (const file of files.slice(start, start + MAX_FILES)) {
+    const descriptor = getRustCheckoutSourceDescriptor(file);
+    if (!descriptor || descriptor.objectsDirectory !== first.objectsDirectory || !ordinarySourceFile(file)) break;
+    batch.push({ hash: descriptor.hash, destination: file.path });
+  }
+  return { objectsDirectory: first.objectsDirectory, files: batch };
+}
+
+function ordinarySourceFile(file: AbstractVinyl): boolean {
+  return (
+    file instanceof AbstractVinyl &&
+    file.write === defaultVinylWrite &&
+    file.override === true &&
+    typeof file.verbose === 'boolean' &&
+    path.isAbsolute(file.path) &&
+    !file.path.includes('\0') &&
+    Buffer.from(file.path).toString() === file.path &&
+    Buffer.byteLength(file.path) <= MAX_PATH
+  );
+}
+
 function projectBatch(files: AbstractVinyl[], start: number): ProjectedFile[] {
   const batch: ProjectedFile[] = [];
   let bytes = 0;
   for (const file of files.slice(start, start + MAX_FILES)) {
+    if (getRustCheckoutSourceDescriptor(file)) break;
     let projected: ProjectedFile | undefined;
     try {
       projected = project(file);
@@ -227,6 +272,7 @@ function eligible(file: AbstractVinyl): boolean {
 }
 
 function ordinaryFile(file: AbstractVinyl): boolean {
+  if (getRustCheckoutSourceDescriptor(file)) return ordinarySourceFile(file);
   if (
     !(file instanceof AbstractVinyl) ||
     file.write !== defaultVinylWrite ||

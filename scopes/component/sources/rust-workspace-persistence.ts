@@ -26,7 +26,11 @@ const scopes = new AsyncLocalStorage<Scope>();
 
 /** Reuse bounded helpers throughout an awaited import/write operation; reap all of them on exit. */
 export async function withWorkspacePersistence<T>(action: () => Promise<T>): Promise<T> {
-  if (process.env.BIT_RUST_WORKSPACE_PERSISTENCE !== 'on' || scopes.getStore()) return action();
+  if (
+    (process.env.BIT_RUST_WORKSPACE_PERSISTENCE !== 'on' && process.env.BIT_RUST_CLIENT_VCS !== 'on') ||
+    scopes.getStore()
+  )
+    return action();
   const scope: Scope = { entries: [], closed: false };
   try {
     return await scopes.run(scope, action);
@@ -39,7 +43,7 @@ export async function withWorkspacePersistence<T>(action: () => Promise<T>): Pro
 /** Keep phase boundaries and extension methods in Node, with ordinary filesystem work in Rust. */
 export async function persistWorkspaceOperation(data: DataToPersist, defaults: PhaseMethods): Promise<boolean> {
   if (
-    process.env.BIT_RUST_WORKSPACE_PERSISTENCE !== 'on' ||
+    (process.env.BIT_RUST_WORKSPACE_PERSISTENCE !== 'on' && process.env.BIT_RUST_CLIENT_VCS !== 'on') ||
     data._deletePathsFromFS !== defaults._deletePathsFromFS ||
     data._persistFilesToFS !== defaults._persistFilesToFS ||
     data._persistSymlinksToFS !== defaults._persistSymlinksToFS
