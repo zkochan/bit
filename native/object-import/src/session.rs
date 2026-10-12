@@ -6,6 +6,7 @@ pub struct WorkspaceSession {
     pool: rayon::ThreadPool,
     checkout: crate::checkout::cache::State,
     merge: crate::merge_state::State,
+    store: Option<crate::store::Store>,
 }
 
 impl WorkspaceSession {
@@ -20,7 +21,18 @@ impl WorkspaceSession {
                 .map_err(io::Error::other)?,
             checkout: crate::checkout::cache::State::default(),
             merge: crate::merge_state::State::default(),
+            store: None,
         })
+    }
+
+    pub fn with_store(
+        threads: usize,
+        directory: std::path::PathBuf,
+        owner: Option<(u32, u32)>,
+    ) -> io::Result<Self> {
+        let mut session = Self::new(threads)?;
+        session.store = Some(crate::store::Store::new(directory, owner)?);
+        Ok(session)
     }
 
     /// Dispatch one existing workspace frame. An error retires the owning session.
@@ -37,7 +49,7 @@ impl WorkspaceSession {
             &mut reader,
             &mut output,
             &self.pool,
-            None,
+            self.store.as_ref(),
             &mut self.checkout,
             &mut self.merge,
         )? || reader.position() != frame.len() as u64

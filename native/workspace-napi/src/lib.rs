@@ -29,13 +29,24 @@ impl WorkspaceEngine {
     pub fn new(threads: u32) -> Result<Self> {
         // Initialize Rayon after dlopen has released the dynamic linker lock.
         let session = WorkspaceSession::new(threads as usize).map_err(failure)?;
-        Ok(Self {
-            state: Arc::new(State {
-                session: Mutex::new(Some(session)),
-                closed: AtomicBool::new(false),
-                busy: AtomicBool::new(false),
-            }),
-        })
+        Ok(Self::from_session(session))
+    }
+
+    #[napi(factory)]
+    pub fn for_objects(
+        threads: u32,
+        directory: String,
+        uid: Option<u32>,
+        gid: Option<u32>,
+    ) -> Result<Self> {
+        let owner = match (uid, gid) {
+            (Some(uid), Some(gid)) => Some((uid, gid)),
+            (None, None) => None,
+            _ => return Err(failure("object owner requires both uid and gid")),
+        };
+        let session = WorkspaceSession::with_store(threads as usize, directory.into(), owner)
+            .map_err(failure)?;
+        Ok(Self::from_session(session))
     }
 
     #[napi]
@@ -57,6 +68,18 @@ impl WorkspaceEngine {
         self.state.closed.store(true, Ordering::Release);
         if let Ok(mut session) = self.state.session.try_lock() {
             session.take();
+        }
+    }
+}
+
+impl WorkspaceEngine {
+    fn from_session(session: WorkspaceSession) -> Self {
+        Self {
+            state: Arc::new(State {
+                session: Mutex::new(Some(session)),
+                closed: AtomicBool::new(false),
+                busy: AtomicBool::new(false),
+            }),
         }
     }
 }

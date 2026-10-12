@@ -1,9 +1,13 @@
 import { spawn } from 'child_process';
 import type { ChildProcessWithoutNullStreams } from 'child_process';
+import { existsSync } from 'fs';
+import path from 'path';
+import { availableParallelism } from 'os';
 
 type RecordRequest = { json: string; parse: (value: any) => unknown };
 type Group = { records: RecordRequest[]; bytes: number; operation: Promise<unknown[] | undefined> };
 type NativePlan<T> = { apply<R>(run: (value: T) => R): R | undefined };
+type ObjectEngine = { request: (input: Buffer) => Promise<Buffer>; close: () => void };
 const MAX_BYTES = 8 * 1024 * 1024;
 
 /** A single bounded import session. Plans contain current canonical values, never cached native objects. */
@@ -13,6 +17,7 @@ export class NativeImportOperation {
   private missing = new Set<string>();
   private generation = 0;
   private child?: ChildProcessWithoutNullStreams;
+  private engine?: ObjectEngine;
   private stopped: Promise<void> = Promise.resolve();
   private tail: Promise<unknown> = Promise.resolve();
   private group?: Group;
@@ -206,6 +211,11 @@ export class NativeImportOperation {
         timer: setTimeout(() => this.stop('native operation timed out'), this.timeoutMs),
       };
       try {
+        if (this.startEngine()) {
+          const input = Buffer.concat([frame, body]);
+          this.stopped = Promise.resolve().then(() => this.executeNative(input));
+          return;
+        }
         const child = this.start();
         child.stdin.cork();
         child.stdin.write(frame);
@@ -219,6 +229,39 @@ export class NativeImportOperation {
     this.stats.frames++;
     this.stats.operations += records.length;
     return result;
+  }
+
+  private startEngine(): boolean {
+    if (this.engine) return true;
+    const addon = process.env.BIT_TEST_WORKSPACE_ADDON;
+    if (
+      !addon ||
+      this.args.length ||
+      !/^bit-object-import(?:\.exe)?$/.test(path.basename(this.executable)) ||
+      !existsSync(this.executable)
+    )
+      return false;
+    const { WorkspaceEngine } = require(addon) as {
+      WorkspaceEngine: { forObjects: (threads: number, directory: string, uid?: number, gid?: number) => ObjectEngine };
+    };
+    this.engine = WorkspaceEngine.forObjects(
+      Math.min(4, availableParallelism()),
+      this.options.objectsDirectory,
+      this.options.owner?.uid,
+      this.options.owner?.gid
+    );
+    return true;
+  }
+
+  private async executeNative(input: Buffer): Promise<void> {
+    try {
+      const response = await this.engine!.request(input);
+      if (!this.unavailableReason) this.receive(response);
+    } catch {
+      this.stop('native operation request failed');
+    } finally {
+      if (this.unavailableReason) this.engine!.close();
+    }
   }
 
   private start() {
@@ -280,6 +323,7 @@ export class NativeImportOperation {
     }
     this.output = [];
     this.outputBytes = 0;
+    if (this.engine) this.engine.close();
     const child = this.child;
     if (!child) return;
     child.stdin.destroy();
