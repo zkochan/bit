@@ -126,3 +126,11 @@ already retained. It still verifies the complete Version manifest and preserves
 the existing byte budget. Public target cloning and the Node alias/hash guards
 remain the authority for live cached Sources; unretained bodies follow the normal
 read path. This avoids reading and decompressing those same objects a third time.
+
+Buffer alias validation checks behavior-affecting property names rather than
+enumerating every byte index. It rejects own Buffer/typed-array method and field
+shadows, symbols, and thenable/legacy buffer hooks without invoking getters. Plain
+extra metadata stays on the exact original alias. Prototype descriptors are checked
+once per synchronous validation batch. Private comparison snapshots use captured
+typed-array length/set operations, so copying does not invoke public Buffer hooks.
+Byte hashes, lengths, alias identity and later mutation checks remain required.
