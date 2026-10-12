@@ -90,7 +90,12 @@ The command corpus covers 36 routes in Node, native, missing-helper and
 crashed-helper modes, with six and 266 baseline workspace Sources. Supplementary
 hidden/unrelated fixtures report their actual smaller Source inventories.
 Captured output, errors, bitmap, workspace bytes and repository objects are
-compared with TypeScript. Native acceptance separately requires actual policy
+compared with TypeScript. Raw reports are retained. Canonical concurrent Source
+loads can reorder adjacent added/updated report rows even between Node-only
+runs; comparison treats only each such same-status block as a multiset. Row
+bytes, counts, status/component boundaries and all other output stay significant.
+Repository index entry order is also treated as unordered. Native acceptance
+separately requires actual policy
 selection, verified decoder reads and completed writes where the route performs
 them. Lost-results, pending-write and snap receipts require their observed
 stopped prefixes, with no replacement helper or later native requests. The

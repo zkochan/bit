@@ -9,6 +9,7 @@ const { sourceIdentity } = require('./artifacts/contract.cjs');
 const { benchmarkGlobals } = require('../rust-dependency-analysis/command-workspace.cjs');
 const fixtureModule = require('./merge-transaction-fixture.cjs');
 const { validateMergeTransactionDiagnostics } = require('./merge-transaction-validation.cjs');
+const { comparableMergeStdout } = require('./merge-transaction-report.cjs');
 const { pairedEntries, measuredCommand } = require('./merge-history-measurement.cjs');
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
@@ -50,6 +51,23 @@ function comparable(state) {
   for (const key of ['components', 'lanes'])
     if (Array.isArray(index[key])) index[key].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
   return { ...state, index };
+}
+
+function comparableStage(stage) {
+  const scenario = fixtureModule.scenarios.find((item) => item.name === stage.scenario);
+  const concurrentFileRows =
+    scenario &&
+    !scenario.hidden &&
+    !scenario.unrelated &&
+    !scenario.detachHead &&
+    scenario.topology !== 'deletion' &&
+    (scenario.topology !== 'fast-forward' || scenario.noSnap);
+  return {
+    ...stage,
+    before: comparable(stage.before),
+    after: comparable(stage.after),
+    result: concurrentFileRows ? { ...stage.result, stdout: comparableMergeStdout(stage.result.stdout) } : stage.result,
+  };
 }
 
 function validateMeasurementProof(proof, expected) {
@@ -446,15 +464,11 @@ async function runQualification(cli, helper, options = {}) {
       const bytes = JSON.stringify(stage);
       await fs.writeFile(artifact, bytes);
       if (mode === 'node') canonical.set(scenario.name, stage);
-      else
+      else if (!options.measure)
         assert.deepEqual(
-          { ...stage, before: comparable(before), after: comparable(after) },
-          {
-            ...canonical.get(scenario.name),
-            before: comparable(canonical.get(scenario.name).before),
-            after: comparable(canonical.get(scenario.name).after),
-          },
-          `${mode}/${scenario.name}: exact raw output and state`
+          comparableStage(stage),
+          comparableStage(canonical.get(scenario.name)),
+          `${mode}/${scenario.name}: raw state and canonical report fields`
         );
       if (options.measure) {
         const key = `${entry.warmup ? 'warmup' : entry.round}/${scenario.name}`;
@@ -463,11 +477,7 @@ async function runQualification(cli, helper, options = {}) {
         matched.set(key, pair);
         if (pair.node && pair.native) {
           const other = JSON.parse(await fs.readFile(pair[mode === 'node' ? 'native' : 'node']));
-          assert.deepEqual(
-            { ...stage, before: comparable(stage.before), after: comparable(stage.after) },
-            { ...other, before: comparable(other.before), after: comparable(other.after) },
-            key
-          );
+          assert.deepEqual(comparableStage(stage), comparableStage(other), key);
         }
       }
       const diagnostics = tracePath ? JSON.parse(await fs.readFile(tracePath)) : undefined;
@@ -509,6 +519,8 @@ async function runQualification(cli, helper, options = {}) {
   }
   const report = {
     qualified: !options.canonicalSmoke,
+    comparison:
+      'Raw artifacts retained; repository index entry order and adjacent concurrent added/updated CLI row order are compared as multisets; all other output and state remain exact',
     proofSha256,
     measurementScope: options.measure
       ? {
