@@ -18,7 +18,7 @@ export type RustWorkspaceRead = {
   snapshotHash?: string;
   bitmap?: true;
 };
-type Snapshot = RustWorkspaceRead & { nativeRead?: { owner: object; token: number } };
+type Snapshot = Readonly<RustWorkspaceRead> & { readonly nativeRead?: { owner: object; token: number } };
 const snapshots = new WeakMap<AbstractVinyl, Snapshot>();
 const bitmapSnapshots = new WeakMap<AbstractVinyl, Snapshot>();
 const defaultLf = eol.lf;
@@ -101,15 +101,23 @@ export function registerRustWorkspaceBitmapFile(file: AbstractVinyl, read: RustW
 export function inheritRustWorkspaceFileSnapshot(original: AbstractVinyl, clone: AbstractVinyl): void {
   if (
     process.env.BIT_RUST_CLIENT_VCS !== 'on' ||
+    !snapshots.has(original) ||
     !hasRustSnapshotTransactionClass(original, 'SourceFile') ||
     !hasRustSnapshotTransactionClass(clone, 'SourceFile')
   )
     return;
   const value = snapshot(original);
-  if (!value || !hasOrdinaryWorkspaceProperties(clone)) return;
-  registerRustWorkspaceFile(clone, value);
-  const inherited = snapshots.get(clone);
-  if (inherited) inherited.nativeRead = value.nativeRead;
+  if (
+    !value ||
+    !hasOrdinaryWorkspaceProperties(clone) ||
+    clone.path !== value.path ||
+    !Buffer.isBuffer(clone.contents) ||
+    !clone.contents.equals(value.contents)
+  )
+    return;
+  // This private byte snapshot never escapes or changes. Each public clone still
+  // validates its own path and mutable Buffer against it before native reuse.
+  snapshots.set(clone, value);
 }
 
 function snapshot(file: AbstractVinyl, registry = snapshots): Snapshot | undefined {

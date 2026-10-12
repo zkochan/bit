@@ -44,6 +44,18 @@ test('workspace read receipts survive ordinary clones and reject another operati
     assert.ok(Number.isSafeInteger(token));
     const clone = file.clone();
     assert.equal(identity.getRustWorkspaceMergeDescriptor(clone).readToken, token);
+    const descendant = clone.clone();
+    clone.contents = Buffer.from('replacement');
+    assert.equal(identity.getRustWorkspaceMergeDescriptor(clone), undefined);
+    assert.equal(identity.getRustWorkspaceMergeDescriptor(descendant).readToken, token);
+    const firstByte = descendant.contents[0];
+    descendant.contents[0] ^= 1;
+    assert.equal(identity.getRustWorkspaceMergeDescriptor(descendant), undefined);
+    assert.equal(identity.getRustWorkspaceMergeDescriptor(file), undefined);
+    descendant.contents[0] = firstByte;
+    descendant.path = path.join(directory, 'renamed.js');
+    assert.equal(identity.getRustWorkspaceMergeDescriptor(descendant), undefined);
+    assert.equal(identity.getRustWorkspaceMergeDescriptor(file).readToken, token);
     await fs.rm(filename);
     assert.equal(identity.getRustWorkspaceMergeDescriptor(file).readToken, token);
     escaped = file;
