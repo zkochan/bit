@@ -9,6 +9,7 @@ pub(super) fn load(
     pool: &ThreadPool,
 ) -> io::Result<Vec<Vec<u8>>> {
     if request.files.len() >= 32
+        && pool.current_num_threads() > 1
         && let Ok(files) = parallel(request, state, use_cache, pool)
     {
         return Ok(files);

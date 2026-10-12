@@ -15,9 +15,26 @@ body. They do not serialize that body as hexadecimal or create another spool.
 Git output and conflict bodies receive separate retained entries. The standalone
 merge-history protocol still returns its existing wire representation.
 
-Buffer alias validation enumerates own keys directly. It rejects the same extra
-properties without allocating a property descriptor for every byte; alias identity
-and content hashes remain checked.
+Merge Source receipts reuse retained raw spools when their hashes match. Base
+Sources without an existing spool get a raw receipt. Node hydrates the default
+Source class from these bytes and checks their length and identity; it retains
+compressed and inflated sizes for the original repository cache accounting.
+Legacy compressed history-query receipts remain supported. The helper bounds
+both compressed receipt input and retained raw receipt bodies to 32 MiB.
+
+Compatibility checks compare captured descriptors directly without rebuilding
+intermediate descriptor maps. Buffer alias validation checks the intrinsic
+TypedArray length and own-key count: every Buffer byte has a non-deletable own
+index, so extra string or symbol properties increase that count. This preserves
+extra-property rejection without running a regular expression for every byte.
+
+The workspace helper uses its CPU-aware default pool, capped at four workers.
+Checkout Source batches of at least 32 files read and verify one worker-sized
+chunk at a time. Each worker receives a share of the remaining compressed and
+inflated byte budgets. A Source exceeding that conservative share retries the
+read-only batch with the original serial budget. Indexed collection preserves
+file order; workspace writes and their failure prefixes remain serial. On Unix,
+normalization returns bytes without allocation when no carriage return exists.
 
 ## Reproduction
 
