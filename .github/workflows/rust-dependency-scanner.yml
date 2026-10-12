@@ -629,7 +629,9 @@ jobs:
       - name: Check in-process lifecycle when present
         run: |
           if test -n "$BIT_TEST_WORKSPACE_ADDON"; then
-            BIT_TEST_OBJECT_IMPORT="$PWD/native/target/release/bit-object-import" BIT_LEGACY_ROOT="$TMPDIR/bit-cli" node --test scripts/rust-object-import/workspace-addon.test.cjs
+            addon_tests=(scripts/rust-object-import/workspace-addon.test.cjs)
+            if test -f scripts/rust-object-import/object-addon.test.cjs; then addon_tests+=(scripts/rust-object-import/object-addon.test.cjs); fi
+            BIT_TEST_OBJECT_IMPORT="$PWD/native/target/release/bit-object-import" BIT_LEGACY_ROOT="$TMPDIR/bit-cli" node --test "${addon_tests[@]}"
           fi
       - name: Qualify all routes, then measure with builds and tests idle
         run: |
