@@ -63,7 +63,7 @@ pub(crate) fn serve(
     state: &mut cache::State,
     pool: &rayon::ThreadPool,
 ) -> io::Result<()> {
-    let request = request(reader)?;
+    let request = request(reader, if preflight_only { 256 } else { MAX_FILES })?;
     let mut response =
         Response { version: 1, id: request.id, completed: 0, skipped: Vec::new(), failed: false };
     let Ok(contents) = preflight::load(&request, state, !preflight_only, pool) else {
@@ -85,10 +85,10 @@ pub(crate) fn serve(
     protocol::respond(writer, &response)
 }
 
-fn request(reader: &mut impl Read) -> io::Result<Request> {
+fn request(reader: &mut impl Read, maximum_files: u32) -> io::Result<Request> {
     let id = protocol::word(reader)?;
     let count = protocol::word(reader)?;
-    if !(1..=MAX_FILES).contains(&count) {
+    if !(1..=maximum_files).contains(&count) {
         return Err(invalid("checkout file count out of bounds"));
     }
     let directory = path(reader)?;

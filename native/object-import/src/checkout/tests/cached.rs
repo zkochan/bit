@@ -47,3 +47,37 @@ fn cache_authority_never_hides_invalid_disk_bytes_on_a_cache_miss() {
     assert_eq!(cached_response(&directory.0, &[(hash, &target, 3, 0)], &mut state)["failed"], true);
     assert!(state.get(&directory.0, hash).is_none());
 }
+
+#[test]
+fn wider_preflight_never_widens_the_public_write_limit() {
+    let directory = Directory::new();
+    let hash = store(&directory.0, b"read-only batching");
+    let target = directory.0.join("target");
+    let inputs = vec![(hash, target.as_path(), 1, 0); 256];
+    let mut state = State::default();
+    assert_eq!(cached_response(&directory.0, &inputs, &mut state)["completed"], 256);
+    assert!(!target.exists());
+    let mut output = Vec::new();
+    assert!(
+        serve(
+            &mut Cursor::new(frame(&directory.0, &inputs)),
+            &mut output,
+            false,
+            &mut state,
+            pool()
+        )
+        .is_err(),
+    );
+    assert!(!target.exists());
+    let too_many = vec![(hash, target.as_path(), 1, 0); 257];
+    assert!(
+        serve(
+            &mut Cursor::new(frame(&directory.0, &too_many)),
+            &mut output,
+            true,
+            &mut state,
+            pool()
+        )
+        .is_err(),
+    );
+}

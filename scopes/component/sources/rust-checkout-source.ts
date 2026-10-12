@@ -167,7 +167,13 @@ function cachedCheckoutHashes(repository: Repository, hashes: string[]): Set<str
   if (!cached) return result;
   const requested = new Set(hashes);
   const selected = cached.filter(([hash]) => requested.has(hash));
-  if (!hasRustSnapshotTransactionClassFieldsBatch(selected.map(([, value]) => value), 'Source', ['contents']))
+  if (
+    !hasRustSnapshotTransactionClassFieldsBatch(
+      selected.map(([, value]) => value),
+      'Source',
+      ['contents']
+    )
+  )
     return result;
   for (const [hash, value] of selected) {
     const body = Object.getOwnPropertyDescriptor(value, 'contents')?.value;
@@ -215,9 +221,13 @@ export async function prepareRustCheckoutSources(
     return undefined;
   try {
     return await withWorkspaceSession(async (session) => {
-      for (let offset = 0; offset < manifest.length; offset += 64) {
-        const batch = manifest.slice(offset, offset + 64);
-        const cached = cachedCheckoutHashes(repository, batch.map((entry) => entry.hash));
+      let width = 256;
+      for (let offset = 0; offset < manifest.length; ) {
+        const batch = manifest.slice(offset, offset + width);
+        const cached = cachedCheckoutHashes(
+          repository,
+          batch.map((entry) => entry.hash)
+        );
         const completed = await session.request(
           (id) =>
             checkoutSourceFrame(
@@ -232,7 +242,16 @@ export async function prepareRustCheckoutSources(
             ),
           batch.length
         );
-        if (completed !== batch.length) return undefined;
+        if (completed !== batch.length) {
+          // A wide read-only request may exceed the shared byte budget. Retry the
+          // original width without changing the public write/error prefix.
+          if (width > 64 && completed === 0 && session.usable) {
+            width = 64;
+            continue;
+          }
+          return undefined;
+        }
+        offset += batch.length;
       }
       if (
         models.length !== manifest.length ||
