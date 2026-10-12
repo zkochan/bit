@@ -583,10 +583,18 @@ jobs:
           node scripts/rust-object-import/canonical-model-tests.cjs
 
   client-performance:
-    name: Client VCS command benchmark
+    name: Client VCS benchmark (${{ matrix.baseline }}, ${{ matrix.extra_files }} extra files)
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.performance_only && !inputs.inspect_only }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        baseline: [object-helper, javascript]
+        extra_files: [0, 260]
+    env:
+      BIT_BENCHMARK_BASELINE: ${{ matrix.baseline }}
+      BIT_BENCHMARK_EXTRA_FILES: ${{ matrix.extra_files }}
     defaults:
       run:
         shell: bash
@@ -666,7 +674,7 @@ jobs:
             await fs.mkdir(directory);
             const cli = path.join(os.tmpdir(), 'bit-cli');
             const helper = process.env.BIT_BENCHMARK_HELPER || path.resolve('native/target/release/bit-object-import');
-            const profiles = ['object-helper', 'javascript'].flatMap(nodeBaseline => [0, 260].map(extraFiles => ({nodeBaseline, extraFiles})));
+            const profiles = [{nodeBaseline:process.env.BIT_BENCHMARK_BASELINE, extraFiles:Number(process.env.BIT_BENCHMARK_EXTRA_FILES)}];
             const sourceRevision = cp.execFileSync('git', ['rev-parse', 'HEAD'], {encoding:'utf8'}).trim();
             await fs.writeFile(path.join(directory, 'runner.json'), JSON.stringify({sourceRevision, node:process.version, os:os.release(), arch:os.arch(), cpus:os.cpus(), availableParallelism:os.availableParallelism()}, null, 2));
             await fs.copyFile(helper, path.join(directory, 'bit-object-import'));
@@ -684,14 +692,14 @@ jobs:
               const result = await runQualification(cli, helper, {...profile, report, proof, measure:true, rounds:3, diagnostics:false});
               console.log(JSON.stringify({...profile, phase:'measurement', qualified:result.qualified}));
             }
-            await fs.appendFile(process.env.GITHUB_STEP_SUMMARY, `Source: ${sourceRevision}\n\n576 parity cases and 384 retained timing samples completed; raw state/output artifacts and source/helper fingerprints are attached.\n`);
+            await fs.appendFile(process.env.GITHUB_STEP_SUMMARY, `Source: ${sourceRevision}\n\nProfile: ${JSON.stringify(profiles[0])}\n\n144 parity cases and 96 retained timing samples completed; raw state/output artifacts and source/helper fingerprints are attached.\n`);
           })().catch(error => { console.error(error); process.exitCode = 1; });
           NODE
       - name: Preserve proofs, raw artifacts and CPU records
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: client-vcs-performance-${{ github.run_id }}
+          name: client-vcs-performance-${{ github.run_id }}-${{ matrix.baseline }}-${{ matrix.extra_files }}
           retention-days: 7
           include-hidden-files: true
           path: |
