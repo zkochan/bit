@@ -209,3 +209,20 @@ test('no-snap fast-forward uses the retained three-way body path', () => {
     })
   );
 });
+
+test('Source body qualification cannot pass with read-only preflight ACKs alone', () => {
+  const trace = positive();
+  trace.checkout = { preflight: { completed: 3, bodyFrames: 0 } };
+  assert.throws(
+    () => validateMergeTransactionDiagnostics(trace, { name: 'Source body regression' }, { sourceBodies: true }),
+    /completed native Source body reads required/
+  );
+});
+
+test('file status qualification rejects silent fallback to JavaScript matching', () => {
+  const trace = positive();
+  assert.throws(
+    () => validateMergeTransactionDiagnostics(trace, { name: 'component-main-theirs' }, { fileStatuses: true }),
+    /completed native file status decisions required/
+  );
+});

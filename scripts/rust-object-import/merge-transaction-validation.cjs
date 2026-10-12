@@ -2,8 +2,17 @@ const assert = require('node:assert/strict');
 
 // Healthy command acceptance requires the new transaction and body engines independently.
 // Genuine error prefixes are added only from retained command traces; fallback-only is never sufficient.
-function validateMergeTransactionDiagnostics(trace, scenario) {
+function validateMergeTransactionDiagnostics(trace, scenario, options = {}) {
   const frames = trace.workspaceFrames || [];
+  if (options.fileStatuses && ['component-main-theirs', 'main-fast-forward', 'lane-bom-crlf'].includes(scenario.name)) {
+    const status = trace.workspace?.fileStatus;
+    assert.ok(
+      status?.frames > 0 && status.completed > 0 && status.files === status.completed && status.failed === 0,
+      `${scenario.name}: completed native file status decisions required`
+    );
+  }
+  if (options.sourceBodies && trace.checkout?.preflight?.completed > 0)
+    assert.ok(trace.checkout.preflight.bodyFrames > 0, `${scenario.name}: completed native Source body reads required`);
   const owned = frames.filter((frame) => frame.magic === 'BMT1' && String(frame.kind || '').startsWith('merge'));
   assert.ok(owned.length, `${scenario.name}: no merge transaction engine frames`);
   const owners = new Set(owned.map((frame) => frame.helperId));
@@ -11,7 +20,7 @@ function validateMergeTransactionDiagnostics(trace, scenario) {
   assert.ok(!owners.has(undefined), 'physical helper identity required');
   const first = frames.findIndex((frame) => owned.includes(frame));
   const last = frames.findLastIndex((frame) => owned.includes(frame));
-  const workspace = new Set(['BMT1', 'BMH1', 'BWS1', 'BWP1', 'BWC0', 'BWC1', 'BCK1']);
+  const workspace = new Set(['BMT1', 'BMH1', 'BWS1', 'BWP1', 'BWC0', 'BWC2', 'BWC1', 'BCK1']);
   assert.equal(
     new Set(
       frames
