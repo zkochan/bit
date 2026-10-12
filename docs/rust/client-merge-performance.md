@@ -100,3 +100,13 @@ read buffers, and ordinary LF files reuse their raw hash for snapshot/Linux iden
 The `workspace-read-benchmark.cjs <baseline-helper> <candidate-helper>` microbenchmark
 includes response transfer and verifies every returned body and hash; it does not
 replace paired whole-command measurements.
+
+Owned merge preparation requests packed body snapshots. Each immutable pack contains
+bounded raw bodies with explicit offsets, lengths and SHA-1 identities. Later
+retargeting creates a new pack and leaves earlier files and descriptors unchanged;
+exclusive creation still rejects collisions. Unpacked callers keep the original
+per-body format, and older helpers decline the optional request through the existing
+continuation. Source hydration and lazy compatibility getters read only the selected
+range, reject truncation and verify its hash. Each public read gets an independent
+Buffer while existing clone aliases remain shared. Native materialization continues
+to use retained Rust bytes, and escaped getters become eager before pack cleanup.
