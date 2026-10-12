@@ -633,6 +633,7 @@ jobs:
         working-directory: native
         run: |
           if test '${{ inputs.packaged_addon }}' = 'true'; then
+            cargo fetch --locked
             node ../scripts/rust-object-import/artifacts/package-helper.cjs --directory "$TMPDIR/bit-packaged-artifacts" > "$TMPDIR/bit-packaged-path.txt"
             node <<'NODE'
           const fs = require('node:fs'), path = require('node:path');
