@@ -82,7 +82,7 @@ test('response size includes the terminator and trailing bytes cannot acknowledg
 test('raw replies preserve arbitrary bytes across header/body fragmentation and subsequent JSON replies', async (t) => {
   for (const width of [1, 37, 65536]) {
     const { session, child } = setup(t);
-    const body = Buffer.from([0, 255, 10, 13, 0xc3, 0xa9, 34, 92]);
+    const body = Buffer.alloc(64 * 1024).fill(Buffer.from([0, 255, 10, 13, 0xc3, 0xa9, 34, 92]));
     const header = Buffer.from(
       JSON.stringify({ version: 1, id: 1, completed: 1, skipped: [], failed: false, binaryBytes: body.length }) + '\n'
     );
