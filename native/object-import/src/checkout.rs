@@ -3,8 +3,6 @@ pub(crate) mod eol;
 pub(crate) mod plan;
 pub(crate) mod repository;
 
-pub(crate) mod source_read;
-
 mod preflight;
 
 use std::{

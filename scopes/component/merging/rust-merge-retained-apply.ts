@@ -7,7 +7,6 @@ import {
   hasRustMergeRetainedBodyFunctions,
   getRustMergeResultBodyPlan,
   attachRustMergeResultBodies,
-  appendRustMergeBodyPlanBodies,
   FileStatus,
   type RustMergeBodyPlan,
   type RustMergeBody,
@@ -177,30 +176,34 @@ export async function applyRetainedRustMerge(
     (data) => validApplied(data, clones, plan, target)
   );
   if (!applied || !valid()) return undefined;
-  const rows = publicRows(results);
+  const sourcesByPath = new Map<string, SourceFile>();
+  for (const row of publicRows(results)) {
+    if ('fsFile' in row && row.fsFile && !sourcesByPath.has(row.filePath)) sourcesByPath.set(row.filePath, row.fsFile);
+  }
   const files: SourceFile[] = [];
   for (const selection of applied.files) {
-    const file =
-      selection.kind === 'target'
-        ? clones[selection.index]
-        : rows.find((row) => row.filePath === selection.relativePath && 'fsFile' in row && row.fsFile)?.fsFile;
+    const file = selection.kind === 'target' ? clones[selection.index] : sourcesByPath.get(selection.relativePath);
     if (!file) return undefined;
     files.push(file);
   }
   // Retargeting may retain an additional current-head Source absent from the incoming/base plan.
   const retainedIndices = new Set(plan.bodies.map((body) => body.planIndex));
   const additions = applied.bodies.filter((body) => !retainedIndices.has(body.planIndex));
-  if (!appendRustMergeBodyPlanBodies(results, additions)) return undefined;
   if (
-    !attachRustMergeResultBodies(results, files, {
-      files: applied.files.map((file) => ({
-        index: file.finalIndex,
-        planIndex: file.planIndex,
-        relativePath: file.relativePath,
-        aliasKind: file.aliasKind,
-        aliasIndex: file.aliasIndex,
-      })),
-    })
+    !attachRustMergeResultBodies(
+      results,
+      files,
+      {
+        files: applied.files.map((file) => ({
+          index: file.finalIndex,
+          planIndex: file.planIndex,
+          relativePath: file.relativePath,
+          aliasKind: file.aliasKind,
+          aliasIndex: file.aliasIndex,
+        })),
+      },
+      additions
+    )
   )
     return undefined;
   if (applied.deferredError) throw new BitError(applied.deferredError.message);

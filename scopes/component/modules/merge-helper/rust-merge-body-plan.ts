@@ -245,7 +245,11 @@ export function rememberRustMergeResultBodyPlan(results: MergeResultsThreeWay, p
 /** Late Native Apply may extend the retained plan; callers cannot mutate already captured body records. */
 export function appendRustMergeBodyPlanBodies(results: MergeResultsThreeWay, additions: RustMergeBody[]): boolean {
   const plan = getRustMergeResultBodyPlan(results);
-  const snapshots = plan && bodySnapshots.get(plan);
+  return plan ? appendPlanBodies(plan, additions) : false;
+}
+
+function appendPlanBodies(plan: RustMergeBodyPlan, additions: RustMergeBody[]): boolean {
+  const snapshots = bodySnapshots.get(plan);
   if (
     !plan ||
     !snapshots ||
@@ -321,29 +325,31 @@ export function attachRustMergeResultBodies(
       aliasKind?: 'target' | 'current' | 'other' | 'new';
       aliasIndex?: number;
     }>;
-  }
+  },
+  additions: RustMergeBody[] = []
 ): boolean {
   const plan = getRustMergeResultBodyPlan(results);
-  if (!plan || !hasRustSnapshotTransactionClassFields(files, 'Array', []) || files.length > 4096) return false;
+  if (
+    !plan ||
+    !hasRustSnapshotTransactionClassFields(files, 'Array', []) ||
+    files.length > 4096 ||
+    !hasRustSnapshotTransactionClassFieldsBatch(files, 'SourceFile', [
+      'history',
+      '_base',
+      '_cwd',
+      'base',
+      'path',
+      'relative',
+    ]) ||
+    !appendPlanBodies(plan, additions)
+  )
+    return false;
   const patches: Array<{ file: SourceFile; body: RustMergeBody; alias?: Buffer }> = [];
   const bodiesByIndex = new Map(plan.bodies.map((body) => [body.planIndex, body]));
   for (const row of selection.files) {
     const file = Object.getOwnPropertyDescriptor(files, String(row.index))?.value;
     const body = bodiesByIndex.get(row.planIndex);
-    if (
-      !file ||
-      !body ||
-      types.isProxy(file) ||
-      !hasRustSnapshotTransactionClassFields(file, 'SourceFile', [
-        'history',
-        '_base',
-        '_cwd',
-        'base',
-        'path',
-        'relative',
-      ])
-    )
-      return false;
+    if (!file || !body || types.isProxy(file)) return false;
     const owned = getRustCheckoutPlanSourceDescriptor(file);
     const alias =
       Object.getOwnPropertyDescriptor(file, '_contents')?.value ??
@@ -362,11 +368,7 @@ export function attachRustMergeResultBodies(
               ? alias
               : undefined;
     if ((row.aliasKind === 'current' || row.aliasKind === 'other') && retained === undefined) return false;
-    if (
-      !canInstallRustCheckoutPlanSourceContents(file, rustMergeBodyDescriptor(plan, body), retained) ||
-      file.relative.replace(/\\/g, '/') !== row.relativePath
-    )
-      return false;
+    if (file.relative.replace(/\\/g, '/') !== row.relativePath) return false;
     patches.push({ file, body, ...(retained === undefined ? {} : { alias: retained }) });
   }
   if (
