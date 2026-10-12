@@ -167,3 +167,28 @@ test('unrelated error acceptance requires exact healthy status prefix and forbid
     assert.throws(() => validateMergeTransactionDiagnostics(trace, scenario));
   }
 });
+
+test('retained command failure traces require the exact stopped prefix and reject replay', () => {
+  // Projections of actual release-helper traces; full raw trace hashes are retained in each fixture.
+  for (const fixture of require('./merge-transaction-prefix-fixtures.json')) {
+    validateMergeTransactionDiagnostics(fixture.trace, fixture.scenario);
+    for (const mutate of [
+      (trace) => {
+        trace.workspaceFrames.push({ magic: 'BMT1', kind: 'mergeTransactionFinish', helperId: 2 });
+      },
+      (trace) => {
+        trace.mergeState.mergeTransactionReceipt.phases.pop();
+      },
+      (trace) => {
+        trace.mergeState.mergePrepare.sourceBodyBytes = 1;
+      },
+      (trace) => {
+        trace.mergeState.mergeStatusBegin.completed = 0;
+      },
+    ]) {
+      const trace = structuredClone(fixture.trace);
+      mutate(trace);
+      assert.throws(() => validateMergeTransactionDiagnostics(trace, fixture.scenario), fixture.scenario.name);
+    }
+  }
+});
