@@ -598,7 +598,9 @@ jobs:
         with:
           python-version: '3.13'
       - name: Configure private scratch directory
-        run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+        run: |
+          benchmark_scratch=$(mktemp -d /tmp/bit-client-performance-XXXXXX)
+          echo "TMPDIR=$benchmark_scratch" >> "$GITHUB_ENV"
       - name: Make space for independent physical CLI copies
         run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
       - name: Bootstrap canonical Bit dependencies
@@ -613,8 +615,8 @@ jobs:
         run: node scripts/rust-object-import/compile-canonical-graph.cjs
       - name: Build physical benchmark CLI
         run: |
-          node scripts/rust-dependency-analysis/command-build.cjs "$GITHUB_WORKSPACE" "$RUNNER_TEMP/bit-cli-base"
-          node scripts/rust-object-import/prepare-cli.cjs "$RUNNER_TEMP/bit-cli-base" "$RUNNER_TEMP/bit-cli"
+          node scripts/rust-dependency-analysis/command-build.cjs "$GITHUB_WORKSPACE" "$TMPDIR/bit-cli-base"
+          node scripts/rust-object-import/prepare-cli.cjs "$TMPDIR/bit-cli-base" "$TMPDIR/bit-cli"
       - name: Build release helper
         working-directory: native
         run: |
@@ -627,7 +629,7 @@ jobs:
       - name: Check in-process lifecycle when present
         run: |
           if test -n "$BIT_TEST_WORKSPACE_ADDON"; then
-            BIT_TEST_OBJECT_IMPORT="$PWD/native/target/release/bit-object-import" BIT_LEGACY_ROOT="$RUNNER_TEMP/bit-cli" node --test scripts/rust-object-import/workspace-addon.test.cjs
+            BIT_TEST_OBJECT_IMPORT="$PWD/native/target/release/bit-object-import" BIT_LEGACY_ROOT="$TMPDIR/bit-cli" node --test scripts/rust-object-import/workspace-addon.test.cjs
           fi
       - name: Qualify all routes, then measure with builds and tests idle
         run: |
@@ -670,10 +672,10 @@ jobs:
           retention-days: 7
           include-hidden-files: true
           path: |
-            ${{ runner.temp }}/bit-performance-evidence/**
-            ${{ runner.temp }}/bit-merge-transaction-*/*.json
-            ${{ runner.temp }}/bit-merge-transaction-*/*.txt
-            ${{ runner.temp }}/bit-cli-base/.bit-rust-*.json
+            /tmp/bit-client-performance-*/bit-performance-evidence/**
+            /tmp/bit-client-performance-*/bit-merge-transaction-*/*.json
+            /tmp/bit-client-performance-*/bit-merge-transaction-*/*.txt
+            /tmp/bit-client-performance-*/bit-cli-base/.bit-rust-*.json
 
   scratch-inspection:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.performance_only && inputs.inspect_only }}
