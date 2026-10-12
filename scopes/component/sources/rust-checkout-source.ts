@@ -163,7 +163,7 @@ function cachedCheckoutHashes(repository: Repository, hashes: string[]): Set<str
     Object.getOwnPropertyDescriptor(sourceHashPrototype, 'digest')?.value !== sourceHashDigest
   )
     return result;
-  const cached = capture(repository) as Array<[string, object]> | undefined;
+  const cached = capture(repository, hashes) as Array<[string, object]> | undefined;
   if (!cached) return result;
   const requested = new Set(hashes);
   const selected = cached.filter(([hash]) => requested.has(hash));

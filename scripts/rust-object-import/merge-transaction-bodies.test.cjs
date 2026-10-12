@@ -287,3 +287,18 @@ test('retarget additions and attachment share one freshness check and copy body 
   assert.deepEqual(plan.bodies, before);
   assert.equal(reads, 0);
 });
+
+test('combined assembly rechecks retained rows before observing a changed public accessor', () => {
+  const fixture = retained();
+  const expected = api.getRustMergeResultBodyPlan(fixture.results);
+  let reads = 0;
+  Object.defineProperty(fixture.row, 'filePath', {
+    configurable: true,
+    get() {
+      reads++;
+      throw Error('must remain unread');
+    },
+  });
+  assert.equal(api.assembleRustMergeResultBodies(fixture.results, expected, [], [], []), undefined);
+  assert.equal(reads, 0);
+});
