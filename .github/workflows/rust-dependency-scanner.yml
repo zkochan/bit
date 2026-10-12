@@ -155,6 +155,10 @@ on:
         description: Inspect benchmark scratch filesystem ancestry only
         type: boolean
         default: false
+      packaged_addon:
+        description: Benchmark automatic discovery from the complete packaged artifact
+        type: boolean
+        default: false
       benchmark_ref:
         description: Exact source revision to build and measure
         type: string
@@ -620,18 +624,34 @@ jobs:
       - name: Build release helper
         working-directory: native
         run: |
-          cargo build --locked --release --package bit-object-import
-          if test -f workspace-napi/Cargo.toml; then
-            cargo build --locked --release --package bit-workspace-napi
-            cp target/release/libbit_workspace_napi.so target/release/bit-workspace.node
-            echo "BIT_TEST_WORKSPACE_ADDON=$PWD/target/release/bit-workspace.node" >> "$GITHUB_ENV"
+          if test '${{ inputs.packaged_addon }}' = 'true'; then
+            node ../scripts/rust-object-import/artifacts/package-helper.cjs --directory "$TMPDIR/bit-packaged-artifacts" > "$TMPDIR/bit-packaged-path.txt"
+            node <<'NODE'
+          const fs = require('node:fs'), path = require('node:path');
+          const {verifiedArchive, smoke} = require('../scripts/rust-object-import/artifacts/smoke.cjs');
+          const archive = fs.readFileSync(path.join(process.env.TMPDIR,'bit-packaged-path.txt'),'utf8').trim();
+          smoke(archive);
+          const {members} = verifiedArchive(archive);
+          const directory = path.join(process.env.TMPDIR,'bit-packaged-helper');
+          fs.mkdirSync(directory);
+          for (const [name,data] of Object.entries(members)) fs.writeFileSync(path.join(directory,name),data,{mode:name==='bit-object-import'?0o755:0o644});
+          fs.appendFileSync(process.env.GITHUB_ENV,`BIT_BENCHMARK_HELPER=${directory}/bit-object-import\nBIT_BENCHMARK_ADDON=${directory}/bit-workspace.node\n`);
+          NODE
+          else
+            cargo build --locked --release --package bit-object-import
+            if test -f workspace-napi/Cargo.toml; then
+              cargo build --locked --release --package bit-workspace-napi
+              cp target/release/libbit_workspace_napi.so target/release/bit-workspace.node
+              echo "BIT_TEST_WORKSPACE_ADDON=$PWD/target/release/bit-workspace.node" >> "$GITHUB_ENV"
+            fi
           fi
       - name: Check in-process lifecycle when present
         run: |
-          if test -n "$BIT_TEST_WORKSPACE_ADDON"; then
+          addon_candidate="${BIT_TEST_WORKSPACE_ADDON:-$BIT_BENCHMARK_ADDON}"
+          if test -n "$addon_candidate"; then
             addon_tests=(scripts/rust-object-import/workspace-addon.test.cjs)
             if test -f scripts/rust-object-import/object-addon.test.cjs; then addon_tests+=(scripts/rust-object-import/object-addon.test.cjs); fi
-            BIT_TEST_OBJECT_IMPORT="$PWD/native/target/release/bit-object-import" BIT_LEGACY_ROOT="$TMPDIR/bit-cli" node --test "${addon_tests[@]}"
+            BIT_TEST_WORKSPACE_ADDON="$addon_candidate" BIT_TEST_OBJECT_IMPORT="${BIT_BENCHMARK_HELPER:-$PWD/native/target/release/bit-object-import}" BIT_LEGACY_ROOT="$TMPDIR/bit-cli" node --test "${addon_tests[@]}"
           fi
       - name: Qualify all routes, then measure with builds and tests idle
         run: |
@@ -645,12 +665,13 @@ jobs:
             const directory = path.join(os.tmpdir(), 'bit-performance-evidence');
             await fs.mkdir(directory);
             const cli = path.join(os.tmpdir(), 'bit-cli');
-            const helper = path.resolve('native/target/release/bit-object-import');
+            const helper = process.env.BIT_BENCHMARK_HELPER || path.resolve('native/target/release/bit-object-import');
             const profiles = ['object-helper', 'javascript'].flatMap(nodeBaseline => [0, 260].map(extraFiles => ({nodeBaseline, extraFiles})));
             const sourceRevision = cp.execFileSync('git', ['rev-parse', 'HEAD'], {encoding:'utf8'}).trim();
             await fs.writeFile(path.join(directory, 'runner.json'), JSON.stringify({sourceRevision, node:process.version, os:os.release(), arch:os.arch(), cpus:os.cpus(), availableParallelism:os.availableParallelism()}, null, 2));
             await fs.copyFile(helper, path.join(directory, 'bit-object-import'));
-            if (process.env.BIT_TEST_WORKSPACE_ADDON) await fs.copyFile(process.env.BIT_TEST_WORKSPACE_ADDON, path.join(directory, 'bit-workspace.node'));
+            if (process.env.BIT_TEST_WORKSPACE_ADDON || process.env.BIT_BENCHMARK_ADDON) await fs.copyFile(process.env.BIT_TEST_WORKSPACE_ADDON || process.env.BIT_BENCHMARK_ADDON, path.join(directory, 'bit-workspace.node'));
+            if (process.env.BIT_BENCHMARK_ADDON) await fs.cp(path.join(os.tmpdir(),'bit-packaged-artifacts'),path.join(directory,'artifacts'),{recursive:true});
             await fs.copyFile(path.join(cli, '.bit-object-import-build.json'), path.join(directory, 'cli-build.json'));
             await Promise.all(profiles.map(async profile => {
               const report = path.join(directory, `${profile.nodeBaseline}-qualification-${profile.extraFiles}.json`);
