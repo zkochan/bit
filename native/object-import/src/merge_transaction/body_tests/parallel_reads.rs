@@ -114,3 +114,31 @@ fn failed_parallel_source_reads_leave_no_private_snapshots() {
         assert_eq!(fs::read_dir(fixture.0.join("snapshots")).unwrap().count(), 0);
     }
 }
+
+#[test]
+fn retarget_reuses_verified_bodies_and_still_checks_the_version_manifest() {
+    let fixture = Fixture::new();
+    let target = target(&fixture, &[4096; 32]);
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(4)
+        .build()
+        .unwrap();
+    let mut state = State::default();
+    let prepared = pool.install(|| fixture.prepare_packed(&mut state, &target, true));
+    for file in target["files"].as_array().unwrap() {
+        let hash = file["hash"].as_str().unwrap();
+        fs::remove_file(
+            fixture.0
+                .join("objects")
+                .join(&hash[..2])
+                .join(&hash[2..]),
+        )
+        .unwrap();
+    }
+    let request = json!({"token":prepared["ownerToken"],"planToken":prepared["token"],"target":target,"strategy":"theirs"});
+    let applied = pool.install(|| super::apply("mergeApply", request.clone(), &mut state)).unwrap();
+    assert_eq!(applied["reads"], json!({"sourceReads":0,"sourceBodyBytes":0}));
+    assert_eq!(applied["bodies"], prepared["bodies"]);
+    fixture.object(&"1".repeat(40), "Version", b"{\"files\":[]}");
+    assert!(pool.install(|| super::apply("mergeApply", request, &mut state)).is_err());
+}

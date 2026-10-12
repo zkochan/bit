@@ -120,3 +120,9 @@ pool, including the caller's one-thread setting, instead of creating another poo
 Each worker reuses its zlib decoder and 64 KiB scratch buffer, resetting before every
 object, including after errors. The preparation microbenchmark accepts `--packed`
 to include packed private snapshots while verifying every selected body.
+
+Retargeting also reuses operation-owned bodies when every target Source hash is
+already retained. It still verifies the complete Version manifest and preserves
+the existing byte budget. Public target cloning and the Node alias/hash guards
+remain the authority for live cached Sources; unretained bodies follow the normal
+read path. This avoids reading and decompressing those same objects a third time.
