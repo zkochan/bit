@@ -1,4 +1,4 @@
-use super::{Output, failure, read};
+use super::{MAX_OUTPUT, Output, failure, invalid, read};
 use rayon::ThreadPool;
 use serde::Serialize;
 use std::{
@@ -53,6 +53,10 @@ fn prepare(id: u32, files: &[PathBuf], pool: &ThreadPool) -> io::Result<Output> 
     let mut output = Output(Vec::new());
     serde_json::to_writer(&mut output, &response)?;
     output.write_all(b"\n")?;
+    if output.0.len() + bytes > MAX_OUTPUT {
+        return Err(invalid("workspace output limit"));
+    }
+    output.0.try_reserve_exact(bytes).map_err(|_| invalid("workspace allocation limit"))?;
     for file in files {
         output.write_all(&file.body)?;
     }

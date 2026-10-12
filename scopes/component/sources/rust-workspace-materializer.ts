@@ -138,6 +138,11 @@ export class MaterializationSession {
       if (typeof bytes !== 'number' || !Number.isSafeInteger(bytes) || bytes < 0 || bytes > maximum - offset)
         return this.stop();
       this.binaryResponse = { response, offset, length: offset + bytes };
+      if (this.pending.length < offset + bytes) {
+        const grown = Buffer.allocUnsafe(offset + bytes);
+        this.pending.copy(grown, 0, 0, this.pendingLength);
+        this.pending = grown;
+      }
       return this.acceptBinary();
     }
     this.finishResponse(response);
