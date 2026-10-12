@@ -5,6 +5,7 @@ use std::{
     fs,
     io::{self, Read},
 };
+mod parallel;
 pub(super) struct Loaded {
     pub(super) raw: Vec<u8>,
     pub(super) normalized: Vec<u8>,
@@ -16,6 +17,16 @@ pub(super) fn load(
     compressed: &mut usize,
 ) -> io::Result<Vec<Loaded>> {
     let mut seen = HashSet::new();
+    if files.len() >= 32
+        && files.iter().all(|file| file.source_hash.is_none())
+        && rayon::current_thread_index().is_some()
+        && rayon::current_num_threads() > 1
+    {
+        for file in files {
+            validate(file, &mut seen)?;
+        }
+        return parallel::load(files, total);
+    }
     let mut output = Vec::new();
     for file in files {
         validate(file, &mut seen)?;
