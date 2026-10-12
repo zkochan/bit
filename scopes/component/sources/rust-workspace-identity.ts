@@ -9,7 +9,6 @@ import {
 import * as eol from '@teambit/toolbox.string.eol';
 import { createHash } from 'crypto';
 import AbstractVinyl, { defaultVinylToSource } from './abstract-vinyl';
-import { workspaceEngineIdentity } from './rust-workspace-engine';
 export type RustWorkspaceRead = {
   path: string;
   contents: Buffer;
@@ -150,6 +149,9 @@ export function getRustWorkspaceMergeDescriptor(
   | { path: string; hash: string; linuxHash: string; snapshotHash?: string; bitmap?: true; readToken?: number }
   | undefined {
   const value = (allowBitmap ? snapshot(file, bitmapSnapshots) : undefined) || snapshot(file);
+  // The engine loads SourceFile through the materializer. Resolve it after the
+  // AbstractVinyl base class has initialized, including direct module imports.
+  const owner = value?.nativeRead && require('./rust-workspace-engine').workspaceEngineIdentity();
   return (
     value && {
       path: value.path,
@@ -157,7 +159,7 @@ export function getRustWorkspaceMergeDescriptor(
       linuxHash: value.linuxHash,
       ...(value.snapshotHash ? { snapshotHash: value.snapshotHash } : {}),
       ...(value.bitmap ? { bitmap: value.bitmap } : {}),
-      ...(value.nativeRead && value.nativeRead.owner === workspaceEngineIdentity()
+      ...(value.nativeRead && value.nativeRead.owner === owner
         ? { readToken: value.nativeRead?.token }
         : {}),
     }

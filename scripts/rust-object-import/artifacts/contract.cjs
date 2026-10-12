@@ -40,7 +40,7 @@ const addonLibrary = (target) =>
       ? 'libbit_workspace_napi.dylib'
       : 'libbit_workspace_napi.so';
 const addonBuildCommand = (target) => [...buildCommand(target).slice(0, 6), 'bit-workspace-napi', '--target', target];
-const addonRustFlags = (target) => (target.endsWith('-musl') ? '-C target-feature=-crt-static -C linker=musl-gcc' : '');
+const addonRustFlags = (target) => (target.endsWith('-musl') ? '-C target-feature=-crt-static -C linker=cc' : '');
 function verifyAddon(members, manifest) {
   const addon = members[addonName],
     target = manifest.target;
