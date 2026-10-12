@@ -220,7 +220,11 @@ function validateMergeTransactionDiagnostics(trace, scenario) {
     assert.equal(trace.checkout?.write?.completed || 0, 0);
     return;
   }
-  if (scenario.topology === 'fast-forward' || scenario.detachHead || scenario.topology === 'deletion') {
+  if (
+    (scenario.topology === 'fast-forward' && !scenario.noSnap) ||
+    scenario.detachHead ||
+    scenario.topology === 'deletion'
+  ) {
     assert.equal(
       metrics.mergePrepare?.frames || 0,
       0,

@@ -192,3 +192,20 @@ test('retained command failure traces require the exact stopped prefix and rejec
     }
   }
 });
+
+test('no-snap fast-forward uses the retained three-way body path', () => {
+  const trace = positive();
+  validateMergeTransactionDiagnostics(trace, {
+    name: 'lane-fast-forward-no-snap',
+    topology: 'fast-forward',
+    noSnap: true,
+  });
+  trace.mergeState.mergeMaterialize.stepsCompleted = 0;
+  assert.throws(() =>
+    validateMergeTransactionDiagnostics(trace, {
+      name: 'lane-fast-forward-no-snap',
+      topology: 'fast-forward',
+      noSnap: true,
+    })
+  );
+});
