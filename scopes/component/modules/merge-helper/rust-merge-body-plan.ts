@@ -64,6 +64,7 @@ const bodySnapshots = new WeakMap<RustMergeBodyPlan, Snapshot[]>();
 const equals = Buffer.prototype.equals;
 const bodyCreateHash = createHash;
 const isBuffer = Buffer.isBuffer;
+const typedArrayLength = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype), 'length')!.get!;
 const mapGet = Map.prototype.get;
 
 function matchingBodyAlias(value: unknown, body: RustMergeBody): value is Buffer {
@@ -74,7 +75,10 @@ function matchingBodyAlias(value: unknown, body: RustMergeBody): value is Buffer
       Object.getOwnPropertyDescriptor(Buffer, 'isBuffer')?.value === isBuffer &&
       isBuffer(value) &&
       Object.getPrototypeOf(value) === Buffer.prototype &&
-      Reflect.ownKeys(value).every((key) => typeof key === 'string' && /^(0|[1-9][0-9]*)$/.test(key)) &&
+      // Typed arrays have one non-deletable own index per byte. Counting keys after
+      // reading the intrinsic length rejects extra properties without per-byte regex work.
+      typedArrayLength.call(value) === body.bytes &&
+      Reflect.ownKeys(value).length === body.bytes &&
       Object.getOwnPropertyDescriptor(require('crypto'), 'createHash')?.value === bodyCreateHash &&
       value.length === body.bytes &&
       bodyCreateHash('sha1').update(value).digest('hex') === body.spoolHash
