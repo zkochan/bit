@@ -71,8 +71,23 @@ test('merge acceptance rejects aggregate-only fallback, replacement owners and n
 test('cancellation permits the observed policy prefix but cannot authorize ordinary direct writes', () => {
   const trace = positive();
   trace.workspaceFrames = trace.workspaceFrames.filter(
-    (f) => !['mergeApplyDecision', 'mergeResultsSelect', 'mergePrepare', 'mergeMaterialize'].includes(f.kind)
+    (f) =>
+      ![
+        'mergeApplyDecision',
+        'mergeResultsSelect',
+        'mergeApply',
+        'mergeMaterialize',
+        'mergeTransactionFinish',
+      ].includes(f.kind)
   );
+  for (const kind of [
+    'mergeApplyDecision',
+    'mergeResultsSelect',
+    'mergeApply',
+    'mergeMaterialize',
+    'mergeTransactionFinish',
+  ])
+    trace.mergeState[kind] = { frames: 0, completed: 0 };
   validateMergeTransactionDiagnostics(trace, { name: 'prompt-cancel', promptCancellation: true });
   assert.throws(() => validateMergeTransactionDiagnostics(trace, { name: 'clean' }));
   assert.throws(

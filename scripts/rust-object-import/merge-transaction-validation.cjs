@@ -45,6 +45,90 @@ function validateMergeTransactionDiagnostics(trace, scenario) {
         );
     }
   }
+  if (scenario.fault) {
+    const phases = [
+      'validateFlags',
+      'context',
+      'upToDate',
+      'status',
+      'importGap',
+      'plans',
+      'clearTemps',
+      'status',
+      'pattern',
+      'workspaceFilter',
+      'throwForFailures',
+      'squash',
+      'artifacts',
+      'lastMergedSnapshot',
+      'prompt',
+    ];
+    const resultLoss = scenario.fault.kind === 'mergeResultsSelect';
+    if (!resultLoss)
+      phases.push(
+        'results',
+        'apply',
+        'writeMany',
+        'workspaceConfig',
+        'configConflict',
+        'configFiles',
+        'laneHistory',
+        'persist',
+        'pendingWrite'
+      );
+    if (scenario.fault.phase === 'snap')
+      phases.push(
+        'bitmap',
+        'workspacePolicy',
+        'componentRemove',
+        'conflicts',
+        'install',
+        'updatedComponents',
+        'bitmapSnapBeforeAutoSnap',
+        'snap'
+      );
+    assert.ok(resultLoss || ['pendingWrite', 'snap'].includes(scenario.fault.phase), 'unknown fault prefix');
+    assert.deepEqual(
+      metrics.mergeTransactionReceipt.phases.map((row) => row.phase),
+      phases
+    );
+    assert.equal(metrics.mergeTransactionBegin.completed, 3);
+    assert.equal(metrics.mergeStatusBegin.completed, 1);
+    assert.equal(metrics.mergeStatusReceipt.completed, 8);
+    assert.equal(metrics.mergeTransactionFinish?.frames || 0, 0, 'retired owner cannot send Finish');
+    assert.equal(metrics.mergeResultsSelect.completed, resultLoss ? 1 : 2);
+    assert.ok(accepted('mergePrepare') && accepted('mergePlanOrder'));
+    assert.ok(metrics.mergePrepare.verifiedReads.some((read) => read.sourceReads > 0 && read.sourceBodyBytes > 0));
+    for (const kind of ['mergeApplyDecision', 'mergeApply', 'mergeMaterialize']) {
+      if (resultLoss) assert.equal(metrics[kind]?.frames || 0, 0, 'work escaped lost results receipt');
+      else assert.ok(accepted(kind), `${scenario.name}: missing completed ${kind} prefix`);
+    }
+    if (!resultLoss) assert.ok(metrics.mergeMaterialize.stepsCompleted > 0);
+    const terminal = frames.at(-1);
+    assert.equal(terminal.kind, scenario.fault.kind, 'no helper requests after discarded receipt');
+    if (scenario.fault.phase) assert.equal(terminal.phase, scenario.fault.phase);
+    return;
+  }
+  if (scenario.promptCancellation) {
+    for (const kind of [
+      'mergeTransactionBegin',
+      'mergeTransactionReceipt',
+      'mergeStatusBegin',
+      'mergeStatusReceipt',
+      'mergePrepare',
+      'mergePlanOrder',
+    ])
+      assert.ok(accepted(kind), `${scenario.name}: missing prompt prefix ${kind}`);
+    for (const kind of [
+      'mergeApplyDecision',
+      'mergeResultsSelect',
+      'mergeApply',
+      'mergeMaterialize',
+      'mergeTransactionFinish',
+    ])
+      assert.equal(metrics[kind]?.frames || 0, 0, 'prompt must release native ownership before stdin EOF');
+    return;
+  }
   for (const kind of [
     'mergeTransactionBegin',
     'mergeTransactionReceipt',
@@ -53,8 +137,6 @@ function validateMergeTransactionDiagnostics(trace, scenario) {
     'mergeStatusReceipt',
   ])
     assert.ok(accepted(kind), `${scenario.name}: missing accepted ${kind}`);
-  if (scenario.fault)
-    assert.fail(`${scenario.name}: transport-loss prefix requires evidence-specific acceptance rules`);
   if (scenario.error && scenario.unrelated) {
     const expected = [
       'validateFlags',
@@ -84,9 +166,23 @@ function validateMergeTransactionDiagnostics(trace, scenario) {
       assert.equal(metrics[kind]?.frames || 0, 0, `${scenario.name}: work escaped the failed status prefix`);
     return;
   }
+  if (scenario.name === 'lane-dependency-required-error') {
+    assert.deepEqual(
+      metrics.mergeTransactionReceipt.phases.map((row) => row.phase),
+      ['validateFlags', 'context', 'upToDate', 'status', 'status', 'importGap', 'plans', 'clearTemps', 'status']
+    );
+    assert.equal(metrics.mergeTransactionBegin.completed, 2);
+    assert.equal(metrics.mergeTransactionFinish.completed, 2);
+    assert.equal(metrics.mergeStatusBegin.completed, 2);
+    assert.equal(metrics.mergeStatusReceipt.completed, 16);
+    assert.ok(accepted('mergePatternDependencies') && accepted('mergePatternOutcome'));
+    assert.ok(accepted('mergePrepare') && accepted('mergePlanOrder'));
+    for (const kind of ['mergeApplyDecision', 'mergeResultsSelect', 'mergeApply', 'mergeMaterialize'])
+      assert.equal(metrics[kind]?.frames || 0, 0, 'dependency rejection must stop before apply');
+    return;
+  }
   if (scenario.error || scenario.canonicalError)
     assert.fail(`${scenario.name}: canonical error prefix requires evidence-specific acceptance rules`);
-  if (scenario.promptCancellation) return;
   assert.ok(accepted('mergeApplyDecision'), `${scenario.name}: apply policy fell back`);
   assert.ok(accepted('mergeResultsSelect'), `${scenario.name}: result selection fell back`);
   if (scenario.resolveUnrelated === 'ours') {

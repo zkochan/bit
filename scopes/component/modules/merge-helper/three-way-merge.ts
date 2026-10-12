@@ -290,9 +290,8 @@ async function getMergeResults(
     const fsFilePathP = tmp.save(modifiedFile.fsFile.contents);
     const writeFile = async (file: SourceFileModel): Promise<PathOsBased> => {
       const content = observedSources ? await observedSources.load(file) : await file.file.load(scope.objects);
-      // @ts-ignore
       return tmp.save(
-        (observedSources ? observedSources.contents(file, content as Source) : content.contents).toString()
+        (observedSources ? observedSources.contents(file, content as Source) : (content as Source).contents).toString()
       );
     };
     const baseFilePathP = modifiedFile.baseFile ? writeFile(modifiedFile.baseFile) : tmp.save('');
