@@ -91,3 +91,12 @@ Preparation reads are serial, and component requests share a serialized protocol
 session. Removing those costs requires a wider ownership boundary; increasing
 worker count alone does not remove them. This change does not parallelize
 filesystem mutations or alter fallback behavior.
+
+Workspace reads use the same bounded worker pool for batches of at least 32 files. Each
+worker receives a share of the remaining 8 MiB raw-byte budget; a read-only serial
+retry preserves support for a single file larger than that share. Results preserve
+input order and never publish a partial batch. File metadata sizes reserve bounded
+read buffers, and ordinary LF files reuse their raw hash for snapshot/Linux identity.
+The `workspace-read-benchmark.cjs <baseline-helper> <candidate-helper>` microbenchmark
+includes response transfer and verifies every returned body and hash; it does not
+replace paired whole-command measurements.
