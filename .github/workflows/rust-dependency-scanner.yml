@@ -613,7 +613,18 @@ jobs:
           node scripts/rust-object-import/prepare-cli.cjs "$RUNNER_TEMP/bit-cli-base" "$RUNNER_TEMP/bit-cli"
       - name: Build release helper
         working-directory: native
-        run: cargo build --locked --release --package bit-object-import
+        run: |
+          cargo build --locked --release --package bit-object-import
+          if test -f workspace-napi/Cargo.toml; then
+            cargo build --locked --release --package bit-workspace-napi
+            cp target/release/libbit_workspace_napi.so target/release/bit-workspace.node
+            echo "BIT_TEST_WORKSPACE_ADDON=$PWD/target/release/bit-workspace.node" >> "$GITHUB_ENV"
+          fi
+      - name: Check in-process lifecycle when present
+        run: |
+          if test -n "$BIT_TEST_WORKSPACE_ADDON"; then
+            BIT_TEST_OBJECT_IMPORT="$PWD/native/target/release/bit-object-import" BIT_LEGACY_ROOT="$RUNNER_TEMP/bit-cli" node --test scripts/rust-object-import/workspace-addon.test.cjs
+          fi
       - name: Qualify all routes, then measure with builds and tests idle
         run: |
           node <<'NODE'
@@ -631,6 +642,7 @@ jobs:
             const sourceRevision = cp.execFileSync('git', ['rev-parse', 'HEAD'], {encoding:'utf8'}).trim();
             await fs.writeFile(path.join(directory, 'runner.json'), JSON.stringify({sourceRevision, node:process.version, os:os.release(), arch:os.arch(), cpus:os.cpus(), availableParallelism:os.availableParallelism()}, null, 2));
             await fs.copyFile(helper, path.join(directory, 'bit-object-import'));
+            if (process.env.BIT_TEST_WORKSPACE_ADDON) await fs.copyFile(process.env.BIT_TEST_WORKSPACE_ADDON, path.join(directory, 'bit-workspace.node'));
             await fs.copyFile(path.join(cli, '.bit-object-import-build.json'), path.join(directory, 'cli-build.json'));
             await Promise.all(profiles.map(async profile => {
               const report = path.join(directory, `${profile.nodeBaseline}-qualification-${profile.extraFiles}.json`);
