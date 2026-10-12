@@ -226,3 +226,29 @@ test('file status qualification rejects silent fallback to JavaScript matching',
     /completed native file status decisions required/
   );
 });
+
+test('hidden history updates require repository Source plans without workspace materialization', () => {
+  const trace = positive();
+  trace.mergeState.mergeStatusBegin.completed = 2;
+  trace.mergeState.mergeResultsSelect.completed = 2;
+  trace.workspaceFrames = trace.workspaceFrames.filter((frame) => frame.kind !== 'mergeMaterialize');
+  trace.mergeState.mergeMaterialize = { frames: 0, completed: 0, failed: 0 };
+  const scenario = { name: 'hidden-main-into-lane', hidden: true };
+  const options = { repositorySourcePlans: true };
+  validateMergeTransactionDiagnostics(trace, scenario, options);
+  for (const change of [
+    (copy) => {
+      copy.mergeState.mergePrepare.completed = 0;
+    },
+    (copy) => {
+      copy.mergeState.mergeMaterialize.frames = 1;
+    },
+    (copy) => {
+      copy.checkout = { write: { completed: 1 } };
+    },
+  ]) {
+    const copy = structuredClone(trace);
+    change(copy);
+    assert.throws(() => validateMergeTransactionDiagnostics(copy, scenario, options));
+  }
+});
