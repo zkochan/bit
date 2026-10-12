@@ -801,12 +801,12 @@ test('malformed snapshot and status replies retire the helper before preserving 
         this,
         build,
         count,
-        (response) => {
+        (response, body) => {
           if (input?.kind === failure && response.data) {
             if (failure === 'inspectionBegin') response.data.files[0].relativePath = 'wrong-identity';
             else response.data.statuses = [];
           }
-          return validate(response);
+          return validate(response, body);
         },
         ...args
       );
