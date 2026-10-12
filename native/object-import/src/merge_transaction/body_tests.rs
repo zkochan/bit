@@ -97,7 +97,14 @@ fn retained_prepare_capsules_and_late_template_preserve_raw_bytes_before_auto_eo
         fs::read(body["spoolPath"].as_str().expect("raw spool")).expect("raw bytes"),
         b"\xef\xbb\xbf\xff\0current\r\n",
     );
-    assert_eq!(fs::read(&output).expect("output"), b"\xef\xbb\xbf\xef\xbf\xbd\0current\n");
+    // Canonical auto-EOL keeps the existing CRLF bytes on Windows; the Unix
+    // conversion decodes the invalid UTF-8 byte while replacing line endings.
+    let expected: &[u8] = if cfg!(windows) {
+        b"\xef\xbb\xbf\xff\0current\r\n"
+    } else {
+        b"\xef\xbb\xbf\xef\xbf\xbd\0current\n"
+    };
+    assert_eq!(fs::read(&output).expect("output"), expected);
     apply("mergeTransactionFinish", json!({"token":prepared["ownerToken"]}), &mut state)
         .expect("finish");
     assert!(
