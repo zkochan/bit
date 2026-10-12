@@ -195,7 +195,7 @@ fn packed_bodies_preserve_ranges_source_receipts_and_retarget_without_rewriting_
     let mut state = State::default();
     let first = fixture.version('1', b"first\n");
     let second = fixture.version('2', b"\0\xffsecond\r\n");
-    let mut target = first.clone();
+    let mut target = first;
     let mut other = second["files"][0].clone();
     other["relativePath"] = json!("other.bin");
     other["name"] = json!("other.bin");
@@ -217,7 +217,7 @@ fn packed_bodies_preserve_ranges_source_receipts_and_retarget_without_rewriting_
         assert_eq!(source["privatePath"], prepared["bodies"][0]["spoolPath"]);
         assert_eq!(
             source["hash"],
-            crate::validate::hexadecimal(&Sha1::digest(&packed[offset..offset + length]))
+            crate::validate::hexadecimal(&Sha1::digest(&packed[offset..offset + length])),
         );
     }
     let next = fixture.version('3', b"late target");
@@ -235,7 +235,7 @@ fn packed_bodies_preserve_ranges_source_receipts_and_retarget_without_rewriting_
     assert_eq!(applied["bodies"][2]["spoolOffset"], 0);
     assert_eq!(
         fs::read(applied["bodies"][2]["spoolPath"].as_str().unwrap()).unwrap(),
-        b"late target"
+        b"late target",
     );
     assert_eq!(fs::read(path).unwrap(), packed);
 }

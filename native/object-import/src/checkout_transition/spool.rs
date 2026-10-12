@@ -8,7 +8,7 @@ pub(super) fn assign(bodies: &mut [Body], directory: &Path, token: &str, first: 
     let path = directory.join(format!("{token}-{first}.checkout-pack"));
     let mut offset = 0;
     for body in bodies {
-        body.path = path.clone();
+        body.path.clone_from(&path);
         body.offset = Some(offset);
         offset += body.contents.len();
     }
