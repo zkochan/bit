@@ -90,6 +90,10 @@ export async function retireRustMergeTransaction(): Promise<void> {
 /** Nested callbacks borrow one physical engine; only protocol requests are serialized. */
 export function withRustMergeTransactionOperation<T>(action: () => Promise<T>): Promise<T> {
   if (process.env.BIT_RUST_CLIENT_VCS !== 'on' || owners.getStore()) return action();
+  // Compiled exports are lazy: component-to-main status can run before any model
+  // export is read. Load the defining model module so its original registrations
+  // exist before eligibility checks; never register observed caller values here.
+  require('../models');
   const sources = require('@teambit/component.sources') as typeof Sources;
   return sources.withWorkspacePersistence(() =>
     sources.withRustWorkspaceEngine(async () => {

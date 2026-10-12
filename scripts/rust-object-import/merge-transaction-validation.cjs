@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 // Genuine error prefixes are added only from retained command traces; fallback-only is never sufficient.
 function validateMergeTransactionDiagnostics(trace, scenario) {
   const frames = trace.workspaceFrames || [];
-  const owned = frames.filter((frame) => String(frame.kind || '').startsWith('merge'));
+  const owned = frames.filter((frame) => frame.magic === 'BMT1' && String(frame.kind || '').startsWith('merge'));
   assert.ok(owned.length, `${scenario.name}: no merge transaction engine frames`);
   const owners = new Set(owned.map((frame) => frame.helperId));
   assert.equal(owners.size, 1, `${scenario.name}: more than one merge owner`);
