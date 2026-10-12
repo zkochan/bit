@@ -26,6 +26,20 @@ struct Input {
     normalize: bool,
     prefer_cached: bool,
 }
+impl Input {
+    fn cached<'a>(
+        &self,
+        request: &Request,
+        state: &'a cache::State,
+        use_cache: bool,
+    ) -> Option<&'a Vec<u8>> {
+        if use_cache || self.prefer_cached {
+            state.get(&request.directory, self.hash)
+        } else {
+            None
+        }
+    }
+}
 struct Request {
     id: u32,
     directory: PathBuf,
@@ -122,13 +136,8 @@ fn sequential_preflight(
     let mut compressed = 0;
     let mut files = Vec::with_capacity(request.files.len());
     for input in &request.files {
-        let body = if (use_cache || input.prefer_cached)
-            && state.get(&request.directory, input.hash).is_some()
-        {
-            state
-                .get(&request.directory, input.hash)
-                .expect("checked cache entry")
-                .clone()
+        let body = if let Some(body) = input.cached(request, state, use_cache) {
+            body.clone()
         } else {
             let body = repository::source(
                 &request.directory,

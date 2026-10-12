@@ -53,3 +53,17 @@ test('write frames retain their original flags even when a caller includes a cac
   const frame = adapter.checkoutSourceFrame('BWC1', 1, path.resolve('objects'), [{ hash: 'a'.repeat(40), destination: path.resolve('target'), preferCached: true }]);
   assert.deepEqual(flags(frame), [1]);
 });
+
+test('replaced cache-capture exports decline reuse without invoking an accessor', async (t) => {
+  const observed = [];
+  const f = setup(t, (frame) => observed.push(flags(frame)));
+  f.repository.setCache(f.body);
+  const query = installed('@teambit/objects/dist/objects/rust-history-query.js');
+  const original = Object.getOwnPropertyDescriptor(query, 'captureRustHistoryQueryObjects');
+  let calls = 0;
+  Object.defineProperty(query, 'captureRustHistoryQueryObjects', { configurable: true, get() { calls++; throw Error('custom capture'); } });
+  t.after(() => Object.defineProperty(query, 'captureRustHistoryQueryObjects', original));
+  assert.equal((await adapter.prepareRustCheckoutSources([f.model], f.repository)).length, 1);
+  assert.deepEqual(observed, [[1]]);
+  assert.equal(calls, 0);
+});
