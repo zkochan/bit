@@ -28,6 +28,7 @@ impl Fixture {
         let path = self.0.join(&name);
         fs::write(&path, bytes).unwrap();
         wire::Current {
+            read_token: None,
             relative_path: name,
             path,
             raw_hash: super::super::digest(bytes),
@@ -51,7 +52,8 @@ fn load(files: &[wire::Current], total: &mut usize) -> std::io::Result<Vec<super
         .build()
         .unwrap();
     let mut compressed = 17;
-    let result = pool.install(|| super::super::load(files, &files[0].path, total, &mut compressed));
+    let result =
+        pool.install(|| super::super::load(files, &files[0].path, total, &mut compressed, None));
     assert_eq!(compressed, 17);
     result
 }
@@ -62,7 +64,7 @@ fn ordered_parallel_reads_match_serial_bom_and_line_ending_semantics() {
     let mut files = fixture.files(65);
     files[3] = fixture.file(3, b"binary\0\xff\r\n");
     let mut serial_total = 13;
-    let expected = super::super::load(&files, &fixture.0, &mut serial_total, &mut 0).unwrap();
+    let expected = super::super::load(&files, &fixture.0, &mut serial_total, &mut 0, None).unwrap();
     let mut parallel_total = 13;
     let actual = load(&files, &mut parallel_total).unwrap();
     assert_eq!(parallel_total, serial_total);
