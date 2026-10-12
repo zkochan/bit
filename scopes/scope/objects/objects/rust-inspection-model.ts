@@ -308,7 +308,11 @@ function utf16(value: any): value is number[] {
     value.every((unit) => Number.isInteger(unit) && unit >= 0 && unit <= 65535)
   );
 }
-function text(units: number[]): string {
+function wireText(value: any): value is string | number[] {
+  return (typeof value === 'string' && value.length <= 65536) || utf16(value);
+}
+function text(units: string | number[]): string {
+  if (typeof units === 'string') return units;
   let result = '';
   for (const unit of units) result += String.fromCharCode(unit);
   return result;
@@ -328,7 +332,7 @@ function hydrate(value: any, depth = 0): any {
         return Buffer.from(value.value, 'hex').readDoubleBE();
       break;
     case 'string':
-      if (utf16(value.value)) return text(value.value);
+      if (wireText(value.value)) return text(value.value);
       break;
     case 'array':
       if (Array.isArray(value.value) && value.value.length <= 4096)
@@ -338,7 +342,7 @@ function hydrate(value: any, depth = 0): any {
       if (!Array.isArray(value.value) || value.value.length > 4096) break;
       const result: Record<string, any> = {};
       for (const row of value.value) {
-        if (!Array.isArray(row) || row.length !== 2 || !utf16(row[0])) throw Error('invalid inspection entry');
+        if (!Array.isArray(row) || row.length !== 2 || !wireText(row[0])) throw Error('invalid inspection entry');
         const key = text(row[0]);
         if (Object.hasOwn(result, key)) throw Error('duplicate inspection entry');
         Object.defineProperty(result, key, {
