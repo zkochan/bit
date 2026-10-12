@@ -168,7 +168,7 @@ fn indexed_completion_receipt_omits_rows_and_still_consumes_order_ack() {
         {"stage":"deletedConflict","order":[]},{"stage":"modified","order":[]}]});
     assert_eq!(
         apply("mergePlanOrder", request.clone(), &mut state).expect("ordered"),
-        json!({"rowIndices":[0]})
+        json!({"rowIndices":[0]}),
     );
     assert!(apply("mergePlanOrder", request, &mut state).is_err());
 }
