@@ -5,7 +5,7 @@ fn parallel_reads_match_serial_order_bytes_and_three_hashes() {
     let directory = Directory::new();
     let inputs: [&[u8]; 6] =
         [b"plain\n", b"\xef\xbb\xbftext\r\n", b"\0\r\n", b"\xff\xfe\r\n", b"", b"\xef\xbb\xbf"];
-    let files: Vec<_> = (0..36)
+    let files: Vec<_> = (0..130)
         .map(|index| directory.write(&format!("{index}"), inputs[index % inputs.len()]))
         .collect();
     let serial = rayon::ThreadPoolBuilder::new()

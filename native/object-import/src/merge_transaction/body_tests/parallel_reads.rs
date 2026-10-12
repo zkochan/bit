@@ -23,14 +23,14 @@ fn parallel_sources_keep_order_complete_receipts_and_serial_equivalence() {
     let mut serial = None;
     for threads in [1, 4] {
         let fixture = Fixture::new();
-        let target = target(&fixture, &[4096; 64]);
+        let target = target(&fixture, &[4096; 130]);
         let pool = rayon::ThreadPoolBuilder::new()
             .num_threads(threads)
             .build()
             .unwrap();
         let prepared =
             pool.install(|| fixture.prepare_packed(&mut State::default(), &target, true));
-        assert_eq!(prepared["reads"], json!({"sourceReads":64,"sourceBodyBytes":64 * 4096}));
+        assert_eq!(prepared["reads"], json!({"sourceReads":130,"sourceBodyBytes":130 * 4096}));
         let hashes = prepared["bodies"]
             .as_array()
             .unwrap()
@@ -51,7 +51,7 @@ fn parallel_sources_keep_order_complete_receipts_and_serial_equivalence() {
                 .as_array()
                 .unwrap()
                 .len(),
-            64,
+            130,
         );
         let result = json!({"rows":prepared["mergeRows"],"groups":prepared["sourceGroups"],"statuses":prepared["statuses"],"hashes":hashes});
         if let Some(expected) = &serial {

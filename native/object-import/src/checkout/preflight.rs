@@ -27,7 +27,7 @@ fn parallel(
     let mut files = Vec::with_capacity(request.files.len());
     let mut inflated = 0;
     let mut compressed = 0;
-    for inputs in request.files.chunks(pool.current_num_threads()) {
+    for inputs in request.files.chunks(64) {
         let budget =
             ((MAX_BYTES - inflated) / inputs.len(), (MAX_BYTES - compressed) / inputs.len());
         let batch = pool.install(|| {

@@ -46,7 +46,7 @@ fn parallel(
     compressed: &mut usize,
 ) -> io::Result<Vec<Vec<u8>>> {
     let mut files = Vec::with_capacity(version.files.len());
-    for batch in version.files.chunks(rayon::current_num_threads()) {
+    for batch in version.files.chunks(64) {
         let budget = ((MAX_BYTES - *total) / batch.len(), (MAX_BYTES - *compressed) / batch.len());
         let records = batch
             .par_iter()

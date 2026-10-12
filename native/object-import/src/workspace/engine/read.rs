@@ -56,7 +56,7 @@ fn parallel<Record: Send>(
 ) -> io::Result<Vec<Record>> {
     let mut total = 0;
     let mut output = Vec::with_capacity(files.len());
-    for batch in files.chunks(pool.current_num_threads()) {
+    for batch in files.chunks(64) {
         let maximum = (MAX_RAW - total) / batch.len();
         let records = pool.install(|| {
             batch
