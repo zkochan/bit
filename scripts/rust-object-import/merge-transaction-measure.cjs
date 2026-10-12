@@ -9,7 +9,7 @@ const report = process.env.BIT_MERGE_TRANSACTION_REPORT;
 if (!cli || !helper || !proof || !report)
   throw new Error('BIT_MERGE_TRANSACTION_CLI, HELPER, PROOF and REPORT are required');
 if (qualification.supportsMeasurement !== true)
-  throw new Error('history query qualification does not support proof-bound measurement');
+  throw new Error('merge transaction qualification does not support proof-bound measurement');
 runQualification(cli, helper, {
   measure: true,
   rounds: 3,
@@ -21,7 +21,7 @@ runQualification(cli, helper, {
 })
   .then((result) => {
     if (!result.qualified || !result.proofSha256 || !result.runs.every((run) => Array.isArray(run.measurements)))
-      throw new Error('history query measurement requires proof-bound command samples');
+      throw new Error('merge transaction measurement requires proof-bound command samples');
     console.log(
       JSON.stringify({
         qualified: result.qualified,

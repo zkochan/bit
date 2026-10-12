@@ -211,7 +211,16 @@ function validateMergeTransactionDiagnostics(trace, scenario) {
     assert.deepEqual(trace.checkout.write.helperIds, [...owners]);
     return;
   }
-  if (scenario.topology === 'fast-forward') {
+  if (scenario.hidden) {
+    assert.equal(metrics.mergeStatusBegin.completed, 2, 'visible and hidden statuses must both be considered');
+    assert.equal(metrics.mergeApplyDecision.completed, 1, 'hidden component cannot become a visible apply');
+    assert.equal(metrics.mergeResultsSelect.completed, 2);
+    for (const kind of ['mergePrepare', 'mergeApply', 'mergeMaterialize'])
+      assert.equal(metrics[kind]?.frames || 0, 0, 'hidden-only history update does not merge file bodies');
+    assert.equal(trace.checkout?.write?.completed || 0, 0);
+    return;
+  }
+  if (scenario.topology === 'fast-forward' || scenario.detachHead || scenario.topology === 'deletion') {
     assert.equal(
       metrics.mergePrepare?.frames || 0,
       0,

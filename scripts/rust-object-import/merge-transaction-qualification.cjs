@@ -92,7 +92,11 @@ async function runQualification(cli, helper, options = {}) {
   if (options.measure) {
     assert.equal(options.canonicalSmoke, undefined);
     assert.equal(options.diagnostics, false);
-    assert.equal(options.scenarios, undefined, 'measurement includes all declared successful and error routes');
+    assert.equal(
+      options.scenarios,
+      undefined,
+      'measurement route selection is fixed by the complete acceptance corpus'
+    );
     assert.equal(options.modes, undefined, 'retained pairs require alternating Node/native order');
     assert.equal(options.rounds || 3, 3, 'one warmup and three retained pairs required');
   }
@@ -346,11 +350,15 @@ async function runQualification(cli, helper, options = {}) {
     runs = [],
     matched = new Map();
   const entries = options.measure ? measurementEntries() : modes.map((mode) => ({ mode, round: 0, warmup: false }));
+  const timedNames = timedScenarios(scenarios);
+  const executedScenarios = options.measure
+    ? scenarios.filter((scenario) => timedNames.includes(scenario.name))
+    : scenarios;
   for (const entry of entries) {
     const { mode } = entry;
     const measurementStart = measurements.length;
     const stages = [];
-    for (const scenario of scenarios) {
+    for (const scenario of executedScenarios) {
       // Preserve absolute paths in canonical errors by reusing one owned path.
       const directory = path.join(temporary, 'routes', scenario.name, 'workspace');
       assert.ok(directory.startsWith(temporary + path.sep));
@@ -489,7 +497,7 @@ async function runQualification(cli, helper, options = {}) {
         assert.equal(hash(await fs.readFile(stage.faultArtifact.artifact)), stage.faultArtifact.sha256);
     }
   if (options.measure) {
-    assert.equal(matched.size, scenarios.length * 4);
+    assert.equal(matched.size, executedScenarios.length * 4);
     for (const pair of matched.values())
       assert.ok(pair.node && pair.native, 'both members of every matched pair required');
     const timed = timedScenarios(scenarios);
@@ -505,8 +513,13 @@ async function runQualification(cli, helper, options = {}) {
     measurementScope: options.measure
       ? {
           unit: 'complete CLI command',
-          includes: ['Node', 'helper', 'Git descendants', 'JSON presentation controls'],
-          excludes: ['fixture setup', 'state capture and parity assertions', 'expected-error routes'],
+          includes: ['Node', 'helper', 'Git descendants', 'CLI formatting'],
+          scenarios: timedNames,
+          excludes: [
+            'fixture setup',
+            'state capture and parity assertions',
+            'expected-error and supplementary untimed routes',
+          ],
           warmupPairs: 1,
           retainedPairs: 3,
         }
@@ -522,7 +535,7 @@ async function runQualification(cli, helper, options = {}) {
     bindings,
     modeCoverage: modes,
     nativeExpectations: Object.fromEntries(
-      scenarios.map((scenario) => [scenario.name, scenario.nativeExpectation || 'stateful-query'])
+      scenarios.map((scenario) => [scenario.name, scenario.nativeExpectation || 'owned-merge-transaction'])
     ),
     fixtureDimensions,
     runs,
