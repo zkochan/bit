@@ -2,12 +2,14 @@ import {
   Ref,
   Source,
   canHashSourceNatively,
-  hasRustSnapshotTransactionClass,
+  hasRustSnapshotTransactionClassBatch,
   registerRustSnapshotFunctionReference,
+  hasRustSnapshotFunctionReference,
 } from '@teambit/objects';
 import * as eol from '@teambit/toolbox.string.eol';
 import { createHash } from 'crypto';
 import AbstractVinyl, { defaultVinylToSource } from './abstract-vinyl';
+import { workspaceEngineIdentity } from './rust-workspace-engine';
 export type RustWorkspaceRead = {
   path: string;
   contents: Buffer;
@@ -16,10 +18,16 @@ export type RustWorkspaceRead = {
   snapshotHash?: string;
   bitmap?: true;
 };
-type Snapshot = RustWorkspaceRead;
+type Snapshot = Readonly<RustWorkspaceRead> & { readonly nativeRead?: { owner: object; token: number } };
 const snapshots = new WeakMap<AbstractVinyl, Snapshot>();
 const bitmapSnapshots = new WeakMap<AbstractVinyl, Snapshot>();
 const defaultLf = eol.lf;
+
+function readReceipt(read: RustWorkspaceRead): Snapshot['nativeRead'] {
+  const module = require('./rust-workspace-reader');
+  const getter = Object.getOwnPropertyDescriptor(module, 'getRustWorkspaceReadReceipt')?.value;
+  return hasRustSnapshotFunctionReference('WorkspaceReadReceipt', getter) ? getter(read) : undefined;
+}
 
 registerRustSnapshotFunctionReference('MergeWorkspaceSourceDescriptor', getRustWorkspaceMergeDescriptor);
 
@@ -61,7 +69,7 @@ export function hasOrdinaryWorkspaceProperties(file: AbstractVinyl): boolean {
 export function registerRustWorkspaceFile(file: AbstractVinyl, read: RustWorkspaceRead): void {
   if (file.path !== read.path || !Buffer.isBuffer(file.contents) || !file.contents.equals(read.contents)) return;
   // The retained copy detects mutation of the original Buffer without hashing it again in Node.
-  snapshots.set(file, { ...read, contents: Buffer.from(read.contents) });
+  snapshots.set(file, { ...read, contents: Buffer.from(read.contents), nativeRead: readReceipt(read) });
 }
 
 /** The canonical root transformation has already run; retain its observed bytes without invoking it again. */
@@ -85,6 +93,7 @@ export function registerRustWorkspaceBitmapFile(file: AbstractVinyl, read: RustW
     snapshotHash,
     linuxHash: snapshotHash,
     bitmap: true,
+    nativeRead: readReceipt(read),
   });
 }
 
@@ -92,13 +101,22 @@ export function registerRustWorkspaceBitmapFile(file: AbstractVinyl, read: RustW
 export function inheritRustWorkspaceFileSnapshot(original: AbstractVinyl, clone: AbstractVinyl): void {
   if (
     process.env.BIT_RUST_CLIENT_VCS !== 'on' ||
-    !hasRustSnapshotTransactionClass(original, 'SourceFile') ||
-    !hasRustSnapshotTransactionClass(clone, 'SourceFile')
+    !snapshots.has(original) ||
+    !hasRustSnapshotTransactionClassBatch([original, clone], 'SourceFile')
   )
     return;
   const value = snapshot(original);
-  if (!value || !hasOrdinaryWorkspaceProperties(clone)) return;
-  registerRustWorkspaceFile(clone, value);
+  if (
+    !value ||
+    !hasOrdinaryWorkspaceProperties(clone) ||
+    clone.path !== value.path ||
+    !Buffer.isBuffer(clone.contents) ||
+    !clone.contents.equals(value.contents)
+  )
+    return;
+  // This private byte snapshot never escapes or changes. Each public clone still
+  // validates its own path and mutable Buffer against it before native reuse.
+  snapshots.set(clone, value);
 }
 
 function snapshot(file: AbstractVinyl, registry = snapshots): Snapshot | undefined {
@@ -128,7 +146,9 @@ export function getRustWorkspaceFileDescriptor(file: AbstractVinyl): { path: str
 export function getRustWorkspaceMergeDescriptor(
   file: AbstractVinyl,
   allowBitmap = false
-): { path: string; hash: string; linuxHash: string; snapshotHash?: string; bitmap?: true } | undefined {
+):
+  | { path: string; hash: string; linuxHash: string; snapshotHash?: string; bitmap?: true; readToken?: number }
+  | undefined {
   const value = (allowBitmap ? snapshot(file, bitmapSnapshots) : undefined) || snapshot(file);
   return (
     value && {
@@ -137,6 +157,9 @@ export function getRustWorkspaceMergeDescriptor(
       linuxHash: value.linuxHash,
       ...(value.snapshotHash ? { snapshotHash: value.snapshotHash } : {}),
       ...(value.bitmap ? { bitmap: value.bitmap } : {}),
+      ...(value.nativeRead && value.nativeRead.owner === workspaceEngineIdentity()
+        ? { readToken: value.nativeRead?.token }
+        : {}),
     }
   );
 }
@@ -221,7 +244,7 @@ export function getRustWorkspaceSource(file: AbstractVinyl): Source | undefined 
     snapshot: value,
     originalContents,
     canonicalContents,
-    canonicalSnapshot: Buffer.from(canonicalContents),
+    canonicalSnapshot: canonicalContents === originalContents ? value.contents : Buffer.from(canonicalContents),
     getter,
     setter,
     hash,
