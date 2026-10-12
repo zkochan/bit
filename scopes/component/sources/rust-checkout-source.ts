@@ -5,6 +5,7 @@ import {
   Ref,
   registerRustSnapshotFunctionReference,
   hasRustSnapshotTransactionClassFields,
+  hasRustSnapshotTransactionClassFieldsBatch,
   hasRustSnapshotFunctionReference,
   type Repository,
   type Source,
@@ -27,6 +28,10 @@ const sources = new WeakMap<AbstractVinyl, Provenance>();
 const bufferEquals = Buffer.prototype.equals;
 const bufferFrom = Buffer.from;
 const sourceCreateHash = createHash;
+const sourceIsBuffer = Buffer.isBuffer;
+const sourceHashPrototype = Object.getPrototypeOf(sourceCreateHash('sha1'));
+const sourceHashUpdate = sourceHashPrototype.update;
+const sourceHashDigest = sourceHashPrototype.digest;
 // Resolve package exports once while still observing live CommonJS exports on every guard.
 const historyQueryModule = require.resolve('@teambit/objects/dist/objects/rust-history-query.js');
 const mergeTransactionModule = require.resolve('@teambit/objects/dist/objects/rust-merge-transaction.js');
@@ -145,6 +150,36 @@ export function createRustCheckoutSourceFile(
   return file;
 }
 
+/** Only cached canonical bytes can authorize reuse of the helper's verified Source snapshot. */
+function cachedCheckoutHashes(repository: Repository, hashes: string[]): Set<string> {
+  const result = new Set<string>();
+  const query = require(historyQueryModule);
+  const capture = Object.getOwnPropertyDescriptor(query, 'captureRustHistoryQueryObjects')?.value;
+  if (
+    !hasRustSnapshotFunctionReference('HistoryQueryObjectCapture', capture) ||
+    Object.getOwnPropertyDescriptor(require('crypto'), 'createHash')?.value !== sourceCreateHash ||
+    Object.getOwnPropertyDescriptor(Buffer, 'isBuffer')?.value !== sourceIsBuffer ||
+    Object.getOwnPropertyDescriptor(sourceHashPrototype, 'update')?.value !== sourceHashUpdate ||
+    Object.getOwnPropertyDescriptor(sourceHashPrototype, 'digest')?.value !== sourceHashDigest
+  )
+    return result;
+  const cached = capture(repository) as Array<[string, object]> | undefined;
+  if (!cached) return result;
+  const requested = new Set(hashes);
+  const selected = cached.filter(([hash]) => requested.has(hash));
+  if (!hasRustSnapshotTransactionClassFieldsBatch(selected.map(([, value]) => value), 'Source', ['contents']))
+    return result;
+  for (const [hash, value] of selected) {
+    const body = Object.getOwnPropertyDescriptor(value, 'contents')?.value;
+    if (!body || types.isProxy(body) || !sourceIsBuffer(body) || Object.getPrototypeOf(body) !== Buffer.prototype)
+      continue;
+    const digest = sourceCreateHash('sha1');
+    sourceHashUpdate.call(digest, body);
+    if (sourceHashDigest.call(digest, 'hex') === hash) result.add(hash);
+  }
+  return result;
+}
+
 /** Validate the complete source set before checkout can remove any old workspace files. */
 export async function prepareRustCheckoutSources(
   models: SourceFileModel[],
@@ -182,6 +217,7 @@ export async function prepareRustCheckoutSources(
     return await withWorkspaceSession(async (session) => {
       for (let offset = 0; offset < manifest.length; offset += 64) {
         const batch = manifest.slice(offset, offset + 64);
+        const cached = cachedCheckoutHashes(repository, batch.map((entry) => entry.hash));
         const completed = await session.request(
           (id) =>
             checkoutSourceFrame(
@@ -190,6 +226,7 @@ export async function prepareRustCheckoutSources(
               objectsDirectory,
               batch.map((entry) => ({
                 hash: entry.hash,
+                preferCached: cached.has(entry.hash),
                 destination: path.resolve(objectsDirectory, entry.relativePath),
               }))
             ),
@@ -230,7 +267,7 @@ export function checkoutSourceFrame(
   magic: 'BWC0' | 'BWC1',
   id: number,
   objectsDirectory: string,
-  files: { hash: string; destination: string }[]
+  files: { hash: string; destination: string; preferCached?: boolean }[]
 ): Buffer {
   const header = Buffer.alloc(12);
   header.write(magic);
@@ -248,7 +285,7 @@ export function checkoutSourceFrame(
     parts.push(Buffer.from(file.hash, 'hex'));
     writePath(file.destination);
     const flags = Buffer.alloc(8);
-    flags.writeUInt32BE(1, 0);
+    flags.writeUInt32BE(magic === 'BWC0' && file.preferCached ? 3 : 1, 0);
     flags.writeUInt32BE(1, 4);
     parts.push(flags);
   }

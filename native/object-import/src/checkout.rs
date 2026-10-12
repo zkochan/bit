@@ -24,6 +24,7 @@ struct Input {
     hash: [u8; 20],
     destination: PathBuf,
     normalize: bool,
+    prefer_cached: bool,
 }
 struct Request {
     id: u32,
@@ -82,15 +83,17 @@ fn request(reader: &mut impl Read) -> io::Result<Request> {
         let mut hash = [0; 20];
         reader.read_exact(&mut hash)?;
         let destination = path(reader)?;
-        if protocol::word(reader)? != 1 {
-            return Err(invalid("checkout requires overwriting files"));
-        }
+        let prefer_cached = match protocol::word(reader)? {
+            1 => false,
+            3 => true,
+            _ => return Err(invalid("checkout requires overwriting files")),
+        };
         let normalize = match protocol::word(reader)? {
             0 => false,
             1 => true,
             _ => return Err(invalid("invalid checkout EOL policy")),
         };
-        files.push(Input { hash, destination, normalize });
+        files.push(Input { hash, destination, normalize, prefer_cached });
     }
     Ok(Request { id, directory, files })
 }
@@ -119,7 +122,9 @@ fn sequential_preflight(
     let mut compressed = 0;
     let mut files = Vec::with_capacity(request.files.len());
     for input in &request.files {
-        let body = if use_cache && state.get(&request.directory, input.hash).is_some() {
+        let body = if (use_cache || input.prefer_cached)
+            && state.get(&request.directory, input.hash).is_some()
+        {
             state
                 .get(&request.directory, input.hash)
                 .expect("checked cache entry")
