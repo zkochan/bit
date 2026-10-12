@@ -228,7 +228,7 @@ fn serve_read_only(
     Ok(true)
 }
 
-fn serve_extension(
+pub(crate) fn serve_extension(
     magic: [u8; 4],
     reader: &mut impl Read,
     writer: &mut impl Write,
