@@ -151,6 +151,10 @@ on:
         description: Run only the isolated client VCS benchmark
         type: boolean
         default: false
+      inspect_only:
+        description: Inspect benchmark scratch filesystem ancestry only
+        type: boolean
+        default: false
       benchmark_ref:
         description: Exact source revision to build and measure
         type: string
@@ -576,7 +580,7 @@ jobs:
 
   client-performance:
     name: Client VCS command benchmark
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.performance_only }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.performance_only && !inputs.inspect_only }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     defaults:
@@ -670,3 +674,21 @@ jobs:
             ${{ runner.temp }}/bit-merge-transaction-*/*.json
             ${{ runner.temp }}/bit-merge-transaction-*/*.txt
             ${{ runner.temp }}/bit-cli-base/.bit-rust-*.json
+
+  scratch-inspection:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.performance_only && inputs.inspect_only }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect scratch ancestry and copy metadata
+        run: |
+          python3 - <<'PYTHON'
+          import os, pathlib, stat, json, tempfile
+          for root in [os.environ['RUNNER_TEMP'], '/tmp', '/var/tmp']:
+            print('ROOT', root, 'REAL', os.path.realpath(root))
+            for item in [pathlib.Path(root), *pathlib.Path(root).parents]:
+              try:
+                info = item.lstat()
+                print(json.dumps({'path':str(item), 'mode':oct(info.st_mode), 'uid':info.st_uid, 'nlink':info.st_nlink, 'link':os.readlink(item) if item.is_symlink() else None, 'xattrs':os.listxattr(item)}))
+              except OSError as error:
+                print(str(error))
+          PYTHON
