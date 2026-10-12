@@ -131,6 +131,7 @@ async function runQualification(cli, helper, options = {}) {
     nodeBaseline,
     sourceBodies: true,
     fileStatuses: true,
+    repositorySourcePlans: true,
     extraFiles: options.extraFiles || 0,
     scenarios: fixtureModule.scenarios
       .filter((item) => !options.scenarios || options.scenarios.includes(item.name))
@@ -188,7 +189,7 @@ async function runQualification(cli, helper, options = {}) {
           validateMergeTransactionDiagnostics(
             stage.diagnostics,
             fixtureModule.scenarios.find((scenario) => scenario.name === stage.scenario),
-            { sourceBodies: true, fileStatuses: true }
+            { sourceBodies: true, fileStatuses: true, repositorySourcePlans: true }
           );
         }
       }
@@ -495,7 +496,11 @@ async function runQualification(cli, helper, options = {}) {
       }
       const diagnostics = tracePath ? JSON.parse(await fs.readFile(tracePath)) : undefined;
       if (diagnostics)
-        validateMergeTransactionDiagnostics(diagnostics, scenario, { sourceBodies: true, fileStatuses: true });
+        validateMergeTransactionDiagnostics(diagnostics, scenario, {
+          sourceBodies: true,
+          fileStatuses: true,
+          repositorySourcePlans: true,
+        });
       const faultArtifact =
         scenario.fault && mode === 'native'
           ? { artifact: faultPath, sha256: hash(await fs.readFile(faultPath)) }

@@ -224,8 +224,16 @@ function validateMergeTransactionDiagnostics(trace, scenario, options = {}) {
     assert.equal(metrics.mergeStatusBegin.completed, 2, 'visible and hidden statuses must both be considered');
     assert.equal(metrics.mergeApplyDecision.completed, 1, 'hidden component cannot become a visible apply');
     assert.equal(metrics.mergeResultsSelect.completed, 2);
-    for (const kind of ['mergePrepare', 'mergeApply', 'mergeMaterialize'])
-      assert.equal(metrics[kind]?.frames || 0, 0, 'hidden-only history update does not merge file bodies');
+    if (options.repositorySourcePlans) {
+      for (const kind of ['mergePrepare', 'mergePlanOrder', 'mergeApply'])
+        assert.ok(accepted(kind), `${scenario.name}: repository Source body planning fell back`);
+      assert.ok(metrics.mergePrepare.retainedBodies > 0);
+      assert.ok(metrics.mergePrepare.verifiedReads?.some((read) => read.sourceReads > 0));
+    } else {
+      for (const kind of ['mergePrepare', 'mergeApply'])
+        assert.equal(metrics[kind]?.frames || 0, 0, 'historical hidden route used canonical body planning');
+    }
+    assert.equal(metrics.mergeMaterialize?.frames || 0, 0, 'hidden-only history update cannot write workspace bodies');
     assert.equal(trace.checkout?.write?.completed || 0, 0);
     return;
   }
