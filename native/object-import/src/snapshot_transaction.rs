@@ -47,7 +47,8 @@ pub(crate) fn apply(kind: &str, input: Value, state: &mut State) -> io::Result<V
 }
 
 fn serialize(input: &Value, state: &mut State) -> io::Result<Value> {
-    let request: wire::Serialize = serde_json::from_value(input.clone()).map_err(io::Error::other)?;
+    let request: wire::Serialize =
+        serde::Deserialize::deserialize(input).map_err(io::Error::other)?;
     if request.objects.len() > MAX_OBJECTS {
         return Err(invalid("snapshot object count limit"));
     }
