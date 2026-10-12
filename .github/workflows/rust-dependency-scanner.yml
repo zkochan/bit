@@ -146,17 +146,27 @@ on:
       - 'scopes/dependencies/dependency-resolver/detector-hook.ts'
       - '.github/workflows/rust-dependency-scanner.yml'
   workflow_dispatch:
+    inputs:
+      performance_only:
+        description: Run only the isolated client VCS benchmark
+        type: boolean
+        default: false
+      benchmark_ref:
+        description: Exact source revision to build and measure
+        type: string
+        required: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: rust-scanner-${{ github.event.pull_request.number || github.ref }}
+  group: rust-scanner-${{ github.event.pull_request.number || inputs.benchmark_ref || github.ref }}
   # Superseded PR pushes are cancelled; every commit on `rust` keeps its result.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   integration:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.performance_only }}
     name: Real dependency pipeline and scoped helpers (Linux)
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -203,6 +213,7 @@ jobs:
         run: node --test scripts/rust-dependency-analysis/process-tree-memory.test.cjs
 
   session:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.performance_only }}
     name: Scanner session lifecycle tests (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -244,6 +255,7 @@ jobs:
         run: node --test scripts/rust-object-import/validator.test.cjs scripts/rust-object-import/importer.test.cjs scripts/rust-object-import/import-trace.test.cjs scripts/rust-object-import/inventory.test.cjs scripts/rust-object-import/reader.test.cjs scripts/rust-object-import/read-budget.test.cjs scripts/rust-object-import/directory.test.cjs scripts/rust-object-import/mutable.test.cjs scripts/rust-object-import/operation.test.cjs scripts/rust-object-import/import-cancellation.test.cjs scripts/rust-object-import/tar-batches.test.cjs scripts/rust-object-import/tar-progressive.test.cjs scripts/rust-object-import/tar-staging.test.cjs scripts/rust-object-import/tar-prefix-replay.test.cjs
 
   lint:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.performance_only }}
     name: pnpm Rust formatting and lints
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -299,6 +311,7 @@ jobs:
         run: cargo doc --locked --workspace --no-deps
 
   test:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.performance_only }}
     name: Rust tests (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -403,6 +416,7 @@ jobs:
           retention-days: 14
 
   musl:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.performance_only }}
     name: Packaged scanner on Alpine (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -460,6 +474,7 @@ jobs:
           '
 
   object-import-models:
+    if: ${{ github.event_name != 'workflow_dispatch' || !inputs.performance_only }}
     name: Object import canonical models (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -558,3 +573,88 @@ jobs:
           BIT_TEST_MERGE_TRANSACTION_COMPILED=1 node --test scripts/rust-object-import/merge-transaction.test.cjs scripts/rust-object-import/merge-transaction-bodies.test.cjs scripts/rust-object-import/merge-row-order.test.cjs scripts/rust-object-import/body-range.test.cjs scripts/rust-object-import/merge-transaction-selectors.test.cjs scripts/rust-object-import/merge-transaction-lane-policy.test.cjs scripts/rust-object-import/merge-transaction-source-guards.test.cjs scripts/rust-object-import/merge-transaction-class-guards.test.cjs scripts/rust-object-import/merge-transaction-producer.test.cjs
           node --test scripts/rust-object-import/merge-transaction-validation.test.cjs scripts/rust-object-import/merge-transaction-measurement.test.cjs scripts/rust-object-import/merge-transaction-report.test.cjs
           node scripts/rust-object-import/canonical-model-tests.cjs
+
+  client-performance:
+    name: Client VCS command benchmark
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.performance_only }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    env:
+      TMPDIR: ${{ runner.temp }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.benchmark_ref || github.ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Make space for independent physical CLI copies
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL
+      - name: Bootstrap canonical Bit dependencies
+        run: |
+          npm install --global @teambit/bvm
+          bvm config set RELEASE_TYPE nightly
+          bvm config set DEFAULT_LINK bbit
+          bvm upgrade
+          bvm link --verbose
+          node -e "console.log(require('path').join(require('os').homedir(),'bin'))" >> "$GITHUB_PATH"
+      - name: Compile canonical source graph
+        run: node scripts/rust-object-import/compile-canonical-graph.cjs
+      - name: Build physical benchmark CLI
+        run: |
+          node scripts/rust-dependency-analysis/command-build.cjs "$GITHUB_WORKSPACE" "$RUNNER_TEMP/bit-cli-base"
+          node scripts/rust-object-import/prepare-cli.cjs "$RUNNER_TEMP/bit-cli-base" "$RUNNER_TEMP/bit-cli"
+      - name: Build release helper
+        working-directory: native
+        run: cargo build --locked --release --package bit-object-import
+      - name: Qualify all routes, then measure with builds and tests idle
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs/promises');
+          const path = require('node:path');
+          const os = require('node:os');
+          const cp = require('node:child_process');
+          const { runQualification } = require('./scripts/rust-object-import/merge-transaction-qualification.cjs');
+          (async () => {
+            const directory = path.join(os.tmpdir(), 'bit-performance-evidence');
+            await fs.mkdir(directory);
+            const cli = path.join(os.tmpdir(), 'bit-cli');
+            const helper = path.resolve('native/target/release/bit-object-import');
+            const profiles = ['object-helper', 'javascript'].flatMap(nodeBaseline => [0, 260].map(extraFiles => ({nodeBaseline, extraFiles})));
+            const sourceRevision = cp.execFileSync('git', ['rev-parse', 'HEAD'], {encoding:'utf8'}).trim();
+            await fs.writeFile(path.join(directory, 'runner.json'), JSON.stringify({sourceRevision, node:process.version, os:os.release(), arch:os.arch(), cpus:os.cpus(), availableParallelism:os.availableParallelism()}, null, 2));
+            await fs.copyFile(helper, path.join(directory, 'bit-object-import'));
+            await fs.copyFile(path.join(cli, '.bit-object-import-build.json'), path.join(directory, 'cli-build.json'));
+            await Promise.all(profiles.map(async profile => {
+              const report = path.join(directory, `${profile.nodeBaseline}-qualification-${profile.extraFiles}.json`);
+              const result = await runQualification(cli, helper, {...profile, report});
+              console.log(JSON.stringify({...profile, phase:'qualification', qualified:result.qualified}));
+            }));
+            for (const profile of profiles) {
+              const report = path.join(directory, `${profile.nodeBaseline}-measure-${profile.extraFiles}.json`);
+              const proof = path.join(directory, `${profile.nodeBaseline}-qualification-${profile.extraFiles}.json`);
+              const result = await runQualification(cli, helper, {...profile, report, proof, measure:true, rounds:3, diagnostics:false});
+              console.log(JSON.stringify({...profile, phase:'measurement', qualified:result.qualified}));
+            }
+            await fs.appendFile(process.env.GITHUB_STEP_SUMMARY, `Source: ${sourceRevision}\n\n576 parity cases and 384 retained timing samples completed; raw state/output artifacts and source/helper fingerprints are attached.\n`);
+          })().catch(error => { console.error(error); process.exitCode = 1; });
+          NODE
+      - name: Preserve proofs, raw artifacts and CPU records
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-vcs-performance-${{ github.run_id }}
+          retention-days: 7
+          include-hidden-files: true
+          path: |
+            ${{ runner.temp }}/bit-performance-evidence/**
+            ${{ runner.temp }}/bit-merge-transaction-*/*.json
+            ${{ runner.temp }}/bit-merge-transaction-*/*.txt
+            ${{ runner.temp }}/bit-cli-base/.bit-rust-*.json
