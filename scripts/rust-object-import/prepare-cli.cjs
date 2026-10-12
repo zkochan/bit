@@ -203,6 +203,7 @@ const files = [
   'scopes/component/sources/rust-workspace-materializer.ts',
   'scopes/component/sources/rust-workspace-persistence.ts',
   'scopes/component/sources/rust-checkout-source.ts',
+  'scopes/component/sources/rust-checkout-source-capsule.ts',
   'scopes/component/checkout/checkout-version.ts',
   'scopes/component/checkout/rust-checkout.ts',
   'scopes/component/checkout/checkout.main.runtime.ts',

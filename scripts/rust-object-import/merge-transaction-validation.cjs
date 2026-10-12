@@ -11,7 +11,7 @@ function validateMergeTransactionDiagnostics(trace, scenario) {
   assert.ok(!owners.has(undefined), 'physical helper identity required');
   const first = frames.findIndex((frame) => owned.includes(frame));
   const last = frames.findLastIndex((frame) => owned.includes(frame));
-  const workspace = new Set(['BMT1', 'BMH1', 'BWS1', 'BWP1', 'BWC0', 'BWC1', 'BCK1']);
+  const workspace = new Set(['BMT1', 'BMH1', 'BWS1', 'BWP1', 'BWC0', 'BWC1', 'BWC2', 'BCK1']);
   assert.equal(
     new Set(
       frames

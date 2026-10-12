@@ -13,6 +13,12 @@ import {
 } from '@teambit/objects';
 import SourceFile, { canReadWorkspaceFilesNatively } from './source-file';
 import type AbstractVinyl from './abstract-vinyl';
+import {
+  canUseRustCheckoutCapsules,
+  loadRustCheckoutCapsule,
+  readRustCheckoutCapsules,
+  type CheckoutSourceCapsule,
+} from './rust-checkout-source-capsule';
 import { defaultVinylWrite } from './abstract-vinyl';
 import { withWorkspaceSession } from './rust-workspace-persistence';
 
@@ -107,7 +113,8 @@ function ordinarySourceRef(reference: Ref): boolean {
 export function createRustCheckoutSourceFile(
   model: SourceFileModel,
   repository: Repository,
-  validated = false
+  validated = false,
+  capsule?: CheckoutSourceCapsule
 ): SourceFile | undefined {
   if (!validated || !ordinarySourceRef(model.file) || !repository.canReadCheckoutSourcesNatively([model.file]))
     return undefined;
@@ -128,6 +135,7 @@ export function createRustCheckoutSourceFile(
       // Preserve live in-memory object precedence if it changed since the native plan.
       const content = (repository.objects[hash] ||
         repository.getCache(snapshotReference) ||
+        (capsule && loadRustCheckoutCapsule(repository, snapshotReference, capsule)) ||
         repository.loadSync(snapshotReference)) as Source;
       sources.delete(file);
       Reflect.deleteProperty(file, 'contents');
@@ -167,7 +175,13 @@ function cachedCheckoutHashes(repository: Repository, hashes: string[]): Set<str
   if (!cached) return result;
   const requested = new Set(hashes);
   const selected = cached.filter(([hash]) => requested.has(hash));
-  if (!hasRustSnapshotTransactionClassFieldsBatch(selected.map(([, value]) => value), 'Source', ['contents']))
+  if (
+    !hasRustSnapshotTransactionClassFieldsBatch(
+      selected.map(([, value]) => value),
+      'Source',
+      ['contents']
+    )
+  )
     return result;
   for (const [hash, value] of selected) {
     const body = Object.getOwnPropertyDescriptor(value, 'contents')?.value;
@@ -215,24 +229,37 @@ export async function prepareRustCheckoutSources(
     return undefined;
   try {
     return await withWorkspaceSession(async (session) => {
+      const capsules: Array<CheckoutSourceCapsule | undefined> = [];
       for (let offset = 0; offset < manifest.length; offset += 64) {
         const batch = manifest.slice(offset, offset + 64);
-        const cached = cachedCheckoutHashes(repository, batch.map((entry) => entry.hash));
-        const completed = await session.request(
-          (id) =>
-            checkoutSourceFrame(
-              'BWC0',
-              id,
-              objectsDirectory,
-              batch.map((entry) => ({
-                hash: entry.hash,
-                preferCached: cached.has(entry.hash),
-                destination: path.resolve(objectsDirectory, entry.relativePath),
-              }))
-            ),
-          batch.length
+        const cached = cachedCheckoutHashes(
+          repository,
+          batch.map((entry) => entry.hash)
         );
-        if (completed !== batch.length) return undefined;
+        const frame = (magic: 'BWC0' | 'BWC2', id: number) =>
+          checkoutSourceFrame(
+            magic,
+            id,
+            objectsDirectory,
+            batch.map((entry) => ({
+              hash: entry.hash,
+              preferCached: cached.has(entry.hash),
+              destination: path.resolve(objectsDirectory, entry.relativePath),
+            }))
+          );
+        if (hasOwnedRepositorySourceOperation() && canUseRustCheckoutCapsules(repository)) {
+          const loaded = await readRustCheckoutCapsules(
+            session,
+            batch.map((entry) => entry.hash),
+            (id) => frame('BWC2', id)
+          );
+          if (!loaded) return undefined;
+          capsules.push(...loaded);
+        } else {
+          const completed = await session.request((id) => frame('BWC0', id), batch.length);
+          if (completed !== batch.length) return undefined;
+          capsules.push(...batch.map(() => undefined));
+        }
       }
       if (
         models.length !== manifest.length ||
@@ -246,7 +273,9 @@ export async function prepareRustCheckoutSources(
         )
       )
         return undefined;
-      const files = models.map((model) => createRustCheckoutSourceFile(model, repository, true));
+      const files = models.map((model, index) =>
+        createRustCheckoutSourceFile(model, repository, true, capsules[index])
+      );
       return files.every((file): file is SourceFile => Boolean(file)) ? files : undefined;
     });
   } catch {
@@ -264,7 +293,7 @@ function validPath(filename: string): boolean {
 }
 
 export function checkoutSourceFrame(
-  magic: 'BWC0' | 'BWC1',
+  magic: 'BWC0' | 'BWC1' | 'BWC2',
   id: number,
   objectsDirectory: string,
   files: { hash: string; destination: string; preferCached?: boolean }[]
@@ -285,7 +314,7 @@ export function checkoutSourceFrame(
     parts.push(Buffer.from(file.hash, 'hex'));
     writePath(file.destination);
     const flags = Buffer.alloc(8);
-    flags.writeUInt32BE(magic === 'BWC0' && file.preferCached ? 3 : 1, 0);
+    flags.writeUInt32BE(magic !== 'BWC1' && file.preferCached ? 3 : 1, 0);
     flags.writeUInt32BE(1, 4);
     parts.push(flags);
   }

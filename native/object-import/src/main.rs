@@ -60,7 +60,7 @@ fn options() -> Result<Options, Box<dyn std::error::Error>> {
                 owner = Some((uid.parse::<u32>()?, gid.parse::<u32>()?));
             }
             _ => return Err(
-                "usage: bit-object-import [--threads 1..16] [--objects-dir PATH] [--owner uid:gid]"
+                "usage: bit-object-import [--threads 1..8] [--objects-dir PATH] [--owner uid:gid]"
                     .into(),
             ),
         }
@@ -68,8 +68,8 @@ fn options() -> Result<Options, Box<dyn std::error::Error>> {
     if owner.is_some() && directory.is_none() {
         return Err("owner requires object directory".into());
     }
-    if !(1..=16).contains(&threads) {
-        return Err("thread count must be between 1 and 16".into());
+    if !(1..=8).contains(&threads) {
+        return Err("thread count must be between 1 and 8".into());
     }
     Ok((threads, directory, owner))
 }

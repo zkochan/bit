@@ -214,3 +214,30 @@ path: ${err.path}`);
   }
 }
 registerRustSnapshotFunctions('HistoryQueryObjectParser', BitObject, ['parseObjectWithSize']);
+
+registerRustSnapshotFunctions('CheckoutSyncObjectParser', BitObject, ['parseSync']);
+registerRustSnapshotFunctions('CheckoutSyncInflation', require('zlib'), ['inflateSync']);
+registerRustSnapshotFunctions(
+  'CheckoutSyncBufferParsing',
+  Buffer.prototype,
+  [
+    'indexOf',
+    'slice',
+    'subarray',
+    'toString',
+    'utf8Slice',
+    'equals',
+    'length',
+    'buffer',
+    'byteOffset',
+    'byteLength',
+    'constructor',
+  ],
+  true
+);
+registerRustSnapshotFunctions('CheckoutSyncHeaderParsing', String.prototype, ['split']);
+registerRustSnapshotFunctions('CheckoutSyncHeaderConstants', require('@teambit/legacy.constants'), [
+  'NULL_BYTE',
+  'SPACE_DELIMITER',
+]);
+registerRustSnapshotFunctions('CheckoutSyncBufferStatics', Buffer, ['from', 'isBuffer']);

@@ -1420,3 +1420,12 @@ async function resolveGroupId(groupName: string): Promise<number | null | undefi
   }
   return gid;
 }
+
+registerRustSnapshotFunctions('CheckoutSyncSourceFS', fs, ['readFileSync']);
+registerRustSnapshotFunctions('CheckoutSyncSourceFSPrimitives', require('fs'), [
+  'readFileSync',
+  'openSync',
+  'readSync',
+  'closeSync',
+  'fstatSync',
+]);

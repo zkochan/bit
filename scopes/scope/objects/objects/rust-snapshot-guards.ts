@@ -175,14 +175,15 @@ function definingDescriptor(
   return undefined;
 }
 
-export function registerRustSnapshotFunctions(name: string, object: object, keys: string[]): void {
+/** Accessors are captured only when explicitly requested; registration never invokes them. */
+export function registerRustSnapshotFunctions(name: string, object: object, keys: string[], accessors = false): void {
   functions ||= new Map();
   if (functions.has(name)) return;
   const descriptors: PropertyDescriptorMap = {};
   const owners = new Map<string, object>();
   for (let index = 0; index < keys.length; index += 1) {
     const field = definingDescriptor(object, keys[index]);
-    if (!field || !('value' in field.descriptor)) return;
+    if (!field || (!accessors && !('value' in field.descriptor))) return;
     descriptors[keys[index]] = field.descriptor;
     owners.set(keys[index], field.owner);
   }
