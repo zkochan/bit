@@ -47,7 +47,7 @@ export class MaterializationSession {
   private killTimer?: NodeJS.Timeout;
 
   constructor(executable: string) {
-    this.child = spawn(executable, ['--threads', '1'], { stdio: ['pipe', 'pipe', 'pipe'] });
+    this.child = spawn(executable, [], { stdio: ['pipe', 'pipe', 'pipe'] });
     this.child.stderr.resume();
     this.closed = new Promise((resolve) => {
       this.child.once('close', () => {
