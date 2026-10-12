@@ -242,7 +242,7 @@ export class NativeImportOperation {
         };
       };
       this.engine = WorkspaceEngine.forObjects(
-        Math.min(4, availableParallelism()),
+        Math.max(4, Math.min(8, availableParallelism() * (process.platform === 'win32' ? 1 : 2))),
         this.options.objectsDirectory,
         this.options.owner?.uid,
         this.options.owner?.gid

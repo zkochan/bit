@@ -55,11 +55,13 @@ export class MaterializationSession {
   private killTimer?: NodeJS.Timeout;
 
   constructor(executable: string) {
+    // File I/O can block a worker without consuming a core; keep a small bounded surplus.
+    const threads = Math.max(4, Math.min(8, availableParallelism() * (process.platform === 'win32' ? 1 : 2)));
     const addon = resolveRustWorkspaceAddon(executable);
     if (addon) {
       try {
         const binding = require(addon) as { WorkspaceEngine: new (threads: number) => WorkspaceEngine };
-        this.engine = new binding.WorkspaceEngine(Math.min(4, availableParallelism()));
+        this.engine = new binding.WorkspaceEngine(threads);
         this.closed = new Promise((resolve) => {
           this.nativeClosed = resolve;
         });
@@ -68,7 +70,7 @@ export class MaterializationSession {
         // A load-time ABI or platform mismatch falls back before any native request starts.
       }
     }
-    this.child = spawn(executable, ['--threads', String(Math.min(4, availableParallelism()))], {
+    this.child = spawn(executable, ['--threads', String(threads)], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     this.child.stderr.resume();

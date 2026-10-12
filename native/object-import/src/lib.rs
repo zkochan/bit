@@ -39,8 +39,10 @@ type Options = (usize, Option<std::path::PathBuf>, Option<(u32, u32)>);
 
 fn options() -> Result<Options, Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().skip(1).collect();
-    let mut threads =
-        std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get).min(4);
+    let mut threads = std::thread::available_parallelism()
+        .map_or(1, std::num::NonZeroUsize::get)
+        .saturating_mul(if cfg!(windows) { 1 } else { 2 })
+        .clamp(4, 8);
     let mut directory = None;
     let mut owner = None;
     let mut arguments = args.iter();

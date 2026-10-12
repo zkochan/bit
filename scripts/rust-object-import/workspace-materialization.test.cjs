@@ -67,7 +67,11 @@ test('actual DataToPersist materializes 150 nested files through multiple bounde
   for (let index = 0; index < 150; index++) data.addFile(file(directory, `nested/${index}.ts`, `a\r\nb\rc\n${index}`));
   await data.persistAllToFS();
   assert.ok(spawns.length > 0);
-  assert.deepEqual(spawns[0][1], ['--threads', String(Math.min(4, os.availableParallelism()))], 'use a CPU-sized bounded worker pool and reject invalid helpers promptly');
+  assert.deepEqual(
+    spawns[0][1],
+    ['--threads', String(Math.max(4, Math.min(8, os.availableParallelism() * (process.platform === 'win32' ? 1 : 2))))],
+    'use a bounded filesystem worker pool and reject invalid helpers promptly'
+  );
   for (const vinyl of data.files) assert.deepEqual(await fs.readFile(vinyl.path), eol.auto(vinyl.contents));
   assert.deepEqual(
     frames(acknowledgements).map((frame) => frame.completed),
