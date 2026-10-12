@@ -2,7 +2,7 @@ import {
   Ref,
   Source,
   canHashSourceNatively,
-  hasRustSnapshotTransactionClass,
+  hasRustSnapshotTransactionClassBatch,
   registerRustSnapshotFunctionReference,
   hasRustSnapshotFunctionReference,
 } from '@teambit/objects';
@@ -102,8 +102,7 @@ export function inheritRustWorkspaceFileSnapshot(original: AbstractVinyl, clone:
   if (
     process.env.BIT_RUST_CLIENT_VCS !== 'on' ||
     !snapshots.has(original) ||
-    !hasRustSnapshotTransactionClass(original, 'SourceFile') ||
-    !hasRustSnapshotTransactionClass(clone, 'SourceFile')
+    !hasRustSnapshotTransactionClassBatch([original, clone], 'SourceFile')
   )
     return;
   const value = snapshot(original);
@@ -245,7 +244,7 @@ export function getRustWorkspaceSource(file: AbstractVinyl): Source | undefined 
     snapshot: value,
     originalContents,
     canonicalContents,
-    canonicalSnapshot: Buffer.from(canonicalContents),
+    canonicalSnapshot: canonicalContents === originalContents ? value.contents : Buffer.from(canonicalContents),
     getter,
     setter,
     hash,
