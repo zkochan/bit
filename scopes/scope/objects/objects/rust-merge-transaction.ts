@@ -85,6 +85,8 @@ export async function retireRustMergeTransaction(): Promise<void> {
   owner.closing = true;
   await owner.requests;
   await owner.session?.dispose();
+  const sources = require('@teambit/component.sources') as typeof Sources;
+  await sources.retireRustWorkspaceEngine(true);
 }
 
 /** Nested callbacks borrow one physical engine; only protocol requests are serialized. */

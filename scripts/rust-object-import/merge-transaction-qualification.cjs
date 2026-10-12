@@ -9,7 +9,7 @@ const { sourceIdentity } = require('./artifacts/contract.cjs');
 const { benchmarkGlobals } = require('../rust-dependency-analysis/command-workspace.cjs');
 const fixtureModule = require('./merge-transaction-fixture.cjs');
 const { validateMergeTransactionDiagnostics } = require('./merge-transaction-validation.cjs');
-const { comparableMergeStdout } = require('./merge-transaction-report.cjs');
+const { comparableMergeStdout, comparableVersionHistory } = require('./merge-transaction-report.cjs');
 const { pairedEntries, measuredCommand } = require('./merge-history-measurement.cjs');
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 
@@ -45,7 +45,14 @@ async function localRuntimeDependencies(entries) {
   return [...seen].map((filename) => path.relative(__dirname, filename)).sort();
 }
 
-function comparable(state) {
+function comparable(state, concurrentHistory = false) {
+  if (concurrentHistory)
+    state = {
+      ...state,
+      objects: Object.fromEntries(
+        Object.entries(state.objects).map(([key, value]) => [key, comparableVersionHistory(value)])
+      ),
+    };
   if (!state.index) return state;
   const index = JSON.parse(Buffer.from(state.index, 'hex').toString());
   for (const key of ['components', 'lanes'])
@@ -64,8 +71,8 @@ function comparableStage(stage) {
     (scenario.topology !== 'fast-forward' || scenario.noSnap);
   return {
     ...stage,
-    before: comparable(stage.before),
-    after: comparable(stage.after),
+    before: comparable(stage.before, stage.scenario === 'main-into-lane-clean'),
+    after: comparable(stage.after, stage.scenario === 'main-into-lane-clean'),
     result: concurrentFileRows ? { ...stage.result, stdout: comparableMergeStdout(stage.result.stdout) } : stage.result,
   };
 }
@@ -520,7 +527,7 @@ async function runQualification(cli, helper, options = {}) {
   const report = {
     qualified: !options.canonicalSmoke,
     comparison:
-      'Raw artifacts retained; repository index entry order and adjacent concurrent added/updated CLI row order are compared as multisets; all other output and state remain exact',
+      'Raw artifacts retained; repository index entries, adjacent concurrent added/updated CLI rows, and complete VersionHistory rows in main-into-lane-clean are compared as multisets; all other output and state remain exact',
     proofSha256,
     measurementScope: options.measure
       ? {

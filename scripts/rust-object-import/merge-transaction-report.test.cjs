@@ -1,6 +1,36 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { comparableMergeStdout } = require('./merge-transaction-report.cjs');
+const { comparableMergeStdout, comparableVersionHistory } = require('./merge-transaction-report.cjs');
+
+test('canonical main-to-lane history insertion order preserves every row and ordered edge', () => {
+  const value = {
+    name: 'component',
+    scope: 'scope',
+    versions: [
+      { hash: 'a', parents: ['b', 'c'] },
+      { hash: 'b', parents: ['c'] },
+    ],
+    graphCompleteRefs: ['a', 'b'],
+  };
+  const encode = (data, type = 'VersionHistory') => {
+    const body = JSON.stringify(data);
+    return Buffer.from(`${type} identity ${Buffer.byteLength(body)}\0${body}`).toString('hex');
+  };
+  const original = comparableVersionHistory(encode(value));
+  assert.equal(original, comparableVersionHistory(encode({ ...value, versions: [...value.versions].reverse() })));
+  for (const changed of [
+    { ...value, name: 'other' },
+    { ...value, versions: [value.versions[0]] },
+    { ...value, versions: [value.versions[0], value.versions[0]] },
+    { ...value, versions: [{ ...value.versions[0], parents: ['c', 'b'] }, value.versions[1]] },
+    { ...value, graphCompleteRefs: ['b', 'a'] },
+  ])
+    assert.notEqual(original, comparableVersionHistory(encode(changed)));
+  const component = encode(value, 'Component');
+  assert.equal(comparableVersionHistory(component), component);
+  const malformed = Buffer.from('VersionHistory identity 3\0bad').toString('hex');
+  assert.equal(comparableVersionHistory(malformed), malformed);
+});
 
 test('concurrent canonical Source additions may complete in either order', () => {
   const first = 'component\n\tremoved removed.js \n\tadded added.js \n\tadded case.js \n\nMerge Summary\n';

@@ -14,7 +14,6 @@ import { LaneId } from '@teambit/lane-id';
 import type { UnmergedComponent } from '@teambit/legacy.scope';
 import {
   withRustMergeTransactionOperation,
-  isRustMergeTransactionOperation,
   retireRustMergeTransaction,
   withRustMergeTransactionJournal,
   completeRustMergeTransactionPhase,
@@ -260,7 +259,7 @@ export class MergingMain {
         if (componentWithConflict && !mergeStrategy) {
           // A prompt may end on stdin EOF without settling its promise. Release the
           // private child before handing control to the canonical interactive adapter.
-          if (isRustMergeTransactionOperation()) await retireRustMergeTransaction();
+          await retireRustMergeTransaction();
           mergeStrategy = await getMergeStrategyInteractive();
         }
         if (nativeApply && canUseRustMergeTransactionMode('apply')) await completeRustMergeTransactionPhase('prompt');

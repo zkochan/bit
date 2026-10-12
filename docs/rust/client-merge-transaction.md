@@ -94,7 +94,11 @@ compared with TypeScript. Raw reports are retained. Canonical concurrent Source
 loads can reorder adjacent added/updated report rows even between Node-only
 runs; comparison treats only each such same-status block as a multiset. Row
 bytes, counts, status/component boundaries and all other output stay significant.
-Repository index entry order is also treated as unordered. Native acceptance
+Repository index entry order is also treated as unordered. In the main-to-lane
+clean route, Node-only repeats also insert independent VersionHistory rows in
+different orders. That route compares complete history rows as a multiset while
+preserving every row, parent order, graph-complete reference order and header.
+The original persisted bytes remain in each artifact. Native acceptance
 separately requires actual policy
 selection, verified decoder reads and completed writes where the route performs
 them. Lost-results, pending-write and snap receipts require their observed

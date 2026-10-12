@@ -15,4 +15,27 @@ function comparableMergeStdout(stdout) {
   }
   return lines.join('');
 }
-module.exports = { comparableMergeStdout };
+// VersionHistory stores a hash-keyed map as an array. Concurrent canonical
+// population can insert independent heads in either order. Parent arrays and
+// graphCompleteRefs remain ordered; only complete version rows are a multiset.
+function comparableVersionHistory(hex) {
+  const bytes = Buffer.from(hex, 'hex');
+  if (!bytes.subarray(0, 15).equals(Buffer.from('VersionHistory '))) return hex;
+  const separator = bytes.indexOf(0);
+  if (separator < 0) return hex;
+  const body = bytes.subarray(separator + 1).toString();
+  let value;
+  try {
+    value = JSON.parse(body);
+  } catch {
+    return hex;
+  }
+  if (!Array.isArray(value.versions) || JSON.stringify(value) !== body) return hex;
+  value.versions.sort((a, b) => {
+    const left = JSON.stringify(a),
+      right = JSON.stringify(b);
+    return left < right ? -1 : left > right ? 1 : 0;
+  });
+  return Buffer.concat([bytes.subarray(0, separator + 1), Buffer.from(JSON.stringify(value))]).toString('hex');
+}
+module.exports = { comparableMergeStdout, comparableVersionHistory };
