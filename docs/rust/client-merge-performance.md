@@ -110,3 +110,13 @@ continuation. Source hydration and lazy compatibility getters read only the sele
 range, reject truncation and verify its hash. Each public read gets an independent
 Buffer while existing clone aliases remain shared. Native materialization continues
 to use retained Rust bytes, and escaped getters become eager before pack cleanup.
+
+Owned merge preparation and retargeting dispatch their heavy work onto the helper's
+existing configured Rayon pool. Source reads use bounded worker shares for both
+compressed and raw bytes, commit receipts in input order, and retry only an
+unsupported read-only batch with the full remaining serial budget. Failed worker
+reads do not publish duplicate Source receipts. Merge classification reuses this
+pool, including the caller's one-thread setting, instead of creating another pool.
+Each worker reuses its zlib decoder and 64 KiB scratch buffer, resetting before every
+object, including after errors. The preparation microbenchmark accepts `--packed`
+to include packed private snapshots while verifying every selected body.
