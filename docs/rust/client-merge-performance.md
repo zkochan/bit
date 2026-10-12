@@ -53,6 +53,19 @@ They exercise clean incoming changes, not expensive Git conflict resolution.
 Fixture creation, output verification and cleanup are excluded. Filesystem caches
 are warm; use `TMPDIR` to choose storage.
 
+Read-only checkout preflight can be compared separately with:
+
+```sh
+node scripts/rust-object-import/checkout-preflight-benchmark.cjs /absolute/baseline-helper /absolute/candidate-helper
+```
+
+This keeps both helpers alive with their default worker counts, alternates their
+request order, warms each size twice and retains seven pairs. Each batch contains
+64 Sources of 1 KiB, 64 KiB or 512 KiB. Reports include helper hashes and raw
+request times. Fixture setup, cleanup, Node compatibility work and workspace
+writes are outside the timer. This benchmark cannot establish a Node/native
+whole-command speed advantage.
+
 Complete-command qualification and measurement use
 `merge-transaction-qualification.cjs` and `merge-transaction-measure.cjs`.
 These include CLI startup, adapters, helper work, Git, public effects and cleanup.
