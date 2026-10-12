@@ -15,6 +15,10 @@ body. They do not serialize that body as hexadecimal or create another spool.
 Git output and conflict bodies receive separate retained entries. The standalone
 merge-history protocol still returns its existing wire representation.
 
+Buffer alias validation enumerates own keys directly. It rejects the same extra
+properties without allocating a property descriptor for every byte; alias identity
+and content hashes remain checked.
+
 ## Reproduction
 
 Build the release helper from `native/`, then run:
