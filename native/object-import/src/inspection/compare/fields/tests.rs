@@ -33,7 +33,7 @@ fn alignment_preserves_first_duplicates_unmatched_rows_and_utf16_identity() {
         json!([
             {"index":0,"modelIndex":3}, {"index":1,"modelIndex":1},
             {"index":2,"modelIndex":4}, {"index":4,"modelIndex":5}
-        ])
+        ]),
     );
     for (row, expected) in array(get(&current, "files"))
         .unwrap()
@@ -50,7 +50,7 @@ fn invalid_current_path_leaves_all_input_rows_unchanged() {
     let before = serde_json::to_value(&current).unwrap();
     assert_eq!(
         align_files(&model, &mut current).unwrap_err().to_string(),
-        "inspection expected string"
+        "inspection expected string",
     );
     assert_eq!(serde_json::to_value(&current).unwrap(), before);
 }

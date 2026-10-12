@@ -133,7 +133,7 @@ pub(crate) fn serve(
         &request,
         Ok(Request::InspectionDiff(_)
             | Request::HistoryQueryBlame(_)
-            | Request::HistoryQueryDiff(_))
+            | Request::HistoryQueryDiff(_)),
     ) {
         32 * 1024 * 1024
     } else {
