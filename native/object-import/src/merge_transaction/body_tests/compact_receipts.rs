@@ -17,7 +17,7 @@ fn compact_apply_returns_only_new_bodies_and_rejects_stale_prefixes() {
             .as_array()
             .unwrap()
             .len(),
-        1
+        1,
     );
     assert_eq!(compact["bodies"][0]["planIndex"], 1);
     assert!(compact.get("targetFiles").is_none());
