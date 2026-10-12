@@ -117,3 +117,31 @@ test('command diagnostics observe genuine addon frames and acknowledgements', as
   assert.equal(result.workspaceFrames.length, 1);
   assert.equal(result.workspaceFrames[0].backend, 'addon');
 });
+
+test('native requests complete while the Node worker pool is occupied', () => {
+  const input = frame(7, { kind: 'compare', left: 'same', right: 'same' }).toString('hex');
+  execFileSync(process.execPath, ['-e', `
+    const assert = require('node:assert/strict');
+    const { pbkdf2 } = require('node:crypto');
+    const { WorkspaceEngine } = require(process.env.BIT_TEST_WORKSPACE_ADDON);
+    const occupied = new Promise((resolve, reject) => pbkdf2('input', 'salt', 5000000, 32, 'sha256', error => error ? reject(error) : resolve('node')));
+    const engine = new WorkspaceEngine(4);
+    (async () => {
+      const native = engine.request(Buffer.from('${input}', 'hex')).then(() => 'rust');
+      assert.equal(await Promise.race([occupied, native]), 'rust');
+      engine.close();
+      await occupied;
+    })().catch(error => { engine.close(); console.error(error); process.exitCode = 1; });
+  `], { env: { ...process.env, UV_THREADPOOL_SIZE: '1' }, timeout: 30000 });
+});
+
+test('independent owners share bounded Rust workers without blocking each other', async () => {
+  const engines = Array.from({ length: 16 }, () => new WorkspaceEngine(4));
+  try {
+    const results = await Promise.all(engines.map((engine, index) =>
+      engine.request(frame(index + 1, { kind: 'compare', left: 'same', right: 'same' }))));
+    assert.deepEqual(results.map((result) => JSON.parse(result).id), engines.map((_, index) => index + 1));
+  } finally {
+    engines.forEach((engine) => engine.close());
+  }
+});

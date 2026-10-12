@@ -1,4 +1,4 @@
-pub use session::WorkspaceSession;
+pub use session::{WorkspaceDispatcher, WorkspaceSession};
 
 mod checkout;
 mod checkout_transition;

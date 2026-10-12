@@ -1,9 +1,24 @@
-use std::io::{self, Cursor, Read};
+use std::{
+    io::{self, Cursor, Read},
+    sync::{Arc, OnceLock},
+};
+
+static POOLS: [OnceLock<Arc<rayon::ThreadPool>>; 8] = [const { OnceLock::new() }; 8];
+
+/// Schedule requests on the same bounded workers used by their parallel file operations.
+#[derive(Clone)]
+pub struct WorkspaceDispatcher(Arc<rayon::ThreadPool>);
+
+impl WorkspaceDispatcher {
+    pub fn spawn(&self, task: impl FnOnce() + Send + 'static) {
+        self.0.spawn(task);
+    }
+}
 
 /// A workspace protocol session whose state survives individual requests.
 /// Callers must serialize requests and wait for outstanding work before replaying it.
 pub struct WorkspaceSession {
-    pool: rayon::ThreadPool,
+    pool: Arc<rayon::ThreadPool>,
     checkout: crate::checkout::cache::State,
     merge: crate::merge_state::State,
     store: Option<crate::store::Store>,
@@ -15,14 +30,16 @@ impl WorkspaceSession {
             return Err(io::Error::other("thread count must be between 1 and 8"));
         }
         Ok(Self {
-            pool: rayon::ThreadPoolBuilder::new()
-                .num_threads(threads)
-                .build()
-                .map_err(io::Error::other)?,
+            pool: shared_pool(threads)?,
             checkout: crate::checkout::cache::State::default(),
             merge: crate::merge_state::State::default(),
             store: None,
         })
+    }
+
+    #[must_use]
+    pub fn dispatcher(&self) -> WorkspaceDispatcher {
+        WorkspaceDispatcher(Arc::clone(&self.pool))
     }
 
     pub fn with_store(
@@ -58,4 +75,18 @@ impl WorkspaceSession {
         }
         Ok(output)
     }
+}
+
+fn shared_pool(threads: usize) -> io::Result<Arc<rayon::ThreadPool>> {
+    let entry = &POOLS[threads - 1];
+    if let Some(pool) = entry.get() {
+        return Ok(Arc::clone(pool));
+    }
+    let pool = Arc::new(
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(threads)
+            .build()
+            .map_err(io::Error::other)?,
+    );
+    Ok(Arc::clone(entry.get_or_init(|| pool)))
 }

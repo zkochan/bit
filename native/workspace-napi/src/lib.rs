@@ -1,7 +1,7 @@
-use bit_object_import::WorkspaceSession;
+use bit_object_import::{WorkspaceDispatcher, WorkspaceSession};
 use napi::{
     Env, Error, Result, Task,
-    bindgen_prelude::{AsyncTask, Buffer},
+    bindgen_prelude::{Buffer, Object},
 };
 use napi_derive::napi;
 use std::{
@@ -13,6 +13,7 @@ use std::{
 };
 
 struct State {
+    dispatcher: WorkspaceDispatcher,
     session: Mutex<Option<WorkspaceSession>>,
     closed: AtomicBool,
     busy: AtomicBool,
@@ -50,7 +51,7 @@ impl WorkspaceEngine {
     }
 
     #[napi]
-    pub fn request(&self, frame: Buffer) -> Result<AsyncTask<WorkspaceRequest>> {
+    pub fn request<'env>(&self, env: &'env Env, frame: Buffer) -> Result<Object<'env>> {
         if frame.len() > 128 * 1024 * 1024 || self.state.closed.load(Ordering::Acquire) {
             return Err(failure("workspace engine closed or frame too large"));
         }
@@ -59,7 +60,17 @@ impl WorkspaceEngine {
         }
         let bytes = frame.to_vec();
         drop(frame);
-        Ok(AsyncTask::new(WorkspaceRequest { state: Arc::clone(&self.state), frame: bytes }))
+        let mut task = WorkspaceRequest { state: Arc::clone(&self.state), frame: bytes };
+        let (deferred, promise) = env.create_deferred::<Buffer, _>()?;
+        self.state.dispatcher.spawn(move || {
+            let result = task.compute();
+            deferred.resolve(move |env| {
+                let result = result.and_then(|output| task.resolve(env, output));
+                task.finally(env)?;
+                result
+            });
+        });
+        Ok(promise)
     }
 
     /// Retire without blocking the event loop. The caller must await its active request.
@@ -76,6 +87,7 @@ impl WorkspaceEngine {
     fn from_session(session: WorkspaceSession) -> Self {
         Self {
             state: Arc::new(State {
+                dispatcher: session.dispatcher(),
                 session: Mutex::new(Some(session)),
                 closed: AtomicBool::new(false),
                 busy: AtomicBool::new(false),
@@ -89,7 +101,6 @@ pub struct WorkspaceRequest {
     frame: Vec<u8>,
 }
 
-#[napi]
 impl Task for WorkspaceRequest {
     type Output = Vec<u8>;
     type JsValue = Buffer;
