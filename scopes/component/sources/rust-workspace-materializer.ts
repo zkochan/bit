@@ -163,7 +163,9 @@ export class MaterializationSession {
       if (!this.nativeActive) this.finishNativeClose();
       return;
     }
-    this.child!.kill('SIGTERM');
+    // A failed spawn has no process to signal; an uninitialized handle can target the process group.
+    if (!this.child?.pid || this.child.pid <= 0) return;
+    this.child.kill('SIGTERM');
     this.killTimer = setTimeout(() => this.child!.kill('SIGKILL'), 250);
     this.killTimer.unref();
   }
