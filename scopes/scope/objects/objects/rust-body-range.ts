@@ -136,7 +136,7 @@ export function readRustBodyRangeSync(filename: string, offset: number, bytes: n
 async function readRetained(filename: string, batch: ReadBatch): Promise<boolean> {
   if (process.env.BIT_RUST_CLIENT_VCS !== 'on') return false;
   try {
-    const engine = require('@teambit/component.sources/dist/rust-workspace-engine');
+    const engine = require('@teambit/component.sources/dist/rust-workspace-engine.js');
     const readRetainedRustBodyRanges = Object.getOwnPropertyDescriptor(engine, 'readRetainedRustBodyRanges')?.value;
     if (!hasRustSnapshotFunctionReference('RetainedWorkspaceBodyReader', readRetainedRustBodyRanges)) return false;
     const ranges = allocateBuffer(batch.ranges.length * 8);

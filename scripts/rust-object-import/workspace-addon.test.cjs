@@ -180,6 +180,7 @@ test('retained addon reads copy owned bodies and decline changed spools without 
   const input = frame(1, {
     kind: 'checkoutPrepare', packedBodies: true, objectsDirectory: objects, snapshotDirectory: snapshots,
     target: { hash: version, files: [{ hash, relativePath: 'index.ts' }] }, current: [],
+    base: { hash: version, files: [{ hash, relativePath: 'index.ts' }] }, labels: { current: 'ours', other: 'theirs' },
   });
   input.write('BMT1');
   const response = JSON.parse(await engine.request(input));
@@ -220,4 +221,52 @@ test('adapter disposal waits for optional retained reads and discards late bytes
   assert.equal(await pending, undefined);
   await disposal;
   assert.equal(disposed, true);
+});
+
+test('retained range adapter preserves aliases and falls back on misses, failures and replaced hooks', {
+  skip: process.platform === 'win32',
+}, async (t) => {
+  const { installed } = require('./load-source.cjs');
+  const materializer = installed('@teambit/component.sources/dist/rust-workspace-materializer.js');
+  const owner = installed('@teambit/component.sources/dist/rust-workspace-engine.js');
+  const { readRustBodyRange } = installed('@teambit/objects/dist/objects/rust-body-range.js');
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-retained-adapter-'));
+  const filename = path.join(directory, 'spool');
+  const disk = Buffer.from([0, 255, 13, 10]);
+  await fs.writeFile(filename, disk);
+  const physical = session();
+  const acquire = materializer.acquireWorkspaceSession;
+  const flag = process.env.BIT_RUST_CLIENT_VCS;
+  const reader = Object.getOwnPropertyDescriptor(owner, 'readRetainedRustBodyRanges');
+  t.after(async () => {
+    materializer.acquireWorkspaceSession = acquire;
+    Object.defineProperty(owner, 'readRetainedRustBodyRanges', reader);
+    if (flag === undefined) delete process.env.BIT_RUST_CLIENT_VCS;
+    else process.env.BIT_RUST_CLIENT_VCS = flag;
+    await physical.dispose();
+    await fs.rm(directory, { recursive: true, force: true });
+  });
+  materializer.acquireWorkspaceSession = () => ({ session: physical, release: async () => {} });
+  process.env.BIT_RUST_CLIENT_VCS = 'on';
+  let calls = 0;
+  physical.engine.readBodyRanges = async () => { calls++; return Buffer.concat([disk, disk]); };
+  await owner.withRustWorkspaceEngine(async () => {
+    const [first, second] = await Promise.all([
+      readRustBodyRange(filename, 0, 4), readRustBodyRange(filename, 0, 4),
+    ]);
+    assert.equal(calls, 1);
+    first.fill(42);
+    assert.deepEqual(second, disk);
+    for (const result of [null, Buffer.from('short')]) {
+      physical.engine.readBodyRanges = async () => result;
+      assert.deepEqual(await readRustBodyRange(filename, 0, 4), disk);
+    }
+    physical.engine.readBodyRanges = async () => { throw new Error('optional read failed'); };
+    assert.deepEqual(await readRustBodyRange(filename, 0, 4), disk);
+    assert.equal(physical.usable, true);
+    let getters = 0;
+    Object.defineProperty(owner, 'readRetainedRustBodyRanges', { configurable: true, get() { getters++; } });
+    assert.deepEqual(await readRustBodyRange(filename, 0, 4), disk);
+    assert.equal(getters, 0);
+  });
 });
