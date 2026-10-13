@@ -1,3 +1,5 @@
+pub(super) mod comparison;
+
 mod history;
 mod index;
 mod remotes;
@@ -37,10 +39,10 @@ pub(super) struct Snapshot {
     histories: Option<Vec<Value>>,
 }
 pub(super) fn read(request: &Request, pool: &rayon::ThreadPool) -> io::Result<(usize, Value)> {
-    let snapshot = load(request, pool)?;
+    let snapshot = load(request, pool, true)?;
     Ok((snapshot.models.len(), serde_json::to_value(snapshot).map_err(io::Error::other)?))
 }
-fn load(request: &Request, pool: &rayon::ThreadPool) -> io::Result<Snapshot> {
+fn load(request: &Request, pool: &rayon::ThreadPool, stored_hashes: bool) -> io::Result<Snapshot> {
     super::path(&request.root)?;
     if request.targets.len() > 4096 {
         return Err(invalid("status model target limit"));
@@ -59,23 +61,17 @@ fn load(request: &Request, pool: &rayon::ThreadPool) -> io::Result<Snapshot> {
             .collect::<io::Result<Vec<_>>>()
     })?;
     let references = versions::references(&models, &request.targets)?;
-    let versions = pool.install(|| {
-        references
-            .par_iter()
-            .map(|reference| {
-                let value = reader.read(reference, "Version")?;
-                crate::history_query::validate_version(&value)?;
-                crate::read_version::parents(&value)?;
-                Ok((reference.clone(), value))
-            })
-            .collect::<io::Result<Vec<_>>>()
-    })?;
-    let semantics = pool.install(|| {
-        versions
-            .par_iter()
-            .map(|(_, value)| semantic::hash(value))
-            .collect::<io::Result<Vec<_>>>()
-    })?;
+    let versions = versions::read(&reader, &references, pool)?;
+    let semantics = if stored_hashes {
+        pool.install(|| {
+            versions
+                .par_iter()
+                .map(|(_, value)| semantic::hash(value))
+                .collect::<io::Result<Vec<_>>>()
+        })?
+    } else {
+        Vec::new()
+    };
     let histories =
         if request.history { Some(history::read(&reader, &models, request, pool)?) } else { None };
     Ok(Snapshot { models, versions, semantics, histories })

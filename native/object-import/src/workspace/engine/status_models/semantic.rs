@@ -4,6 +4,10 @@ use serde_json::{Map, Value, json};
 use std::io;
 
 pub(super) fn hash(model: &Value) -> io::Result<String> {
+    Ok(crate::snapshot_projection::semantic(&project(model)?)?.hash)
+}
+
+pub(super) fn project(model: &Value) -> io::Result<Js> {
     let mut fields = fields(model)?;
     for field in ["dependencies", "devDependencies"] {
         let value = fields
@@ -38,7 +42,7 @@ pub(super) fn hash(model: &Value) -> io::Result<String> {
                 .collect::<io::Result<_>>()?,
         ),
     );
-    Ok(crate::snapshot_projection::semantic(&convert(&Value::Object(fields))?)?.hash)
+    convert(&Value::Object(fields))
 }
 fn fields(model: &Value) -> io::Result<Map<String, Value>> {
     let object = model.as_object().ok_or_else(|| invalid("status Version object"))?;

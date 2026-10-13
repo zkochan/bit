@@ -45,6 +45,7 @@ enum Request {
         request: Value,
     },
     StatusModels(status_models::Request),
+    StatusCompare(status_models::comparison::Request),
     StatusPrepare(client_status::Prepare),
     StatusScan(client_status::Scan),
     StatusFinish(client_status::Finish),
@@ -164,6 +165,7 @@ fn failure(id: u32) -> Response {
 fn apply(request: Request, pool: &rayon::ThreadPool) -> io::Result<(usize, Value)> {
     match request {
         Request::StatusModels(request) => status_models::read(&request, pool),
+        Request::StatusCompare(request) => status_models::comparison::read(&request, pool),
         Request::DependencyPolicyPackages(request) => {
             dependency_policy::packages_on_disk::read(&request, pool)
         }

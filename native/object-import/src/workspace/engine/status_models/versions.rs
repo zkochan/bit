@@ -1,4 +1,5 @@
-use super::{Target, invalid};
+use super::{Reader, Target, invalid};
+use rayon::prelude::*;
 use serde_json::Value;
 use std::{
     collections::{HashMap, HashSet},
@@ -40,4 +41,23 @@ pub(super) fn reference(model: &Value, version: &str) -> io::Result<String> {
         .as_str()
         .map(str::to_owned)
         .ok_or_else(|| invalid("status model version absent"))
+}
+
+// The mutable Version body is read once per reference in this command.
+pub(super) fn read(
+    reader: &Reader<'_>,
+    references: &[String],
+    pool: &rayon::ThreadPool,
+) -> io::Result<Vec<(String, Value)>> {
+    pool.install(|| {
+        references
+            .par_iter()
+            .map(|reference| {
+                let value = reader.read(reference, "Version")?;
+                crate::history_query::validate_version(&value)?;
+                crate::read_version::parents(&value)?;
+                Ok((reference.clone(), value))
+            })
+            .collect()
+    })
 }

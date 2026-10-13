@@ -6,8 +6,8 @@ const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const { installed } = require('./load-source.cjs');
 const { ModelComponent, Version, Source } = installed('@teambit/objects');
-function request(root, targets, history = false) {
-  const body = Buffer.from(JSON.stringify({ kind: 'statusModels', root, targets, history }));
+function request(root, targets, history = false, compare = false) {
+  const body = Buffer.from(JSON.stringify(compare ? { kind: 'statusCompare', root, targets } : { kind: 'statusModels', root, targets, history }));
   const header = Buffer.alloc(12);
   header.write('BWS1');
   header.writeUInt32BE(1, 4);
@@ -20,6 +20,105 @@ function request(root, targets, history = false) {
     })
   );
 }
+
+test('owned status comparisons match the public Consumer across source and semantic changes', async (t) => {
+  const { root, version, targets, index } = await fixture(t);
+  const { Consumer } = installed('@teambit/legacy.consumer');
+  const { ConsumerComponent } = installed('@teambit/legacy.consumer-component');
+  const { SourceFile } = installed('@teambit/component.sources');
+  const { deflateSync } = require('node:zlib');
+  const previousFlag = process.env.BIT_RUST_CLIENT_VCS;
+  process.env.BIT_RUST_CLIENT_VCS = 'off';
+  t.after(() => {
+    if (previousFlag === undefined) delete process.env.BIT_RUST_CLIENT_VCS;
+    else process.env.BIT_RUST_CLIENT_VCS = previousFlag;
+  });
+  index.components = index.components.slice(0, 1);
+  await fs.writeFile(path.join(root, '.bit/index.json'), JSON.stringify(index));
+  const directory = path.join(root, 'component');
+  await fs.mkdir(directory);
+  const filename = path.join(directory, 'index.js');
+  const hash = version.hash().toString();
+  const objectFile = path.join(root, '.bit/objects', hash.slice(0, 2), hash.slice(2));
+  for (let i = 0; i < 96; i++) {
+    const raw = JSON.parse(version.toBuffer().toString());
+    raw.packageDependencies = { z: '^2.0.0', a: '^1.0.0' };
+    raw.overrides = { dependencies: { z: '^2', a: '^1' } };
+    raw.dependencies = [
+      { id: { scope: 'qualification.status', name: 'dep', version: '1.0.0' }, relativePaths: [] },
+    ];
+    raw.extensions = [{ name: 'teambit.dependencies/dependency-resolver', config: { enabled: true }, data: {} }];
+    const body = Buffer.from(JSON.stringify(raw));
+    await fs.writeFile(objectFile, deflateSync(Buffer.concat([Buffer.from(`Version ${hash} ${body.length}\0`), body])));
+    const current = structuredClone(raw);
+    for (const field of Object.keys(current)) {
+      if (!['mainFile', 'dependencies', 'devDependencies', 'packageDependencies', 'devPackageDependencies',
+        'peerPackageDependencies', 'bindingPrefix', 'overrides', 'extensions'].includes(field)) delete current[field];
+    }
+    current.packageDependencies = { a: '^1.0.0', z: '^2.0.0' };
+    current.overrides.dependencies = { a: '^1', z: '^2' };
+    // The current ID can be unresolved; the model supplies its version.
+    if (i % 2) delete current.dependencies[0].id.version;
+    let contents = Buffer.from(i % 3 ? '\ufeffmodule.exports = 1;\r\n' : 'module.exports = 1;\n');
+    switch (i % 8) {
+      case 1: current.packageDependencies.a = '^3'; break;
+      case 2: current.dependencies[0].id.version = '2.0.0'; break;
+      case 3: current.extensions[0].config.enabled = false; break;
+      case 4: current.overrides.dependencies.a = '^3'; break;
+      case 5: contents = Buffer.from([0, 255, 13, 10]); break;
+      case 6: current.mainFile = 'other.js'; break;
+      default: break;
+    }
+    await fs.writeFile(filename, contents);
+    const sourceFile = SourceFile.load(filename, directory, root);
+    const currentFiles = [{ relativePath: 'index.js', name: 'old ignored name', test: true,
+      file: sourceFile.toSourceAsLinuxEOL().hash().toString() }];
+    const left = Version.parse(body.toString(), hash);
+    const right = Version.parse(JSON.stringify({ ...current, files: currentFiles, log: raw.log }), hash);
+    const component = new ConsumerComponent({ name: 'component0', scope: 'qualification.status',
+      version: '1.0.0', mainFile: current.mainFile, files: [], dependencies: [], devDependencies: [] });
+    const context = { scope: { sources: { consumerComponentToVersion: async () => ({ version: right }) } } };
+    const expected = await Consumer.prototype.isComponentModified.call(context, left, component);
+    const actual = request(root, [{ ...targets[0], directory: 'component', files: ['index.js'], current }], false, true);
+    assert.equal(actual.failed, false, `case ${i}`);
+    assert.deepEqual(actual.data.comparisons, [{ identity: targets[0].identity, modified: expected,
+      modelHash: left.calculateHash().toString(), currentHash: right.calculateHash().toString() }], `case ${i}`);
+  }
+});
+
+test('owned status reads share the batch budget and publish no partial comparisons', async (t) => {
+  const { root, targets } = await fixture(t);
+  const batch = targets.map((target, index) => ({ ...target, directory: `component-${index}`,
+    files: ['index.js'], current: { mainFile: 'index.js' } }));
+  await Promise.all(batch.map(async (target) => {
+    const directory = path.join(root, target.directory);
+    await fs.mkdir(directory);
+    await fs.writeFile(path.join(directory, 'index.js'), 'module.exports = 1;\n');
+  }));
+  const initial = request(root, batch, false, true);
+  assert.equal(initial.failed, false);
+  assert.equal(initial.data.comparisons.length, batch.length);
+  assert.deepEqual(initial.data.comparisons.map((row) => row.identity), targets.map((target) => target.identity));
+  assert.ok(initial.data.comparisons.every((row) => !row.modified));
+  const file = path.join(root, batch[65].directory, 'index.js');
+  await fs.writeFile(file, 'module.exports = 2;\n');
+  const changed = request(root, batch, false, true);
+  assert.deepEqual(changed.data.comparisons.filter((row) => row.modified).map((row) => row.identity), [targets[65].identity]);
+  for (const bad of [
+    { files: ['../index.js'] }, { directory: '../outside' }, { files: ['index.js', 'index.js'] },
+    { current: { mainFile: 'index.js', files: [] } }, { identity: 'qualification.status/missing' },
+    { files: ['missing.js'] },
+  ]) {
+    const response = request(root, [batch[0], { ...batch[1], ...bad }], false, true);
+    assert.equal(response.failed, true, JSON.stringify(bad));
+    assert.equal(response.data, undefined);
+  }
+  // Two individually acceptable files exceed the shared eight-MiB budget.
+  await fs.writeFile(file, Buffer.alloc(5 * 1024 * 1024, 120));
+  await fs.writeFile(path.join(root, batch[66].directory, 'index.js'), Buffer.alloc(5 * 1024 * 1024, 120));
+  assert.equal(request(root, batch, false, true).failed, true);
+  assert.equal(request(root, batch.slice(0, 1), false, true).failed, false);
+});
 async function fixture(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-status-models-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
