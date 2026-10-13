@@ -744,7 +744,7 @@ jobs:
                 BIT_RUST_CLIENT_VCS:mode==='node'?'off':'on',BIT_RUST_OBJECT_IMPORT:process.env.BIT_BENCHMARK_HELPER,
                 BIT_CHECKOUT_TRANSITION_QUALIFICATION_SEED:createHash('sha256').update(args.join('\\0')).digest('hex'),
                 BIT_CHECKOUT_TRANSITION_QUALIFICATION_CLOCK:'1700000060000',BIT_CHECKOUT_TRANSITION_DISPLAY_DURATION:'deterministic'
-              },maxBuffer:128*1024*1024,timeout:120000});
+              },maxBuffer:128*1024*1024,timeout:120000}).then(output=>({...output,code:0}));
             }
             const {comparableMergeStdout} = require('./scripts/rust-object-import/merge-transaction-report.cjs');
             const states = [];
