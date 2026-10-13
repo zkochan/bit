@@ -1,6 +1,8 @@
 pub(crate) mod client_status;
 pub(crate) mod diff;
 pub(crate) mod inventory;
+
+mod dependency_policy;
 mod read;
 mod read_dependency_cache;
 mod read_raw;
@@ -31,6 +33,7 @@ const MAX_FILES: usize = 4096;
     deny_unknown_fields
 )]
 enum Request {
+    DependencyPolicy(Box<dependency_policy::Request>),
     DependencyCacheRead(read_dependency_cache::Read),
     DependencyCacheFreshness(read_dependency_cache::Freshness),
     DependencyResolve(resolve_dependencies::Request),
@@ -155,6 +158,7 @@ fn failure(id: u32) -> Response {
 }
 fn apply(request: Request, pool: &rayon::ThreadPool) -> io::Result<(usize, Value)> {
     match request {
+        Request::DependencyPolicy(request) => dependency_policy::apply(&request),
         Request::DependencyCacheRead(request) => read_dependency_cache::read(&request),
         Request::DependencyCacheFreshness(request) => {
             read_dependency_cache::freshness(&request, pool)
