@@ -99,7 +99,7 @@ fn staged_manifest_reads_share_the_retained_view() {
     let fixture = Fixture::new();
     let component = fixture.0.join("component");
     fs::create_dir_all(&component).unwrap();
-    let linked = fixture.0.join("node_modules/pkg");
+    let linked = fixture.0.join("node_modules").join("pkg");
     let mut overlay = SourceOverlay::new(&fixture.0).unwrap();
     overlay
         .insert_source(&linked.join("fresh.js"), &fixture.source(b"module.exports=1"))

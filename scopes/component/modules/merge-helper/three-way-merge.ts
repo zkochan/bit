@@ -163,7 +163,7 @@ export async function continueThreeWayMerge({
     baseFile?: SourceFileModel,
     otherFile?: SourceFileModel,
     captured?: MergeCurrentObservation
-  ) => {
+  ): Promise<MergeResultsThreeWay['updatedFiles'][number] | undefined> => {
     const filePath: PathLinux = captured ? captured.filePath : pathNormalizeToLinux(fsFile.relative);
     const fsFileHash = captured ? captured.hash : sha1(fsFile.contents);
     if (!otherFile) {
@@ -194,12 +194,11 @@ export async function continueThreeWayMerge({
       const content = observedSources
         ? await observedSources.load(otherFile)
         : ((await otherFile.file.load(scope.objects)) as Source);
-      results.updatedFiles.push({
+      return {
         filePath,
         otherFile,
         content: observedSources ? observedSources.contents(otherFile, content) : content.contents,
-      });
-      return;
+      };
     }
     // it was changed in both, there is a chance for conflict. (regardless the base)
     if (!captured) {
@@ -210,16 +209,19 @@ export async function continueThreeWayMerge({
     results.modifiedFiles.push({ filePath, fsFile, baseFile, otherFile, output: null, conflict: null });
   };
 
-  await Promise.all(
+  const updatedFiles = await Promise.all(
     currentFiles.map(async (fsFile, index) => {
       const captured = observedCurrent?.[index];
       if (captured) return getFileResult(fsFile, captured.baseFile, captured.otherFile, captured);
       const relativePath = pathNormalizeToLinux(fsFile.relative);
       const baseFile = baseFiles.find((file) => file.relativePath === relativePath);
       const otherFile = otherFiles.find((file) => file.relativePath === relativePath);
-      await getFileResult(fsFile, baseFile, otherFile);
+      return getFileResult(fsFile, baseFile, otherFile);
     })
   );
+  for (const updatedFile of updatedFiles) {
+    if (updatedFile) results.updatedFiles.push(updatedFile);
+  }
   const fsFilesPaths = currentFiles.map((fsFile) => pathNormalizeToLinux(fsFile.relative));
   const baseFilesPaths = baseFiles.map((baseFile) => baseFile.relativePath);
   const isOtherSameAsBase = (otherFile: SourceFileModel) => {
