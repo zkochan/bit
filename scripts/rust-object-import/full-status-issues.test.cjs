@@ -7,6 +7,7 @@ const { installed, source } = require('./load-source.cjs');
 const { collectRustStatusIssues } = source('scopes/harmony/bit/rust-status-issues.ts');
 const { ComponentID } = installed('@teambit/component-id');
 const { IssuesList } = installed('@teambit/component-issues');
+const { PkgMain } = installed('@teambit/pkg/dist/pkg.main.runtime.js');
 const { CompilerMain } = installed('@teambit/compiler/dist/compiler.main.runtime.js');
 const { InstallMain } = installed('@teambit/install/dist/install.main.runtime.js');
 const { DependencyResolverMain } = installed('@teambit/dependency-resolver/dist/dependency-resolver.main.runtime.js');
@@ -39,7 +40,7 @@ test('cold built-in issues match canonical callbacks across package layouts and 
       versions: [],
       targets: identities.map((id) => ({
         identity: id.split('@')[0],
-        directory: id.includes('alpha') ? 'alpha' : 'beta',
+        directory: id.includes('alpha') ? 'alpha' : variant >= 18 ? '.' : 'beta',
       })),
     };
     const rows = identities.map((identity, index) => ({
@@ -55,6 +56,7 @@ test('cold built-in issues match canonical callbacks across package layouts and 
           ? 'node_modules/.bit_roots/test.scope_alpha/node_modules/@test/scope.alpha'
           : 'node_modules/.bit_roots/teambit.harmony_node/node_modules/@test/scope.alpha';
     await fs.mkdir(path.join(root, alphaDir, 'dist'), { recursive: true });
+    if (variant % 5 === 0) await fs.mkdir(path.join(root, 'node_modules/@test/scope.beta'), { recursive: true });
     const canonical = rows.map((row) => ({
       id: { toString: () => row.identity, toStringWithoutVersion: () => row.identity.split('@')[0] },
       state: {
@@ -78,6 +80,23 @@ test('cold built-in issues match canonical callbacks across package layouts and 
     const cwd = process.cwd();
     process.chdir(root);
     try {
+      const pkgContext = {
+        dependencyResolver: {
+          getModulePath: (component) => path.join('node_modules', rows[canonical.indexOf(component)].packageName),
+        },
+        workspace: {
+          path: root,
+          bitMap: {
+            getBitmapEntryIfExist: (id) => ({
+              rootDir: context.targets.find((target) => target.identity === id.toStringWithoutVersion()).directory,
+            }),
+          },
+        },
+        getModulePath: PkgMain.prototype.getModulePath,
+        isModulePathExists: PkgMain.prototype.isModulePathExists,
+      };
+      for (const component of canonical)
+        await PkgMain.prototype.addMissingLinksFromNodeModulesIssue.call(pkgContext, component);
       await CompilerMain.prototype.addMissingDistsIssue.call(
         {
           envs: { getOrCalculateEnv: () => ({ env: { getCompiler: () => ({}) } }) },
@@ -109,7 +128,14 @@ test('cold built-in issues match canonical callbacks across package layouts and 
               find: (name) => (duplicate && name === '@test/scope.alpha' ? { dependencyId: name } : undefined),
             }),
           },
-          workspace: { path: root, componentDir: (id) => path.join(root, id.toStringWithoutVersion().split('/')[1]) },
+          workspace: {
+            path: root,
+            componentDir: (id) =>
+              path.join(
+                root,
+                context.targets.find((target) => target.identity === id.toStringWithoutVersion()).directory
+              ),
+          },
         },
         canonical
       );

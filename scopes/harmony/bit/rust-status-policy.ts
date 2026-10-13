@@ -96,9 +96,6 @@ export function statusPolicy(context: any, target: any) {
   const modelDependencies = [...(version?.dependencies ?? []), ...(version?.devDependencies ?? [])].map((dep) =>
     identity(dep.id)
   );
-  for (const dep of resolverData?.dependencies ?? []) {
-    if (dep.__type === 'component' && dep.lifecycle === 'peer') modelDependencies.push(identity(dep.componentId));
-  }
   const input = {
     policies: {
       modelPeers: map(version?.peerPackageDependencies),
@@ -130,8 +127,8 @@ export function statusPolicy(context: any, target: any) {
     input,
     extensions,
     overrides,
-    bindingPrefix: version?.bindingPrefix ?? `@${target.identity.split('.')[0].split('/')[0]}`,
-    packageName: packageName(target.identity, version?.bindingPrefix),
+    bindingPrefix: model?.bindingPrefix || `@${target.identity.split('.')[0].split('/')[0]}`,
+    packageName: packageName(target.identity, model?.bindingPrefix),
   };
 }
 export function currentStatusMetadata(target: any, policy: any, output: any) {

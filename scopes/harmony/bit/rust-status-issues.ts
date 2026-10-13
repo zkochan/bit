@@ -34,10 +34,12 @@ export async function collectRustStatusIssues(root: string, context: any, compon
   return Promise.all(
     components.map(async (component) => {
       const issues = IssuesList.deserialize(component.issues);
-      const modulePath = runtimeModulePath(root, component, Boolean(resolver.rootComponents));
-      if (!(await exists(path.join(modulePath, 'dist')))) issues.getOrCreate(IssuesClasses.MissingDists).data = true;
       const target = context.targets.find((row: any) => row.identity === withoutVersion(component.identity));
       if (!target) throw new Error('status issue target missing');
+      if (target.directory !== '.' && !fs.existsSync(path.join(root, 'node_modules', component.packageName)))
+        issues.getOrCreate(IssuesClasses.MissingLinksFromNodeModulesToSrc).data = true;
+      const modulePath = runtimeModulePath(root, component, Boolean(resolver.rootComponents));
+      if (!(await exists(path.join(modulePath, 'dist')))) issues.getOrCreate(IssuesClasses.MissingDists).data = true;
       if (target.directory !== '.' && workspacePackages.has(component.packageName))
         issues.getOrCreate(IssuesClasses.DuplicateComponentAndPackage).data = component.packageName;
       if (circular.has(component.identity)) issues.getOrCreate(IssuesClasses.CircularDependencies).data = true;
