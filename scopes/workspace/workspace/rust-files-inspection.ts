@@ -2,9 +2,10 @@ import fs from 'fs-extra';
 import os from 'os';
 import path from 'path';
 import { createHash } from 'crypto';
+import { types } from 'util';
 import type { ComponentID } from '@teambit/component-id';
 import type { SourceFileModel } from '@teambit/objects';
-import { hasRustSnapshotTransactionClass } from '@teambit/objects';
+import { hasRustSnapshotTransactionClassBatch } from '@teambit/objects';
 import {
   canReadWorkspaceFilesNatively,
   canInspectWorkspaceSourcesNatively,
@@ -67,26 +68,23 @@ export function summarizeCompFiles(comp: CompFiles, mode: FilesInspectionMode): 
 }
 
 function modelManifest(files: SourceFileModel[]): Array<{ relativePath: string; hash: string }> | undefined {
-  if (!Array.isArray(files) || files.length > 4096) return undefined;
+  if (types.isProxy(files) || !Array.isArray(files) || files.length > 4096) return undefined;
   const output: Array<{ relativePath: string; hash: string }> = [];
   const seen = new Set<string>();
+  const references: object[] = [];
   for (let index = 0; index < files.length; index += 1) {
     const file = Object.getOwnPropertyDescriptor(files, index)?.value;
-    if (!file || typeof file !== 'object') return undefined;
+    if (!file || typeof file !== 'object' || types.isProxy(file)) return undefined;
     const relativePath = Object.getOwnPropertyDescriptor(file, 'relativePath')?.value;
     const ref = Object.getOwnPropertyDescriptor(file, 'file')?.value;
-    const reference = ref && Object.getOwnPropertyDescriptor(ref, 'hash')?.value;
-    if (
-      !safeRelative(relativePath) ||
-      seen.has(relativePath) ||
-      !hasRustSnapshotTransactionClass(ref, 'Ref') ||
-      !hash(reference)
-    )
-      return undefined;
+    if (!ref || typeof ref !== 'object' || types.isProxy(ref)) return undefined;
+    const reference = Object.getOwnPropertyDescriptor(ref, 'hash')?.value;
+    if (!safeRelative(relativePath) || seen.has(relativePath) || !hash(reference)) return undefined;
     seen.add(relativePath);
+    references.push(ref);
     output.push({ relativePath, hash: reference });
   }
-  return output;
+  return references.length === 0 || hasRustSnapshotTransactionClassBatch(references, 'Ref') ? output : undefined;
 }
 
 function fromNativeResult(options: Options, mode: FilesInspectionMode, result: Result): FilesInspectionSummary {
