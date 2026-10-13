@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
+const { inflateSync, deflateSync } = require('node:zlib');
 const { execFileSync } = require('node:child_process');
 const { source, installed } = require('./load-source.cjs');
 const { writeComponents, mutate } = require('./workspace-inspection-fixture.cjs');
@@ -77,6 +78,89 @@ test('cold full status owns real default-Node workspaces and preserves canonical
   };
   const clean = await compare('clean');
   assert.deepEqual(clean.modifiedComponents, []);
+  const objects = path.join(directory, '.bit/objects');
+  let componentObject;
+  for (const shard of await fs.readdir(objects)) {
+    if (!/^[a-f0-9]{2}$/.test(shard)) continue;
+    for (const suffix of await fs.readdir(path.join(objects, shard))) {
+      if (!/^[a-f0-9]{38}$/.test(suffix)) continue;
+      const filename = path.join(objects, shard, suffix);
+      const original = await fs.readFile(filename);
+      const inflated = inflateSync(original);
+      const separator = inflated.indexOf(0);
+      const [type, hash] = inflated.subarray(0, separator).toString().split(' ');
+      if (type !== 'Component') continue;
+      const model = JSON.parse(inflated.subarray(separator + 1));
+      if (model.name === 'beta') componentObject = { filename, original, model, hash };
+    }
+  }
+  assert.ok(componentObject, 'actual tagged Component model exists');
+  for (const prefix of ['@alternate', undefined, '']) {
+    const model = { ...componentObject.model };
+    if (prefix === undefined) delete model.bindingPrefix;
+    else model.bindingPrefix = prefix;
+    const body = JSON.stringify(model);
+    await fs.writeFile(
+      componentObject.filename,
+      deflateSync(Buffer.concat([Buffer.from(`Component ${componentObject.hash} ${body.length}\0`), Buffer.from(body)]))
+    );
+    const result = await compare(`Component bindingPrefix ${String(prefix)}`);
+    assert.deepEqual(result.modifiedComponents, prefix === '@alternate' ? ['qualification.inspection/beta'] : []);
+    command(['link']);
+    await compare(`linked Component bindingPrefix ${String(prefix)}`);
+  }
+  await fs.writeFile(componentObject.filename, componentObject.original);
+  await compare('restored Component binding prefix');
+  const versionHash = componentObject.model.versions['1.0.0'];
+  const versionFile = path.join(objects, versionHash.slice(0, 2), versionHash.slice(2));
+  const versionOriginal = await fs.readFile(versionFile);
+  const versionBytes = inflateSync(versionOriginal);
+  const versionData = JSON.parse(versionBytes.subarray(versionBytes.indexOf(0) + 1));
+  versionData.extensions
+    .find((extension) => extension.name === 'teambit.dependencies/dependency-resolver')
+    .data.dependencies.push({
+      __type: 'component',
+      lifecycle: 'peer',
+      id: 'qualification.external/peer@1.0.0',
+      version: '1.0.0',
+      componentId: { scope: 'qualification.external', name: 'peer', version: '1.0.0' },
+    });
+  const versionBody = JSON.stringify(versionData);
+  await fs.writeFile(
+    versionFile,
+    deflateSync(
+      Buffer.concat([Buffer.from(`Version ${versionHash} ${versionBody.length}\0`), Buffer.from(versionBody)])
+    )
+  );
+  try {
+    const { Scope } = installed('@teambit/legacy.scope');
+    const { ComponentID } = installed('@teambit/component-id');
+    const legacyScope = await Scope.load(path.join(directory, '.bit'), false);
+    const model = await legacyScope.getModelComponent(ComponentID.fromString('qualification.inspection/beta@1.0.0'));
+    const consumer = await model.toConsumerComponent('1.0.0', undefined, legacyScope.objects);
+    const policyModule =
+      process.env.BIT_TEST_STATUS_COMPILED === '1'
+        ? installed('@teambit/bit/dist/rust-status-policy.js')
+        : source('scopes/harmony/bit/rust-status-policy.ts');
+    const target = { identity: 'qualification.inspection/beta', version: '1.0.0' };
+    const policy = policyModule.statusPolicy(
+      {
+        models: [componentObject.model],
+        versions: [[versionHash, versionData]],
+        targets: [target],
+        workspace: {},
+        packageJson: {},
+      },
+      target
+    );
+    assert.deepEqual(
+      policy.input.resolution.sources.model,
+      Array.from(consumer.getAllDependenciesIds(), (id) => id.toString()),
+      'resolver-data peers are not legacy model dependencies during version selection'
+    );
+  } finally {
+    await fs.writeFile(versionFile, versionOriginal);
+  }
   for (const phase of ['eol', 'config', 'content', 'inventory']) {
     await mutate(directory, phase);
     await compare(phase);
