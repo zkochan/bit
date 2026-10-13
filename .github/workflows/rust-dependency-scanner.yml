@@ -737,14 +737,20 @@ jobs:
           NODE
       - name: Collect diagnostic command CPU profiles
         if: ${{ inputs.profile_only }}
+        env:
+          BIT_PROFILE_INSPECTION: ${{ inputs.inspection_only }}
         run: |
+          if test "$BIT_PROFILE_INSPECTION" = 'true'; then
+            sudo apt-get update -qq
+            sudo apt-get install -y strace
+          fi
           node <<'NODE'
           const fs = require('node:fs'), path = require('node:path');
           const directory = path.join(process.env.TMPDIR, 'bit-performance-evidence');
           fs.mkdirSync(directory);
           const preload = path.join(directory, 'profile-preload.cjs');
           fs.writeFileSync(preload, `
-          if (process.argv.includes('merge')) {
+          if (['merge','status','diff','mini-status'].some(name => process.argv.includes(name))) {
             const fs = require('node:fs'), path = require('node:path'), inspector = require('node:inspector');
             const {performance} = require('node:perf_hooks'), Module = require('node:module');
             const load = Module._load, nativeRequests = [], seen = new WeakSet();
@@ -774,12 +780,14 @@ jobs:
             }));
           }
           `);
-          const {runQualification} = require('./scripts/rust-object-import/merge-transaction-qualification.cjs');
+          const inspection = process.env.BIT_PROFILE_INSPECTION === 'true';
+          const {runQualification} = require(inspection ? './scripts/rust-object-import/workspace-inspection-qualification.cjs' : './scripts/rust-object-import/merge-transaction-qualification.cjs');
           runQualification(path.join(process.env.TMPDIR,'bit-cli'), process.env.BIT_BENCHMARK_HELPER, {
-            extraFiles:0, modes:['node','native'], scenarios:['main-fast-forward','component-main-manual'],
+            extraFiles:0, modes:['node','native'], ...(inspection ? {} : {scenarios:['main-fast-forward','component-main-manual']}),
             report:path.join(directory,'diagnostic-qualification.json')
           }).then(async result => {
             if (!result.qualified) throw Error('diagnostic parity failed');
+            if (inspection) { await profileInspection(result); return; }
             const assert = require('node:assert/strict'), {promisify} = require('node:util');
             const {execFile} = require('node:child_process'), {createHash} = require('node:crypto');
             const fixture = require('./scripts/rust-object-import/merge-transaction-fixture.cjs');
@@ -824,6 +832,45 @@ jobs:
             fs.writeFileSync(path.join(directory,'untraced-states.json'),JSON.stringify({diagnosticOnly:true,parity:true,states}));
             console.log('Untraced diagnostic profiles only; no retained performance claim.');
           }).catch(error => {console.error(error); process.exitCode=1;});
+          async function profileInspection(result) {
+            const assert = require('node:assert/strict'), zlib = require('node:zlib');
+            const {promisify} = require('node:util'), {execFile} = require('node:child_process');
+            const {capture} = require('./scripts/rust-object-import/workspace-inspection-fixture.cjs');
+            const workspace = path.join(result.temporary,'node-0','inspection-workspace');
+            const original = result.runs[0].stages.find(stage=>stage.phase==='content').before;
+            for (const name of ['alpha','beta','.bit/objects','.bit/staged-config']) fs.rmSync(path.join(workspace,name),{recursive:true,force:true});
+            function write(name,bytes) { const file=path.join(workspace,name); fs.mkdirSync(path.dirname(file),{recursive:true}); fs.writeFileSync(file,bytes); }
+            for (const [name,hex] of Object.entries({...original.workingFiles,...original.stagedConfig})) write(name,Buffer.from(hex,'hex'));
+            for (const [hash,object] of Object.entries(original.objects)) write('.bit/objects/'+hash.slice(0,2)+'/'+hash.slice(2),zlib.deflateSync(Buffer.from(object.inflatedHex,'hex')));
+            for (const [field,name] of Object.entries({bitmap:'.bitmap',config:'workspace.jsonc',index:'.bit/index.json',stagedSnaps:'.bit/staged-snaps',unmerged:'.bit/unmerged.json'})) {
+              if(original[field]===null) fs.rmSync(path.join(workspace,name),{force:true}); else write(name,original[field]);
+            }
+            const pristine = path.join(result.temporary,'profile-pristine');
+            fs.cpSync(workspace,pristine,{recursive:true,verbatimSymlinks:true});
+            const env={...process.env,CI:'1',NODE_OPTIONS:'',BIT_GLOBALS_DIR:path.join(result.temporary,'globals'),BIT_RUST_OBJECT_IMPORT:process.env.BIT_BENCHMARK_HELPER};
+            for(const key of Object.keys(env)) if(key.startsWith('BIT_IMPORT_TRACE') || key.startsWith('BIT_MERGE_TRANSACTION_FAULT')) delete env[key];
+            function comparable(value,key) {
+              if(key==='index'&&typeof value==='string') { const parsed=JSON.parse(value); for(const field of ['components','lanes']) if(Array.isArray(parsed[field])) parsed[field].sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))); return parsed; }
+              if(Array.isArray(value)) return value.map(item=>comparable(item));
+              if(value&&typeof value==='object') return Object.fromEntries(Object.entries(value).map(([key,item])=>[key,comparable(item,key)]));
+              return value;
+            }
+            const states=[];
+            for(const [operation,command] of [['mini','mini-status'],['status','status'],['diff','diff']]) {
+              const stages=[];
+              for(const mode of ['off','on','on','off']) {
+                fs.rmSync(workspace,{recursive:true,force:true}); fs.cpSync(pristine,workspace,{recursive:true,verbatimSymlinks:true});
+                const args=['--require',path.resolve('scripts/rust-object-import/workspace-inspection-determinism.cjs'),'--require',preload,path.join(process.env.TMPDIR,'bit-cli','bin/bit.js'),command,'--json'];
+                const output=await promisify(execFile)(process.execPath,args,{cwd:workspace,env:{...env,BIT_RUST_CLIENT_VCS:mode,BIT_INSPECTION_QUALIFICATION_SEED:'inspection:content-'+operation,BIT_INSPECTION_QUALIFICATION_CLOCK:'1800000000000'},maxBuffer:128*1024*1024,timeout:120000});
+                const after=await capture(workspace);
+                if(stages.length) { assert.deepEqual(output,stages[0].output); assert.deepEqual(comparable(after),comparable(stages[0].after)); }
+                stages.push({mode,output,after});
+              }
+              states.push({operation,stages});
+            }
+            fs.writeFileSync(path.join(directory,'untraced-states.json'),JSON.stringify({diagnosticOnly:true,operation:'inspection',parity:true,states}));
+            console.log('Untraced status/diff diagnostics only; no retained performance claim.');
+          }
           NODE
       - name: Preserve proofs, raw artifacts and CPU records
         if: always()
