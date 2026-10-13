@@ -1,11 +1,11 @@
 use super::{MAX_RAW, count, hash, invalid, path};
+use crate::read_budget::Budget;
 use rayon::{ThreadPool, prelude::*};
 use serde::Serialize;
 use std::{
     fs::{self, File},
     io::{self, Read},
     path::{Path, PathBuf},
-    sync::atomic::{AtomicUsize, Ordering},
 };
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -57,7 +57,7 @@ fn parallel<Record: Send>(
     pool: &ThreadPool,
     record: &(impl Fn(&Path, Vec<u8>) -> Record + Sync),
 ) -> io::Result<Vec<Record>> {
-    let remaining = AtomicUsize::new(MAX_RAW);
+    let remaining = Budget::new(MAX_RAW);
     pool.install(|| {
         files
             .par_iter()
@@ -68,26 +68,12 @@ fn parallel<Record: Send>(
 
 // Reserve the complete raw allocation before reading. Large files can use the
 // shared budget without being constrained to a fraction of a 64-file batch.
-fn reserved(file: &Path, remaining: &AtomicUsize) -> io::Result<Vec<u8>> {
+fn reserved(file: &Path, remaining: &Budget) -> io::Result<Vec<u8>> {
     path(file)?;
     if !fs::symlink_metadata(file)?.is_file() {
         return Err(invalid("workspace unsupported file type"));
     }
-    let mut input = File::open(file)?;
-    let metadata = input.metadata()?;
-    if !metadata.is_file() || metadata.len() > MAX_RAW as u64 {
-        return Err(invalid("workspace raw bytes limit"));
-    }
-    let length = metadata.len() as usize;
-    remaining
-        .try_update(Ordering::Relaxed, Ordering::Relaxed, |bytes| bytes.checked_sub(length))
-        .map_err(|_| invalid("workspace raw bytes limit"))?;
-    let mut bytes = vec![0; length];
-    input.read_exact(&mut bytes)?;
-    if input.read(&mut [0])? != 0 {
-        return Err(invalid("workspace file grew during reserved read"));
-    }
-    Ok(bytes)
+    remaining.read(File::open(file)?)
 }
 fn record(file: &Path, raw: Vec<u8>) -> FileRecord {
     let (metadata, contents) = canonical(file, raw);
