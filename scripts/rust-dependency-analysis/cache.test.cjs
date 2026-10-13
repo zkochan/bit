@@ -70,7 +70,9 @@ test('native freshness agrees with recursive directory and explicit-file timesta
   for (const file of all) stamp(file, base);
   const files = [path.join(root, 'root.js'), path.join(root, 'missing.js')];
   const compare = async (timestamp) => {
-    const expected = (await getLastModifiedComponentTimestampMs(root, files)) > timestamp;
+    // Component-map directories are Linux paths. Globby requires forward
+    // slashes on Windows; the native request carries a filesystem path.
+    const expected = (await getLastModifiedComponentTimestampMs(root.split(path.sep).join('/'), files)) > timestamp;
     const actual = native({ kind: 'dependencyCacheFreshness', root, files, timestamp });
     assert.equal(actual.failed, false, JSON.stringify(actual));
     assert.equal(actual.data.stale, expected);

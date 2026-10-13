@@ -70,14 +70,18 @@ test('freshness adapter preserves filesystem hooks and observes edits without ca
   const file = path.join(f.root, 'file.js');
   fs.writeFileSync(file, '');
   const timestamp = Date.now()+10000;
-  assert.equal(await nativeDependencyCacheStale(f.root, [file], timestamp), false);
+  const pattern = f.root.split(path.sep).join('/');
+  assert.equal(await nativeDependencyCacheStale(pattern, [file], timestamp), false);
   fs.utimesSync(file, (timestamp+1000)/1000, (timestamp+1000)/1000);
-  assert.equal(await nativeDependencyCacheStale(f.root, [file], timestamp), true);
+  assert.equal(await nativeDependencyCacheStale(pattern, [file], timestamp), true);
+  assert.equal(await nativeDependencyCacheStale(f.root+'\\escaped', [file], timestamp), undefined);
+  if (process.platform === 'win32')
+    assert.equal(await nativeDependencyCacheStale(f.root, [file], timestamp), undefined);
   const r = createRequire(installed.resolve('@teambit/toolbox.fs.last-modified'));
   const filesystem = r('fs-extra');
   const original = filesystem.stat;
   filesystem.stat = async (...args) => original(...args);
-  try { assert.equal(await nativeDependencyCacheStale(f.root, [file], timestamp), undefined); }
+  try { assert.equal(await nativeDependencyCacheStale(pattern, [file], timestamp), undefined); }
   finally { filesystem.stat = original; }
 });
 test('cache responses respect session byte limits and retire failed sessions', async (t) => {

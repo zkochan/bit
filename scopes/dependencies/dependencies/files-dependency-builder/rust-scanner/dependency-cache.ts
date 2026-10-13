@@ -51,6 +51,9 @@ export async function nativeDependencyCacheStale(
 ): Promise<boolean | undefined> {
   if (
     process.env.BIT_RUST_CLIENT_VCS !== 'on' ||
+    // Globby treats backslashes as pattern escapes, even on Windows. Resolving
+    // that spelling as a filesystem path would change its directory selection.
+    root.includes('\\') ||
     timestampVersion !== '11.0.1' ||
     timestampFs.stat !== originalTimestampFs.stat ||
     !canReadModificationTimestampsNatively() ||
