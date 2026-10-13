@@ -537,7 +537,7 @@ jobs:
           BIT_TEST_MERGE_STATE_COMPILED=1 node --test scripts/rust-object-import/merge-state.test.cjs
           node --test scripts/rust-object-import/squash-history.test.cjs
           BIT_TEST_SQUASH_HISTORY_COMPILED=1 node --test scripts/rust-object-import/squash-history.test.cjs
-          node --test scripts/rust-object-import/config-merge.test.cjs
+          node --test scripts/rust-object-import/config-merge.test.cjs scripts/rust-object-import/config-guards.test.cjs
           BIT_TEST_CONFIG_MERGE_COMPILED=1 node --test scripts/rust-object-import/config-merge.test.cjs
           node --test scripts/rust-object-import/lane-recovery.test.cjs
           BIT_TEST_LANE_RECOVERY_COMPILED=1 node --test scripts/rust-object-import/lane-recovery.test.cjs
