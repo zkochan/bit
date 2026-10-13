@@ -35,8 +35,10 @@ function native(filename, groups) {
     .trim().split('\n').map((line) => JSON.parse(line));
 }
 function canonical(filename, dependency) {
-  return ts.resolveModuleName(dependency, filename, { module: ts.ModuleKind.CommonJS }, ts.createCompilerHost({}))
-    .resolvedModule?.resolvedFileName || null;
+  const resolved = ts.resolveModuleName(dependency, filename, { module: ts.ModuleKind.CommonJS }, ts.createCompilerHost({}))
+    .resolvedModule?.resolvedFileName;
+  // Bit's lookupTypeScript normalizes the compiler's slash-separated path before returning it.
+  return resolved ? path.resolve(resolved) : null;
 }
 function compare(filename, groups) {
   const results = native(filename, groups);
