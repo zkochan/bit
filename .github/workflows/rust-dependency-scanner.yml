@@ -712,11 +712,30 @@ jobs:
           fs.writeFileSync(preload, `
           if (process.argv.includes('merge')) {
             const fs = require('node:fs'), path = require('node:path'), inspector = require('node:inspector');
+            const {performance} = require('node:perf_hooks'), Module = require('node:module');
+            const load = Module._load, nativeRequests = [], seen = new WeakSet();
+            Module._load = function(request, ...args) {
+              const binding = load.call(this, request, ...args);
+              if (request.endsWith('bit-workspace.node') && binding.WorkspaceEngine && !seen.has(binding)) {
+                seen.add(binding);
+                const method = binding.WorkspaceEngine.prototype.request;
+                binding.WorkspaceEngine.prototype.request = function(frame) {
+                  const magic = frame.subarray(0,4).toString();
+                  const kind = ['BMT1','BWS1','BSS1','BMH1'].includes(magic) ? JSON.parse(frame.subarray(12)).kind : undefined;
+                  const started = performance.now(), result = method.call(this, frame), submitted = performance.now();
+                  return result.then(bytes => {
+                    nativeRequests.push({magic,kind,input:frame.length,output:bytes.length,started,submitMs:submitted-started,totalMs:performance.now()-started});
+                    return bytes;
+                  });
+                };
+              }
+              return binding;
+            };
             const session = new inspector.Session(); session.connect();
             session.post('Profiler.enable'); session.post('Profiler.setSamplingInterval', {interval:100}); session.post('Profiler.start');
             process.once('exit', () => session.post('Profiler.stop', (error, result) => {
               if (error) throw error;
-              fs.writeFileSync(path.join(__dirname, 'profile-'+process.env.BIT_RUST_CLIENT_VCS+'-'+process.pid+'.json'), JSON.stringify({diagnosticOnly:true, args:process.argv, profile:result.profile}));
+              fs.writeFileSync(path.join(__dirname, 'profile-'+process.env.BIT_RUST_CLIENT_VCS+'-'+process.pid+'.json'), JSON.stringify({diagnosticOnly:true, args:process.argv, nativeRequests, profile:result.profile}));
               session.disconnect();
             }));
           }
