@@ -49,8 +49,8 @@ is needed for this path.
 
 The embedded transport retains the scanner protocol's result validation,
 timeouts, cancellation, queue limits and fallback semantics. The workspace frame
-limits requests to 4 MiB; scanner output is accumulated in worker-sized batches
-with an 8 MiB metadata budget. Unsupported syntax, parser options and custom
+limits requests to 4 MiB; workers share an atomic 8 MiB output budget while work-stealing across the
+whole request, without barriers between worker-sized batches. Unsupported syntax, parser options and custom
 detectors retain canonical extraction. Built-in Node parser packages load only
 when their detective is invoked; successful native extraction avoids those
 precinct imports. Dependency resolution and custom detector orchestration still
