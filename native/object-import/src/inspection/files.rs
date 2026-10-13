@@ -1,5 +1,4 @@
-use super::read;
-use super::{invalid, wire};
+use super::{invalid, read, wire};
 use serde_json::{Value, json};
 use std::{
     collections::{HashMap, HashSet},

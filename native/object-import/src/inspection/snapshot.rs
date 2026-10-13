@@ -1,4 +1,4 @@
-use super::{MAX_BYTES, MAX_FILES, State, invalid, read};
+use super::{MAX_BYTES, MAX_FILES, State, invalid, read, wire};
 use std::{io, sync::Arc};
 
 /// Immutable captured bytes remain available after the owning engine retires.
@@ -40,4 +40,19 @@ pub(super) fn remaining(state: &mut State, incoming: usize) -> io::Result<usize>
         return Err(invalid("inspection retained file/byte limit"));
     }
     Ok(MAX_BYTES - bytes)
+}
+
+pub(super) fn validate_mode(request: &wire::Begin, state: &State) -> io::Result<()> {
+    if request.owned_memory && !state.memory_snapshots {
+        return Err(invalid("inspection memory ownership requires an embedded session"));
+    }
+    if request.memory_only
+        && !request.owned_memory
+        && request.files
+            .iter()
+            .any(|file| file.raw_hash.is_none() || file.snapshot_hash.is_none())
+    {
+        return Err(invalid("inspection memory-only capture requires caller hashes"));
+    }
+    Ok(())
 }

@@ -1,4 +1,5 @@
 pub(crate) use bitmap::normalize as normalize_bitmap;
+pub use snapshot::InspectionSnapshot;
 
 mod bitmap;
 mod compare;
@@ -10,7 +11,6 @@ mod wire;
 
 use serde_json::{Value, json};
 use sha1::{Digest, Sha1};
-pub use snapshot::InspectionSnapshot;
 use std::{
     collections::HashMap,
     io,
@@ -47,17 +47,7 @@ pub(crate) fn begin(
     snapshots: Option<&crate::workspace::snapshots::State>,
 ) -> io::Result<Value> {
     let request: wire::Begin = serde::Deserialize::deserialize(input).map_err(io::Error::other)?;
-    if request.owned_memory && !state.memory_snapshots {
-        return Err(invalid("inspection memory ownership requires an embedded session"));
-    }
-    if request.memory_only
-        && !request.owned_memory
-        && request.files
-            .iter()
-            .any(|file| file.raw_hash.is_none() || file.snapshot_hash.is_none())
-    {
-        return Err(invalid("inspection memory-only capture requires caller hashes"));
-    }
+    snapshot::validate_mode(&request, state)?;
     let maximum = snapshot::remaining(state, request.files.len())?;
     let mut files = read::capture(&request, maximum, snapshots)?;
     let revision =
