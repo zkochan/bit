@@ -23,6 +23,8 @@ pub(super) struct Request {
     targets: Vec<Target>,
     #[serde(default)]
     history: bool,
+    #[serde(default)]
+    include_heads: bool,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -60,7 +62,10 @@ fn load(request: &Request, pool: &rayon::ThreadPool, stored_hashes: bool) -> io:
             .map(|item| index::model(&reader, item))
             .collect::<io::Result<Vec<_>>>()
     })?;
-    let references = versions::references(&models, &request.targets)?;
+    let mut references = versions::references(&models, &request.targets)?;
+    if request.include_heads {
+        versions::include_heads(&models, &mut references)?;
+    }
     let versions = versions::read(&reader, &references, pool)?;
     let semantics = if stored_hashes {
         pool.install(|| {

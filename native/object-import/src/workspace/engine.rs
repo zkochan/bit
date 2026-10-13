@@ -10,7 +10,9 @@ mod resolve_dependencies;
 mod resolve_typescript;
 mod scan;
 mod status;
+mod status_context;
 mod status_models;
+mod status_result;
 
 use crate::protocol;
 use serde::{Deserialize, Serialize};
@@ -46,6 +48,8 @@ enum Request {
     DependencyScan {
         request: Value,
     },
+    StatusContext(status_context::Request),
+    StatusResult(status_result::Request),
     StatusModels(status_models::Request),
     StatusCompare(status_models::comparison::Request),
     StatusPrepare(client_status::Prepare),
@@ -166,6 +170,8 @@ fn failure(id: u32) -> Response {
 }
 fn apply(request: Request, pool: &rayon::ThreadPool) -> io::Result<(usize, Value)> {
     match request {
+        Request::StatusContext(request) => status_context::read(&request, pool),
+        Request::StatusResult(request) => status_result::read(&request),
         Request::StatusModels(request) => status_models::read(&request, pool),
         Request::StatusCompare(request) => status_models::comparison::read(&request, pool),
         Request::Scan { root, exclude_dirs, workspace_root } => {

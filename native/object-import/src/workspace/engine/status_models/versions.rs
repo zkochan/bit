@@ -61,3 +61,26 @@ pub(super) fn read(
             .collect()
     })
 }
+
+pub(super) fn include_heads(models: &[Value], references: &mut Vec<String>) -> io::Result<()> {
+    let mut seen: HashSet<_> = references.iter().cloned().collect();
+    for model in models {
+        if model["deprecated"].as_bool().unwrap_or(false) {
+            return Err(invalid("status deprecated model requires canonical issues"));
+        }
+        if let Some(head) = model
+            .get("head")
+            .filter(|head| !head.is_null())
+        {
+            let head = head.as_str().ok_or_else(|| invalid("status model head"))?;
+            crate::merge_history::hash(head)?;
+            if seen.insert(head.to_owned()) {
+                references.push(head.to_owned());
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests;
