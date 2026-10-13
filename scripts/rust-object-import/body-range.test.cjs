@@ -65,14 +65,18 @@ test('concurrent packed ranges preserve independent aliases and observe later sp
   await fs.writeFile(filename, bytes);
   const ranges = Array.from({ length: 64 }, (_, index) => [index * 257, index % 7 ? 257 : 0]);
   const bodies = await Promise.all(ranges.map(([offset, length]) => api.readRustBodyRange(filename, offset, length)));
-  bodies.forEach((body, index) => assert.deepEqual(body, bytes.subarray(ranges[index][0], ranges[index][0] + ranges[index][1])));
+  bodies.forEach((body, index) =>
+    assert.deepEqual(body, bytes.subarray(ranges[index][0], ranges[index][0] + ranges[index][1]))
+  );
   const aliases = await Promise.all(Array.from({ length: 32 }, () => api.readRustBodyRange(filename, 0, 257)));
   aliases[0].fill(42);
   for (const body of aliases.slice(1)) assert.deepEqual(body, bytes.subarray(0, 257));
   bytes.fill(93);
   await fs.writeFile(filename, bytes);
   const changed = await Promise.all(ranges.map(([offset, length]) => api.readRustBodyRange(filename, offset, length)));
-  changed.forEach((body, index) => assert.deepEqual(body, bytes.subarray(ranges[index][0], ranges[index][0] + ranges[index][1])));
+  changed.forEach((body, index) =>
+    assert.deepEqual(body, bytes.subarray(ranges[index][0], ranges[index][0] + ranges[index][1]))
+  );
   assert.notDeepEqual(bodies[1], changed[1], 'completed batches must not cache old private bytes');
 });
 
@@ -99,4 +103,19 @@ test('a truncated or missing private range does not fail valid neighboring logic
   });
   await fs.truncate(filename, 0);
   await assert.rejects(api.readRustBodyRange(filename, 0, 4), /truncated/);
+});
+
+test('small batches retain successful prefixes when a neighbor is truncated', async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-body-small-batch-'));
+  t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const filename = path.join(directory, 'pack');
+  await fs.writeFile(filename, Buffer.from([0, 255, 13, 10]));
+  const [valid, invalid] = await Promise.allSettled([
+    api.readRustBodyRange(filename, 0, 4),
+    api.readRustBodyRange(filename, 3, 4),
+  ]);
+  assert.equal(valid.status, 'fulfilled');
+  assert.deepEqual(valid.value, Buffer.from([0, 255, 13, 10]));
+  assert.equal(invalid.status, 'rejected');
+  assert.match(invalid.reason.message, /truncated/);
 });

@@ -94,7 +94,7 @@ export async function observeRustMergeSourceGroups(
     );
     batchIndex = 0;
     batchSources =
-      references.length >= 8
+      references.length >= 2
         ? loadRustCapturedSourceCapsuleBatch(
             repository,
             references.map((reference) => ({

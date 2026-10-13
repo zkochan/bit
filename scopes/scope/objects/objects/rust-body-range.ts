@@ -68,9 +68,15 @@ async function readRange(filename: string, offset: number, body: Buffer): Promis
 
 async function flush(filename: string, batch: ReadBatch): Promise<void> {
   if (pending.get(filename) === batch) pending.delete(filename);
-  if (batch.ranges.length >= 8) {
-    const start = Math.min(...batch.ranges.map((range) => range.offset));
-    const end = Math.max(...batch.ranges.map((range) => range.offset + range.body.length));
+  if (batch.ranges.length === 1) {
+    const range = batch.ranges[0];
+    await readRange(filename, range.offset, range.body).then(range.resolve, range.reject);
+    return;
+  }
+  const start = Math.min(...batch.ranges.map((range) => range.offset));
+  const end = Math.max(...batch.ranges.map((range) => range.offset + range.body.length));
+  // Nearby small reads benefit too; sparse slices must not read the entire intervening spool.
+  if (end - start <= Math.max(65536, batch.bytes * 2)) {
     try {
       const bytes = await readRange(filename, start, allocate(start, end - start));
       for (const range of batch.ranges) {
