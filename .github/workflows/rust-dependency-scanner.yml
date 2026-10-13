@@ -721,14 +721,53 @@ jobs:
             }));
           }
           `);
-          process.env.NODE_OPTIONS = '--require=' + preload;
           const {runQualification} = require('./scripts/rust-object-import/merge-transaction-qualification.cjs');
           runQualification(path.join(process.env.TMPDIR,'bit-cli'), process.env.BIT_BENCHMARK_HELPER, {
             extraFiles:0, modes:['node','native'], scenarios:['main-fast-forward','component-main-manual'],
             report:path.join(directory,'diagnostic-qualification.json')
-          }).then(result => {
+          }).then(async result => {
             if (!result.qualified) throw Error('diagnostic parity failed');
-            console.log('Diagnostic profiles only; no retained performance claim.');
+            const assert = require('node:assert/strict'), {promisify} = require('node:util');
+            const {execFile} = require('node:child_process'), {createHash} = require('node:crypto');
+            const fixture = require('./scripts/rust-object-import/merge-transaction-fixture.cjs');
+            const {comparable} = require('./scripts/rust-object-import/merge-transaction-qualification.cjs');
+            const cli = path.join(process.env.TMPDIR,'bit-cli'), root = result.temporary;
+            const roots = ['checkout/component','checkout/dependency'];
+            const ids = {id:'qualification.checkout/component',dependencyId:'qualification.checkout/dependency'};
+            const env = {...process.env, BIT_GLOBALS_DIR:path.join(root,'globals'), CI:'', NODE_OPTIONS:''};
+            for (const key of Object.keys(env))
+              if (key.startsWith('BIT_IMPORT_TRACE') || key.startsWith('BIT_MERGE_TRANSACTION_FAULT')) delete env[key];
+            async function command(cwd,args,mode='node',profile=false) {
+              const argv = ['--require',path.resolve('scripts/rust-object-import/merge-transaction-determinism.cjs'),
+                ...(profile?['--require',preload]:[]),path.join(cli,'bin/bit.js'),...args];
+              return promisify(execFile)(process.execPath,argv,{cwd,env:{...env,
+                BIT_RUST_CLIENT_VCS:mode==='node'?'off':'on',BIT_RUST_OBJECT_IMPORT:process.env.BIT_BENCHMARK_HELPER,
+                BIT_CHECKOUT_TRANSITION_QUALIFICATION_SEED:createHash('sha256').update(args.join('\\0')).digest('hex'),
+                BIT_CHECKOUT_TRANSITION_QUALIFICATION_CLOCK:'1700000060000',BIT_CHECKOUT_TRANSITION_DISPLAY_DURATION:'deterministic'
+              },maxBuffer:128*1024*1024,timeout:120000});
+            }
+            const states = [];
+            for (const name of ['main-fast-forward','component-main-manual']) {
+              const scenario = fixture.scenarios.find(item=>item.name===name), stages=[];
+              const workspace = path.join(root,'untraced-profile-'+name,'workspace');
+              for (const mode of ['node','native','native','node']) {
+                fs.rmSync(workspace,{recursive:true,force:true}); fs.mkdirSync(path.dirname(workspace),{recursive:true});
+                fs.cpSync(path.join(root,'baseline'),workspace,{recursive:true,verbatimSymlinks:true});
+                fs.rmSync(path.join(root,'remote'),{recursive:true,force:true});
+                fs.cpSync(path.join(root,'remote-pristine'),path.join(root,'remote'),{recursive:true,verbatimSymlinks:true});
+                await fixture.prepareScenario(workspace,scenario,{root:path.join(workspace,roots[0]),dependencyRoot:path.join(workspace,roots[1])},ids,command,cli);
+                const output = await command(workspace,fixture.commandFor(scenario,ids),mode,true);
+                const after = await fixture.capture(workspace,roots);
+                if (stages.length) {
+                  assert.deepEqual(comparable(stages[0].after),comparable(after));
+                  assert.equal(stages[0].output.stdout,output.stdout); assert.equal(stages[0].output.stderr,output.stderr);
+                }
+                stages.push({mode,output,after});
+              }
+              states.push({name,stages});
+            }
+            fs.writeFileSync(path.join(directory,'untraced-states.json'),JSON.stringify({diagnosticOnly:true,parity:true,states}));
+            console.log('Untraced diagnostic profiles only; no retained performance claim.');
           }).catch(error => {console.error(error); process.exitCode=1;});
           NODE
       - name: Preserve proofs, raw artifacts and CPU records
