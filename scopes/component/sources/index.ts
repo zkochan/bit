@@ -89,3 +89,11 @@ export {
 export type { RustCheckoutPlanSourceDescriptor } from './rust-checkout-plan-source';
 
 export { getRustFileStatuses } from './rust-file-status';
+
+export { runRustWorkspaceInventory } from './rust-workspace-inventory';
+export type {
+  RustInventoryPolicy,
+  RustInventoryBegin,
+  RustInventoryConfiguration,
+  RustInventoryFile,
+} from './rust-workspace-inventory';

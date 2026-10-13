@@ -283,6 +283,8 @@ async function runQualification(cli, helper, options = {}) {
     runs.push({ ...entry, stages, measurements });
   }
   if (options.diagnostics !== false && entries.some((entry) => entry.mode === 'native')) {
+    assert.ok(diagnostics.some((entry) => entry.trace.workspace.inventoryFinish?.completed > 0),
+      'actual commands must complete native inventory');
     const kinds = ['inspectionBegin', 'inspectionFiles', 'inspectionCompare', 'inspectionDiff', 'inspectionFinish'];
     for (const kind of kinds) {
       assert.ok(
