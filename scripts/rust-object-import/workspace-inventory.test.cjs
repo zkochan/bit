@@ -259,3 +259,16 @@ test('invalid native completion counts cannot publish a partial manifest', async
     Session.prototype.request = original;
   }
 });
+
+test('noncanonical root spellings retain component bitmap semantics', async (t) => {
+  const root = await fixture(t, { '.bitmap': '{}', 'main.js': '' });
+  process.env.BIT_RUST_CLIENT_VCS = 'off';
+  const expected = await bitmap.getFilesByDir('./', root, ignore(), [], true);
+  process.env.BIT_RUST_CLIENT_VCS = 'on';
+  const actual = await sources.withWorkspacePersistence(() => bitmap.getFilesByDir('./', root, ignore(), [], true));
+  assert.deepEqual(actual, expected);
+  assert.equal(
+    actual.some((file) => file.relativePath === '.bitmap'),
+    false
+  );
+});

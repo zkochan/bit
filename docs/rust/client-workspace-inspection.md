@@ -20,7 +20,7 @@ The embedded addon retains immutable inspection bytes in Rust. A read handle can
 
 Workspace inventory uses `inventoryBegin` and `inventoryFinish` on one owner. Rust scans and retains candidates, reads nested ignore files on the shared worker pool, evaluates configured policies, rebases component paths and builds the sorted manifest. Filtering uses ordered 64-file batches above 128 candidates. The adapter supplies the installed ignore compiler's expressions and checks custom hooks and mutations before applying root-cache additions. Failed or cancelled operations publish no manifest.
 
-An owner permits at most 32 pending inventories, 4096 retained candidate paths and 8 MiB of candidate path bytes. Nested ignore files are limited to 64 KiB each and 1 MiB of total pattern text. Unsupported limits, custom ignore implementations and Unicode paths/expressions use canonical filtering. The Unicode fallback preserves V8 legacy case folding, which the pinned native regex engine does not fully reproduce. Native inventory is a migration boundary; it does not itself establish a whole-command speedup.
+An owner permits at most 32 pending inventories, 4096 retained candidate paths and 8 MiB of candidate path bytes. Parent-policy evaluation additionally bounds depth to 128 and aggregate cache prefixes to 65,536 entries and 8 MiB. Nested ignore files are limited to 64 KiB each and 1 MiB of total pattern text. Unsupported limits, custom ignore implementations and Unicode paths/expressions use canonical filtering. The Unicode fallback preserves V8 legacy case folding, which the pinned native regex engine does not fully reproduce. Native inventory is a migration boundary; it does not itself establish a whole-command speedup.
 
 ## Compatibility and limits
 

@@ -94,6 +94,7 @@ fn validate_paths(paths: &[String], state: &State) -> io::Result<()> {
     {
         return Err(invalid("inventory requires ASCII paths"));
     }
+    validate_prefixes(paths)?;
     let retained = state.plans
         .values()
         .flat_map(|plan| &plan.paths)
@@ -107,6 +108,25 @@ fn validate_paths(paths: &[String], state: &State) -> io::Result<()> {
         > super::MAX_RAW
     {
         return Err(invalid("inventory retained path bytes limit"));
+    }
+    Ok(())
+}
+fn validate_prefixes(paths: &[String]) -> io::Result<()> {
+    let mut count = paths.len();
+    let mut bytes = paths
+        .iter()
+        .map(String::len)
+        .sum::<usize>();
+    for path in paths {
+        let mut depth = 0;
+        for (offset, _) in path.match_indices('/') {
+            depth += 1;
+            count += 1;
+            bytes += offset + 1;
+        }
+        if depth > 128 || count > 65536 || bytes > super::MAX_RAW {
+            return Err(invalid("inventory ignore parent cache limit"));
+        }
     }
     Ok(())
 }
@@ -179,3 +199,6 @@ fn relative(root: &Path, file: &Path) -> io::Result<String> {
         .collect::<io::Result<Vec<_>>>()?
         .join("/"))
 }
+
+#[cfg(test)]
+mod tests;

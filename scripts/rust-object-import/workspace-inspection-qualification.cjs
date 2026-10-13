@@ -304,6 +304,11 @@ async function runQualification(cli, helper, options = {}) {
           entry.trace.workspaceFrames.every((frame) => frame.backend === 'addon'),
           'packaged inspection must use the addon'
         );
+      if (!entry.operation.endsWith('-mini')) {
+        assert.ok(entry.trace.workspace.inventoryFinish.completed > 0, `${entry.operation}: native inventory required`);
+        assert.equal(entry.trace.workspace.inventoryBegin.failed + entry.trace.workspace.inventoryFinish.failed, 0);
+        assert.equal(entry.trace.workspace.scan.frames, 0, `${entry.operation}: no candidate path transfer to Node`);
+      }
       const metrics = entry.trace.mergeState;
       const operationHelpers = new Set(kinds.flatMap((kind) => metrics[kind].helperIds));
       assert.equal(

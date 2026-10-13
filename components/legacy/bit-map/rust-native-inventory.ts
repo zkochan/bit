@@ -13,6 +13,8 @@ export async function readRustComponentInventory(
   trackAllFiles: boolean,
   rebase: (pattern: string, directory: string) => string
 ): Promise<{ count: number; files: RustInventoryFile[] } | undefined> {
+  // Only the literal workspace-root component receives nested policies and bitmap protection.
+  if (directory !== '.' && path.resolve(workspace, directory) === path.resolve(workspace)) return undefined;
   const root = captureRustInventoryPolicy(rootIgnore);
   if (!root) return undefined;
   const result = await runRustWorkspaceInventory(
