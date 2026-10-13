@@ -9,6 +9,8 @@ import {
   canReadWorkspaceFilesNatively,
   canInspectWorkspaceSourcesNatively,
   isRustWorkspaceInspection,
+  canRetainRustWorkspaceInspectionSnapshot,
+  retainRustWorkspaceInspectionSnapshot,
   requestRustWorkspaceInspection,
 } from '@teambit/component.sources';
 import { canInspectCompFilesNatively, type CompFiles, type FilesStatus } from './workspace-component/comp-files';
@@ -127,22 +129,28 @@ export async function inspectTrackedWorkspaceFiles(
     new Set(options.files.map((file) => file.relativePath)).size !== options.files.length
   )
     return undefined;
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-workspace-inspection-')).catch(() => undefined);
-  if (!directory) return undefined;
+  const ownedMemory = canRetainRustWorkspaceInspectionSnapshot();
+  const directory = ownedMemory
+    ? undefined
+    : await fs.mkdtemp(path.join(os.tmpdir(), 'bit-workspace-inspection-')).catch(() => undefined);
+  if (!ownedMemory && !directory) return undefined;
   let captured: Captured | undefined;
   let retained = false;
+  let memorySnapshot: ReturnType<typeof retainRustWorkspaceInspectionSnapshot>;
   const release = async () => {
+    memorySnapshot?.close();
     if (captured)
       await requestRustWorkspaceInspection(
         { kind: 'inspectionFinish', token: captured.token },
         (value): value is { finished: true } => value?.finished === true
       );
-    await fs.remove(directory).catch(() => undefined);
+    if (directory) await fs.remove(directory).catch(() => undefined);
   };
   try {
     captured = await requestRustWorkspaceInspection(
       {
         kind: 'inspectionBegin',
+        ownedMemory,
         files: options.files,
         workspaceRoot: options.workspaceRoot,
         snapshotDirectory: directory,
@@ -160,7 +168,9 @@ export async function inspectTrackedWorkspaceFiles(
                 hash(file.rawHash) &&
                 hash(file.linuxHash) &&
                 hash(file.snapshotHash) &&
-                file.snapshotPath === path.join(directory, `${value.token}-${index}.snapshot`) &&
+                (ownedMemory
+                  ? file.snapshotPath === undefined
+                  : file.snapshotPath === path.join(directory!, `${value.token}-${index}.snapshot`)) &&
                 Number.isSafeInteger(file.bytes) &&
                 file.bytes >= 0 &&
                 file.bytes <= 32 * 1024 * 1024
@@ -168,11 +178,15 @@ export async function inspectTrackedWorkspaceFiles(
         )
     );
     if (!captured || !ordinary() || !options.unchanged()) return undefined;
+    if (ownedMemory) {
+      memorySnapshot = retainRustWorkspaceInspectionSnapshot(captured.token);
+      if (!memorySnapshot) return undefined;
+    }
     const snapshot = captured;
     const modelFiles = await options.loadModelFiles();
     const canonical = () => {
-      const contents = snapshot.files.map((file) => {
-        const body = readSnapshot(file.snapshotPath);
+      const contents = snapshot.files.map((file, index) => {
+        const body = memorySnapshot ? memorySnapshot.read(index) : readSnapshot(file.snapshotPath);
         if (body.length !== file.bytes || hashSnapshot('sha1').update(body).digest('hex') !== file.snapshotHash)
           throw new Error('workspace inspection fallback snapshot changed');
         return body;

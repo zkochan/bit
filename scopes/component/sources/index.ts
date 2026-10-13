@@ -12,6 +12,8 @@ export {
   requestRustWorkspaceInspection,
   retireRustWorkspaceInspection,
   isRustWorkspaceInspection,
+  canRetainRustWorkspaceInspectionSnapshot,
+  retainRustWorkspaceInspectionSnapshot,
 } from './rust-workspace-inspection';
 export {
   scanRustWorkspace,

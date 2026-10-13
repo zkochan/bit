@@ -21,7 +21,12 @@ const stringify = JSON.stringify;
 let active = 0;
 
 type ProjectedFile = { filename: Buffer; contents: Buffer; overwrite: boolean };
-type WorkspaceEngine = { request: (frame: Buffer) => Promise<Buffer>; close: () => void };
+export type RustInspectionSnapshot = { read: (index: number) => Buffer; close: () => void };
+type WorkspaceEngine = {
+  request: (frame: Buffer) => Promise<Buffer>;
+  close: () => void;
+  inspectionSnapshot?: (token: string) => RustInspectionSnapshot;
+};
 type Result = {
   version: number;
   id: number;
@@ -131,6 +136,19 @@ export class MaterializationSession {
   async dispose(): Promise<void> {
     this.stop();
     await this.closed;
+  }
+
+  get supportsInspectionSnapshots(): boolean {
+    return !this.stopped && typeof this.engine?.inspectionSnapshot === 'function';
+  }
+
+  retainInspectionSnapshot(token: string): RustInspectionSnapshot | undefined {
+    if (!this.supportsInspectionSnapshots) return undefined;
+    try {
+      return this.engine!.inspectionSnapshot!(token);
+    } catch {
+      return undefined;
+    }
   }
 
   get usable(): boolean {

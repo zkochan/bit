@@ -332,6 +332,7 @@ async function runQualification(cli, helper, options = {}) {
         for (const kind of ['inspectionBegin', 'inspectionFiles', 'inspectionFinish'])
           assert.ok(metrics[kind].completed > 0, `${entry.operation}: snapshot file summary must be Native`);
         assert.ok(metrics.inspectionBegin.snapshotBytes > 0);
+        if (addon) assert.equal(metrics.inspectionBegin.spooledFiles, 0, 'addon mini-status must retain bytes in Rust');
         if (process.platform === 'linux') {
           assert.ok(entry.bodyReads, 'Linux body-read evidence is mandatory');
           assert.equal(
