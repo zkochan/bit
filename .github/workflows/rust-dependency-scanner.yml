@@ -748,6 +748,17 @@ jobs:
           const fs = require('node:fs'), path = require('node:path');
           const directory = path.join(process.env.TMPDIR, 'bit-performance-evidence');
           fs.mkdirSync(directory);
+          const {createHash} = require('node:crypto'), {execFileSync} = require('node:child_process');
+          const digest = file => createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+          const helper = process.env.BIT_BENCHMARK_HELPER, addon = process.env.BIT_BENCHMARK_ADDON;
+          const sourceRevision = execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+          fs.copyFileSync(helper,path.join(directory,'bit-object-import'));
+          if(addon) {
+            fs.copyFileSync(addon,path.join(directory,'bit-workspace.node'));
+            fs.cpSync(path.join(process.env.TMPDIR,'bit-packaged-artifacts'),path.join(directory,'artifacts'),{recursive:true});
+          }
+          fs.copyFileSync(path.join(process.env.TMPDIR,'bit-cli','.bit-object-import-build.json'),path.join(directory,'cli-build.json'));
+          fs.writeFileSync(path.join(directory,'runner.json'),JSON.stringify({diagnosticOnly:true,sourceRevision,operation:process.env.BIT_PROFILE_INSPECTION==='true'?'inspection':'merge',helperSha256:digest(helper),addonSha256:addon?digest(addon):undefined}));
           const preload = path.join(directory, 'profile-preload.cjs');
           fs.writeFileSync(preload, `
           if (['merge','status','diff','mini-status'].some(name => process.argv.includes(name))) {
