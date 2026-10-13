@@ -1,6 +1,7 @@
 use crate::{limits, protocol, scan_request};
 use rayon::ThreadPoolBuilder;
 use serde_json::json;
+use std::fmt::Write;
 
 #[test]
 fn embedded_preserves_standalone_results_and_order_across_worker_batches() {
@@ -46,9 +47,10 @@ fn embedded_bounds_expanded_dependency_metadata() {
         .num_threads(2)
         .build()
         .unwrap();
-    let source = (0..1000)
-        .map(|index| format!("import {{ v{index} }} from 'dep{index}';\n"))
-        .collect::<String>();
+    let mut source = String::new();
+    for index in 0..1000 {
+        writeln!(&mut source, "import {{ v{index} }} from 'dep{index}';").unwrap();
+    }
     let input = json!({
         "version":1,
         "files":vec![json!({"path":"a.ts","source":source});100],
