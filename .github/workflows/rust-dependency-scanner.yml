@@ -746,6 +746,7 @@ jobs:
                 BIT_CHECKOUT_TRANSITION_QUALIFICATION_CLOCK:'1700000060000',BIT_CHECKOUT_TRANSITION_DISPLAY_DURATION:'deterministic'
               },maxBuffer:128*1024*1024,timeout:120000});
             }
+            const {comparableMergeStdout} = require('./scripts/rust-object-import/merge-transaction-report.cjs');
             const states = [];
             for (const name of ['main-fast-forward','component-main-manual']) {
               const scenario = fixture.scenarios.find(item=>item.name===name), stages=[];
@@ -760,7 +761,8 @@ jobs:
                 const after = await fixture.capture(workspace,roots);
                 if (stages.length) {
                   assert.deepEqual(comparable(stages[0].after),comparable(after));
-                  assert.equal(stages[0].output.stdout,output.stdout); assert.equal(stages[0].output.stderr,output.stderr);
+                  const stdout = value => name==='component-main-manual'?comparableMergeStdout(value):value;
+                  assert.equal(stdout(stages[0].output.stdout),stdout(output.stdout)); assert.equal(stages[0].output.stderr,output.stderr);
                 }
                 stages.push({mode,output,after});
               }
