@@ -36,7 +36,7 @@ function summarize(text, sourcePaths) {
         changed = true;
       }
   }
-  const sourceSet = new Set(sourcePaths.map((filename) => path.resolve(filename)));
+  const sourceSet = new Set(sourcePaths.map((filename) => path.posix.resolve(filename)));
   const rustThreads = new Set();
   const rustReads = [];
   for (const line of lines) {
