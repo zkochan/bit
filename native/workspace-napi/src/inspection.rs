@@ -24,9 +24,9 @@ impl WorkspaceInspectionSnapshot {
     }
 }
 #[napi]
+#[expect(clippy::needless_pass_by_value, reason = "Node-API requires owned JavaScript strings")]
 impl WorkspaceEngine {
     #[napi]
-    #[expect(clippy::needless_pass_by_value, reason = "Node-API requires owned JavaScript strings")]
     pub fn inspection_snapshot(&self, token: String) -> Result<WorkspaceInspectionSnapshot> {
         if self.state.closed.load(Ordering::Acquire) || self.state.busy.load(Ordering::Acquire) {
             return Err(failure("workspace engine closed or busy"));
