@@ -587,7 +587,11 @@ async function runQualification(cli, helper, options = {}) {
       ? {
           proofSha256,
           measurement: true,
-          qualificationOnlyScenarios: ['checkout-divergent-head', 'main-last-target-callback-fallback'],
+          qualificationOnlyScenarios: [
+            'checkout-divergent-head',
+            'main-last-target-callback-fallback',
+            'main-duplicate-package-fallback',
+          ],
         }
       : {}),
     runs,
