@@ -599,7 +599,7 @@ jobs:
       fail-fast: false
       matrix:
         baseline: ${{ fromJSON((inputs.profile_only || inputs.inspection_only) && '["object-helper"]' || '["object-helper", "javascript"]') }}
-        extra_files: ${{ fromJSON(inputs.profile_only && '[0]' || '[0, 260]') }}
+        extra_files: [0, 260]
     env:
       BIT_BENCHMARK_BASELINE: ${{ matrix.baseline }}
       BIT_BENCHMARK_EXTRA_FILES: ${{ matrix.extra_files }}
@@ -794,7 +794,7 @@ jobs:
           const inspection = process.env.BIT_PROFILE_INSPECTION === 'true';
           const {runQualification} = require(inspection ? './scripts/rust-object-import/workspace-inspection-qualification.cjs' : './scripts/rust-object-import/merge-transaction-qualification.cjs');
           runQualification(path.join(process.env.TMPDIR,'bit-cli'), process.env.BIT_BENCHMARK_HELPER, {
-            extraFiles:0, modes:['node','native'], ...(inspection ? {} : {scenarios:['main-fast-forward','component-main-manual']}),
+            extraFiles:Number(process.env.BIT_BENCHMARK_EXTRA_FILES), modes:['node','native'], ...(inspection ? {} : {scenarios:['main-fast-forward','component-main-manual']}),
             report:path.join(directory,'diagnostic-qualification.json')
           }).then(async result => {
             if (!result.qualified) throw Error('diagnostic parity failed');
