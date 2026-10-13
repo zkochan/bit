@@ -729,7 +729,7 @@ jobs:
             await fs.copyFile(path.join(cli,'.bit-object-import-build.json'),path.join(directory,'cli-build.json'));
             const proof = await runQualification(cli,helper,{extraFiles,report:path.join(directory,'inspection-qualification.json')});
             if (!proof.qualified) throw Error('status/diff qualification failed');
-            const measured = await runQualification(cli,helper,{extraFiles,report:path.join(directory,'inspection-measure.json'),measure:true,rounds:3,diagnostics:false});
+            const measured = await runQualification(cli,helper,{extraFiles,report:path.join(directory,'inspection-measure.json'),measure:true,rounds:3,diagnostics:false,omitStates:true});
             if (!measured.qualified || await identity(helper)!==artifacts.helper || await identity(addon)!==artifacts.addon) throw Error('status/diff measured identity or parity failed');
             console.log(JSON.stringify({sourceRevision,extraFiles,qualified:true,runs:measured.runs.map(({mode,round,warmup,measurements})=>({mode,round,warmup,measurements:measurements.length}))}));
             await fs.appendFile(process.env.GITHUB_STEP_SUMMARY,`Status/diff source: ${sourceRevision}; ${extraFiles} extra files per component. Full parity, fallbacks and untraced paired timings are attached.\n`);
