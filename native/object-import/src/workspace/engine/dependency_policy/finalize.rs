@@ -15,7 +15,7 @@ pub(in crate::workspace::engine) fn apply(request: &Request) -> io::Result<(usiz
     manual::apply(request, &mut output);
     Ok((1, json!(output)))
 }
-fn validate(request: &Request) -> io::Result<()> {
+pub(super) fn validate(request: &Request) -> io::Result<()> {
     validate_state(request)?;
     let state = &request.state;
     let maps = state.packages

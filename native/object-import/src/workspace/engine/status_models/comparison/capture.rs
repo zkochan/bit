@@ -1,7 +1,7 @@
 use super::{Request, Target, invalid};
 use crate::workspace::engine::read;
 use serde_json::{Value, json};
-use std::{collections::HashSet, io};
+use std::{collections::HashSet, io, path::Path};
 
 pub(super) fn all(request: &Request, pool: &rayon::ThreadPool) -> io::Result<Vec<Value>> {
     let mut paths = Vec::new();
@@ -17,13 +17,36 @@ pub(super) fn all(request: &Request, pool: &rayon::ThreadPool) -> io::Result<Vec
                 .map(|file| request.root.join(&target.directory).join(file)),
         );
     }
-    let captured = read::read_with(&paths, pool, |path, bytes| read::canonical(path, bytes).0)?;
+    let bitmap = request.root.join(".bitmap");
+    let captured = read::read_with(&paths, pool, |path, bytes| capture(path, bytes, &bitmap))?
+        .into_iter()
+        .collect::<io::Result<Vec<_>>>()?;
+    if captured
+        .iter()
+        .map(|file| file.raw_bytes)
+        .sum::<usize>()
+        > super::super::super::MAX_RAW
+    {
+        return Err(invalid("status normalized source budget"));
+    }
     let mut captured = captured.into_iter();
     Ok(request.targets.iter().map(|target| Value::Array(target.files.iter().map(|file| {
         let metadata = captured.next().expect("one captured file per path");
         json!({"relativePath":file,"name":file.rsplit('/').next(),"test":false,"file":metadata.linux_hash})
     }).collect())).collect())
 }
+fn capture(path: &Path, bytes: Vec<u8>, bitmap: &Path) -> io::Result<read::Metadata> {
+    let original = bytes.len();
+    let bytes = if path == bitmap {
+        crate::inspection::normalize_bitmap(&read::strip_bom(bytes))?
+    } else {
+        bytes
+    };
+    let mut metadata = read::canonical(path, bytes).0;
+    metadata.raw_bytes = metadata.raw_bytes.max(original);
+    Ok(metadata)
+}
+
 fn validate(target: &Target) -> io::Result<()> {
     if target.directory != "." {
         relative(&target.directory)?;

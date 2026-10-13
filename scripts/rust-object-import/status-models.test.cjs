@@ -119,6 +119,30 @@ test('owned status reads share the batch budget and publish no partial compariso
   assert.equal(request(root, batch, false, true).failed, true);
   assert.equal(request(root, batch.slice(0, 1), false, true).failed, false);
 });
+
+test('owned workspace-root comparisons normalize the live bitmap before hashing', async (t) => {
+  const { root, version, targets, write, index } = await fixture(t);
+  const { normalizeBitmapContentForVersioning } = installed('@teambit/legacy.bit-map');
+  const bitmap = { alpha: { name: 'alpha', scope: '', defaultScope: 'qualification.status',
+    version: '1.0.0', rootDir: 'alpha', mainFile: 'index.js' }, '$schema-version': '17.0.0' };
+  const stored = Source.from(Buffer.from(normalizeBitmapContentForVersioning(JSON.stringify(bitmap))));
+  version.files = [{ relativePath: '.bitmap', name: '.bitmap', test: false, file: stored.hash() }];
+  version.mainFile = '.bitmap';
+  await write(version);
+  index.components = index.components.slice(0, 1);
+  await fs.writeFile(path.join(root, '.bit/index.json'), JSON.stringify(index));
+  const compare = () => request(root, [{ ...targets[0], directory: '.', files: ['.bitmap'],
+    current: { mainFile: '.bitmap' } }], false, true);
+  bitmap.alpha.version = '2.0.0';
+  bitmap._bit_lane = { name: 'lane', scope: 'qualification.status' };
+  await fs.writeFile(path.join(root, '.bitmap'), `\ufeff// current workspace\n${JSON.stringify(bitmap, null, 2)}`);
+  const same = compare();
+  assert.equal(same.failed, false);
+  assert.equal(same.data.comparisons[0].modified, false);
+  bitmap.alpha.mainFile = 'different.js';
+  await fs.writeFile(path.join(root, '.bitmap'), JSON.stringify(bitmap));
+  assert.equal(compare().data.comparisons[0].modified, true);
+});
 async function fixture(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-status-models-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));

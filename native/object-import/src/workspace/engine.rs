@@ -34,6 +34,8 @@ const MAX_FILES: usize = 4096;
     deny_unknown_fields
 )]
 enum Request {
+    DependencyPolicyCached(Box<dependency_policy::cached::Request>),
+    DependencyPolicyComplete(Box<dependency_policy::pipeline::Request>),
     DependencyPolicyPackages(dependency_policy::packages_on_disk::Request),
     DependencyPolicy(Box<dependency_policy::Request>),
     DependencyPolicyFinish(Box<dependency_policy::finalize::Request>),
@@ -166,6 +168,34 @@ fn apply(request: Request, pool: &rayon::ThreadPool) -> io::Result<(usize, Value
     match request {
         Request::StatusModels(request) => status_models::read(&request, pool),
         Request::StatusCompare(request) => status_models::comparison::read(&request, pool),
+        Request::Scan { root, exclude_dirs, workspace_root } => {
+            let paths = scan::scan(&root, &exclude_dirs, workspace_root)?;
+            Ok((paths.len(), json!({"paths":paths})))
+        }
+        Request::Read { files, .. } => {
+            let files = read::read(&files, pool)?;
+            Ok((files.len(), json!({"files":files})))
+        }
+        Request::Diff { files, git_executable, color } => {
+            let files = pool.install(|| diff::diff(&files, &git_executable, color))?;
+            Ok((files.len(), json!({"files":files})))
+        }
+        Request::FileStatus { target, current } => status::compare(&target, &current),
+        Request::Compare { left, right } => Ok((
+            1,
+            json!({"modified":Sha1::digest(left.as_bytes())!=Sha1::digest(right.as_bytes())}),
+        )),
+        request => dependencies(request, pool),
+    }
+}
+fn dependencies(request: Request, pool: &rayon::ThreadPool) -> io::Result<(usize, Value)> {
+    match request {
+        Request::DependencyPolicyCached(request) => {
+            dependency_policy::cached::apply(&request, pool)
+        }
+        Request::DependencyPolicyComplete(request) => {
+            dependency_policy::pipeline::apply(&request, pool)
+        }
         Request::DependencyPolicyPackages(request) => {
             dependency_policy::packages_on_disk::read(&request, pool)
         }
@@ -185,23 +215,7 @@ fn apply(request: Request, pool: &rayon::ThreadPool) -> io::Result<(usize, Value
         | Request::InventoryBegin(_)
         | Request::InventoryFinish(_)
         | Request::InventoryCancel { .. } => Err(invalid("inventory operation requires an owner")),
-        Request::Scan { root, exclude_dirs, workspace_root } => {
-            let paths = scan::scan(&root, &exclude_dirs, workspace_root)?;
-            Ok((paths.len(), json!({"paths":paths})))
-        }
-        Request::Read { files, .. } => {
-            let files = read::read(&files, pool)?;
-            Ok((files.len(), json!({"files":files})))
-        }
-        Request::Diff { files, git_executable, color } => {
-            let files = pool.install(|| diff::diff(&files, &git_executable, color))?;
-            Ok((files.len(), json!({"files":files})))
-        }
-        Request::FileStatus { target, current } => status::compare(&target, &current),
-        Request::Compare { left, right } => Ok((
-            1,
-            json!({"modified":Sha1::digest(left.as_bytes())!=Sha1::digest(right.as_bytes())}),
-        )),
+        _ => Err(invalid("unsupported dependency operation")),
     }
 }
 fn dependency_scan(request: &Value, pool: &rayon::ThreadPool) -> io::Result<(usize, Value)> {
