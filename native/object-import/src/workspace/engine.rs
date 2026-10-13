@@ -35,6 +35,7 @@ const MAX_FILES: usize = 4096;
 enum Request {
     DependencyPolicy(Box<dependency_policy::Request>),
     DependencyPolicyFinish(Box<dependency_policy::finalize::Request>),
+    DependencyPolicyVersions(Box<dependency_policy::versions::Request>),
     DependencyCacheRead(read_dependency_cache::Read),
     DependencyCacheFreshness(read_dependency_cache::Freshness),
     DependencyResolve(resolve_dependencies::Request),
@@ -161,6 +162,7 @@ fn apply(request: Request, pool: &rayon::ThreadPool) -> io::Result<(usize, Value
     match request {
         Request::DependencyPolicy(request) => dependency_policy::apply(&request),
         Request::DependencyPolicyFinish(request) => dependency_policy::finalize::apply(&request),
+        Request::DependencyPolicyVersions(request) => dependency_policy::versions::apply(&request),
         Request::DependencyCacheRead(request) => read_dependency_cache::read(&request),
         Request::DependencyCacheFreshness(request) => {
             read_dependency_cache::freshness(&request, pool)
