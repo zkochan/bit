@@ -159,6 +159,10 @@ on:
         description: Collect diagnostic CPU profiles without retained timings
         type: boolean
         default: false
+      inspection_only:
+        description: Qualify and measure complete status and diff commands
+        type: boolean
+        default: false
       packaged_addon:
         description: Benchmark automatic discovery from the complete packaged artifact
         type: boolean
@@ -172,7 +176,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: rust-scanner-${{ github.event.pull_request.number || inputs.benchmark_ref || github.ref }}-${{ inputs.profile_only || false }}
+  group: rust-scanner-${{ github.event.pull_request.number || inputs.benchmark_ref || github.ref }}-${{ inputs.profile_only || false }}-${{ inputs.inspection_only || false }}
   # Superseded PR pushes are cancelled; every commit on `rust` keeps its result.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
@@ -594,7 +598,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        baseline: ${{ fromJSON(inputs.profile_only && '["object-helper"]' || '["object-helper", "javascript"]') }}
+        baseline: ${{ fromJSON((inputs.profile_only || inputs.inspection_only) && '["object-helper"]' || '["object-helper", "javascript"]') }}
         extra_files: ${{ fromJSON(inputs.profile_only && '[0]' || '[0, 260]') }}
     env:
       BIT_BENCHMARK_BASELINE: ${{ matrix.baseline }}
@@ -667,7 +671,7 @@ jobs:
             BIT_TEST_WORKSPACE_ADDON="$addon_candidate" BIT_TEST_OBJECT_IMPORT="${BIT_BENCHMARK_HELPER:-$PWD/native/target/release/bit-object-import}" BIT_LEGACY_ROOT="$TMPDIR/bit-cli" node --test "${addon_tests[@]}"
           fi
       - name: Qualify all routes, then measure with builds and tests idle
-        if: ${{ !inputs.profile_only }}
+        if: ${{ !inputs.profile_only && !inputs.inspection_only }}
         run: |
           node <<'NODE'
           const fs = require('node:fs/promises');
@@ -700,6 +704,36 @@ jobs:
             }
             await fs.appendFile(process.env.GITHUB_STEP_SUMMARY, `Source: ${sourceRevision}\n\nProfile: ${JSON.stringify(profiles[0])}\n\n144 parity cases and 96 retained timing samples completed; raw state/output artifacts and source/helper fingerprints are attached.\n`);
           })().catch(error => { console.error(error); process.exitCode = 1; });
+          NODE
+      - name: Qualify and measure public status and diff
+        if: ${{ inputs.inspection_only && !inputs.profile_only }}
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y strace
+          node <<'NODE'
+          const fs = require('node:fs/promises'), path = require('node:path'), os = require('node:os');
+          const cp = require('node:child_process'), {createHash} = require('node:crypto');
+          const {runQualification} = require('./scripts/rust-object-import/workspace-inspection-qualification.cjs');
+          (async () => {
+            const directory = path.join(os.tmpdir(),'bit-performance-evidence');
+            await fs.mkdir(directory);
+            const cli = path.join(os.tmpdir(),'bit-cli'), helper = process.env.BIT_BENCHMARK_HELPER;
+            const addon = process.env.BIT_BENCHMARK_ADDON, extraFiles = Number(process.env.BIT_BENCHMARK_EXTRA_FILES);
+            const identity = async file => createHash('sha256').update(await fs.readFile(file)).digest('hex');
+            const artifacts = {helper:await identity(helper), addon:await identity(addon)};
+            const sourceRevision = cp.execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+            await fs.writeFile(path.join(directory,'runner.json'),JSON.stringify({sourceRevision,operation:'inspection',extraFiles,artifacts,node:process.version,os:os.release(),cpus:os.cpus(),availableParallelism:os.availableParallelism()},null,2));
+            await fs.copyFile(helper,path.join(directory,'bit-object-import'));
+            await fs.copyFile(addon,path.join(directory,'bit-workspace.node'));
+            await fs.cp(path.join(os.tmpdir(),'bit-packaged-artifacts'),path.join(directory,'artifacts'),{recursive:true});
+            await fs.copyFile(path.join(cli,'.bit-object-import-build.json'),path.join(directory,'cli-build.json'));
+            const proof = await runQualification(cli,helper,{extraFiles,report:path.join(directory,'inspection-qualification.json')});
+            if (!proof.qualified) throw Error('status/diff qualification failed');
+            const measured = await runQualification(cli,helper,{extraFiles,report:path.join(directory,'inspection-measure.json'),measure:true,rounds:3,diagnostics:false});
+            if (!measured.qualified || await identity(helper)!==artifacts.helper || await identity(addon)!==artifacts.addon) throw Error('status/diff measured identity or parity failed');
+            console.log(JSON.stringify({sourceRevision,extraFiles,qualified:true,runs:measured.runs.map(({mode,round,warmup,measurements})=>({mode,round,warmup,measurements:measurements.length}))}));
+            await fs.appendFile(process.env.GITHUB_STEP_SUMMARY,`Status/diff source: ${sourceRevision}; ${extraFiles} extra files per component. Full parity, fallbacks and untraced paired timings are attached.\n`);
+          })().catch(error=>{console.error(error);process.exitCode=1});
           NODE
       - name: Collect diagnostic command CPU profiles
         if: ${{ inputs.profile_only }}
@@ -802,6 +836,7 @@ jobs:
             /tmp/bit-client-performance-*/bit-performance-evidence/**
             /tmp/bit-client-performance-*/bit-merge-transaction-*/*.json
             /tmp/bit-client-performance-*/bit-merge-transaction-*/*.txt
+            /tmp/bit-client-performance-*/bit-real-workspace-inspection-*/*.txt
             /tmp/bit-client-performance-*/bit-cli-base/.bit-rust-*.json
 
   scratch-inspection:
