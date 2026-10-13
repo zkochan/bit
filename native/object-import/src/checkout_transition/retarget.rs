@@ -43,7 +43,7 @@ pub(super) fn apply(input: Value, state: &mut plan::State) -> io::Result<Value> 
     if plan.bodies.first().is_some_and(|body| body.offset.is_some()) {
         super::spool::assign(&mut added, &directory, &request.token, plan.bodies.len());
     }
-    super::spool::write(&added)?;
+    super::spool::write_retained(&mut added, state.retain_reads)?;
     plan.bodies.extend(added);
     if plan.other.is_none() {
         plan.other = Some(plan.target.clone());

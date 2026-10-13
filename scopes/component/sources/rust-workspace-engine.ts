@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'async_hooks';
+import { registerRustSnapshotFunctionReference } from '@teambit/objects';
 import { acquireWorkspaceSession, type MaterializationSession } from './rust-workspace-materializer';
 
 type Lease = NonNullable<ReturnType<typeof acquireWorkspaceSession>>;
@@ -158,3 +159,18 @@ function borrow(owner: Owner, physical: MaterializationSession): Materialization
   });
   return session;
 }
+
+/** Optional retained bytes share the owner queue and cannot outlive its cleanup barrier. */
+export function readRetainedRustBodyRanges(filename: string, ranges: Buffer): Promise<Buffer | undefined> | undefined {
+  const owner = owners.getStore();
+  const physical = owner?.lease?.session;
+  if (!owner || owner.closed || owner.failed || !physical?.usable || !physical.readBodyRanges) return undefined;
+  const request = owner.requests.then(async () => {
+    if (owner.closed || owner.failed || !physical.usable) return undefined;
+    return physical.readBodyRanges(filename, ranges);
+  });
+  owner.requests = request.then(() => undefined, () => undefined);
+  return request;
+}
+
+registerRustSnapshotFunctionReference('RetainedWorkspaceBodyReader', readRetainedRustBodyRanges);

@@ -145,3 +145,79 @@ test('independent owners share bounded Rust workers without blocking each other'
     engines.forEach((engine) => engine.close());
   }
 });
+
+function bodyRanges(rows) {
+  const bytes = Buffer.alloc(rows.length * 8);
+  rows.forEach(([offset, length], index) => {
+    bytes.writeUInt32BE(offset, index * 8);
+    bytes.writeUInt32BE(length, index * 8 + 4);
+  });
+  return bytes;
+}
+
+test('retained addon reads copy owned bodies and decline changed spools without retiring the engine', async (t) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'bit-addon-retained-'));
+  t.after(() => fs.rm(directory, { force: true, recursive: true }));
+  const bytes = Buffer.from('retained\n');
+  const hash = require('node:crypto').createHash('sha1').update(bytes).digest('hex');
+  const version = '2'.repeat(40);
+  const objects = path.join(directory, 'objects');
+  const snapshots = path.join(directory, 'snapshots');
+  await fs.mkdir(snapshots);
+  for (const [identity, kind, body] of [
+    [hash, 'Source', bytes],
+    [version, 'Version', Buffer.from(JSON.stringify({ files: [{ file: hash, relativePath: 'index.ts' }] }))],
+  ]) {
+    const filename = path.join(objects, identity.slice(0, 2), identity.slice(2));
+    await fs.mkdir(path.dirname(filename), { recursive: true });
+    const compressed = require('node:zlib').deflateSync(Buffer.concat([
+      Buffer.from(`${kind} ${identity} ${body.length}\0`), body,
+    ]));
+    await fs.writeFile(filename, compressed);
+  }
+  const engine = new WorkspaceEngine(2);
+  t.after(() => engine.close());
+  const input = frame(1, {
+    kind: 'checkoutPrepare', packedBodies: true, objectsDirectory: objects, snapshotDirectory: snapshots,
+    target: { hash: version, files: [{ hash, relativePath: 'index.ts' }] }, current: [],
+  });
+  input.write('BMT1');
+  const response = JSON.parse(await engine.request(input));
+  assert.equal(response.failed, false);
+  const filename = response.data.bodies[0].spoolPath;
+  const ranges = bodyRanges([[0, bytes.length], [0, bytes.length]]);
+  const first = await engine.readBodyRanges(filename, ranges);
+  if (process.platform === 'win32') assert.equal(first, null, 'unsupported file identity stays on disk');
+  else {
+    assert.deepEqual(first, Buffer.concat([bytes, bytes]));
+    first.fill(42);
+    assert.deepEqual(await engine.readBodyRanges(filename, bodyRanges([[0, bytes.length]])), bytes);
+  }
+  assert.equal(await engine.readBodyRanges(filename, bodyRanges([[1, bytes.length - 1]])), null);
+  const metadata = await fs.stat(filename);
+  await fs.writeFile(filename, Buffer.alloc(bytes.length, 97));
+  await fs.utimes(filename, metadata.atime, metadata.mtime);
+  assert.equal(await engine.readBodyRanges(filename, ranges), null, 'restoring mtime cannot conceal a changed spool');
+  assert.equal(JSON.parse(await engine.request(frame(2, { kind: 'compare', left: 'x', right: 'x' }))).failed, false);
+  assert.throws(() => engine.readBodyRanges(filename, Buffer.alloc(7)), /invalid/);
+  const pending = engine.readBodyRanges(filename, ranges);
+  assert.throws(() => engine.readBodyRanges(filename, ranges), /busy/);
+  engine.close();
+  assert.equal(await pending, null);
+});
+
+test('adapter disposal waits for optional retained reads and discards late bytes', async () => {
+  const value = session();
+  let release;
+  value.engine.readBodyRanges = () => new Promise((resolve) => { release = () => resolve(Buffer.from('late')); });
+  const pending = value.readBodyRanges('/private/spool', bodyRanges([[0, 4]]));
+  await Promise.resolve();
+  let disposed = false;
+  const disposal = value.dispose().then(() => { disposed = true; });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(disposed, false);
+  release();
+  assert.equal(await pending, undefined);
+  await disposal;
+  assert.equal(disposed, true);
+});

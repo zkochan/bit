@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { promisify } from 'util';
+import { hasRustSnapshotFunctionReference } from './rust-snapshot-guards';
 
 const open = promisify(fs.open);
 const read = promisify(fs.read);
@@ -33,6 +34,8 @@ const pending = new Map<string, ReadBatch>();
 const maximumBytes = 32 * 1024 * 1024;
 const copy = Buffer.prototype.copy;
 const allocateBuffer = Buffer.allocUnsafe;
+const writeUInt32 = Buffer.prototype.writeUInt32BE;
+const isBuffer = Buffer.isBuffer;
 const enqueue = queueMicrotask;
 const promiseConstructor = Promise;
 const mapGet = Map.prototype.get;
@@ -68,6 +71,8 @@ async function readRange(filename: string, offset: number, body: Buffer): Promis
 
 async function flush(filename: string, batch: ReadBatch): Promise<void> {
   if (pending.get(filename) === batch) pending.delete(filename);
+  if (process.platform !== 'win32' && process.env.BIT_RUST_CLIENT_VCS === 'on' && (await readRetained(filename, batch)))
+    return;
   if (batch.ranges.length === 1) {
     const range = batch.ranges[0];
     await readRange(filename, range.offset, range.body).then(range.resolve, range.reject);
@@ -124,5 +129,31 @@ export function readRustBodyRangeSync(filename: string, offset: number, bytes: n
     return body;
   } finally {
     closeSync(descriptor);
+  }
+}
+
+/** The native provider only copies exact owned bodies. Disk reads retain all miss/error behavior. */
+async function readRetained(filename: string, batch: ReadBatch): Promise<boolean> {
+  if (process.env.BIT_RUST_CLIENT_VCS !== 'on') return false;
+  try {
+    const engine = require('@teambit/component.sources/dist/rust-workspace-engine');
+    const readRetainedRustBodyRanges = Object.getOwnPropertyDescriptor(engine, 'readRetainedRustBodyRanges')?.value;
+    if (!hasRustSnapshotFunctionReference('RetainedWorkspaceBodyReader', readRetainedRustBodyRanges)) return false;
+    const ranges = allocateBuffer(batch.ranges.length * 8);
+    batch.ranges.forEach((range, index) => {
+      writeUInt32.call(ranges, range.offset, index * 8);
+      writeUInt32.call(ranges, range.body.length, index * 8 + 4);
+    });
+    const bytes = await readRetainedRustBodyRanges(filename, ranges);
+    if (!isBuffer(bytes) || bytes.length !== batch.bytes) return false;
+    let offset = 0;
+    for (const range of batch.ranges) {
+      copy.call(bytes, range.body, 0, offset, offset + range.body.length);
+      offset += range.body.length;
+    }
+    for (const range of batch.ranges) range.resolve(range.body);
+    return true;
+  } catch {
+    return false;
   }
 }

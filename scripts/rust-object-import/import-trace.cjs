@@ -568,6 +568,16 @@ if (output && process.pid === owner) {
         }
       };
     }
+    const readBodies = WorkspaceEngine.prototype.readBodyRanges;
+    if (readBodies) {
+      WorkspaceEngine.prototype.readBodyRanges = async function (...args) {
+        const result = await readBodies.apply(this, args);
+        const reads = metrics.retainedBodyReads ||= { requests: 0, hits: 0, bytes: 0 };
+        reads.requests++;
+        if (Buffer.isBuffer(result)) { reads.hits++; reads.bytes += result.length; }
+        return result;
+      };
+    }
     const request = WorkspaceEngine.prototype.request;
     const transports = new WeakMap();
     WorkspaceEngine.prototype.request = async function (bytes) {

@@ -231,3 +231,16 @@ fn prepare_response(
     }
     Ok(response)
 }
+
+impl State {
+    pub(crate) fn enable_retained_reads(&mut self) {
+        self.checkout.enable_retained_reads();
+    }
+    pub(crate) fn read_retained(
+        &self,
+        path: &std::path::Path,
+        ranges: &[(usize, usize)],
+    ) -> Option<Vec<u8>> {
+        self.checkout.read_retained(path, ranges)
+    }
+}

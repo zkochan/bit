@@ -222,3 +222,9 @@ and scanning the class registry for every aspect while still checking method
 replacements, accessors, extra properties and instance overrides on every call.
 Only registration metadata is retained; eligibility is never cached across hooks
 or asynchronous work.
+
+### Retained private body reads
+
+The in-process workspace engine can return exact checkout/merge body ranges from the bytes it already owns. Reads run on the shared worker pool and are serialized with the owner's requests and cleanup. Each read checks the private spool's device/inode, size and nanosecond modification/change timestamps before and after copying. Changed, missing, replaced, unsupported or unowned spools use the existing disk reader. Windows keeps the disk path because this implementation requires Unix file identity. Helper processes do not capture this optional metadata.
+
+The operation accepts at most 4,096 ranges and 32 MiB of output, retains independent JavaScript buffers, and leaves Source hash validation in place. The request does not keep completed plans alive. Qualification traces report `retainedBodyReads` requests, hits and bytes; these counters establish coverage, not a command speedup. Retained timing remains a separate untraced Node/native comparison.

@@ -310,3 +310,6 @@ fn deferred_apply_error_preserves_prior_modified_file_selector() {
     assert_eq!(result["filesStatus"], json!([{"relativePath":"a","status":"merged"}]));
     assert_eq!(result["deferredError"]["message"], "file b not found");
 }
+
+#[path = "retained_tests.rs"]
+mod retained;

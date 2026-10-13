@@ -11,6 +11,7 @@ use std::{
 pub(super) struct State {
     pub(super) plans: HashMap<String, Plan>,
     sequence: u64,
+    pub(super) retain_reads: bool,
 }
 pub(super) struct Plan {
     pub(super) bodies: Vec<Body>,
@@ -31,6 +32,7 @@ pub(super) struct Current {
     pub(super) raw_hash: String,
 }
 pub(super) struct Body {
+    pub(super) stamp: Option<super::retained::Stamp>,
     pub(super) offset: Option<usize>,
     pub(super) contents: Vec<u8>,
     pub(super) path: PathBuf,
@@ -39,7 +41,7 @@ pub(super) struct Body {
 impl Body {
     pub(super) fn new(contents: Vec<u8>) -> Self {
         let hash = crate::validate::hexadecimal(&Sha1::digest(&contents));
-        Self { contents, path: PathBuf::new(), hash, offset: None }
+        Self { contents, path: PathBuf::new(), hash, offset: None, stamp: None }
     }
     pub(super) fn manifest(&self, index: usize) -> Value {
         let mut row = json!({"planIndex":index,"spoolPath":self.path,"spoolHash":self.hash,"bytes":self.contents.len()});
@@ -117,7 +119,7 @@ impl State {
         if serde_json::to_vec(&output).map_err(io::Error::other)?.len() > 4 * 1024 * 1024 {
             return Err(invalid("checkout manifest output limit"));
         }
-        super::spool::write(&plan.bodies)?;
+        super::spool::write_retained(&mut plan.bodies, self.retain_reads)?;
         self.sequence = sequence;
         self.plans.insert(token, plan);
         Ok(output)

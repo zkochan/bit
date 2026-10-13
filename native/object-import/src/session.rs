@@ -25,6 +25,24 @@ pub struct WorkspaceSession {
 }
 
 impl WorkspaceSession {
+    /// Retain file identity only for in-process consumers; child helpers keep their existing I/O path.
+    pub fn enable_retained_reads(&mut self) {
+        if cfg!(unix) {
+            self.merge.operations.checkout_transition.enable_retained_reads();
+            self.merge.operations.merge_transaction.enable_retained_reads();
+        }
+    }
+    /// Copy exact owned ranges while the backing private spool still has its original identity.
+    pub fn read_retained_bodies(
+        &self,
+        path: &std::path::Path,
+        ranges: &[(usize, usize)],
+    ) -> Option<Vec<u8>> {
+        self.merge.operations.checkout_transition
+            .read_retained(path, ranges)
+            .or_else(|| self.merge.operations.merge_transaction.read_retained(path, ranges))
+    }
+
     pub fn new(threads: usize) -> io::Result<Self> {
         if !(1..=8).contains(&threads) {
             return Err(io::Error::other("thread count must be between 1 and 8"));

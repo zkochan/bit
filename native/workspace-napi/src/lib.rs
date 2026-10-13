@@ -1,5 +1,6 @@
 pub use stream::ImportStreamEngine;
 
+mod retained;
 mod stream;
 mod stream_io;
 
@@ -89,7 +90,8 @@ impl WorkspaceEngine {
 }
 
 impl WorkspaceEngine {
-    fn from_session(session: WorkspaceSession) -> Self {
+    fn from_session(mut session: WorkspaceSession) -> Self {
+        session.enable_retained_reads();
         Self {
             state: Arc::new(State {
                 dispatcher: session.dispatcher(),

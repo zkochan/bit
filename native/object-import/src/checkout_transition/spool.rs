@@ -13,7 +13,7 @@ pub(super) fn assign(bodies: &mut [Body], directory: &Path, token: &str, first: 
         offset += body.contents.len();
     }
 }
-pub(super) fn write(bodies: &[Body]) -> io::Result<()> {
+fn write(bodies: &[Body]) -> io::Result<()> {
     let Some(first) = bodies.first() else {
         return Ok(());
     };
@@ -32,4 +32,12 @@ pub(super) fn write(bodies: &[Body]) -> io::Result<()> {
         output.write_all(&body.contents)?;
     }
     output.flush()
+}
+
+pub(super) fn write_retained(bodies: &mut [Body], retain_reads: bool) -> io::Result<()> {
+    write(bodies)?;
+    if retain_reads {
+        super::retained::capture(bodies);
+    }
+    Ok(())
 }

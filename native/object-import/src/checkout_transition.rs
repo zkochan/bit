@@ -3,6 +3,7 @@ mod materialize;
 mod plan;
 mod prepare;
 mod removals;
+mod retained;
 mod retarget;
 mod select;
 mod spool;
@@ -97,4 +98,17 @@ pub(crate) fn order(
         .collect::<io::Result<Vec<_>>>()?;
     plan.merge_rows = rows;
     if indexed { Ok(json!({"rowIndices":order})) } else { Ok(json!({"mergeRows":plan.merge_rows})) }
+}
+
+impl State {
+    pub(crate) fn enable_retained_reads(&mut self) {
+        self.plans.retain_reads = true;
+    }
+    pub(crate) fn read_retained(
+        &self,
+        path: &std::path::Path,
+        ranges: &[(usize, usize)],
+    ) -> Option<Vec<u8>> {
+        retained::read(&self.plans, path, ranges)
+    }
 }

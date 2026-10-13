@@ -21,7 +21,11 @@ const stringify = JSON.stringify;
 let active = 0;
 
 type ProjectedFile = { filename: Buffer; contents: Buffer; overwrite: boolean };
-type WorkspaceEngine = { request: (frame: Buffer) => Promise<Buffer>; close: () => void };
+type WorkspaceEngine = {
+  request: (frame: Buffer) => Promise<Buffer>;
+  readBodyRanges?: (filename: string, ranges: Buffer) => Promise<Buffer | null>;
+  close: () => void;
+};
 type Result = {
   version: number;
   id: number;
@@ -86,6 +90,21 @@ export class MaterializationSession {
     this.child.stdin.on('error', () => this.stop());
     this.child.stdout.on('error', () => this.stop());
     this.child.stdout.on('data', (data: Buffer) => this.accept(data));
+  }
+
+  async readBodyRanges(filename: string, ranges: Buffer): Promise<Buffer | undefined> {
+    if (this.stopped || this.nativeActive || !this.engine?.readBodyRanges) return undefined;
+    const pending = Promise.resolve().then(() => this.engine!.readBodyRanges!(filename, ranges));
+    this.nativeActive = pending.then(() => undefined, () => undefined);
+    try {
+      const bytes = await pending;
+      return this.stopped ? undefined : bytes || undefined;
+    } catch {
+      return undefined;
+    } finally {
+      this.nativeActive = undefined;
+      if (this.stopped) this.finishNativeClose();
+    }
   }
 
   write(files: ProjectedFile[]): Promise<number | undefined> {
