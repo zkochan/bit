@@ -40,7 +40,7 @@ function summarize(text, sourcePaths) {
   const rustThreads = new Set();
   const rustReads = [];
   for (const line of lines) {
-    const named = line.match(/^\s*(\d+)\s+prctl\(PR_SET_NAME, "([^"]+)"\)\s+=\s+0$/);
+    const named = line.match(/^\s*(\d+)\s+prctl\(PR_SET_NAME, "([^"]+)"\s*\)\s+=\s+0$/);
     if (named && threads.has(Number(named[1]))) {
       if (/^bit-vcs-[0-7]$/.test(named[2])) rustThreads.add(Number(named[1]));
       else rustThreads.delete(Number(named[1]));
