@@ -237,7 +237,7 @@ test('native merge input frames contain only verified descriptors rather than so
   }
 });
 
-test('canonical updated files follow Source load completion order while parity preserves complete rows', async (t) => {
+test('canonical updated files retain current order despite reversed Source completion', async (t) => {
   const fixture = await setup(t);
   const params = {
     scope: fixture.scope,
@@ -257,7 +257,7 @@ test('canonical updated files follow Source load completion order while parity p
   params.otherComponent.files[1].file.load = async () => second;
   Object.defineProperty(second, 'contents', {
     get() {
-      // Reading the second body happens immediately before its push; only then release the first load.
+      // Reading the second body completes its load before releasing the first load.
       releaseFirst();
       return Buffer.from('other second\n');
     },
@@ -271,11 +271,11 @@ test('canonical updated files follow Source load completion order while parity p
   }
   assert.deepEqual(
     result.updatedFiles.map((row) => row.filePath),
-    ['second.js', 'first.js']
+    ['first.js', 'second.js']
   );
   assert.deepEqual(
     result.updatedFiles.map((row) => row.content.toString()),
-    ['other second\n', 'other first\n']
+    ['other first\n', 'other second\n']
   );
   assert.deepEqual(publicResult(result), publicResult({ ...result, updatedFiles: [...result.updatedFiles].reverse() }));
 });
@@ -322,4 +322,59 @@ test('canonical added and restored files retain model order despite reversed asy
     result.deletedConflictFiles.filter((file) => file.fsFile).map((file) => file.filePath),
     restored
   );
+});
+
+test('retained Source groups preserve canonical model order for additions and restored files', async () => {
+  const { observeRustMergeSourceGroups } = compiled
+    ? require(path.join(mergeRoot, 'rust-merge-source-groups.js'))
+    : source('scopes/component/modules/merge-helper/rust-merge-source-groups.ts');
+  const pending = new Map();
+  const completed = [];
+  const models = Array.from({ length: 6 }, (_, index) => ({
+    relativePath: `file-${index}.js`,
+    test: false,
+    file: {
+      hash: String(index).repeat(40),
+      load: () =>
+        new Promise((resolve) =>
+          pending.set(index, () => {
+            completed.push(index);
+            resolve(Source.from(Buffer.from(`file-${index}`)));
+          })
+        ),
+    },
+  }));
+  const stages = ['currentUpdated', 'added', 'deletedConflict'];
+  const groups = stages.map((stage, stageIndex) => ({
+    stage,
+    loads: [0, 1].map((offset) => {
+      const index = stageIndex * 2 + offset;
+      return { row: index, source: index, ref: { side: 'other', index } };
+    }),
+  }));
+  const observing = observeRustMergeSourceGroups(
+    {},
+    models.map((model) => ({ hash: model.file.hash })),
+    groups,
+    [],
+    models
+  );
+  for (let index = 0; index < 6; index += 2) {
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.ok(pending.has(index) && pending.has(index + 1));
+    pending.get(index + 1)();
+    await new Promise((resolve) => setImmediate(resolve));
+    pending.get(index)();
+  }
+  const observed = await observing;
+  assert.deepEqual(completed, [1, 0, 3, 2, 5, 4], 'the loader really completed every group in reverse');
+  assert.deepEqual(observed.groups, [
+    { stage: 'currentUpdated', order: [0, 1] },
+    { stage: 'added', order: [2, 3] },
+    { stage: 'deletedConflict', order: [4, 5] },
+  ]);
+  for (let index = 2; index < 6; index++) {
+    assert.equal(observed.sources.get(index).file.relative, models[index].relativePath);
+    assert.equal(observed.sources.get(index).file.contents.toString(), `file-${index}`);
+  }
 });
