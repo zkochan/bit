@@ -837,6 +837,7 @@ jobs:
             /tmp/bit-client-performance-*/bit-merge-transaction-*/*.json
             /tmp/bit-client-performance-*/bit-merge-transaction-*/*.txt
             /tmp/bit-client-performance-*/bit-real-workspace-inspection-*/*.txt
+            /tmp/bit-client-performance-*/bit-real-workspace-inspection-*/*.strace
             /tmp/bit-client-performance-*/bit-cli-base/.bit-rust-*.json
 
   scratch-inspection:
