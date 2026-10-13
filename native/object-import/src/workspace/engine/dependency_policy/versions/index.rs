@@ -19,7 +19,7 @@ impl<'a> Index<'a> {
             bitmap
                 .entry(unversioned(id))
                 .and_modify(|value| *value = None)
-                .or_insert(Some(version(id)));
+                .or_insert_with(|| Some(version(id)));
         }
         Self {
             request,

@@ -34,6 +34,7 @@ const MAX_FILES: usize = 4096;
     deny_unknown_fields
 )]
 enum Request {
+    DependencyPolicyPackages(dependency_policy::packages_on_disk::Request),
     DependencyPolicy(Box<dependency_policy::Request>),
     DependencyPolicyFinish(Box<dependency_policy::finalize::Request>),
     DependencyPolicyVersions(Box<dependency_policy::versions::Request>),
@@ -163,6 +164,9 @@ fn failure(id: u32) -> Response {
 fn apply(request: Request, pool: &rayon::ThreadPool) -> io::Result<(usize, Value)> {
     match request {
         Request::StatusModels(request) => status_models::read(&request, pool),
+        Request::DependencyPolicyPackages(request) => {
+            dependency_policy::packages_on_disk::read(&request, pool)
+        }
         Request::DependencyPolicy(request) => dependency_policy::apply(&request),
         Request::DependencyPolicyFinish(request) => dependency_policy::finalize::apply(&request),
         Request::DependencyPolicyVersions(request) => dependency_policy::versions::apply(&request),

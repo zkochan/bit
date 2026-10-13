@@ -1,4 +1,6 @@
+mod history;
 mod index;
+mod remotes;
 mod semantic;
 mod versions;
 
@@ -17,6 +19,8 @@ use std::{
 pub(super) struct Request {
     root: PathBuf,
     targets: Vec<Target>,
+    #[serde(default)]
+    history: bool,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -29,6 +33,8 @@ pub(super) struct Snapshot {
     models: Vec<Value>,
     versions: Vec<(String, Value)>,
     semantics: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    histories: Option<Vec<Value>>,
 }
 pub(super) fn read(request: &Request, pool: &rayon::ThreadPool) -> io::Result<(usize, Value)> {
     let snapshot = load(request, pool)?;
@@ -70,7 +76,9 @@ fn load(request: &Request, pool: &rayon::ThreadPool) -> io::Result<Snapshot> {
             .map(|(_, value)| semantic::hash(value))
             .collect::<io::Result<Vec<_>>>()
     })?;
-    Ok(Snapshot { models, versions, semantics })
+    let histories =
+        if request.history { Some(history::read(&reader, &models, request, pool)?) } else { None };
+    Ok(Snapshot { models, versions, semantics, histories })
 }
 struct Reader<'a> {
     directory: &'a Path,

@@ -6,8 +6,8 @@ const os = require('node:os');
 const { execFileSync } = require('node:child_process');
 const { installed } = require('./load-source.cjs');
 const { ModelComponent, Version, Source } = installed('@teambit/objects');
-function request(root, targets) {
-  const body = Buffer.from(JSON.stringify({ kind: 'statusModels', root, targets }));
+function request(root, targets, history = false) {
+  const body = Buffer.from(JSON.stringify({ kind: 'statusModels', root, targets, history }));
   const header = Buffer.alloc(12);
   header.write('BWS1');
   header.writeUInt32BE(1, 4);
@@ -132,4 +132,84 @@ test('native stored Version semantics match canonical parsing, defaults and exte
     assert.equal(actual.failed, false, `case ${i}`);
     assert.equal(actual.data.semantics[0], expected, `case ${i}: ${Version.parse(body.toString(), hash).id()}`);
   }
+});
+
+test('cached main status and merge distances match the actual Node history pipeline', async (t) => {
+  const { root, models, index, targets, write } = await fixture(t);
+  const { VersionHistory, Ref } = installed('@teambit/objects');
+  const { getDivergeData } = installed('@teambit/component.snap-distance');
+  index.components = index.components.slice(0, 1);
+  await fs.writeFile(path.join(root, '.bit/index.json'), JSON.stringify(index));
+  const model = models[0];
+  const remoteFile = path.join(root, '.bit/refs/remotes', model.scope, 'main');
+  await fs.mkdir(path.dirname(remoteFile), { recursive: true });
+  const ref = (n) => new Ref(n.toString(16).padStart(40, '0'));
+  const normalize = (distance) => ({
+    sourceOnly: distance.snapsOnSourceOnly.map(String),
+    targetOnly: distance.snapsOnTargetOnly.map(String),
+    noCommon: !!distance.err,
+    ...(distance.commonSnapBeforeDiverge ? { common: distance.commonSnapBeforeDiverge.toString() } : {}),
+  });
+  for (let i = 0; i < 64; i++) {
+    const versions = Array.from({ length: 7 }, (_, n) => ({
+      hash: ref(n + 1),
+      parents: n ? [ref(i % 3 && n > 2 ? n - 1 : n)] : [],
+    }));
+    if (i % 4 === 0) versions[6].parents.push(ref(4));
+    if (i % 3 === 0) versions[6].parents = [];
+    if (i % 6 === 0) versions[6].unrelated = ref(2);
+    if (i % 7 === 0) versions[6].squashed = [ref(3)];
+    const history = new VersionHistory({ name: model.name, scope: model.scope, versions });
+    await write(history);
+    model.head = ref(3 + (i % 5));
+    await write(model);
+    const remote = i % 8 ? ref(i % 8) : null;
+    await fs.writeFile(
+      remoteFile,
+      JSON.stringify(remote ? [{ id: { scope: model.scope, name: model.name }, head: remote.toString() }] : [])
+    );
+    const repo = {
+      load: async (hash) => {
+        assert.equal(hash.toString(), history.hash().toString());
+        return history;
+      },
+      unmergedComponents: { getEntry: () => undefined },
+    };
+    // The workspace version uses the fixture's existing Version body; include
+    // that detached ref in history without manufacturing a second body read.
+    history.addFromVersionParents([{ hash: model.getRef('1.0.0'), parents: [ref(2)] }]);
+    await write(history);
+    const status = await getDivergeData({
+      repo,
+      modelComponent: model,
+      sourceHead: model.getRef('1.0.0'),
+      targetHead: remote,
+      throws: false,
+    });
+    const merge = await getDivergeData({ repo, modelComponent: model, targetHead: remote, throws: false });
+    const actual = request(root, targets.slice(0, 1), true);
+    assert.equal(actual.failed, false, `case ${i}`);
+    assert.deepEqual(
+      actual.data.histories,
+      [
+        {
+          identity: model.id(),
+          remoteHead: remote?.toString() ?? null,
+          status: normalize(status),
+          merge: normalize(merge),
+        },
+      ],
+      `case ${i}`
+    );
+  }
+  await fs.writeFile(path.join(root, '.bit/unmerged.json'), JSON.stringify([{ unrelated: true }]));
+  assert.equal(request(root, targets.slice(0, 1), true).failed, true);
+});
+
+test('missing history keeps population and writes on the canonical path', async (t) => {
+  const { root, targets } = await fixture(t);
+  const response = request(root, targets, true);
+  assert.equal(response.failed, true);
+  assert.equal(response.data, undefined);
+  assert.equal(request(root, targets).failed, false);
 });
