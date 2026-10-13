@@ -222,8 +222,10 @@ export async function getRustFilesDiff(
   if (files.some((file) => !hasOrdinaryWorkspaceProperties(file))) return undefined;
   const observedPaths = files.map((file) => file.relative);
   const paths = [...new Set(observedPaths)];
-  const indexedA = indexRustWorkspaceFiles(snapshotA, observedPaths.slice(0, snapshotA.length));
-  const indexedB = indexRustWorkspaceFiles(snapshotB, observedPaths.slice(snapshotA.length));
+  const indexedA =
+    snapshotA.length >= 8 ? indexRustWorkspaceFiles(snapshotA, observedPaths.slice(0, snapshotA.length)) : undefined;
+  const indexedB =
+    snapshotB.length >= 8 ? indexRustWorkspaceFiles(snapshotB, observedPaths.slice(snapshotA.length)) : undefined;
   if (!paths.length || paths.length > MAX_FILES) return undefined;
   const input = (file: AbstractVinyl | undefined) => {
     if (!file) return undefined;
