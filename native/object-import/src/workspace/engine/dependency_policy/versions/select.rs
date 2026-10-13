@@ -6,17 +6,17 @@ use std::io;
 
 type Choice = Option<(String, Option<String>)>;
 pub(super) fn select(
-    request: &Request,
+    index: &super::index::Index<'_>,
     identity: &str,
     field: usize,
     package: Option<&str>,
 ) -> io::Result<Choice> {
+    let request = index.request;
     let base = unversioned(identity);
-    let bitmap: Vec<_> = request.sources.bitmap
-        .iter()
-        .filter(|id| unversioned(id) == base)
-        .collect();
-    let bitmap = (bitmap.len() == 1).then(|| bitmap[0].as_str());
+    let bitmap = index.bitmap
+        .get(base)
+        .copied()
+        .flatten();
     if let Some(value) = request.sources.component_config
         .get(base)
         .filter(|value| !value.is_empty())
@@ -24,10 +24,7 @@ pub(super) fn select(
         return Ok(Some((value.clone(), None)));
     }
     if let Some(name) = package
-        && !(request.policy.env_own
-            .iter()
-            .any(|entry| entry == name)
-            && bitmap.is_some())
+        && !(index.env.contains(name) && bitmap.is_some())
         && let Some(spec) = request.policy.manual[field]
             .get(name)
             .filter(|value| !value.is_empty())
@@ -35,7 +32,7 @@ pub(super) fn select(
     {
         return Ok(Some(selected));
     }
-    if let Some(value) = bitmap.map(version).or_else(|| from_ids(&request.sources.lane, base)) {
+    if let Some(value) = bitmap.or_else(|| index.lane.get(base).copied()) {
         return Ok(Some((value.to_owned(), None)));
     }
     if let Some(name) = package
@@ -43,14 +40,11 @@ pub(super) fn select(
     {
         return Ok(Some(selected));
     }
-    Ok(from_ids(&request.sources.model, base)
+    Ok(index.model
+        .get(base)
+        .copied()
         .or_else(|| (version(identity) != "latest").then(|| version(identity)))
         .map(|value| (value.to_owned(), None)))
-}
-fn from_ids<'a>(ids: &'a [String], identity: &str) -> Option<&'a str> {
-    ids.iter()
-        .find(|id| unversioned(id) == identity)
-        .map(|id| version(id))
 }
 fn package_policy(request: &Request, identity: &str, name: &str) -> io::Result<Choice> {
     if let version = version(identity)

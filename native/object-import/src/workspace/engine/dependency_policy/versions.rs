@@ -1,5 +1,6 @@
 pub(in crate::workspace::engine) use wire::Request;
 
+mod index;
 mod select;
 mod validate;
 mod wire;
@@ -9,16 +10,17 @@ use serde_json::{Value, json};
 
 pub(in crate::workspace::engine) fn apply(request: &Request) -> io::Result<(usize, Value)> {
     validate::validate(request)?;
+    let index = index::Index::new(request);
     let mut entries = request.entries.clone();
     for (field, indices) in request.components.iter().enumerate() {
-        for index in indices {
-            update(request, &mut entries[*index], field)?;
+        for position in indices {
+            update(&index, &mut entries[*position], field)?;
         }
     }
     let extensions = request.extensions
         .iter()
         .map(|identity| {
-            Ok(select::select(request, identity, 1, None)?
+            Ok(select::select(&index, identity, 1, None)?
                 .map_or_else(
                     || identity.clone(),
                     |(version, _)| wire::identity(identity, &version),
@@ -27,9 +29,14 @@ pub(in crate::workspace::engine) fn apply(request: &Request) -> io::Result<(usiz
         .collect::<io::Result<Vec<_>>>()?;
     Ok((1, json!({"entries":entries,"extensions":extensions})))
 }
-fn update(request: &Request, entry: &mut super::wire::Entry, field: usize) -> io::Result<()> {
+fn update(
+    index: &index::Index<'_>,
+    entry: &mut super::wire::Entry,
+    field: usize,
+) -> io::Result<()> {
+    let request = index.request;
     let Some((version, range)) =
-        select::select(request, &entry.identity, field, entry.package_name.as_deref())?
+        select::select(index, &entry.identity, field, entry.package_name.as_deref())?
     else {
         return Ok(());
     };
