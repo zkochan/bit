@@ -155,6 +155,10 @@ on:
         description: Inspect benchmark scratch filesystem ancestry only
         type: boolean
         default: false
+      profile_only:
+        description: Collect diagnostic CPU profiles without retained timings
+        type: boolean
+        default: false
       packaged_addon:
         description: Benchmark automatic discovery from the complete packaged artifact
         type: boolean
@@ -168,7 +172,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: rust-scanner-${{ github.event.pull_request.number || inputs.benchmark_ref || github.ref }}
+  group: rust-scanner-${{ github.event.pull_request.number || inputs.benchmark_ref || github.ref }}-${{ inputs.profile_only || false }}
   # Superseded PR pushes are cancelled; every commit on `rust` keeps its result.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
@@ -590,8 +594,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        baseline: [object-helper, javascript]
-        extra_files: [0, 260]
+        baseline: ${{ fromJSON(inputs.profile_only && '["object-helper"]' || '["object-helper", "javascript"]') }}
+        extra_files: ${{ fromJSON(inputs.profile_only && '[0]' || '[0, 260]') }}
     env:
       BIT_BENCHMARK_BASELINE: ${{ matrix.baseline }}
       BIT_BENCHMARK_EXTRA_FILES: ${{ matrix.extra_files }}
@@ -663,6 +667,7 @@ jobs:
             BIT_TEST_WORKSPACE_ADDON="$addon_candidate" BIT_TEST_OBJECT_IMPORT="${BIT_BENCHMARK_HELPER:-$PWD/native/target/release/bit-object-import}" BIT_LEGACY_ROOT="$TMPDIR/bit-cli" node --test "${addon_tests[@]}"
           fi
       - name: Qualify all routes, then measure with builds and tests idle
+        if: ${{ !inputs.profile_only }}
         run: |
           node <<'NODE'
           const fs = require('node:fs/promises');
@@ -695,6 +700,36 @@ jobs:
             }
             await fs.appendFile(process.env.GITHUB_STEP_SUMMARY, `Source: ${sourceRevision}\n\nProfile: ${JSON.stringify(profiles[0])}\n\n144 parity cases and 96 retained timing samples completed; raw state/output artifacts and source/helper fingerprints are attached.\n`);
           })().catch(error => { console.error(error); process.exitCode = 1; });
+          NODE
+      - name: Collect diagnostic command CPU profiles
+        if: ${{ inputs.profile_only }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs'), path = require('node:path');
+          const directory = path.join(process.env.TMPDIR, 'bit-performance-evidence');
+          fs.mkdirSync(directory);
+          const preload = path.join(directory, 'profile-preload.cjs');
+          fs.writeFileSync(preload, `
+          if (process.argv.includes('merge')) {
+            const fs = require('node:fs'), path = require('node:path'), inspector = require('node:inspector');
+            const session = new inspector.Session(); session.connect();
+            session.post('Profiler.enable'); session.post('Profiler.setSamplingInterval', {interval:100}); session.post('Profiler.start');
+            process.once('exit', () => session.post('Profiler.stop', (error, result) => {
+              if (error) throw error;
+              fs.writeFileSync(path.join(__dirname, 'profile-'+process.env.BIT_RUST_CLIENT_VCS+'-'+process.pid+'.json'), JSON.stringify({diagnosticOnly:true, args:process.argv, profile:result.profile}));
+              session.disconnect();
+            }));
+          }
+          `);
+          process.env.NODE_OPTIONS = '--require=' + preload;
+          const {runQualification} = require('./scripts/rust-object-import/merge-transaction-qualification.cjs');
+          runQualification(path.join(process.env.TMPDIR,'bit-cli'), process.env.BIT_BENCHMARK_HELPER, {
+            extraFiles:0, modes:['node','native'], scenarios:['main-fast-forward','component-main-manual'],
+            report:path.join(directory,'diagnostic-qualification.json')
+          }).then(result => {
+            if (!result.qualified) throw Error('diagnostic parity failed');
+            console.log('Diagnostic profiles only; no retained performance claim.');
+          }).catch(error => {console.error(error); process.exitCode=1;});
           NODE
       - name: Preserve proofs, raw artifacts and CPU records
         if: always()
