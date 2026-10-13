@@ -20,6 +20,8 @@ mod read_store;
 mod read_version;
 mod recovery;
 mod session;
+#[cfg(test)]
+mod session_tests;
 mod snapshot;
 mod snapshot_projection;
 mod snapshot_transaction;

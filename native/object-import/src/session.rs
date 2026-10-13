@@ -25,6 +25,17 @@ pub struct WorkspaceSession {
 }
 
 impl WorkspaceSession {
+    /// Small, memory-only journal transitions may run in an event-loop microtask.
+    /// Everything involving files, retained bodies, or unbounded output stays on workers.
+    #[must_use]
+    pub fn is_bounded_metadata(frame: &[u8]) -> bool {
+        if frame.len() < 12 || frame.len() > 16 * 1024 || &frame[..4] != b"BMT1" {
+            return false;
+        }
+        let length = u32::from_be_bytes(frame[8..12].try_into().expect("frame header"));
+        length as usize == frame.len() - 12 && crate::merge_state::is_bounded_metadata(&frame[12..])
+    }
+
     pub fn new(threads: usize) -> io::Result<Self> {
         if !(1..=8).contains(&threads) {
             return Err(io::Error::other("thread count must be between 1 and 8"));

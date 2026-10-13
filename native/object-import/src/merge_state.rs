@@ -1,4 +1,5 @@
 pub(crate) mod write;
+pub(crate) use execution::is_bounded_metadata;
 pub(crate) use state::State;
 
 mod execution;

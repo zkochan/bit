@@ -1,7 +1,7 @@
 use bit_object_import::{WorkspaceDispatcher, WorkspaceSession};
 use napi::{
     Env, Error, Result, Task,
-    bindgen_prelude::{Buffer, Object},
+    bindgen_prelude::{Buffer, Either, Object, PromiseRaw},
 };
 use napi_derive::napi;
 use std::{
@@ -51,7 +51,11 @@ impl WorkspaceEngine {
     }
 
     #[napi]
-    pub fn request<'env>(&self, env: &'env Env, frame: Buffer) -> Result<Object<'env>> {
+    pub fn request<'env>(
+        &self,
+        env: &'env Env,
+        frame: Buffer,
+    ) -> Result<Either<Object<'env>, PromiseRaw<'env, Buffer>>> {
         if frame.len() > 128 * 1024 * 1024 || self.state.closed.load(Ordering::Acquire) {
             return Err(failure("workspace engine closed or frame too large"));
         }
@@ -61,6 +65,17 @@ impl WorkspaceEngine {
         let bytes = frame.to_vec();
         drop(frame);
         let mut task = WorkspaceRequest { state: Arc::clone(&self.state), frame: bytes };
+        if WorkspaceSession::is_bounded_metadata(&task.frame) {
+            let promise = PromiseRaw::resolve(env, ())?
+                .then(move |context| {
+                    let result = task
+                        .compute()
+                        .and_then(|output| task.resolve(context.env, output));
+                    task.finally(context.env)?;
+                    result
+                })?;
+            return Ok(Either::B(promise));
+        }
         let (deferred, promise) = env.create_deferred::<Buffer, _>()?;
         self.state.dispatcher.spawn(move || {
             let result = task.compute();
@@ -70,7 +85,7 @@ impl WorkspaceEngine {
                 result
             });
         });
-        Ok(promise)
+        Ok(Either::A(promise))
     }
 
     /// Retire without blocking the event loop. The caller must await its active request.

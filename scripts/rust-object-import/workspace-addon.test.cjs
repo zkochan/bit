@@ -145,3 +145,45 @@ test('independent owners share bounded Rust workers without blocking each other'
     engines.forEach((engine) => engine.close());
   }
 });
+
+function metadataFrame(id, value) {
+  const input = frame(id, value);
+  input.write('BMT1');
+  return input;
+}
+
+test('bounded metadata retains promise, ownership, concurrency and close semantics', async () => {
+  const engine = new WorkspaceEngine(2);
+  const input = metadataFrame(1, { kind: 'mergeTransactionBegin', mode: 'status', count: 1 });
+  const expected = execFileSync(process.env.BIT_TEST_OBJECT_IMPORT, { input });
+  const pending = engine.request(input);
+  assert.ok(pending instanceof Promise);
+  input.fill(0);
+  assert.throws(() => engine.request(input), /active request/);
+  assert.deepEqual(await pending, expected);
+  const closing = engine.request(metadataFrame(2, { kind: 'mergeTransactionBegin', mode: 'apply', count: 1 }));
+  engine.close();
+  await assert.rejects(closing, /closed/);
+  assert.throws(() => engine.request(input), /closed/);
+});
+
+test('bounded metadata completes in a microtask and uses the same journal as worker requests', async () => {
+  const engine = new WorkspaceEngine(2);
+  try {
+    const pending = engine.request(metadataFrame(1, { kind: 'mergeTransactionBegin', mode: 'status', count: 1 }));
+    let completed = false;
+    pending.then(() => { completed = true; });
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(completed, true, 'metadata does not require a worker/event-loop round trip');
+    const { data } = JSON.parse(await pending);
+    const receipt = metadataFrame(2, { kind: 'mergeTransactionReceipt', token: data.token, revision: 0,
+      phase: 'status', index: 0, completed: 1 });
+    const finish = metadataFrame(3, { kind: 'mergeTransactionFinish', token: data.token });
+    assert.equal(JSON.parse(await engine.request(receipt)).data.revision, 1);
+    assert.equal(JSON.parse(await engine.request(finish)).data.finished, true);
+    assert.equal(JSON.parse(await engine.request(receipt)).failed, true);
+  } finally {
+    engine.close();
+  }
+});
