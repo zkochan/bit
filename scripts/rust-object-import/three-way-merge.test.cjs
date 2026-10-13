@@ -279,3 +279,47 @@ test('canonical updated files follow Source load completion order while parity p
   );
   assert.deepEqual(publicResult(result), publicResult({ ...result, updatedFiles: [...result.updatedFiles].reverse() }));
 });
+
+test('canonical added and restored files retain model order despite reversed async Source completion', async () => {
+  const { continueThreeWayMerge } = compiled ? require(path.join(mergeRoot, 'three-way-merge.js')) : merge;
+  const added = ['first.js', 'second.js', 'third.js'];
+  const restored = ['restore-first.js', 'restore-second.js'];
+  const pending = new Map();
+  const completed = [];
+  const model = (relativePath, hash) => ({ relativePath, file: { hash } });
+  const merging = continueThreeWayMerge({
+    scope: { objects: {} },
+    currentLabel: 'current',
+    otherLabel: 'incoming',
+    currentFiles: [],
+    baseFiles: restored.map((name) => model(name, 'base')),
+    otherFiles: [...added, ...restored].map((name) => model(name, 'incoming')),
+    observedSources: {
+      load: () => assert.fail('no modified file body loads'),
+      contents: () => assert.fail('no modified file contents'),
+      file: (file) =>
+        new Promise((resolve) =>
+          pending.set(file.relativePath, () => {
+            completed.push(file.relativePath);
+            resolve({ relative: file.relativePath, contents: Buffer.from(file.relativePath) });
+          })
+        ),
+    },
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual([...pending.keys()], added);
+  for (const name of [...added].reverse()) pending.get(name)();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual([...pending.keys()], [...added, ...restored]);
+  for (const name of [...restored].reverse()) pending.get(name)();
+  const result = await merging;
+  assert.deepEqual(completed, [...added].reverse().concat([...restored].reverse()));
+  assert.deepEqual(
+    result.addFiles.map((file) => file.filePath),
+    added
+  );
+  assert.deepEqual(
+    result.deletedConflictFiles.filter((file) => file.fsFile).map((file) => file.filePath),
+    restored
+  );
+});

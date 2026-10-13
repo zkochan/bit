@@ -245,22 +245,24 @@ export async function continueThreeWayMerge({
   deletedFromFs.forEach((file) => results.remainDeletedFiles.push({ filePath: file.relativePath }));
   deletedAndModified.forEach((file) => results.deletedConflictFiles.push({ filePath: file.relativePath }));
 
-  await Promise.all(
+  const addedFiles = await Promise.all(
     addedOnOther.map(async (file) => {
       const fsFile = observedSources
         ? await observedSources.file(file)
         : await SourceFile.loadFromSourceFileModel(file, scope.objects);
-      results.addFiles.push({ filePath: file.relativePath, fsFile });
+      return { filePath: file.relativePath, fsFile };
     })
   );
-  await Promise.all(
+  results.addFiles.push(...addedFiles);
+  const restoredFiles = await Promise.all(
     deletedAndModified.map(async (file) => {
       const fsFile = observedSources
         ? await observedSources.file(file)
         : await SourceFile.loadFromSourceFileModel(file, scope.objects);
-      results.deletedConflictFiles.push({ filePath: file.relativePath, fsFile });
+      return { filePath: file.relativePath, fsFile };
     })
   );
+  results.deletedConflictFiles.push(...restoredFiles);
   if (isEmpty(results.modifiedFiles)) return results;
 
   const conflictResults = await getMergeResults(scope, results.modifiedFiles, observedSources);
