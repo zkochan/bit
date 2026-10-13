@@ -3,12 +3,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 type Packages = Map<String, Value>;
-#[derive(Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct Entry {
-    pub(super) identity: String,
-    pub(super) package_name: Option<String>,
-    pub(super) version_range: Option<String>,
+pub(in crate::workspace::engine) struct Entry {
+    pub(in crate::workspace::engine) identity: String,
+    pub(in crate::workspace::engine) package_name: Option<String>,
+    pub(in crate::workspace::engine) version_range: Option<String>,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -18,9 +18,9 @@ pub(super) struct Missing {
 }
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(super) struct Policy {
-    pub(super) dependencies: Packages,
-    pub(super) peer_dependencies: Packages,
+pub(in crate::workspace::engine) struct Policy {
+    pub(in crate::workspace::engine) dependencies: Packages,
+    pub(in crate::workspace::engine) peer_dependencies: Packages,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -137,7 +137,7 @@ impl Request {
         Ok(())
     }
 }
-fn name(value: &str) -> bool {
+pub(super) fn name(value: &str) -> bool {
     !value.is_empty()
         && !value.contains('\0')
         && !matches!(
@@ -157,7 +157,7 @@ fn name(value: &str) -> bool {
                 | "__lookupSetter__",
         )
 }
-pub(super) fn version(map: &Packages, name: &str) -> Option<String> {
+pub(in crate::workspace::engine) fn version(map: &Packages, name: &str) -> Option<String> {
     map.get(name)
         .and_then(Value::as_str)
         .filter(|value| !value.is_empty())
