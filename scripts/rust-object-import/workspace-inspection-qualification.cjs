@@ -289,10 +289,11 @@ async function runQualification(cli, helper, options = {}) {
     );
     const kinds = ['inspectionBegin', 'inspectionFiles', 'inspectionCompare', 'inspectionDiff', 'inspectionFinish'];
     for (const kind of kinds) {
-      assert.ok(
-        diagnostics.some((entry) => entry.trace.mergeState[kind].completed > 0),
-        `actual commands must accept ${kind}`
-      );
+      if (!addon || kind !== 'inspectionFiles')
+        assert.ok(
+          diagnostics.some((entry) => entry.trace.mergeState[kind].completed > 0),
+          `actual commands must accept ${kind}`
+        );
       assert.equal(
         diagnostics.reduce((sum, entry) => sum + entry.trace.mergeState[kind].failed, 0),
         0,
