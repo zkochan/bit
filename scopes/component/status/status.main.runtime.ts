@@ -1,4 +1,9 @@
-import { withWorkspacePersistence, withRustSourceReads, withRustWorkspaceInspection } from '@teambit/component.sources';
+import {
+  withWorkspacePersistence,
+  withRustSourceReads,
+  withRustWorkspaceInspection,
+  withRustWorkspaceEngine,
+} from '@teambit/component.sources';
 import type { CLIMain } from '@teambit/cli';
 import { MainRuntime } from '@teambit/harmony.modules.runtimes';
 import { CLIAspect } from '@teambit/cli';
@@ -82,7 +87,9 @@ export class StatusMain {
 
   async status(options: { lanes?: boolean; ignoreCircularDependencies?: boolean }): Promise<StatusResult> {
     return withWorkspacePersistence(() =>
-      withRustSourceReads(() => withRustWorkspaceInspection(() => this.statusWithinPersistence(options)))
+      withRustWorkspaceEngine(() =>
+        withRustSourceReads(() => withRustWorkspaceInspection(() => this.statusWithinPersistence(options)))
+      )
     );
   }
 
