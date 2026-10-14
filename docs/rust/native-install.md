@@ -369,3 +369,7 @@ The PR e2e jobs never provision the addon, so they run the TypeScript command. T
 `BIT_NATIVE_INSTALL_REQUIRE=on`. With that variable, a missing or unusable addon is an
 error instead of a fallback, so the job cannot pass on the TypeScript command by accident.
 Workspaces the native command declines on purpose (yarn) still fall back.
+
+`native-install-full-e2e.yml` runs the whole e2e suite the same way, in 20 shards split
+like CircleCI's (`scripts/split-e2e-tests.js`). It is too heavy for every PR, so it runs
+on PRs labeled `native-install-full-e2e`, or by hand.
