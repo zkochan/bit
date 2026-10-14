@@ -18,7 +18,7 @@ use crate::{
 };
 use indexmap::IndexMap;
 use serde_json::Value;
-use std::{collections::HashSet, io, slice};
+use std::{collections::HashSet, io};
 
 /// What a custom detector found in one file.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -79,8 +79,7 @@ impl<'a> Detectors<'a> {
 
 /// A non-core env, or a configured non-core aspect, may bring a detector.
 fn may_have_detectors(component: &WorkspaceComponent, core_aspects: &[CoreAspect]) -> bool {
-    !is_core_env(&component.env_id)
-        || !slots::candidates(slice::from_ref(component), core_aspects).is_empty()
+    !is_core_env(&component.env_id) || slots::configures_non_core(component, core_aspects)
 }
 
 /// `{ dependencies, typescript }`; `dependency-tree` reads an object's keys.

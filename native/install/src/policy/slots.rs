@@ -97,6 +97,14 @@ fn is_env_plugin(
     Ok(objects.aspect(env_id)?.is_some_and(|model| model.uses_env_of_envs()))
 }
 
+/// The component configures an extension id that is not a core aspect. On a core env,
+/// that is the same as [`candidates`] being non-empty, without classifying the env.
+pub fn configures_non_core(component: &WorkspaceComponent, core_aspects: &[CoreAspect]) -> bool {
+    component.config
+        .keys()
+        .any(|id| !is_core(super::split_version(id).0, core_aspects))
+}
+
 fn is_core(id: &str, core_aspects: &[CoreAspect]) -> bool {
     RESERVED.contains(&id)
         || is_core_env(id)
