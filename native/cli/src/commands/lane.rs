@@ -10,7 +10,7 @@ mod show;
 
 use super::{
     color::Chalk,
-    merge::{force_local_build, report},
+    merge::{force_local_build, install, report},
     workspace_command::{self, Request, progress::Progress},
 };
 use crate::{commands::Command, native::Outcome, workspace};
@@ -46,6 +46,10 @@ fn merge(args: &[OsString], argv: &[&str]) -> io::Result<Outcome> {
     if force_local_build(&root) {
         return Ok(Outcome::Declined("force_local_build may be set".to_string()));
     }
+    let installer = match install::start(&root, argv, options.skip_install) {
+        Ok(installer) => installer,
+        Err(error) => return Ok(Outcome::Declined(format!("lane merge installation: {error}"))),
+    };
     let request =
         Request { operation: "merge", options: options.request(), to: None, verify_fresh: true };
     let mode = report::Mode { verbose: options.verbose, lane: true };
@@ -59,9 +63,5 @@ fn merge(args: &[OsString], argv: &[&str]) -> io::Result<Outcome> {
         Ok(prepared) => prepared,
         Err(error) => return Ok(Outcome::Declined(format!("lane merge: {error}"))),
     };
-    workspace_command::execute(&root, args, "merge", planned, &report, |output| {
-        if let Some(progress) = &progress {
-            progress.render_merge(output);
-        }
-    })
+    install::execute(&root, args, planned, report, progress.as_ref(), installer)
 }
