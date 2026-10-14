@@ -116,7 +116,7 @@ fn lane_header_sets_current_lane_without_becoming_component_target() {
             .as_array()
             .unwrap()
             .len(),
-        1
+        1,
     );
     assert_eq!(value["targets"][0]["identity"], "test.scope/alpha");
 }

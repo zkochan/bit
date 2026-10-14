@@ -16,10 +16,24 @@ pub(super) struct Lane {
 }
 
 pub(super) fn read(root: &Path, reader: &Reader<'_>, id: &str) -> io::Result<Option<Lane>> {
-    let (scope, name) = id.split_once('/').ok_or_else(|| invalid("status lane id"))?;
+    let (scope, name) = parse_id(id)?;
     if name == "main" {
         return Ok(None);
     }
+    let lane = local_object(root, reader, scope, name)?;
+    let heads = component_heads(&lane)?;
+    let remotes = remote(root, scope, name)?;
+    if remotes
+        .keys()
+        .any(|key| !heads.contains_key(key))
+    {
+        return Err(invalid("status lane remote component mismatch"));
+    }
+    Ok(Some(Lane { scope: scope.to_owned(), name: name.to_owned(), heads, remotes }))
+}
+
+fn parse_id(id: &str) -> io::Result<(&str, &str)> {
+    let (scope, name) = id.split_once('/').ok_or_else(|| invalid("status lane id"))?;
     if [scope, name]
         .iter()
         .any(|part| {
@@ -33,6 +47,10 @@ pub(super) fn read(root: &Path, reader: &Reader<'_>, id: &str) -> io::Result<Opt
     {
         return Err(invalid("status lane id"));
     }
+    Ok((scope, name))
+}
+
+fn local_object(root: &Path, reader: &Reader<'_>, scope: &str, name: &str) -> io::Result<Value> {
     let index: Value = serde_json::from_slice(
         &Budget::new(4 * 1024 * 1024).read(File::open(root.join(".bit/index.json"))?)?,
     )
@@ -48,13 +66,17 @@ pub(super) fn read(root: &Path, reader: &Reader<'_>, id: &str) -> io::Result<Opt
         || lane["name"] != name
         || lane
             .get("forkedFrom")
-            .is_some_and(|v| !v.is_null())
+            .is_some_and(|value| !value.is_null())
         || lane["updateDependents"]
             .as_array()
             .is_some_and(|rows| !rows.is_empty())
     {
         return Err(invalid("status complex lane requires canonical loading"));
     }
+    Ok(lane)
+}
+
+fn component_heads(lane: &Value) -> io::Result<HashMap<String, String>> {
     let components =
         lane["components"].as_array().ok_or_else(|| invalid("status lane components"))?;
     if components.len() > 4096 {
@@ -67,11 +89,11 @@ pub(super) fn read(root: &Path, reader: &Reader<'_>, id: &str) -> io::Result<Opt
         }
         let component_scope = row["id"]["scope"]
             .as_str()
-            .filter(|s| !s.is_empty())
+            .filter(|scope| !scope.is_empty())
             .ok_or_else(|| invalid("status lane component scope"))?;
         let component_name = row["id"]["name"]
             .as_str()
-            .filter(|s| !s.is_empty())
+            .filter(|name| !name.is_empty())
             .ok_or_else(|| invalid("status lane component name"))?;
         let head = row["head"].as_str().ok_or_else(|| invalid("status lane component head"))?;
         crate::merge_history::hash(head)?;
@@ -82,14 +104,7 @@ pub(super) fn read(root: &Path, reader: &Reader<'_>, id: &str) -> io::Result<Opt
             return Err(invalid("status duplicate lane component"));
         }
     }
-    let remotes = remote(root, scope, name)?;
-    if remotes
-        .keys()
-        .any(|key| !heads.contains_key(key))
-    {
-        return Err(invalid("status lane remote component mismatch"));
-    }
-    Ok(Some(Lane { scope: scope.to_owned(), name: name.to_owned(), heads, remotes }))
+    Ok(heads)
 }
 
 fn remote(root: &Path, scope: &str, name: &str) -> io::Result<HashMap<String, String>> {

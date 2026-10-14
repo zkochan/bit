@@ -82,7 +82,6 @@ fn load_overlay(
     if request.targets.len() > 4096 {
         return Err(invalid("status model target limit"));
     }
-    let items = index::read(&request.root)?;
     let directory = request.root.join(".bit/objects");
     let reader = Reader {
         directory: &directory,
@@ -95,20 +94,9 @@ fn load_overlay(
         .map(|id| lane::read(&request.root, &reader, id))
         .transpose()?
         .flatten();
-    let mut models = pool.install(|| {
-        items
-            .par_iter()
-            .map(|item| index::model(&reader, item))
-            .collect::<io::Result<Vec<_>>>()
-    })?;
+    let mut models = indexed_models(&reader, &request.root, pool)?;
     replace_models(&mut models, overlay);
-    let mut references = versions::references(&models, &request.targets)?;
-    if request.include_heads {
-        versions::include_heads(&models, &mut references)?;
-        if let Some(lane) = &lane {
-            versions::include_lane_heads(&lane.heads, &mut references)?;
-        }
-    }
+    let references = selected_references(request, &models, lane.as_ref())?;
     let versions = versions::read(&reader, &references, pool)?;
     let semantics = stored_semantics(&versions, pool, stored_hashes)?;
     let (histories, pending_history) = if request.history {
@@ -118,6 +106,33 @@ fn load_overlay(
         (None, Vec::new())
     };
     Ok(Snapshot { models, versions, semantics, histories, pending_history })
+}
+fn indexed_models(
+    reader: &Reader<'_>,
+    root: &Path,
+    pool: &rayon::ThreadPool,
+) -> io::Result<Vec<Value>> {
+    let items = index::read(root)?;
+    pool.install(|| {
+        items
+            .par_iter()
+            .map(|item| index::model(reader, item))
+            .collect()
+    })
+}
+fn selected_references(
+    request: &Request,
+    models: &[Value],
+    lane: Option<&lane::Lane>,
+) -> io::Result<Vec<String>> {
+    let mut references = versions::references(models, &request.targets)?;
+    if request.include_heads {
+        versions::include_heads(models, &mut references)?;
+        if let Some(lane) = lane {
+            versions::include_lane_heads(&lane.heads, &mut references)?;
+        }
+    }
+    Ok(references)
 }
 fn replace_models(models: &mut Vec<Value>, overlay: Option<&crate::command_import::Overlay>) {
     let Some(overlay) = overlay else {

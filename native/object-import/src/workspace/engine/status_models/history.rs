@@ -55,33 +55,8 @@ fn compare(
         .filter(|value| !value.is_null())
         .map(|value| value.as_str().ok_or_else(|| invalid("status model head")))
         .transpose()?;
-    if let Some(lane_head) = lane.and_then(|lane| lane.heads.get(&identity)) {
-        let lane_remote = lane
-            .and_then(|lane| lane.remotes.get(&identity))
-            .map(String::as_str)
-            .or(remote)
-            .or(head);
-        let workspace = targets
-            .get(identity.as_str())
-            .filter(|version| !version.is_empty())
-            .map(|version| versions::reference(model, version))
-            .transpose()?;
-        if workspace
-            .as_deref()
-            .is_some_and(|version| version != lane_head)
-        {
-            return Err(invalid("status lane bitmap head mismatch"));
-        }
-        let (mut result, pending) = distances(
-            reader,
-            model,
-            &identity,
-            [Some(lane_head), Some(lane_head), lane_remote],
-            stage,
-        )?;
-        result["laneHead"] = json!(lane_head);
-        result["mainHead"] = json!(head);
-        return Ok((result, pending));
+    if let Some(lane) = lane.filter(|lane| lane.heads.contains_key(&identity)) {
+        return compare_lane(reader, model, targets, lane, stage, &identity, [head, remote]);
     }
     let workspace = targets
         .get(identity.as_str())
@@ -92,6 +67,40 @@ fn compare(
     // a detached workspace version was passed as the source head.
     let source = if remote.is_some() { workspace.as_deref().or(head) } else { head };
     distances(reader, model, &identity, [source, head, remote], stage)
+}
+
+fn compare_lane(
+    reader: &Reader<'_>,
+    model: &Value,
+    targets: &HashMap<&str, &str>,
+    lane: &Lane,
+    stage: bool,
+    identity: &str,
+    main: [Option<&str>; 2],
+) -> io::Result<(Value, Option<Value>)> {
+    let [head, remote] = main;
+    let lane_head = lane.heads.get(identity).ok_or_else(|| invalid("status lane head"))?;
+    let lane_remote = lane.remotes
+        .get(identity)
+        .map(String::as_str)
+        .or(remote)
+        .or(head);
+    let workspace = targets
+        .get(identity)
+        .filter(|version| !version.is_empty())
+        .map(|version| versions::reference(model, version))
+        .transpose()?;
+    if workspace
+        .as_deref()
+        .is_some_and(|version| version != lane_head)
+    {
+        return Err(invalid("status lane bitmap head mismatch"));
+    }
+    let (mut result, pending) =
+        distances(reader, model, identity, [Some(lane_head), Some(lane_head), lane_remote], stage)?;
+    result["laneHead"] = json!(lane_head);
+    result["mainHead"] = json!(head);
+    Ok((result, pending))
 }
 
 fn distances(
