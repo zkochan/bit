@@ -80,7 +80,9 @@ pub(super) fn select(input: &Prepare) -> io::Result<Option<LaneSelected>> {
     }
     let component_rows =
         index["components"].as_array().ok_or_else(|| invalid("outbound component index"))?;
+    let remote_heads = remote_heads(&input.root, &scope, &name)?;
     let host = remote::configured_host(input, &scope)?;
+    let mut seen_ids = HashSet::new();
     let mut component_ids = Vec::new();
     let mut expected_ids = Vec::new();
     let mut models = Vec::new();
@@ -105,8 +107,17 @@ pub(super) fn select(input: &Prepare) -> io::Result<Option<LaneSelected>> {
         let head = entry["head"].as_str().ok_or_else(|| invalid("outbound lane head"))?;
         crate::merge_history::hash(head)?;
         let id = format!("{component_scope}/{component_name}");
-        if component_ids.contains(&id) {
+        if !seen_ids.insert(id.clone()) {
             return Err(invalid("outbound duplicate lane component"));
+        }
+        let previous_head = remote_heads
+            .iter()
+            .find(|row| {
+                row["id"]["scope"] == component_scope && row["id"]["name"] == component_name
+            })
+            .and_then(|row| row["head"].as_str());
+        if previous_head == Some(head) {
+            continue;
         }
         let row = component_rows
             .iter()
@@ -128,7 +139,7 @@ pub(super) fn select(input: &Prepare) -> io::Result<Option<LaneSelected>> {
             &input.transport.export_date,
         )?;
         let after = model::encode(model_hash, "Component", &component)?;
-        let versions = lane_versions(&dir, head, &scope, &name)?;
+        let versions = lane_versions(&dir, head, previous_head, &scope, &name)?;
         for object in model::collect(&dir, model_hash, &after, &versions)? {
             append(&mut objects, &mut seen, &mut budget, object)?;
         }
@@ -159,18 +170,42 @@ pub(super) fn select(input: &Prepare) -> io::Result<Option<LaneSelected>> {
     }))
 }
 
+fn remote_heads(root: &Path, scope: &str, name: &str) -> io::Result<Vec<Value>> {
+    if scope.contains('/') || name.contains('/') || scope == ".." || name == ".." {
+        return Err(invalid("outbound lane ref path"));
+    }
+    let path = root
+        .join(".bit/refs/remotes")
+        .join(scope)
+        .join(name);
+    match fs::read(path) {
+        Ok(bytes) => serde_json::from_slice(&bytes).map_err(io::Error::other),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(Vec::new()),
+        Err(error) => Err(error),
+    }
+}
+
 fn read_compressed(dir: &Path, hash: &str) -> io::Result<Vec<u8>> {
     transfer::object::repository(dir, crate::merge_history::hash(hash)?, MAX_BYTES)
 }
 
 /// Keep the lane head and any preceding snaps made on this lane. A main-lane
 /// parent is already on the component's home scope and does not need sending.
-fn lane_versions(dir: &Path, head: &str, scope: &str, name: &str) -> io::Result<Vec<String>> {
+fn lane_versions(
+    dir: &Path,
+    head: &str,
+    previous_head: Option<&str>,
+    scope: &str,
+    name: &str,
+) -> io::Result<Vec<String>> {
     let mut output = Vec::new();
     let mut pending = vec![head.to_owned()];
     let mut seen = HashSet::new();
     while let Some(hash) = pending.pop() {
         if !seen.insert(hash.clone()) {
+            continue;
+        }
+        if Some(hash.as_str()) == previous_head {
             continue;
         }
         if seen.len() > MAX_OBJECTS {
