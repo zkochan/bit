@@ -4,6 +4,7 @@ mod calculate;
 mod external;
 mod modules;
 mod packages;
+mod restore;
 mod session;
 mod summary;
 mod workspace_jsonc;

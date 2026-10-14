@@ -6,7 +6,7 @@ mod linking;
 
 use super::{
     calculate::{Calculated, calculate},
-    packages,
+    packages, restore,
     session::{Loaded, Session},
     workspace_jsonc,
 };
@@ -44,8 +44,11 @@ pub async fn install(session: &Session<'_>, mut loaded: Loaded) -> io::Result<In
         calculated = calculate(session, &loaded, &links).await?;
     }
     print_manifest_messages(session, &calculated);
+    let has_root_components = loaded.config.dependency_resolver.has_root_components();
+    let restore = restore::input(session, has_root_components, &calculated)?;
     prepare_directories(&loaded, &calculated)?;
-    let old_non_loaded_envs = run_cycles(session, &loaded, &links, &mut calculated).await?;
+    let context = CycleContext { loaded: &loaded, links: &links, restore: restore.as_ref() };
+    let old_non_loaded_envs = run_cycles(session, &context, &mut calculated).await?;
     linking::sync_core_aspects(session, &loaded, &calculated)?;
     if !session.options.lockfile_only {
         // A failed prune never fails the installation.
@@ -58,14 +61,14 @@ pub async fn install(session: &Session<'_>, mut loaded: Loaded) -> io::Result<In
 /// that failed to load before the installation change the manifests.
 async fn run_cycles(
     session: &Session<'_>,
-    loaded: &Loaded,
-    links: &DependencyMap,
+    context: &CycleContext<'_>,
     calculated: &mut Calculated,
 ) -> io::Result<Vec<String>> {
+    let CycleContext { loaded, links, restore } = *context;
     let mut previous = HashSet::new();
     for cycle in 1..=MAX_CYCLES {
         let has_missing_local_components = calculated.outcome.has_missing_local_components;
-        let result = engine_run::run(session, loaded, calculated).await?;
+        let result = engine_run::run(session, loaded, calculated, restore).await?;
         linking::link_components(session, loaded, calculated).await?;
         linking::sync_core_aspects(session, loaded, calculated)?;
         let old_non_loaded_envs = calculated.non_loaded_envs();
@@ -84,6 +87,13 @@ async fn run_cycles(
         }
     }
     Ok(calculated.non_loaded_envs())
+}
+
+/// What every engine run of the installation shares.
+struct CycleContext<'a> {
+    loaded: &'a Loaded,
+    links: &'a DependencyMap,
+    restore: Option<&'a engine::RestoreInput>,
 }
 
 /// Compile and write the config files through the JavaScript host.

@@ -6,7 +6,7 @@ use super::super::{
     session::{Loaded, Session},
 };
 use crate::{
-    engine::{self, EngineError, EngineInstallOptions, EngineResult, OutputSink},
+    engine::{self, EngineError, EngineInstallOptions, EngineResult, OutputSink, RestoreInput},
     output::{Output, Style},
 };
 use indexmap::IndexMap;
@@ -28,6 +28,7 @@ pub async fn run(
     session: &Session<'_>,
     loaded: &Loaded,
     calculated: &Calculated,
+    restore: Option<&RestoreInput>,
 ) -> io::Result<EngineResult> {
     let output = &session.output;
     output.status(DEDUPING);
@@ -41,7 +42,7 @@ pub async fn run(
         update_all: session.options.update,
         lockfile_only: session.options.lockfile_only,
         include_optional_deps: !session.options.no_optional,
-        restore: None,
+        restore: restore.cloned(),
         output: Some(OutputSink(output.sink())),
     };
     let result = engine::install(&calculated.outcome.plan, &loaded.engine, &options)
