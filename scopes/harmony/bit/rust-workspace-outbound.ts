@@ -44,10 +44,15 @@ export async function readRustWorkspaceOutbound(
         typeof prepared.token !== 'string' ||
         !prepared.token ||
         typeof prepared.nothingToExport !== 'boolean' ||
+        typeof prepared.fileRemote !== 'boolean' ||
         !Array.isArray(prepared.scopes) ||
         prepared.scopes.some((scope: unknown) => typeof scope !== 'string' || !scope)
       )
         throw new Error('native outbound prepare receipt');
+      if (prepared.fileRemote) {
+        const { ExportPersist } = await import('@teambit/scope.remote-actions');
+        if (ExportPersist.onPutHook) return undefined;
+      }
       await beforeCommit?.();
       committing = true;
       let applied;

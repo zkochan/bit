@@ -22,7 +22,10 @@ const sha = (value) => createHash('sha256').update(value).digest('hex');
 const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 const fingerprint = async (file) => ({ file, sha256: sha(await fs.readFile(file)) });
 const timedScenarios = scenarios.filter((scenario) => scenario.native && !scenario.fails);
-const fullQualificationRows = scenarios.reduce((count, scenario) => count + (scenario.httpOnly ? 4 : 8), 0);
+const fullQualificationRows = scenarios.reduce(
+  (count, scenario) => count + (scenario.httpOnly || scenario.fileOnly ? 4 : 8),
+  0
+);
 
 function ipc(server, predicate) {
   return new Promise((resolve, reject) => {
@@ -67,7 +70,7 @@ async function benchmark(cli, helper, reportFile, options = {}) {
   const required = new Set(
     scenarios.flatMap((scenario) =>
       ['file', 'http'].flatMap((kind) =>
-        scenario.httpOnly && kind === 'file'
+        (scenario.httpOnly && kind === 'file') || (scenario.fileOnly && kind === 'http')
           ? []
           : ['node', 'native', 'missing-helper', 'crashed-helper'].map((mode) => `${kind}/${mode}/${scenario.name}`)
       )

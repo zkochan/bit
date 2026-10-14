@@ -6,18 +6,53 @@ use std::{
     fs,
     io::{self, Write},
     path::Path,
-    process::{Command, Stdio},
 };
+mod file_bridge;
+use file_bridge::FileBridge;
 
 const MAX_BYTES: usize = 32 * 1024 * 1024;
-const FILE_ACTION: &str = "\
-const [bitDir, scopePath, name, options] = process.argv.slice(1);\
-let api;\
-try { api = require(require.resolve('@teambit/legacy.scope-api', { paths: [bitDir] })); }\
-catch (error) { process.stderr.write(String(error.message || error)); process.exit(1); }\
-Promise.resolve(api.action(scopePath, name, JSON.parse(options))).then(\
-  result => process.stdout.write(JSON.stringify(result ?? {})),\
-  error => { process.stderr.write(String(error.message || error)); process.exitCode = 1; });";
+
+/// One lazily started file-remote server-action process per outbound Apply.
+/// HTTP scopes continue to use the native network client.
+pub(super) struct Actions {
+    file: Option<FileBridge>,
+}
+
+impl Actions {
+    pub(super) fn new(_retained: &Retained) -> io::Result<Self> {
+        Ok(Self { file: None })
+    }
+
+    fn action(
+        &mut self,
+        retained: &Retained,
+        pending: &Pending,
+        name: &str,
+        options: &Value,
+    ) -> io::Result<Value> {
+        check_client_id(&retained.client_id)?;
+        match Remote::from_host(&pending.host)? {
+            Remote::File(path) => {
+                check_file_remote(&path, &pending.scope)?;
+                if self.file.is_none() {
+                    self.file = Some(FileBridge::spawn(
+                        &retained.network.node_executable,
+                        &retained.network.bit_dir,
+                    )?);
+                }
+                self.file
+                    .as_mut()
+                    .ok_or_else(|| invalid("outbound file action bridge"))?
+                    .call(&path, name, options)
+            }
+            Remote::Http(url) => {
+                let network = network(retained)?;
+                let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+                runtime.block_on(network.action(&url, name, options))
+            }
+        }
+    }
+}
 
 pub(super) fn host(input: &Prepare, scope: &str) -> io::Result<String> {
     let host = configured_host(input, scope)?;
@@ -51,6 +86,12 @@ fn check_file_remote(path: &Path, scope: &str) -> io::Result<()> {
     let config: Value = serde_json::from_slice(&fs::read(path.join("scope.json"))?)?;
     if config["name"] != scope {
         return Err(invalid("outbound file remote scope"));
+    }
+    if config["groupName"]
+        .as_str()
+        .is_some_and(|group| !group.is_empty())
+    {
+        return Err(invalid("outbound file remote group ownership requires canonical export"));
     }
     Ok(())
 }
@@ -134,91 +175,71 @@ fn push_http(retained: &Retained, pending: &Pending, url: &str) -> io::Result<()
 }
 
 /// Use the resumable form of the canonical `ExportValidate` server action.
-pub(super) fn validate(retained: &Retained, pending: &Pending) -> io::Result<()> {
-    let result = action(
-        retained,
-        pending,
-        "ExportValidate",
-        &json!({
-            "clientId":retained.client_id,"isResumingExport":true
-        }),
-    )?;
-    if !result.is_object() {
-        return Err(invalid("outbound validation result"));
+impl Actions {
+    pub(super) fn validate(&mut self, retained: &Retained, pending: &Pending) -> io::Result<()> {
+        let result = self.action(
+            retained,
+            pending,
+            "ExportValidate",
+            &json!({
+                "clientId":retained.client_id,"isResumingExport":true
+            }),
+        )?;
+        if !result.is_object() {
+            return Err(invalid("outbound validation result"));
+        }
+        Ok(())
     }
-    Ok(())
-}
 
-/// Match `persistRemotes`: retry any action failure at most three times.
-pub(super) fn persist(retained: &Retained, pending: &Pending) -> io::Result<Vec<String>> {
-    let mut last = None;
-    for _ in 0..3 {
-        match action(retained, pending, "ExportPersist", &json!({"clientId":retained.client_id})) {
-            Ok(Value::Array(ids)) => {
-                return ids
-                    .into_iter()
-                    .map(|id| {
-                        id.as_str()
-                            .map(str::to_owned)
-                            .ok_or_else(|| invalid("outbound persisted identities"))
-                    })
-                    .collect();
+    /// Match `persistRemotes`: retry any action failure at most three times.
+    pub(super) fn persist(
+        &mut self,
+        retained: &Retained,
+        pending: &Pending,
+    ) -> io::Result<Vec<String>> {
+        let mut last = None;
+        for _ in 0..3 {
+            match self.action(
+                retained,
+                pending,
+                "ExportPersist",
+                &json!({"clientId":retained.client_id}),
+            ) {
+                Ok(Value::Array(ids)) => {
+                    return ids
+                        .into_iter()
+                        .map(|id| {
+                            id.as_str()
+                                .map(str::to_owned)
+                                .ok_or_else(|| invalid("outbound persisted identities"))
+                        })
+                        .collect();
+                }
+                Ok(_) => last = Some(invalid("outbound persisted identities")),
+                Err(error) => last = Some(error),
             }
-            Ok(_) => last = Some(invalid("outbound persisted identities")),
-            Err(error) => last = Some(error),
         }
+        Err(io::Error::other(format!(
+            "outbound persist failed: {}: {}",
+            pending.scope,
+            last.ok_or_else(|| invalid("outbound persist attempts"))?
+        )))
     }
-    Err(io::Error::other(format!(
-        "outbound persist failed: {}: {}",
-        pending.scope,
-        last.ok_or_else(|| invalid("outbound persist attempts"))?
-    )))
-}
 
-/// Clean pending objects after push or validate fails. Persist failures retain
-/// pending objects for the canonical resume-export recovery flow.
-pub(super) fn cleanup(retained: &Retained, pending: &Pending) -> io::Result<()> {
-    let result =
-        action(retained, pending, "RemovePendingDir", &json!({"clientId":retained.client_id}))?;
-    if !result.is_object() {
-        return Err(invalid("outbound cleanup result"));
-    }
-    Ok(())
-}
-
-fn action(
-    retained: &Retained,
-    pending: &Pending,
-    name: &str,
-    options: &Value,
-) -> io::Result<Value> {
-    check_client_id(&retained.client_id)?;
-    match Remote::from_host(&pending.host)? {
-        Remote::File(path) => {
-            check_file_remote(&path, &pending.scope)?;
-            file_action(retained, &path, name, options)
+    /// Clean pending objects after push or validate fails. Persist failures retain
+    /// pending objects for the canonical resume-export recovery flow.
+    pub(super) fn cleanup(&mut self, retained: &Retained, pending: &Pending) -> io::Result<()> {
+        let result = self.action(
+            retained,
+            pending,
+            "RemovePendingDir",
+            &json!({"clientId":retained.client_id}),
+        )?;
+        if !result.is_object() {
+            return Err(invalid("outbound cleanup result"));
         }
-        Remote::Http(url) => {
-            let network = network(retained)?;
-            let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
-            runtime.block_on(network.action(&url, name, options))
-        }
+        Ok(())
     }
-}
-
-fn file_action(retained: &Retained, path: &Path, name: &str, options: &Value) -> io::Result<Value> {
-    let output = Command::new(&retained.network.node_executable)
-        .args(["-e", FILE_ACTION])
-        .arg(&retained.network.bit_dir)
-        .arg(path)
-        .arg(name)
-        .arg(options.to_string())
-        .stdin(Stdio::null())
-        .output()?;
-    if !output.status.success() {
-        return Err(io::Error::other(String::from_utf8_lossy(&output.stderr).trim().to_string()));
-    }
-    serde_json::from_slice(&output.stdout).map_err(|_| invalid("outbound file action result"))
 }
 
 fn network(retained: &Retained) -> io::Result<Network> {

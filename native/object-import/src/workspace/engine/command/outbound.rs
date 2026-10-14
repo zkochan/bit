@@ -136,6 +136,7 @@ pub(in crate::workspace::engine) fn prepare(
         .sum::<usize>();
     let receipt = json!({"token":token,"owner":"rust","nothingToExport":count == 0,
         "scopes":pending.iter().map(|batch| &batch.scope).collect::<Vec<_>>(),
+        "fileRemote":pending.iter().any(|batch| batch.host.starts_with("file://")),
         "objectCount":object_count});
     state.outbound = Some(Retained {
         token,
@@ -202,25 +203,32 @@ pub(in crate::workspace::engine) fn apply(
     if let Some(plan) = &retained.publication {
         plan.stage_history()?;
     }
+    let mut actions = remote::Actions::new(retained)?;
     for (pushed, batch) in retained.pending.iter().enumerate() {
         if let Err(error) = remote::push(retained, batch) {
             for prior in &retained.pending[..pushed] {
-                let _ = remote::cleanup(retained, prior);
+                let _ = actions.cleanup(retained, prior);
             }
             return Err(error);
         }
     }
+    let mut validation_error = None;
     for batch in &retained.pending {
-        if let Err(error) = remote::validate(retained, batch) {
-            for pushed in &retained.pending {
-                let _ = remote::cleanup(retained, pushed);
-            }
-            return Err(io::Error::new(error.kind(), format!("outbound validate failed: {error}")));
+        if let Err(error) = actions.validate(retained, batch)
+            && validation_error.is_none()
+        {
+            validation_error = Some(error);
         }
+    }
+    if let Some(error) = validation_error {
+        for pushed in &retained.pending {
+            let _ = actions.cleanup(retained, pushed);
+        }
+        return Err(io::Error::new(error.kind(), format!("outbound validate failed: {error}")));
     }
     let mut exported_ids = Vec::new();
     for batch in &retained.pending {
-        exported_ids.extend(remote::persist(retained, batch)?);
+        exported_ids.extend(actions.persist(retained, batch)?);
     }
     retained.exported_ids = exported_ids;
     retained.transferred = true;

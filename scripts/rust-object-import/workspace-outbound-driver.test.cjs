@@ -90,7 +90,7 @@ test('outbound driver validates before publication and propagates failures after
         events.push(input.kind);
         if (input.kind === 'commandOutboundPrepare') {
           clientId = input.clientId;
-          return { token: 'held', owner: 'rust', nothingToExport: true, scopes: [] };
+          return { token: 'held', owner: 'rust', nothingToExport: true, scopes: [], fileRemote: false };
         }
         if (failApply) throw new Error('failed after outbound apply');
         if (input.kind === 'commandOutboundApply')
@@ -115,4 +115,49 @@ test('outbound driver validates before publication and propagates failures after
   ]);
   failApply = true;
   await assert.rejects(read('/workspace', '/home', options), /failed after outbound apply/);
+});
+
+test('registered persist hook declines file transfer before commit while HTTP remains native', async (t) => {
+  const capture = load('rust-client-capture');
+  const original = capture.withRustClientRequest;
+  const { ExportPersist } = installed('@teambit/scope.remote-actions');
+  const originalHook = ExportPersist.onPutHook;
+  t.after(() => {
+    capture.withRustClientRequest = original;
+    ExportPersist.onPutHook = originalHook;
+  });
+  ExportPersist.onPutHook = async () => {};
+  const events = [];
+  capture.withRustClientRequest = async (callback) =>
+    callback(async (input) => {
+      events.push(input.kind);
+      if (input.kind === 'commandOutboundPrepare')
+        return { token: 'held', owner: 'rust', nothingToExport: false, scopes: ['qualification.alpha'], fileRemote: true };
+      throw new Error(`unexpected native transfer: ${input.kind}`);
+    });
+  const { readRustWorkspaceOutbound: read } = load('rust-workspace-outbound');
+  const result = await read('/workspace', '/home', options, async () => events.push('beforeCommit'));
+  assert.equal(result, undefined);
+  assert.deepEqual(events, ['commandOutboundPrepare']);
+
+  events.length = 0;
+  let clientId;
+  capture.withRustClientRequest = async (callback) =>
+    callback(async (input) => {
+      events.push(input.kind);
+      if (input.kind === 'commandOutboundPrepare') {
+        clientId = input.clientId;
+        return { token: 'held', owner: 'rust', nothingToExport: false, scopes: ['qualification.alpha'], fileRemote: false };
+      }
+      if (input.kind === 'commandOutboundApply')
+        return { token: 'held', owner: 'rust', pending: true, scopes: ['qualification.alpha'], clientId, objectCount: 1 };
+      return receipt;
+    });
+  assert.equal(typeof (await read('/workspace', '/home', options, async () => events.push('beforeCommit'))), 'string');
+  assert.deepEqual(events, [
+    'commandOutboundPrepare',
+    'beforeCommit',
+    'commandOutboundApply',
+    'commandOutboundFinalize',
+  ]);
 });
