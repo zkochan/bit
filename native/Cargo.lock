@@ -366,6 +366,7 @@ dependencies = [
  "pnpm-store-dir",
  "pnpm-tarball",
  "pnpm-workspace",
+ "regress",
  "serde",
  "serde_json",
  "tempfile",
