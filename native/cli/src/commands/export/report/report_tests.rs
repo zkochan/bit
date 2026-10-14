@@ -57,7 +57,7 @@ fn reports_an_exported_lane_with_and_without_new_versions() {
     assert!(published(&one, "outbound-1").is_ok());
     assert_eq!(
         format(&one, chalk),
-        "exported components (1)\n  exported the lane s/study and the following component(s)\n   \u{203A} s/a"
+        "exported components (1)\n  exported the lane s/study and the following component(s)\n   \u{203A} s/a",
     );
     let mut empty = receipt(&[], &[]);
     empty["exportedLanes"] = json!(["s/study"]);
