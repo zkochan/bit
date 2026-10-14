@@ -1,6 +1,8 @@
 //! Public outbound export owner. Prepare captures and validates local objects;
 //! Apply transfers compressed objects and owns remote validation/persistence.
 //! Finalize publishes local bookkeeping from the retained acknowledgements.
+mod lane_model;
+mod lane_publication;
 mod model;
 mod publication;
 mod remote;
@@ -66,7 +68,8 @@ pub(super) struct Retained {
     selected_order: HashMap<String, usize>,
     resume: Option<ResumeContext>,
     network: NetworkConfig,
-    publication: Option<publication::Prepared>,
+    publication: Option<Publication>,
+    lane: Option<String>,
     /// The ids the remotes persisted, once the objects are transferred.
     transferred: Option<Vec<String>>,
 }
@@ -75,6 +78,11 @@ struct Pending {
     scope: String,
     host: String,
     objects: Vec<ObjectItem>,
+}
+
+enum Publication {
+    Main(publication::Prepared),
+    Lane(lane_publication::Prepared),
 }
 
 struct ResumeContext {
@@ -96,24 +104,44 @@ pub(in crate::workspace::engine) fn prepare(
 ) -> io::Result<(usize, Value)> {
     state.outbound = None;
     validate(input)?;
-    let selected = model::select(input)?;
-    let resume = resume_context(input, &selected)?;
-    let count = selected.len();
-    let selected_order = selected
-        .iter()
-        .enumerate()
-        .map(|(index, item)| (format!("{}/{}", item.scope, item.name), index))
-        .collect();
+    let lane_selected = lane_model::select(input)?;
+    let (count, selected_order, resume, publication, pending, lane) =
+        if let Some(lane) = lane_selected {
+            if input.options.resume.is_some() {
+                return Err(invalid("outbound lane resume requires canonical export"));
+            }
+            let host = remote::host(input, &lane.scope)?;
+            let publication = lane_publication::prepare(input, &lane)?;
+            let order = lane.component_ids
+                .iter()
+                .enumerate()
+                .map(|(index, id)| (id.clone(), index))
+                .collect();
+            let name = format!("{}/{}", lane.scope, lane.name);
+            let count = lane.component_ids.len();
+            let pending = vec![Pending { scope: lane.scope, host, objects: lane.objects }];
+            (count, order, None, Some(Publication::Lane(publication)), pending, Some(name))
+        } else {
+            let selected = model::select(input)?;
+            let resume = resume_context(input, &selected)?;
+            let count = selected.len();
+            let order = selected
+                .iter()
+                .enumerate()
+                .map(|(index, item)| (format!("{}/{}", item.scope, item.name), index))
+                .collect();
+            let hosts = hosts(input, &selected)?;
+            let publication = if selected.is_empty() {
+                None
+            } else {
+                Some(Publication::Main(publication::prepare(input, &selected, &hosts)?))
+            };
+            let pending = batches(selected, &hosts)?;
+            (count, order, resume, publication, pending, None)
+        };
     state.sequence = state.sequence.wrapping_add(1);
     let token = format!("outbound-{}", state.sequence);
-    let hosts = hosts(input, &selected)?;
-    let publication = if selected.is_empty() {
-        None
-    } else {
-        Some(publication::prepare(input, &selected, &hosts)?)
-    };
-    let pending = batches(selected, &hosts)?;
-    let receipt = prepare_receipt(&token, count, &pending);
+    let receipt = prepare_receipt(&token, count, &pending, lane.as_deref());
     state.outbound = Some(Retained {
         token,
         client_id: input.transport.client_id.clone(),
@@ -122,6 +150,7 @@ pub(in crate::workspace::engine) fn prepare(
         resume,
         network: network(input),
         publication,
+        lane,
         transferred: None,
     });
     Ok((count, receipt))
@@ -189,12 +218,13 @@ fn batches(
         .collect()
 }
 
-fn prepare_receipt(token: &str, count: usize, pending: &[Pending]) -> Value {
+fn prepare_receipt(token: &str, count: usize, pending: &[Pending], lane: Option<&str>) -> Value {
     let object_count = pending
         .iter()
         .map(|batch| batch.objects.len())
         .sum::<usize>();
-    json!({"token":token,"owner":"rust","nothingToExport":count == 0,
+    json!({"token":token,"owner":"rust","nothingToExport":count == 0 && lane.is_none(),
+        "lane":lane,
         "componentCount":count,
         "scopes":pending.iter().map(|batch| &batch.scope).collect::<Vec<_>>(),
         "scopeObjectCounts":pending.iter().map(|batch| batch.objects.len()).collect::<Vec<_>>(),
@@ -256,14 +286,14 @@ pub(in crate::workspace::engine) fn apply(
         return Err(invalid("outbound owner token"));
     }
     let pending = !retained.pending.is_empty();
-    if let Some(plan) = &retained.publication {
+    if let Some(Publication::Main(plan)) = &retained.publication {
         plan.stage_history()?;
     }
     let mut actions = remote::Actions::new(retained)?;
     push_and_validate(retained, &mut actions)?;
     let exported_ids = persist(retained, &mut actions)?;
     if let Some(context) = retained.resume.take() {
-        if let Some(plan) = retained.publication.as_mut() {
+        if let Some(Publication::Main(plan)) = retained.publication.as_mut() {
             plan.resume_acknowledgement(&context.selected, &exported_ids)?;
         } else if !exported_ids.is_empty() {
             return Err(invalid("outbound resume acknowledgement"));
@@ -336,7 +366,10 @@ pub(in crate::workspace::engine) fn finalize(
         return Err(invalid("outbound owner token"));
     };
     if let Some(plan) = retained.publication {
-        plan.commit(&exported_ids)?;
+        match plan {
+            Publication::Main(plan) => plan.commit(&exported_ids)?,
+            Publication::Lane(plan) => plan.commit(&exported_ids)?,
+        }
     } else if !exported_ids.is_empty() {
         return Err(invalid("outbound unexpected remote ids"));
     }
@@ -357,7 +390,7 @@ pub(in crate::workspace::engine) fn finalize(
         json!({"token":retained.token,"owner":"rust","applied":true,
         "componentsIds":components,"newIdsOnRemote":exported_ids,
         "nonExistOnBitMap":[],"removedIds":[],"missingScope":[],
-        "exportedLanes":[],"rippleJobUrls":[]}),
+        "exportedLanes":retained.lane.into_iter().collect::<Vec<_>>(),"rippleJobUrls":[]}),
     ))
 }
 
