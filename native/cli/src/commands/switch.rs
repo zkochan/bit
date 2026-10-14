@@ -29,6 +29,7 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
         Ok(prepared) => prepared,
         Err(error) => return Ok(Outcome::Declined(format!("switch: {error}"))),
     };
+    let needs_checkout_progress = options.skip_fetch || !prepared.checkout_import_present();
     workspace_command::execute(
         &root,
         args,
@@ -41,7 +42,7 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
                     import.render(output);
                 }
             }
-            if options.skip_fetch || !prepared.checkout_import_present() {
+            if needs_checkout_progress {
                 render_import(output, prepared.import_count);
             }
         },
