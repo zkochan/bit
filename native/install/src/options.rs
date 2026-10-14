@@ -117,7 +117,10 @@ fn flag_value<'a>(
 ) -> Option<String> {
     match (arity, inline) {
         (_, Some(value)) => Some(value),
-        (Arity::Switch, None) => None,
+        // yargs booleans take a following `true`/`false`.
+        (Arity::Switch, None) => args
+            .next_if(|next| matches!(next.as_str(), "true" | "false"))
+            .cloned(),
         (Arity::Value, None) => args
             .next_if(|next| !next.starts_with('-'))
             .cloned(),

@@ -68,3 +68,11 @@ fn help_and_unknown_flags() {
     assert!(parse(&argv(&["install", "--bogus"])).is_err());
     assert!(parse(&argv(&["status"])).is_err());
 }
+
+#[test]
+fn switches_take_a_following_boolean() {
+    let parsed = options(&["install", "--skipCompile", "true", "--skip-import", "false", "lodash"]);
+    assert!(parsed.skip_compile);
+    assert!(!parsed.skip_import);
+    assert_eq!(parsed.packages, ["lodash"]);
+}
