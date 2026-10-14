@@ -37,16 +37,25 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
         prepared.planned,
         &prepared.report,
         |output| {
-            for import in &prepared.imports {
-                if import.requested > 0 {
-                    import.render(output);
-                }
-            }
-            if needs_checkout_progress {
-                render_import(output, prepared.import_count);
-            }
+            render_progress(
+                output,
+                &prepared.imports,
+                needs_checkout_progress,
+                prepared.import_count,
+            )
         },
     )
+}
+
+fn render_progress(output: &Output, imports: &[RemoteImport], checkout: bool, count: u64) {
+    for import in imports {
+        if import.requested > 0 {
+            import.render(output);
+        }
+    }
+    if checkout {
+        render_import(output, count);
+    }
 }
 
 struct PreparedSwitch {

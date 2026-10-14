@@ -1,5 +1,6 @@
 //! Local, ordinary lane switches reuse checkout capture, transition and bitmap publication.
 //! Resolve the complete target set before the command retains a writable plan.
+pub(super) mod progress;
 use super::{Record, capture, input::Prepare, invalid, planning, prepare, repository};
 use crate::{
     command_import,
@@ -338,57 +339,6 @@ fn model_staged(model: &Value, staged: &HashSet<&str>) -> bool {
         .into_iter()
         .chain(versions)
         .any(|hash| staged.contains(hash))
-}
-
-pub(super) fn import_count(
-    root: &std::path::Path,
-    context: &Value,
-    targets: &[Value],
-) -> io::Result<usize> {
-    let additions = context["lane"]["addedTargets"]
-        .as_array()
-        .ok_or_else(|| invalid("switch addition count"))?
-        .len();
-    if context["lane"]["switchId"]["name"] == "main" {
-        return Ok(targets.len() + additions);
-    }
-    if context["lane"]["switchFetched"] == true {
-        return context["lane"]["switchLaneHeads"]
-            .as_object()
-            .map(serde_json::Map::len)
-            .ok_or_else(|| invalid("switch fetched head count"));
-    }
-    let staged = match std::fs::read_to_string(root.join(".bit/staged-snaps")) {
-        Ok(value) => value,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => {
-            return Ok(targets.len() + additions);
-        }
-        Err(error) => return Err(error),
-    };
-    let local = staged
-        .lines()
-        .map(str::trim)
-        .collect::<HashSet<_>>();
-    let new_imports = context["lane"]["addedTargets"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|target| {
-            target["version"]
-                .as_str()
-                .is_none_or(|version| !local.contains(version))
-        })
-        .count();
-    Ok(new_imports
-        + targets
-            .iter()
-            .filter(|target| {
-                let identity = target["identity"].as_str().unwrap_or_default();
-                let version = target["switchVersion"].as_str().unwrap_or_default();
-                context["lane"]["switchLaneHeads"].get(identity).is_none()
-                    || !local.contains(version)
-            })
-            .count())
 }
 
 pub(super) fn append_skipped(

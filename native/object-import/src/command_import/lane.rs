@@ -71,28 +71,9 @@ impl PreparedImport {
         if scope.get("lanes").is_none() {
             scope["lanes"] = serde_json::json!({"current":"main","tracking":[],"new":[]});
         }
-        let tracking = scope["lanes"]["tracking"]
-            .as_array_mut()
-            .ok_or_else(|| invalid("switch lane tracking configuration"))?;
-        if tracking.len() >= 4096 {
-            return Err(invalid("switch lane tracking budget"));
-        }
-        if tracking
-            .iter()
-            .any(|row| row["remoteLane"] == id.name && row["remoteScope"] == id.scope)
-        {
+        if !append_switch_tracking(&mut scope, id)? {
             return Ok(());
         }
-        if let Some(existing) = tracking
-            .iter()
-            .find(|row| row["localLane"] == id.name)
-            && (existing["remoteLane"] != id.name || existing["remoteScope"] != id.scope)
-        {
-            return Err(invalid("switch lane alias already tracks another remote"));
-        }
-        tracking.push(
-            serde_json::json!({"localLane":id.name,"remoteLane":id.name,"remoteScope":id.scope}),
-        );
         let mut output = Vec::new();
         let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
         let mut serializer = serde_json::Serializer::with_formatter(&mut output, formatter);
@@ -273,6 +254,32 @@ impl PreparedImport {
             .is_some_and(|rows| rows.iter().any(|name| name == &id.name));
         Ok(Some(Record { hash, value, is_new }))
     }
+}
+
+fn append_switch_tracking(scope: &mut Value, id: &Id) -> io::Result<bool> {
+    let tracking = scope["lanes"]["tracking"]
+        .as_array_mut()
+        .ok_or_else(|| invalid("switch lane tracking configuration"))?;
+    if tracking.len() >= 4096 {
+        return Err(invalid("switch lane tracking budget"));
+    }
+    if tracking
+        .iter()
+        .any(|row| row["remoteLane"] == id.name && row["remoteScope"] == id.scope)
+    {
+        return Ok(false);
+    }
+    if let Some(existing) = tracking
+        .iter()
+        .find(|row| row["localLane"] == id.name)
+        && (existing["remoteLane"] != id.name || existing["remoteScope"] != id.scope)
+    {
+        return Err(invalid("switch lane alias already tracks another remote"));
+    }
+    tracking.push(
+        serde_json::json!({"localLane":id.name,"remoteLane":id.name,"remoteScope":id.scope}),
+    );
+    Ok(true)
 }
 
 fn resolve_local(name: &str, scope: &Value, index: &Value) -> io::Result<Id> {
