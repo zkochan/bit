@@ -38,7 +38,10 @@ pub async fn switch(session: &Session<'_>, loaded: &Loaded) -> io::Result<()> {
         output.console(&output.paint(Style::Red, "✗ Failed to switch to Bit package manager mode"));
         return Err(error);
     }
-    output.console(&output.paint(Style::Green, "✓ Successfully switched to Bit package manager mode"));
+    output.console(&output.paint(
+        Style::Green,
+        "✓ Successfully switched to Bit package manager mode",
+    ));
     Ok(())
 }
 
@@ -61,11 +64,17 @@ fn disable(session: &Session<'_>, loaded: &Loaded) -> io::Result<()> {
 }
 
 fn disable_in_config(document: &mut Document) {
-    if document.get(&[DEPENDENCY_RESOLVER_ASPECT]).is_some() {
+    if document
+        .get(&[DEPENDENCY_RESOLVER_ASPECT])
+        .is_some()
+    {
         document.remove(&[DEPENDENCY_RESOLVER_ASPECT, "externalPackageManager"]);
         document.set(&[DEPENDENCY_RESOLVER_ASPECT, "rootComponent"], &json!(true));
     }
-    if document.get(&[WORKSPACE_CONFIG_FILES_ASPECT]).is_some() {
+    if document
+        .get(&[WORKSPACE_CONFIG_FILES_ASPECT])
+        .is_some()
+    {
         document.set(&[WORKSPACE_CONFIG_FILES_ASPECT, "enableWorkspaceConfigWrite"], &json!(true));
     }
 }
@@ -83,7 +92,9 @@ fn remove_postinstall_script(root: &Path) -> io::Result<()> {
     }
     scripts.remove("postinstall");
     if scripts.is_empty() {
-        manifest.as_object_mut().map(|object| object.remove("scripts"));
+        manifest
+            .as_object_mut()
+            .map(|object| object.remove("scripts"));
     }
     let mut written = serde_json::to_string_pretty(&manifest).map_err(io::Error::other)?;
     written.push('\n');

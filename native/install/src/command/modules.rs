@@ -11,12 +11,8 @@ use super::{
     workspace_jsonc,
 };
 use crate::{
-    AfterInstall,
-    config::DEPENDENCY_RESOLVER_ASPECT,
-    engine,
-    manifests::manifests_hash,
-    model::DependencyMap,
-    output::Style,
+    AfterInstall, config::DEPENDENCY_RESOLVER_ASPECT, engine, manifests::manifests_hash,
+    model::DependencyMap, output::Style,
 };
 use serde_json::{Value, json};
 use std::{collections::HashSet, fs, io, path::Path};
@@ -41,7 +37,9 @@ pub async fn install(session: &Session<'_>, mut loaded: Loaded) -> io::Result<In
     let links = linking::root_links(session, &loaded)?;
     let mut calculated = calculate(session, &loaded, &links).await?;
     linking::link_components_timed(session, &loaded, &calculated).await?;
-    if session.options.add_missing_deps && add_missing_deps(session, &loaded, &calculated, &links).await? {
+    if session.options.add_missing_deps
+        && add_missing_deps(session, &loaded, &calculated, &links).await?
+    {
         loaded = Loaded::load(session)?;
         calculated = calculate(session, &loaded, &links).await?;
     }
@@ -72,7 +70,10 @@ async fn run_cycles(
         linking::sync_core_aspects(session, loaded, calculated)?;
         let old_non_loaded_envs = calculated.non_loaded_envs();
         after_install(session, &old_non_loaded_envs).await?;
-        if !result.dependencies_changed || !session.options.recurring_install || old_non_loaded_envs.is_empty() {
+        if !result.dependencies_changed
+            || !session.options.recurring_install
+            || old_non_loaded_envs.is_empty()
+        {
             return Ok(old_non_loaded_envs);
         }
         previous.insert(manifests_hash(&calculated.outcome.plan));
@@ -130,7 +131,11 @@ fn prepare_directories(loaded: &Loaded, calculated: &Calculated) -> io::Result<(
 }
 
 fn remove_path(path: &Path) -> io::Result<()> {
-    if path.is_dir() && !path.is_symlink() { fs::remove_dir_all(path) } else { fs::remove_file(path) }
+    if path.is_dir() && !path.is_symlink() {
+        fs::remove_dir_all(path)
+    } else {
+        fs::remove_file(path)
+    }
 }
 
 /// `--add-missing-deps`: missing packages not provided by the root are added to the
@@ -161,18 +166,25 @@ async fn add_missing_deps(
 /// Root dependencies, linked root dependencies and the components' package names.
 fn provided_by_root(calculated: &Calculated, links: &DependencyMap) -> HashSet<String> {
     let mut provided: HashSet<String> = links.keys().cloned().collect();
-    for project in &calculated.outcome.plan.projects {
-        if project.dir == calculated.outcome.plan.projects[0].dir {
-            for field in ["dependencies", "devDependencies"] {
-                if let Some(Value::Object(dependencies)) = project.manifest.get(field) {
-                    provided.extend(dependencies.keys().cloned());
-                }
-            }
-        } else if let Some(name) = project.manifest.get("name").and_then(Value::as_str) {
-            provided.insert(name.to_string());
+    let projects = &calculated.outcome.plan.projects;
+    if let Some(root) = projects.first() {
+        for field in ["dependencies", "devDependencies"] {
+            provided.extend(dependency_names(root.manifest.get(field)));
         }
     }
+    let names = projects
+        .iter()
+        .skip(1)
+        .filter_map(|project| project.manifest.get("name").and_then(Value::as_str));
+    provided.extend(names.map(ToString::to_string));
     provided
+}
+
+fn dependency_names(field: Option<&Value>) -> Vec<String> {
+    field
+        .and_then(Value::as_object)
+        .map(|object| object.keys().cloned().collect())
+        .unwrap_or_default()
 }
 
 /// `updateAllowedScripts` + `persistConfig('update allowScripts configuration')`.
@@ -190,10 +202,16 @@ fn persist_allow_scripts(
             for (name, allowed) in allow_scripts {
                 document.set(&[DEPENDENCY_RESOLVER_ASPECT, "allowScripts", name], &json!(allowed));
             }
-            if document.get(&[DEPENDENCY_RESOLVER_ASPECT, "policy"]).is_none() {
+            if document
+                .get(&[DEPENDENCY_RESOLVER_ASPECT, "policy"])
+                .is_none()
+            {
                 document.set(&[DEPENDENCY_RESOLVER_ASPECT, "policy"], &json!({}));
             }
-            if document.get(&[DEPENDENCY_RESOLVER_ASPECT, "linkCoreAspects"]).is_none() {
+            if document
+                .get(&[DEPENDENCY_RESOLVER_ASPECT, "linkCoreAspects"])
+                .is_none()
+            {
                 document.set(&[DEPENDENCY_RESOLVER_ASPECT, "linkCoreAspects"], &json!(true));
             }
         },

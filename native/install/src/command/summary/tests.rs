@@ -17,7 +17,10 @@ fn prints_seconds_like_javascript() {
 #[test]
 fn formats_the_summary() {
     let text = format(&output(), 3, Duration::from_millis(1_250), false, &[]);
-    assert_eq!(text, "\nSuccessfully installed dependencies and compiled 3 component(s) in 1.25 seconds");
+    assert_eq!(
+        text,
+        "\nSuccessfully installed dependencies and compiled 3 component(s) in 1.25 seconds",
+    );
 }
 
 #[test]

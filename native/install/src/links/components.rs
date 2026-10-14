@@ -105,7 +105,10 @@ async fn env_props(
         }
         let response = host.package_json_props(&component.env_id).await?;
         let props = EnvProps {
-            props: response.get("props").cloned().unwrap_or_else(|| json!({})),
+            props: response
+                .get("props")
+                .cloned()
+                .unwrap_or_else(|| json!({})),
             modifies: response.get("modifiesPackageJson").and_then(Value::as_bool) == Some(true),
         };
         envs.insert(component.env_id.clone(), props);
@@ -201,7 +204,11 @@ async fn package_json(
         let modified = context.host.transform_package_json(&id, Value::Object(manifest)).await?;
         manifest = match modified {
             Value::Object(manifest) => manifest,
-            _ => return Err(io::Error::other(format!("modifyPackageJson of {id} returned no object"))),
+            _ => {
+                return Err(io::Error::other(format!(
+                    "modifyPackageJson of {id} returned no object",
+                )));
+            }
         };
     }
     Ok(finish(manifest, component, &package_context))

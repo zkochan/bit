@@ -32,8 +32,10 @@ fn backup(path: &Path, scope_path: &Path, file_id: &str, reason: &str) -> io::Re
     let files = directory.join("files");
     fs::create_dir_all(&files)?;
     fs::copy(path, files.join(file_id))?;
-    let mut metadata =
-        OpenOptions::new().create(true).append(true).open(directory.join("metadata.txt"))?;
+    let mut metadata = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(directory.join("metadata.txt"))?;
     writeln!(metadata, "{file_id} {reason}")
 }
 

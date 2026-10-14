@@ -17,8 +17,7 @@ use crate::{
 use session::{Loaded, Session};
 use std::{fs, io, path::Path, time::Instant};
 
-const UPDATE_EXISTING: &str =
-    r#"--update-existing is deprecated, please omit it. "bit install" will update existing dependencies by default"#;
+const UPDATE_EXISTING: &str = r#"--update-existing is deprecated, please omit it. "bit install" will update existing dependencies by default"#;
 
 /// What the command did, for the final summary line.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -100,7 +99,11 @@ async fn install(session: &Session<'_>) -> io::Result<Outcome> {
 }
 
 /// External package manager mode, then `bit install <packages>` and `--add-missing-peers`.
-async fn prepare(session: &Session<'_>, mut loaded: Loaded, packages: &[String]) -> io::Result<Loaded> {
+async fn prepare(
+    session: &Session<'_>,
+    mut loaded: Loaded,
+    packages: &[String],
+) -> io::Result<Loaded> {
     if loaded.config.dependency_resolver.external_package_manager == Some(true) {
         external::switch(session, &loaded).await?;
         loaded = Loaded::load(session)?;
@@ -119,12 +122,16 @@ async fn prepare(session: &Session<'_>, mut loaded: Loaded, packages: &[String])
 async fn add_missing_peers(session: &Session<'_>, loaded: Loaded) -> io::Result<Loaded> {
     let calculated = calculate::calculate(session, &loaded, &DependencyMap::default()).await?;
     let plan = &calculated.outcome.plan;
-    let missing = crate::engine::missing_peers(&plan.projects, &plan.overrides, &loaded.engine).await?;
+    let missing =
+        crate::engine::missing_peers(&plan.projects, &plan.overrides, &loaded.engine).await?;
     if missing.is_empty() {
         session.output.console("No missing peer dependencies found.");
         return Ok(loaded);
     }
-    let packages: Vec<String> = missing.iter().map(|(name, range)| format!("{name}@{range}")).collect();
+    let packages: Vec<String> = missing
+        .iter()
+        .map(|(name, range)| format!("{name}@{range}"))
+        .collect();
     packages::add(session, &loaded, &packages, "peer").await?;
     Loaded::load(session)
 }

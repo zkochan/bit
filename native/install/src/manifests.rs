@@ -4,6 +4,8 @@
 //! components part of `InstallMain._getComponentsManifests`, and the manifest
 //! preparation of `DependencyInstaller.installComponents`.
 
+pub(crate) mod semver;
+
 mod assemble;
 mod component_deps;
 mod dedupe;
@@ -11,7 +13,6 @@ mod deps;
 mod env_root;
 mod intersect;
 mod root_components;
-pub(crate) mod semver;
 mod versions;
 
 use crate::{

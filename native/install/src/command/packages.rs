@@ -2,10 +2,10 @@
 //! resolution with the save prefix (`_addPackages`, `getVersionWithSavePrefix`)
 //! and the `workspace.jsonc` policy update (`addToRootPolicy`, `updateConfigPolicy`).
 
+pub use names::{extract_package_name, is_valid_package_name};
+
 mod names;
 mod policy_edit;
-
-pub use names::{extract_package_name, is_valid_package_name};
 
 use super::session::{Loaded, Session};
 use crate::{engine, manifests::semver};
@@ -26,7 +26,7 @@ pub fn validate(packages: &[String], loaded: &Loaded) -> io::Result<Vec<String>>
                 return Ok(package_name);
             }
             Err(invalid(&format!(
-                r#"the package name "{name}" is invalid. please provide a valid package name."#
+                r#"the package name "{name}" is invalid. please provide a valid package name."#,
             )))
         })
         .collect()
@@ -40,7 +40,9 @@ fn component_package_name(argument: &str, loaded: &Loaded) -> Option<String> {
         .find(|component| {
             component.id.to_string_without_version() == id
                 || component.id.name == id
-                || component.id.scope.as_deref().is_some_and(|scope| format!("{scope}/{}", component.id.name) == id)
+                || component.id.scope
+                    .as_deref()
+                    .is_some_and(|scope| format!("{scope}/{}", component.id.name) == id)
         })
         .map(|component| component.package_name.clone())
 }
@@ -80,16 +82,24 @@ pub fn version_with_save_prefix(
     prefix: Option<&str>,
     wanted_range: Option<&str>,
 ) -> io::Result<String> {
-    let prerelease = semver::SemVer::parse(version).is_ok_and(|parsed| !parsed.prerelease.is_empty());
+    let prerelease =
+        semver::SemVer::parse(version).is_ok_and(|parsed| !parsed.prerelease.is_empty());
     if prerelease || wanted_range == Some(version) {
         return Ok(version.to_string());
     }
     if let Some(range) = wanted_range.filter(|range| range.starts_with(['~', '^'])) {
         return Ok(range.to_string());
     }
-    let with_prefix = format!("{}{version}", prefix.filter(|prefix| !prefix.is_empty()).unwrap_or("^"));
+    let with_prefix = format!(
+        "{}{version}",
+        prefix
+            .filter(|prefix| !prefix.is_empty())
+            .unwrap_or("^"),
+    );
     if semver::valid_range(&with_prefix).is_none() {
-        return Err(invalid(&format!("the version {with_prefix} is invalid. your prefix might be invalid")));
+        return Err(invalid(&format!(
+            "the version {with_prefix} is invalid. your prefix might be invalid",
+        )));
     }
     Ok(with_prefix)
 }

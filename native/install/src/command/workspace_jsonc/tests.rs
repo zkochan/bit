@@ -14,8 +14,11 @@ fn edits_keep_comments_and_back_up_the_previous_file() {
     .unwrap();
     let written = fs::read_to_string(root.path().join("workspace.jsonc")).unwrap();
     assert!(written.contains("// keep me"));
-    assert!(written.contains("\"b\": 2"));
+    assert!(written.contains(r#""b": 2"#));
     let history = scope.join("workspace-config-history");
     assert_eq!(fs::read_to_string(history.join("files/2026-1-2-3-4-5")).unwrap(), original);
-    assert_eq!(fs::read_to_string(history.join("metadata.txt")).unwrap(), "2026-1-2-3-4-5 install\n");
+    assert_eq!(
+        fs::read_to_string(history.join("metadata.txt")).unwrap(),
+        "2026-1-2-3-4-5 install\n",
+    );
 }

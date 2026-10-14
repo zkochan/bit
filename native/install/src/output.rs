@@ -83,7 +83,8 @@ impl Output {
         }
         let (open, close) = style.codes();
         // chalk re-opens the outer style after a nested style closes it.
-        let nested = text.replace(&format!("\u{1b}[{close}m"), &format!("\u{1b}[{close}m\u{1b}[{open}m"));
+        let nested =
+            text.replace(&format!("\u{1b}[{close}m"), &format!("\u{1b}[{close}m\u{1b}[{open}m"));
         format!("\u{1b}[{open}m{nested}\u{1b}[{close}m")
     }
 

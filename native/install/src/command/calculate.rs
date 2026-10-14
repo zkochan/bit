@@ -6,8 +6,14 @@ use super::session::{Loaded, Session};
 use crate::{
     dependencies::{self, DependencyOptions, default_package_name, glob},
     import::remotes::global_remotes,
-    manifests::{self, ManifestContext, ManifestInput, ManifestOptions, ManifestOutcome, Policies, RemoteFilter},
-    model::{ComponentDependencies, ComponentId, DependencyMap, EnvPolicy, Lifecycle, PolicyEntry, WorkspaceComponent},
+    manifests::{
+        self, ManifestContext, ManifestInput, ManifestOptions, ManifestOutcome, Policies,
+        RemoteFilter,
+    },
+    model::{
+        ComponentDependencies, ComponentId, DependencyMap, EnvPolicy, Lifecycle, PolicyEntry,
+        WorkspaceComponent,
+    },
     policy::{self, is_core_env, split_version},
 };
 use indexmap::IndexMap;
@@ -54,14 +60,18 @@ pub async fn calculate(
     .await?;
     let apps = apps(session, loaded, &components).await?;
     let root_policy = root_policy(session, loaded, workspace_policy);
-    let outcome = plan(session, loaded, &Inputs {
-        components: &components,
-        dependencies: &dependencies,
-        env_policies: &env_policies,
-        root_policy: &root_policy,
-        linked_root_deps,
-        apps: &apps,
-    })?;
+    let outcome = plan(
+        session,
+        loaded,
+        &Inputs {
+            components: &components,
+            dependencies: &dependencies,
+            env_policies: &env_policies,
+            root_policy: &root_policy,
+            linked_root_deps,
+            apps: &apps,
+        },
+    )?;
     Ok(Calculated { components, env_policies, dependencies, outcome })
 }
 
@@ -74,7 +84,11 @@ struct Inputs<'a> {
     apps: &'a [String],
 }
 
-fn plan(session: &Session<'_>, loaded: &Loaded, inputs: &Inputs<'_>) -> io::Result<ManifestOutcome> {
+fn plan(
+    session: &Session<'_>,
+    loaded: &Loaded,
+    inputs: &Inputs<'_>,
+) -> io::Result<ManifestOutcome> {
     let config = &loaded.config.dependency_resolver;
     let options = ManifestOptions::new(
         config,
@@ -113,7 +127,11 @@ fn workspace_policy(loaded: &Loaded) -> io::Result<Vec<PolicyEntry>> {
 /// `addConfiguredAspectsToWorkspacePolicy` and `addConfiguredGeneratorEnvsToWorkspacePolicy`:
 /// aspects and envs configured in `workspace.jsonc` but not in the workspace are installed
 /// at the root (`skipIfExisting`).
-fn root_policy(session: &Session<'_>, loaded: &Loaded, mut policy: Vec<PolicyEntry>) -> Vec<PolicyEntry> {
+fn root_policy(
+    session: &Session<'_>,
+    loaded: &Loaded,
+    mut policy: Vec<PolicyEntry>,
+) -> Vec<PolicyEntry> {
     let aspects = loaded.config.user_aspect_ids(&session.core_ids());
     let envs = loaded.config.generator_envs
         .iter()
@@ -126,7 +144,10 @@ fn root_policy(session: &Session<'_>, loaded: &Loaded, mut policy: Vec<PolicyEnt
             continue;
         }
         let package = default_package_name(&component_id);
-        if policy.iter().any(|entry| entry.name == package) {
+        if policy
+            .iter()
+            .any(|entry| entry.name == package)
+        {
             continue;
         }
         policy.push(PolicyEntry {
@@ -195,7 +216,9 @@ async fn apps(
     let patterns = session.host.app_types().await?;
     Ok(components
         .iter()
-        .filter(|component| component.files.iter().any(|file| glob::match_patterns(file, &patterns)))
+        .filter(|component| {
+            component.files.iter().any(|file| glob::match_patterns(file, &patterns))
+        })
         .map(|component| component.id.to_string_without_version())
         .collect())
 }
@@ -221,7 +244,11 @@ fn remote_filter(session: &Session<'_>, loaded: &Loaded) -> io::Result<RemoteFil
     let scope = crate::config::ScopeJson::load(&loaded.workspace.scope_path)?;
     let global = global_remotes(&session.info.global_config_dir)?;
     Ok(RemoteFilter {
-        local_remotes: scope.remotes.keys().chain(global.keys()).cloned().collect(),
+        local_remotes: scope.remotes
+            .keys()
+            .chain(global.keys())
+            .cloned()
+            .collect(),
         registry_scopes: loaded.engine.registry.registries.scopes
             .keys()
             .map(|scope| scope.trim_start_matches('@').to_string())

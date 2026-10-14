@@ -6,7 +6,13 @@ use std::time::Duration;
 const DOCS: &str = "Read more about how to fix this issue in: https://bit.dev/blog/using-a-static-dependency-policy-in-a-legacy-env-lihfbt9b";
 
 /// The final report.
-pub fn format(output: &Output, components: usize, elapsed: Duration, recurring: bool, non_loaded: &[String]) -> String {
+pub fn format(
+    output: &Output,
+    components: usize,
+    elapsed: Duration,
+    recurring: bool,
+    non_loaded: &[String],
+) -> String {
     let summary = output.paint(
         Style::Green,
         &format!(
@@ -21,17 +27,26 @@ pub fn format(output: &Output, components: usize, elapsed: Duration, recurring: 
     }
 }
 
-fn another_install_required(output: &Output, recurring: bool, non_loaded: &[String]) -> Option<String> {
+fn another_install_required(
+    output: &Output,
+    recurring: bool,
+    non_loaded: &[String],
+) -> Option<String> {
     if non_loaded.is_empty() {
         return None;
     }
     let command = output.paint(Style::Cyan, "bit install");
-    let first = format!(r#"Bit was not able to install all dependencies. Please run "{command}" again "#);
+    let first =
+        format!(r#"Bit was not able to install all dependencies. Please run "{command}" again "#);
     let flag = output.paint(Style::Cyan, "--recurring-install");
-    let suggestion = if recurring { String::new() } else { format!(r#"(or use the "{flag}" option next time)."#) };
+    let suggestion = if recurring {
+        String::new()
+    } else {
+        format!(r#"(or use the "{flag}" option next time)."#)
+    };
     let envs = format!(
         r#"The following environments need to add support for "dependency policy" to fix the warning: {}"#,
-        output.paint(Style::Cyan, &non_loaded.join(", "))
+        output.paint(Style::Cyan, &non_loaded.join(", ")),
     );
     Some(output.paint(Style::Yellow, &format!("{first}{suggestion}\n{envs}\n{DOCS}")))
 }

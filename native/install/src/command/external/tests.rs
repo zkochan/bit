@@ -16,11 +16,11 @@ fn disables_the_mode_in_the_config() {
     let value = document.value();
     assert_eq!(
         value["teambit.dependencies/dependency-resolver"],
-        json!({ "policy": {}, "rootComponent": true })
+        json!({ "policy": {}, "rootComponent": true }),
     );
     assert_eq!(
         value["teambit.workspace/workspace-config-files"],
-        json!({ "enableWorkspaceConfigWrite": true })
+        json!({ "enableWorkspaceConfigWrite": true }),
     );
 }
 
@@ -31,7 +31,8 @@ fn removes_only_bits_postinstall_script() {
     let ours = json!({ "name": "x", "scripts": { "postinstall": "bit link && bit compile && bit ws-config write" } });
     fs::write(&path, ours.to_string()).unwrap();
     remove_postinstall_script(root.path()).unwrap();
-    let written: serde_json::Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+    let written: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
     assert_eq!(written, json!({ "name": "x" }));
     let theirs = json!({ "scripts": { "postinstall": "echo hi" } });
     fs::write(&path, theirs.to_string()).unwrap();

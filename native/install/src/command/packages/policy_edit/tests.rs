@@ -13,7 +13,7 @@ fn added_entries_win_and_fields_are_sorted() {
     let [dependencies, peers] = to_config_object(&entries);
     assert_eq!(
         serde_json::to_value(&dependencies).unwrap(),
-        json!({ "abc": "^1.0.0", "lodash": { "version": "4.0.0", "preserve": true }, "zed": "^2.0.0" })
+        json!({ "abc": "^1.0.0", "lodash": { "version": "4.0.0", "preserve": true }, "zed": "^2.0.0" }),
     );
     assert_eq!(dependencies.keys().collect::<Vec<_>>(), ["abc", "lodash", "zed"]);
     assert_eq!(serde_json::to_value(&peers).unwrap(), json!({ "react": "18" }));
@@ -33,7 +33,8 @@ fn creates_missing_fields_and_keeps_comments() {
   }
 }"#;
     let mut document = Document::parse(text).unwrap();
-    let entries = vec![(0, "zed".to_string(), json!("1.0.0")), (0, "abc".to_string(), json!("^1.0.0"))];
+    let entries =
+        vec![(0, "zed".to_string(), json!("1.0.0")), (0, "abc".to_string(), json!("^1.0.0"))];
     update_config_policy(&mut document, &to_config_object(&entries));
     let written = format!("{document}");
     assert!(written.contains("// pinned on purpose"));

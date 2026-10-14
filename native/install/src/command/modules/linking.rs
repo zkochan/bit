@@ -30,7 +30,8 @@ pub fn root_links(session: &Session<'_>, loaded: &Loaded) -> io::Result<Dependen
         link_core_aspects: config.link_core_aspects(),
         link_nested_deps_in_nm: !config.has_root_components(),
     };
-    let links = links::linked_root_deps(&session.root, session.info, &loaded.components(), &options)?;
+    let links =
+        links::linked_root_deps(&session.root, session.info, &loaded.components(), &options)?;
     if loaded.engine.layout.enable_global_virtual_store {
         links::link_core_aspects_to_hoisted_store(&session.root, &links)?;
     }
@@ -56,7 +57,10 @@ pub async fn link_components(
     let config = &loaded.config.dependency_resolver;
     let root_components_dir = loaded.config.root_components_path(&session.root);
     let cloud_domain = loaded.effective.cloud_domain();
-    let aspect_env_ids: Vec<String> = ASPECT_ENVS.iter().map(ToString::to_string).collect();
+    let aspect_env_ids: Vec<String> = ASPECT_ENVS
+        .iter()
+        .map(ToString::to_string)
+        .collect();
     let options = ComponentLinkOptions {
         has_root_components: config.has_root_components(),
         root_components_dir: &root_components_dir,
@@ -70,7 +74,11 @@ pub async fn link_components(
 }
 
 /// `syncCoreAspectLinksForEnvs`, only for workspaces that author the core aspects.
-pub fn sync_core_aspects(session: &Session<'_>, loaded: &Loaded, calculated: &Calculated) -> io::Result<()> {
+pub fn sync_core_aspects(
+    session: &Session<'_>,
+    loaded: &Loaded,
+    calculated: &Calculated,
+) -> io::Result<()> {
     if loaded.config.dependency_resolver.link_core_aspects() {
         return Ok(());
     }

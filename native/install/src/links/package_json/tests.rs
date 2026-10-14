@@ -1,7 +1,7 @@
-use super::{PackageJsonContext, generate, snap_to_semver};
+use super::{PackageJsonContext, finish, snap_to_semver, transformed};
 use crate::model::{
-    ComponentDependencies, ComponentDependency, ComponentId, Lifecycle, PackageDependency,
-    WorkspaceComponent,
+    ComponentDependencies, ComponentDependency, ComponentId, Lifecycle, Manifest,
+    PackageDependency, WorkspaceComponent,
 };
 use serde_json::{Map, Value, json};
 
@@ -186,4 +186,9 @@ fn snap_to_semver_only_rewrites_hashes() {
     assert_eq!(snap_to_semver("abc"), "0.0.0-abc");
     assert_eq!(snap_to_semver("ab"), "ab");
     assert_eq!(snap_to_semver(&"a".repeat(41)), "a".repeat(41));
+}
+
+/// The manifest without an env transform.
+fn generate(component: &WorkspaceComponent, context: &PackageJsonContext<'_>) -> Manifest {
+    finish(transformed(component, context), component, context)
 }

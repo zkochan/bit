@@ -119,7 +119,8 @@ impl Host for JsHost {
     }
 
     async fn transform_package_json(&self, component: &str, manifest: Value) -> io::Result<Value> {
-        self.call("transformPackageJson", json!({ "component": component, "manifest": manifest })).await
+        self.call("transformPackageJson", json!({ "component": component, "manifest": manifest }))
+            .await
     }
 
     async fn after_install(&self, request: AfterInstall) -> io::Result<AfterInstallResult> {

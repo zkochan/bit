@@ -3,6 +3,8 @@
 //! objects of every exported `.bitmap` id (`importAccordingToBitMap`); on a
 //! remote lane it first fetches the lane object (`importObjectsOnLane`).
 
+pub(crate) mod remotes;
+
 pub use bitmap::{Bitmap, Id, LaneId};
 pub use fetch::FetchOptions;
 pub use objects::Repo;
@@ -17,7 +19,6 @@ mod lane;
 mod objects;
 mod persist;
 mod plan;
-pub(crate) mod remotes;
 mod tar;
 
 use crate::{host::HostInfo, model::GlobalConfig, output::Output};

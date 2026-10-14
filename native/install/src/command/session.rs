@@ -84,11 +84,13 @@ impl Loaded {
 
     /// `workspace.name`: the configured name, else the root directory's name.
     pub fn workspace_name(&self, root: &Path) -> String {
-        self.config.workspace.name.clone().unwrap_or_else(|| {
-            root.file_name()
-                .map(|name| name.to_string_lossy().into_owned())
-                .unwrap_or_default()
-        })
+        self.config.workspace.name
+            .clone()
+            .unwrap_or_else(|| {
+                root.file_name()
+                    .map(|name| name.to_string_lossy().into_owned())
+                    .unwrap_or_default()
+            })
     }
 
     /// `getComponentsDirectory([])`: the workspace components, without the one

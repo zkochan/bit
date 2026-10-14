@@ -54,15 +54,6 @@ pub(super) fn finish(
     manifest
 }
 
-/// Build the manifest written to `node_modules/<pkg>/package.json` without an env transform.
-#[cfg(test)]
-pub(super) fn generate(
-    component: &WorkspaceComponent,
-    context: &PackageJsonContext<'_>,
-) -> Manifest {
-    finish(transformed(component, context), component, context)
-}
-
 /// `createFromComponent(dir, component, addExportProperty = true)`.
 fn base(component: &WorkspaceComponent, context: &PackageJsonContext<'_>) -> Manifest {
     let id = &component.id;
@@ -70,7 +61,13 @@ fn base(component: &WorkspaceComponent, context: &PackageJsonContext<'_>) -> Man
     let mut manifest = Map::new();
     manifest.insert("name".into(), component.package_name.clone().into());
     // A new component's legacy version is `latest`, written as `0.0.1-new`.
-    manifest.insert("version".into(), id.version.clone().unwrap_or_else(|| "latest".into()).into());
+    manifest.insert(
+        "version".into(),
+        id.version
+            .clone()
+            .unwrap_or_else(|| "latest".into())
+            .into(),
+    );
     if let Some(scope) = &id.scope {
         let path = scope.replacen('.', "/", 1);
         let homepage = format!("https://{}/{path}/{}", context.cloud_domain, id.name);
