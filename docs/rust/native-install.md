@@ -180,8 +180,10 @@ The import requests what `importCurrentObjects` requests, and nothing more:
 A `resolverPath` in `scope.json` names a JavaScript module that resolves scopes
 with no configured remote, instead of the hub. The module runs in the Node.js
 that runs Bit, as a one-shot process, and gets the scope name, the workspace
-scope name and the configured `user.token`. `require` resolves a relative
-path from the current directory, where Bit resolves it from its own module.
+scope name and the configured `user.token`. As in Bit, the path is `require`d from
+`remote-resolver.js` of the `@teambit/scope.remotes` that Bit runs, so a relative
+path or a package name resolves from there. Without that package it resolves from
+the current directory.
 
 ## Validation
 
@@ -201,20 +203,22 @@ These install e2e suites pass on the native path:
 - `dependencies/allow-scripts`
 - `root-components`
 
+`commands/import` runs installs through `InstallMain.install`, so it covers the
+programmatic entry.
+
 ## Known differences
 
 - Custom env dependency detectors (`getDepDetectors`) are not applied; detection uses the built-in JavaScript/TypeScript, style and MDX extraction.
 - Dependency policies an env registers in its own provider are not collected: the host is asked for registered policies only when a component configures a non-env, non-core extension.
 - `resolveFromEnv` links of an external env use the env's default package name; a custom `teambit.pkg/pkg` name is not applied there.
-- A relative `resolverPath` resolves from the current directory, not from Bit's module directory.
-- On Windows, a destination that is a hard link of its source is not recognized as already linked.
 - Workspaces configured with the yarn package manager use the TypeScript command, because yarn is a JavaScript package manager.
 
 ## CI
 
 The PR e2e jobs never provision the addon, so they run the TypeScript command. The
 `Native install e2e` job of `rust-dependency-scanner.yml` builds the addon, points
-`BIT_NATIVE_INSTALL_ADDON` at it, and runs the install e2e suites with
+`BIT_NATIVE_INSTALL_ADDON` at it, and runs the install e2e suites and `commands/import`
+(programmatic installs) with
 `BIT_NATIVE_INSTALL_REQUIRE=on`. With that variable, a missing or unusable addon is an
 error instead of a fallback, so the job cannot pass on the TypeScript command by accident.
 Workspaces the native command declines on purpose (yarn) still fall back.
