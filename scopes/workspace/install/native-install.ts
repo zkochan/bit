@@ -58,17 +58,37 @@ export async function runNativeInstall(
   // eslint-disable-next-line global-require, import/no-dynamic-require
   const binding = require(addon) as NativeBinding;
   if (typeof binding.installWithOptions !== 'function') return required(`${addon} has no installWithOptions export`);
-  const host = new InProcessInstallHost(context);
   const { prepareBuildScriptsPath } = await import('@teambit/pnpm/dist/build-scripts-path.js');
   prepareBuildScriptsPath();
-  // the native output writes its own status lines; the running loader would draw over them.
+  // the native installer prints status and success lines while Bit's loader exists, as the
+  // TypeScript logger does. Like `PnpmPackageManager.install`, it turns the logger off for the
+  // package manager and on after it, so the compile step and the caller run with the loader on.
+  const { loader } = await import('@teambit/legacy.loader');
+  const { logger: legacyLogger } = await import('@teambit/legacy.logger');
+  const info = JSON.stringify({
+    ...(await hostInfo(context)),
+    loader: loader.isStarted,
+    writeToConsole: legacyLogger.shouldWriteToConsole,
+  });
+  const host = new InProcessInstallHost({
+    ...context,
+    afterInstall: async (request) => {
+      context.logger.on();
+      try {
+        return await context.afterInstall(request);
+      } finally {
+        // the native installer writes its own lines again until it returns.
+        context.logger.off();
+      }
+    },
+  });
   context.logger.off();
   let result: string;
   try {
     result = await binding.installWithOptions(
       JSON.stringify(nativeOptions(packages, options)),
       context.workspace.path,
-      JSON.stringify(await hostInfo(context)),
+      info,
       (method, payload) => host.serve(method, payload),
       (text) => {
         process.stdout.write(text);
@@ -159,7 +179,6 @@ async function hostInfo(context: NativeInstallContext) {
       import('@teambit/legacy.consumer/dist/bitmap-history-file-id.js'),
     ]);
   const { loadedVirtualStoreDirNames } = await import('@teambit/pnpm/dist/preserve-loaded-virtual-store-dirs.js');
-  const { shouldDisableLoader } = await import('@teambit/legacy.logger');
   const { globalFlags } = await import('@teambit/cli');
   const chalk = (await import('chalk')).default;
   return {
@@ -170,7 +189,6 @@ async function hostInfo(context: NativeInstallContext) {
     bitVersion: getBitVersion(),
     columns: process.stdout.isTTY ? process.stdout.columns : null,
     color: chalk.level > 0,
-    loader: !shouldDisableLoader,
     nonInteractive: process.argv.includes('--json'),
     fileId: currentDateAndTimeToFileName(),
     loadedVirtualStoreDirs: [

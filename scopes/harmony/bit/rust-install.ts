@@ -245,8 +245,9 @@ class InstallHost {
 
   private async afterInstall(request: { compile: boolean; writeConfigFiles: boolean; clearCache: boolean }) {
     const harmony = await this.loadHarmony();
-    const { shouldDisableLoader } = await import('@teambit/legacy.logger');
-    if (!shouldDisableLoader) (await import('@teambit/legacy.loader')).loader.on();
+    // `PnpmPackageManager.install` turns the logger on after the package manager, so the
+    // compile step reports through Bit's loader even when the command runs without one.
+    (await import('@teambit/legacy.loader')).loader.on();
     const workspace = harmony.get<any>('teambit.workspace/workspace');
     const install = harmony.get<any>('teambit.workspace/install');
     const envs = harmony.get<any>('teambit.envs/envs');

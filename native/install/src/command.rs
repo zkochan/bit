@@ -69,7 +69,9 @@ pub async fn run_with_options(
         options,
         info,
         host,
-        output: Output::new(info.color, info.columns.is_some(), info.loader, sink),
+        output: Output::new(info.color, info.columns.is_some(), info.loader, sink)
+            .with_console(info.write_to_console.unwrap_or(info.loader))
+            .with_ci(std::env::var_os("CI").is_some_and(|ci| !ci.is_empty())),
         started: Instant::now(),
         cloud_username: OnceLock::new(),
     };

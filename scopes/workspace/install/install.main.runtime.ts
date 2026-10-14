@@ -303,8 +303,6 @@ export class InstallMain {
    * global-virtual-store bridge, env reloads, compile and workspace config files.
    */
   private async nativeAfterInstall(request: AfterInstallRequest): Promise<AfterInstallResult> {
-    // the native installer turns this logger off while it writes its own output.
-    this.logger.on();
     this.workspace.inInstallAfterPmContext = true;
     if (this.dependencyResolver.enableGlobalVirtualStore()) {
       ensureHoistedDependencyResolution(this.workspace.path);
@@ -330,7 +328,6 @@ export class InstallMain {
     if (request.writeConfigFiles) {
       await this.tryWriteConfigFiles(!cacheCleared && shouldClearCacheOnInstall);
     }
-    this.logger.off();
     return { oldNonLoadedEnvs, compiled };
   }
 

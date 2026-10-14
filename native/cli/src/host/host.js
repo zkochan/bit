@@ -243,8 +243,9 @@ async function loadEnv(envId) {
 /** Compile and write config files with the canonical JavaScript aspects. */
 async function afterInstall(request) {
   const loaded = await loadHarmony();
-  const { shouldDisableLoader } = bitRequire('@teambit/legacy.logger');
-  if (!shouldDisableLoader) bitRequire('@teambit/legacy.loader').loader.on();
+  // `PnpmPackageManager.install` turns the logger on after the package manager, so the
+  // compile step reports through Bit's loader even when the command runs without one.
+  bitRequire('@teambit/legacy.loader').loader.on();
   const workspace = loaded.get('teambit.workspace/workspace');
   const install = loaded.get('teambit.workspace/install');
   const envs = loaded.get('teambit.envs/envs');
