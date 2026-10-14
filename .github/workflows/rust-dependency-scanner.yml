@@ -307,7 +307,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-15-intel, macos-15, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    # Intel macOS builds both release helpers from a cold cache after workspace tests.
+    timeout-minutes: ${{ matrix.os == 'macos-15-intel' && 45 || 20 }}
     defaults:
       run:
         working-directory: native
