@@ -37,9 +37,11 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
         &prepared.report,
         |output| {
             for import in &prepared.imports {
-                import.render(output);
+                if import.requested > 0 {
+                    import.render(output);
+                }
             }
-            if options.skip_fetch {
+            if options.skip_fetch || !prepared.checkout_import_present() {
                 render_import(output, prepared.import_count);
             }
         },
@@ -51,6 +53,14 @@ struct PreparedSwitch {
     report: Report,
     import_count: u64,
     imports: Vec<RemoteImport>,
+}
+
+impl PreparedSwitch {
+    fn checkout_import_present(&self) -> bool {
+        self.imports
+            .last()
+            .is_some_and(|import| import.requested > 0 && import.reason.is_none())
+    }
 }
 
 fn prepare(
@@ -85,13 +95,9 @@ fn remote_imports(value: Option<&Value>) -> io::Result<Vec<RemoteImport>> {
     if rows.len() > 4 {
         return Err(decline("native switch remote imports"));
     }
-    Ok(rows
-        .iter()
+    rows.iter()
         .map(RemoteImport::parse)
-        .collect::<io::Result<Vec<_>>>()?
-        .into_iter()
-        .filter(|import| import.requested > 0)
-        .collect())
+        .collect()
 }
 
 impl RemoteImport {
