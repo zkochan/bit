@@ -9,12 +9,12 @@ import { BitError } from '@teambit/bit-error';
  * implement in JavaScript.
  */
 export async function runRustInstall(): Promise<boolean> {
-  if (process.env.BIT_NATIVE_INSTALL === 'off') return false;
+  if (process.env.BIT_NATIVE_INSTALL === 'off') return required('BIT_NATIVE_INSTALL=off disables it');
   const addon = resolveNativeInstallAddon();
-  if (!addon) return false;
+  if (!addon) return required('no native addon is available');
   // eslint-disable-next-line global-require, import/no-dynamic-require
   const binding = require(addon) as { install?: NativeInstall };
-  if (typeof binding.install !== 'function') return false;
+  if (typeof binding.install !== 'function') return required(`${addon} has no install export`);
   const { logger } = await import('@teambit/legacy.logger');
   const root = findWorkspaceRoot(process.cwd());
   if (root) {
@@ -42,6 +42,18 @@ export async function runRustInstall(): Promise<boolean> {
   if (outcome !== 'installed') return false;
   await logger.exitAfterFlush(0, 'install');
   return true;
+}
+
+/**
+ * `BIT_NATIVE_INSTALL_REQUIRE=on` turns the deployment fallback (no usable addon) into an error,
+ * so CI that qualifies the native command cannot pass on the TypeScript command by accident.
+ * Workspaces the native command declines on purpose (yarn) still fall back.
+ */
+function required(reason: string): false {
+  if (process.env.BIT_NATIVE_INSTALL_REQUIRE === 'on') {
+    throw new BitError(`native bit install is required (BIT_NATIVE_INSTALL_REQUIRE=on) but ${reason}`);
+  }
+  return false;
 }
 
 type NativeInstall = (
