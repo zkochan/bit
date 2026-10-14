@@ -41,7 +41,7 @@ fn reports_failed_validation_without_repeating_remote_actions() {
         "the engine declined commandOutboundApply: outbound validate failed: remote rejected";
     assert_eq!(
         validation_failure(error, &scopes).as_deref(),
-        Some("remote rejected\nthe following scopes were used for this export: a, b")
+        Some("remote rejected\nthe following scopes were used for this export: a, b"),
     );
     assert!(validation_failure("outbound persist failed: a: busy", &scopes).is_none());
 }

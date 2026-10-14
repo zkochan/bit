@@ -46,12 +46,7 @@ fn parse(args: &[&str]) -> Option<Options> {
             "--origin-directly" if !options.origin_directly => options.origin_directly = true,
             "--resume" if options.resume.is_none() => {
                 let client_id = args.next()?;
-                if client_id.is_empty()
-                    || client_id.len() > 128
-                    || !client_id
-                        .bytes()
-                        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
-                {
+                if !valid_client_id(client_id) {
                     return None;
                 }
                 options.resume = Some(client_id.to_owned());
@@ -61,6 +56,14 @@ fn parse(args: &[&str]) -> Option<Options> {
         }
     }
     Some(options)
+}
+
+fn valid_client_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 128
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
 }
 
 fn valid_id(id: &str) -> bool {
@@ -236,7 +239,7 @@ fn validation_failure(error: &str, scopes: &[String]) -> Option<String> {
     let (_, message) = error.split_once("outbound validate failed: ")?;
     Some(format!(
         "{message}\nthe following scopes were used for this export: {}",
-        scopes.join(", ")
+        scopes.join(", "),
     ))
 }
 
