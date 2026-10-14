@@ -47,27 +47,36 @@ impl Rewriter<'_> {
         let package =
             edge["attr"]["pkgId"].as_str().unwrap_or_else(|| without_peer_suffix(edge_id));
         let peers = if edge_id == ROOT { None } else { self.peer_dependencies(package) };
-        let mut peer_ids_by_name = HashMap::new();
-        for peer in split_peer_ids(edge_id) {
-            let rewritten = self.peer_id(&peer, peers);
-            if let Some((name, _)) = parse_package_id(&rewritten) {
-                peer_ids_by_name.insert(name, rewritten);
-            }
-        }
+        let peer_ids_by_name = self.peer_ids_by_name(edge_id, peers);
         let mut rewritten = edge.clone();
         if edge_id != ROOT {
             rewritten["id"] = Value::String(self.node_id(edge_id));
         }
-        if let Some(neighbours) = rewritten["neighbours"].as_array_mut() {
-            for neighbour in neighbours {
-                let dependency = self.peer_dependency(id(neighbour), peers, &peer_ids_by_name);
-                let new_id = self.node_id(&dependency);
-                if new_id != id(neighbour) {
-                    neighbour["id"] = Value::String(new_id);
-                }
+        for neighbour in rewritten["neighbours"]
+            .as_array_mut()
+            .into_iter()
+            .flatten()
+        {
+            let dependency = self.peer_dependency(id(neighbour), peers, &peer_ids_by_name);
+            let new_id = self.node_id(&dependency);
+            if new_id != id(neighbour) {
+                neighbour["id"] = Value::String(new_id);
             }
         }
         rewritten
+    }
+
+    /// The rewritten peers of an edge, by package name.
+    fn peer_ids_by_name(
+        &self,
+        edge_id: &str,
+        peers: Option<&Map<String, Value>>,
+    ) -> HashMap<String, String> {
+        split_peer_ids(edge_id)
+            .iter()
+            .map(|peer| self.peer_id(peer, peers))
+            .filter_map(|rewritten| Some((parse_package_id(&rewritten)?.0, rewritten)))
+            .collect()
     }
 
     /// `rewritePeerId`.
@@ -228,23 +237,25 @@ pub fn without_peer_suffix(node: &str) -> &str {
 /// `splitPeerIds`: the top-level parenthesized segments.
 pub fn split_peer_ids(node: &str) -> Vec<String> {
     let Some(start) = node.find('(') else { return Vec::new() };
-    let (mut peers, mut depth, mut peer_start) = (Vec::new(), 0_usize, None);
-    for (index, character) in node
+    let mut peers = Vec::new();
+    let mut depth = 0_usize;
+    let mut segment_start = start + 1;
+    for (index, character) in node[start..]
         .char_indices()
-        .skip_while(|(index, _)| *index < start)
+        .map(|(index, character)| (index + start, character))
     {
-        if character == '(' {
-            if depth == 0 {
-                peer_start = Some(index + 1);
+        match (character, depth) {
+            ('(', 0) => {
+                segment_start = index + 1;
+                depth = 1;
             }
-            depth += 1;
-        } else if character == ')' {
-            depth = depth.saturating_sub(1);
-            if depth == 0
-                && let Some(begin) = peer_start.take()
-            {
-                peers.push(node[begin..index].to_owned());
+            ('(', _) => depth += 1,
+            (')', 1) => {
+                peers.push(node[segment_start..index].to_owned());
+                depth = 0;
             }
+            (')', _) => depth = depth.saturating_sub(1),
+            _ => {}
         }
     }
     peers

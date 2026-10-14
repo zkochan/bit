@@ -24,26 +24,34 @@ pub fn resolve(
         if component.env_id != DEFAULT_ENV || has_configured_env(component) {
             continue;
         }
-        let candidates: Vec<String> = component.config
-            .keys()
-            .cloned()
-            .collect();
-        for id in candidates {
-            let without = aspect_id_without_version(&id);
-            if without == ENVS_ASPECT
-                || core_aspect_ids
-                    .iter()
-                    .any(|core| core == without)
-            {
-                continue;
-            }
-            if CORE_ENVS.contains(&without) || is_env_component(&id, &envs, objects)? {
-                component.env_id = id;
-                break;
-            }
+        if let Some(env) = first_env(component, &envs, objects, core_aspect_ids)? {
+            component.env_id = env;
         }
     }
     Ok(())
+}
+
+/// The first configured aspect that is an env; core aspects never are.
+fn first_env(
+    component: &WorkspaceComponent,
+    envs: &[(String, bool)],
+    objects: &ScopeObjects,
+    core_aspect_ids: &[String],
+) -> io::Result<Option<String>> {
+    for id in component.config.keys() {
+        let without = aspect_id_without_version(id);
+        if without == ENVS_ASPECT
+            || core_aspect_ids
+                .iter()
+                .any(|core| core == without)
+        {
+            continue;
+        }
+        if CORE_ENVS.contains(&without) || is_env_component(id, envs, objects)? {
+            return Ok(Some(id.clone()));
+        }
+    }
+    Ok(None)
 }
 
 /// `teambit.envs/envs` names the env, or the default env is configured itself.

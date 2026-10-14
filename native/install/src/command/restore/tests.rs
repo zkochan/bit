@@ -1,5 +1,7 @@
-use super::graph::merge;
-use super::peers::{split_peer_ids, without_peer_suffix};
+use super::{
+    graph::merge,
+    peers::{split_peer_ids, without_peer_suffix},
+};
 use serde_json::json;
 
 #[expect(clippy::needless_pass_by_value, reason = "test fixtures read best as json! literals")]
@@ -11,7 +13,7 @@ fn graph(packages: serde_json::Value, edges: serde_json::Value) -> serde_json::V
 fn splits_peer_suffixes() {
     assert_eq!(
         split_peer_ids("a@1.0.0(b@2.0.0(c@1.0.0))(d@1.0.0)"),
-        ["b@2.0.0(c@1.0.0)", "d@1.0.0"]
+        ["b@2.0.0(c@1.0.0)", "d@1.0.0"],
     );
     assert_eq!(without_peer_suffix("a@1.0.0(b@2.0.0)"), "a@1.0.0");
     assert!(split_peer_ids("a@1.0.0").is_empty());
@@ -41,7 +43,7 @@ fn merges_direct_dependencies_and_prunes_unreachable_nodes() {
         json!([
             { "id": "a@1.1.0", "name": "a", "specifier": "^1.0.0" },
             { "id": "b@1.0.0", "name": "b", "specifier": "1.0.0" }
-        ])
+        ]),
     );
     assert_eq!(base["packages"], json!({ "a@1.1.0": {}, "b@1.0.0": {} }));
     assert_eq!(base["pnpmfileChecksum"], "bit-1");
