@@ -27,6 +27,9 @@ pub struct HostInfo {
     /// Terminal columns, when stdout is a TTY.
     pub columns: Option<u32>,
     pub color: bool,
+    /// Bit's loader is on (`BIT_DISABLE_SPINNER` unset). Without it, status and
+    /// success lines are not printed at all, only plain console messages.
+    pub loader: bool,
     /// The process runs with `--json`/non-interactive output.
     pub non_interactive: bool,
 }

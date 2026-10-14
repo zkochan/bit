@@ -393,10 +393,15 @@ dependencies = [
 name = "bit-workspace-napi"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
+ "bit-install",
  "bit-object-import",
  "napi",
  "napi-build",
  "napi-derive",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
@@ -2614,6 +2619,7 @@ dependencies = [
  "napi-sys",
  "nohash-hasher",
  "rustc-hash",
+ "tokio",
 ]
 
 [[package]]
