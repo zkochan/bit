@@ -15,6 +15,7 @@ JavaScript function through a thread-safe function. The callbacks are:
 | `envPolicy` | The dependency policy of a core env, or of a legacy env without `env.jsonc`, comes from the env's `getDependencies()` |
 | `dependencyPolicies` | Aspects and env aspects register dependency policies in their providers (`registerDependenciesPolicies`) |
 | `appTypes` | Aspects register application types (file patterns) |
+| `detectDependencies` | Custom dependency detectors: the env's `getDepDetectors()` (or `detectors()`) and the detectors aspects register (`registerDetector`) |
 | `packageJsonProps` | Envs and aspects transform the generated `node_modules/<pkg>/package.json` |
 | `afterInstall` | Compilation (env compilers) and workspace config files (env config writers) |
 
@@ -23,7 +24,7 @@ Everything else is Rust:
 - argv parsing
 - reading `workspace.jsonc`, `.bitmap`, `component.json`, variants, the merge-config file, `scope.json` and the root `package.json`
 - importing missing objects
-- dependency detection and policies
+- dependency detection (except custom detectors) and policies
 - manifest generation
 - registry and network configuration
 - the engine call and its `readPackage` hooks
@@ -100,6 +101,35 @@ lines while Bit's loader exists, and console lines without a loader only when
 `logger.shouldWriteToConsole` is on. Like `PnpmPackageManager.install`, it turns
 the loader on after the package manager, and status lines are not shown on CI
 (`logger.setStatusLine`).
+
+## Custom dependency detectors
+
+Precinct asks custom detectors before its built-in detectives: first the env's
+detectors (`getDepDetectors()`), then those aspects register (`registerDetector`).
+The first one supporting a file (`isSupported({ ext, filename })`) detects it alone.
+`detectDependencies` takes the env id (without version) and the component's
+absolute file paths. It runs `detectWithCustomDetectors` of
+`@teambit/dependency-resolver`, which returns
+`{ "<file>": { dependencies, typescript } }` for the files a custom detector
+supports, or `null` when the env has no detectors and every registered detector
+is one Rust replicates (env.jsonc, MDX). `typescript` marks a registered detector:
+`filing-cabinet` resolves its relative imports through `lookupTypeScript`. The
+detected specifiers replace the native scan of the file. After that they are
+resolved and classified like any other import: packages, components, relative
+files and missing packages. `@bit-no-check` files and detector errors yield
+nothing.
+
+The host is asked only for a component that can have a custom detector. Its env
+must not be a core env, because no core env implements `getDepDetectors()`, or the
+component must configure a non-core aspect, which could register a detector.
+An env the host reports without detectors is not asked about again. Components of
+core envs without custom aspects therefore never reach the host. A non-core env
+loads the env in the host, but the host already loads it for its dev patterns.
+
+The dependency cache entry is keyed by the component id and checked against file
+times, as in TypeScript, and does not record detector output. An entry written by
+an install that did not apply the detectors would be stale. A component a custom
+detector applies to is therefore always detected, and its entry is written again.
 
 ## Crate layout (`native/install/src`)
 
@@ -243,7 +273,8 @@ programmatic entry.
 
 ## Known differences
 
-- Custom env dependency detectors (`getDepDetectors`) are not applied; detection uses the built-in JavaScript/TypeScript, style and MDX extraction.
+- A custom detector's `dependencyLookup` is not called: the specifiers it detects are resolved natively, with the lookup `filing-cabinet` uses when there is none.
+- A detector registered by a workspace aspect that no component configures is not applied to components on core envs: the host is asked only for components with a non-core env or a non-core configured aspect.
 - Workspaces configured with the yarn package manager use the TypeScript command, because yarn is a JavaScript package manager.
 
 ## CI

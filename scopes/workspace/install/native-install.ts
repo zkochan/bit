@@ -5,6 +5,7 @@ import type { AspectLoaderMain } from '@teambit/aspect-loader';
 import { getAspectDir, getCoreAspectName, getCoreAspectPackageName } from '@teambit/aspect-loader';
 import type { ApplicationMain } from '@teambit/application';
 import type { DependencyResolverMain } from '@teambit/dependency-resolver';
+import { detectWithCustomDetectors } from '@teambit/dependency-resolver';
 import type { EnvsMain } from '@teambit/envs';
 import type { Logger } from '@teambit/logger';
 import type { Workspace } from '@teambit/workspace';
@@ -263,6 +264,8 @@ export class InProcessInstallHost {
         return JSON.stringify(await this.devPatterns(input.envId));
       case 'dependencyPolicies':
         return JSON.stringify(await this.dependencyPolicies(input.extensionIds));
+      case 'detectDependencies':
+        return JSON.stringify(await this.detectDependencies(input.envId, input.files));
       case 'packageJsonProps':
         return JSON.stringify(await this.packageJsonProps(input.envId));
       case 'transformPackageJson':
@@ -302,6 +305,12 @@ export class InProcessInstallHost {
     const { workspace, dependencyResolver } = this.context;
     await workspace.loadAspects(extensionIds, false, undefined, { throwOnError: false, hideMissingModuleError: true });
     return dependencyResolver['policiesRegistry'].toArray();
+  }
+
+  /** The import specifiers custom detectors find in `files` (`detectWithCustomDetectors`). */
+  private async detectDependencies(envId: string, files: string[]) {
+    const env = await this.env(envId);
+    return detectWithCustomDetectors(env?.getDepDetectors?.(), files);
   }
 
   private async packageJsonProps(envId: string) {
