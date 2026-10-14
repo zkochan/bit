@@ -321,8 +321,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-15-intel, macos-15, windows-latest]
     runs-on: ${{ matrix.os }}
-    # Intel macOS builds both release helpers from a cold cache after workspace tests.
-    timeout-minutes: ${{ matrix.os == 'macos-15-intel' && 45 || 20 }}
+    # The packaging step builds the release helper and addon from a cold cache after the
+    # workspace tests. The addon links pnpm's engine, so the fat-LTO build takes most of
+    # the limit; Intel macOS is the slowest runner.
+    timeout-minutes: ${{ matrix.os == 'macos-15-intel' && 90 || 60 }}
     defaults:
       run:
         working-directory: native
