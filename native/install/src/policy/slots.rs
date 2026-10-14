@@ -99,6 +99,7 @@ fn is_env_plugin(
 
 /// The component configures an extension id that is not a core aspect. On a core env,
 /// that is the same as [`candidates`] being non-empty, without classifying the env.
+#[must_use]
 pub fn configures_non_core(component: &WorkspaceComponent, core_aspects: &[CoreAspect]) -> bool {
     component.config
         .keys()

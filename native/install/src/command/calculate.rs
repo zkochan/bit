@@ -7,8 +7,8 @@ use crate::{
     dependencies::{self, DependencyOptions, DevPatternConfig, default_package_name, glob},
     import::{self, remotes::global_remotes},
     manifests::{
-        self, ManifestContext, ManifestInput, ManifestOptions, ManifestOutcome, Policies,
-        RemoteFilter,
+        self, ManifestContext, ManifestInput, ManifestOptions, ManifestOutcome,
+        PackageJsonDependencies, Policies, RemoteFilter,
     },
     model::{
         ComponentDependencies, ComponentId, DependencyMap, EnvPolicy, Lifecycle, PolicyEntry,
@@ -57,19 +57,11 @@ pub async fn calculate(
     session.loading(loaded);
     session.loading(loaded);
     let components = loaded.components();
-    let env_policies = policy::load_env_policies(&session.root, &components, session.host).await?;
-    let workspace_policy = workspace_policy(loaded)?;
-    let options = options_with_slots(session, loaded, &components).await?;
-    let dependencies = dependencies::compute(
-        &session.root,
-        &components,
-        &workspace_policy,
-        &env_policies,
-        loaded.workspace.root_package_json.as_ref(),
-        &options,
-        session.host,
-    )
-    .await?;
+    let Resolved {
+        env_policies,
+        workspace_policy,
+        dependencies,
+    } = resolve(session, loaded, &components).await?;
     let (linked_root_deps, env_packages) =
         &with_env_links(session, loaded, linked_root_deps, &components, &dependencies)?;
     let apps = apps(session, loaded, &components).await?;
@@ -97,18 +89,79 @@ pub async fn calculate(
     Ok(Calculated { components, env_policies, dependencies, outcome })
 }
 
-/// The dependency options with the policies aspects register (the slots layer).
-async fn options_with_slots(
+/// `writeDependenciesToPackageJson`: the root manifest `_getComponentsManifests`
+/// calculates with `{ dedupe: true, includeAllEnvPeers: false }`, without the
+/// dependency filter and the linked root dependencies of an installation.
+pub async fn package_json_dependencies(
+    session: &Session<'_>,
+    loaded: &Loaded,
+) -> io::Result<PackageJsonDependencies> {
+    // `getComponentsDirectory` in `_getComponentsManifests`.
+    session.loading(loaded);
+    let components = loaded.components();
+    let Resolved {
+        env_policies,
+        workspace_policy,
+        dependencies,
+    } = resolve(session, loaded, &components).await?;
+    let root_policy = root_policy(session, loaded, workspace_policy)?;
+    session.output.status(DEDUPING);
+    let config = &loaded.config.dependency_resolver;
+    let options = ManifestOptions::for_package_json(
+        config,
+        loaded.config.root_components_path(&session.root),
+    );
+    let env_packages =
+        external_env_packages(&components, &ScopeObjects::new(&loaded.workspace.scope_path))?;
+    let result = manifests::package_json_dependencies(&ManifestInput {
+        root: &session.root,
+        components: &components,
+        dependencies: &dependencies,
+        policies: Policies { workspace: &root_policy, envs: &env_policies },
+        config,
+        options: &options,
+        context: ManifestContext {
+            linked_root_deps: &DependencyMap::default(),
+            remote_filter: None,
+            core_aspects: &session.info.core_aspects,
+            apps: &[],
+            env_packages: &env_packages,
+        },
+    })?;
+    session.output.success(DEDUPING, None);
+    Ok(result)
+}
+
+/// The env policies, the workspace policy and the components' dependencies.
+struct Resolved {
+    env_policies: IndexMap<String, EnvPolicy>,
+    workspace_policy: Vec<PolicyEntry>,
+    dependencies: IndexMap<String, ComponentDependencies>,
+}
+
+async fn resolve(
     session: &Session<'_>,
     loaded: &Loaded,
     components: &[WorkspaceComponent],
-) -> io::Result<DependencyOptions> {
+) -> io::Result<Resolved> {
+    let env_policies = policy::load_env_policies(&session.root, components, session.host).await?;
+    let workspace_policy = workspace_policy(loaded)?;
     let mut options = dependency_options(session, loaded, components)?;
     let objects = ScopeObjects::new(&loaded.workspace.scope_path);
     options.policy_slots =
         policy::slots::registry(components, &session.info.core_aspects, &objects, session.host)
             .await?;
-    Ok(options)
+    let dependencies = dependencies::compute(
+        &session.root,
+        components,
+        &workspace_policy,
+        &env_policies,
+        loaded.workspace.root_package_json.as_ref(),
+        &options,
+        session.host,
+    )
+    .await?;
+    Ok(Resolved { env_policies, workspace_policy, dependencies })
 }
 
 /// `linkDepsResolvedFromEnv` (off with root components), and the external env packages
@@ -160,7 +213,8 @@ fn plan(
         config,
         !session.options.skip_dedupe,
         loaded.config.root_components_path(&session.root),
-    );
+    )
+    .with_copy_peer_to_runtime(session.options);
     let remote_filter = remote_filter(session, loaded)?;
     manifests::plan(&ManifestInput {
         root: &session.root,

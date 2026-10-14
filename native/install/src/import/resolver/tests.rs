@@ -30,7 +30,7 @@ fn only_a_configured_resolver_path_is_used() {
     {
         assert!(
             Resolver::configured(&scope_json, PathBuf::new(), PathBuf::new(), "local", &global)
-                .is_none()
+                .is_none(),
         );
     }
 }

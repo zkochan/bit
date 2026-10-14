@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { parse } from 'comment-json';
 import { BitError } from '@teambit/bit-error';
 import type { AspectLoaderMain } from '@teambit/aspect-loader';
 import { getAspectDir, getCoreAspectName, getCoreAspectPackageName } from '@teambit/aspect-loader';
@@ -32,7 +33,16 @@ export type NativeInstallContext = {
   afterInstall: (request: AfterInstallRequest) => Promise<AfterInstallResult>;
 };
 
-export type NativeInstallResult = { oldNonLoadedEnvs: string[] };
+export type NativeInstallResult = {
+  oldNonLoadedEnvs: string[];
+  /**
+   * External package manager mode without `showExternalPackageManagerPrompt`: the dependencies
+   * were written to the root `package.json` and nothing was installed.
+   */
+  skipped: boolean;
+  /** The native installer edited `workspace.jsonc` (added packages, `allowScripts`, leaving external mode). */
+  configChanged: boolean;
+};
 
 type NativeBinding = {
   installWithOptions?: (
@@ -46,8 +56,7 @@ type NativeBinding = {
 
 /**
  * Install natively, or `undefined` when the TypeScript implementation must run: the addon is off or
- * missing, the options need something only the TypeScript path does, or the workspace declines
- * (yarn, external package manager mode without the prompt).
+ * missing, or the workspace uses yarn.
  */
 export async function runNativeInstall(
   context: NativeInstallContext,
@@ -55,7 +64,6 @@ export async function runNativeInstall(
   options: WorkspaceInstallOptions | undefined
 ): Promise<NativeInstallResult | undefined> {
   if (process.env.BIT_NATIVE_INSTALL === 'off') return required('BIT_NATIVE_INSTALL=off disables it');
-  if (!nativeOptionsSupported(options)) return undefined;
   const addon = resolveNativeInstallAddon();
   if (!addon) return required('no native addon is available');
   // eslint-disable-next-line global-require, import/no-dynamic-require
@@ -85,6 +93,9 @@ export async function runNativeInstall(
       }
     },
   });
+  await persistPendingWorkspaceConfig(context.workspace);
+  const configPath = context.workspace.getWorkspaceConfig().path;
+  const configBefore = await readText(configPath);
   context.logger.off();
   let result: string;
   try {
@@ -103,24 +114,43 @@ export async function runNativeInstall(
     context.logger.on();
   }
   const parsed = JSON.parse(result) as { outcome: string; oldNonLoadedEnvs?: string[] };
-  if (parsed.outcome !== 'installed') return undefined;
-  return { oldNonLoadedEnvs: parsed.oldNonLoadedEnvs ?? [] };
+  if (parsed.outcome !== 'installed' && parsed.outcome !== 'skipped') return undefined;
+  return {
+    oldNonLoadedEnvs: parsed.oldNonLoadedEnvs ?? [],
+    skipped: parsed.outcome === 'skipped',
+    configChanged: (await readText(configPath)) !== configBefore,
+  };
 }
 
 /**
- * Options the native installer cannot express keep the TypeScript implementation:
- * - an explicit `dependenciesGraph` (the native `--restore` reads the graphs from the components);
- * - non-default `copyPeerToRuntimeOnRoot` / `copyPeerToRuntimeOnComponents`;
- * - `addMissingPeers` with a lifecycle other than `peer` (the native installer adds them as peers,
- *   as `bit install --add-missing-peers` does).
+ * The calling command may have changed the workspace config in memory without writing it
+ * (`setExtension`). The TypeScript install reads those changes and `persistConfig` writes them
+ * together with its own edits, since it writes the whole config. The native installer reads and
+ * edits `workspace.jsonc` on disk, so pending changes are written before it runs, the way
+ * `persistConfig` writes them. Returns whether the file was written.
  */
-export function nativeOptionsSupported(options: WorkspaceInstallOptions | undefined): boolean {
-  if (!options) return true;
-  if (options.dependenciesGraph) return false;
-  if (options.copyPeerToRuntimeOnRoot === false) return false;
-  if (options.copyPeerToRuntimeOnComponents === true) return false;
-  if (options.addMissingPeers && options.lifecycleType !== 'peer') return false;
+export async function persistPendingWorkspaceConfig(workspace: Workspace): Promise<boolean> {
+  const workspaceConfig = workspace.getWorkspaceConfig();
+  const text = await readText(workspaceConfig.path);
+  if (text === undefined) return false;
+  let onDisk: unknown;
+  try {
+    onDisk = parse(text);
+  } catch {
+    return false;
+  }
+  if (!hasPendingChanges(onDisk, workspaceConfig.raw)) return false;
+  await workspaceConfig.write({ reasonForChange: 'install' });
   return true;
+}
+
+/** The parsed file and the in-memory config differ in content (comments and formatting aside). */
+export function hasPendingChanges(onDisk: unknown, inMemory: unknown): boolean {
+  return JSON.stringify(onDisk) !== JSON.stringify(inMemory);
+}
+
+async function readText(filePath: string): Promise<string | undefined> {
+  return fs.promises.readFile(filePath, 'utf8').catch(() => undefined);
 }
 
 /** `WorkspaceInstallOptions` as native `InstallOptions` (`native/install/src/options.rs`). */
@@ -150,6 +180,10 @@ export function nativeOptions(packages: string[] | undefined, options: Workspace
     existingEntries: options.skipIfExisting ? 'skip' : options.updateExisting ? 'update' : 'fail',
     skipPrune: options.skipPrune ?? false,
     appendOnly: options.optimizeReportForNonTerminal ?? false,
+    copyPeerToRuntimeOnRoot: options.copyPeerToRuntimeOnRoot,
+    copyPeerToRuntimeOnComponents: options.copyPeerToRuntimeOnComponents ?? false,
+    // `resolveDependenciesGraph` prefers it to the graphs `restoreFromDependenciesGraph` reads.
+    dependenciesGraph: options.dependenciesGraph ? JSON.parse(options.dependenciesGraph.serialize()) : undefined,
   };
 }
 
