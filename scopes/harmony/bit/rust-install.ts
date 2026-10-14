@@ -121,7 +121,18 @@ async function hostInfo(root: string | undefined) {
     nonInteractive: process.argv.includes('--json'),
     fileId: currentDateAndTimeToFileName(),
     loadedVirtualStoreDirs,
+    token: tokenFlag(process.argv.slice(3)) ?? null,
   };
+}
+
+/** The global `--token` flag, which `CommandRunner` copies to `globalFlags.token` on the TypeScript path. */
+function tokenFlag(args: string[]): string | undefined {
+  for (let i = 0; i < args.length; i += 1) {
+    if (args[i] === '--') return undefined;
+    if (args[i].startsWith('--token=')) return args[i].slice('--token='.length);
+    if (args[i] === '--token' && args[i + 1] !== undefined && !args[i + 1].startsWith('-')) return args[i + 1];
+  }
+  return undefined;
 }
 
 /** Serves the callbacks components and aspects implement in JavaScript. */
