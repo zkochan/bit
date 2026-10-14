@@ -50,7 +50,7 @@ struct Change {
 
 struct Refs {
     before: Option<Vec<u8>>,
-    after: Vec<u8>,
+    after: Option<Vec<u8>>,
 }
 
 struct Staged {
@@ -145,10 +145,13 @@ fn prepare_refs(root: &Path, selected: &LaneSelected) -> io::Result<Refs> {
     if components.len() > 4096 {
         return Err(invalid("outbound lane publication bounds"));
     }
-    Ok(Refs {
-        before: read_optional(&refs_path(root, &selected.scope, &selected.name))?,
-        after: serde_json::to_vec_pretty(components)?,
-    })
+    let before = read_optional(&refs_path(root, &selected.scope, &selected.name))?;
+    if components.is_empty() && before.is_some() {
+        return Err(invalid("outbound empty lane remote refs require canonical export"));
+    }
+    let after =
+        if components.is_empty() { None } else { Some(serde_json::to_vec_pretty(components)?) };
+    Ok(Refs { before, after })
 }
 
 fn prepare_staged(root: &Path, expected_ids: &[String]) -> io::Result<Staged> {
@@ -223,10 +226,9 @@ impl Prepared {
         for model in &self.models {
             store.write(&model.hash, &model.after)?;
         }
-        write(
-            &refs_path(&self.workspace.root, &self.lane.scope, &self.lane.name),
-            &self.published.refs.after,
-        )?;
+        if let Some(refs) = &self.published.refs.after {
+            write(&refs_path(&self.workspace.root, &self.lane.scope, &self.lane.name), refs)?;
+        }
         fs::write(
             self.workspace.root.join(".bit/staged-config/main.json"),
             &self.staged.config.after,
