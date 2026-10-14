@@ -523,7 +523,7 @@ function observeWorkspaceTransport(child) {
               completed: response.completed || 0,
               failed: Boolean(response.failed),
               applied: response.data?.applied === true,
-              restored: response.data?.restored === true,
+              ...(magic === 'BWS1:commandRecoveryRestore' ? { restored: response.data?.restored === true } : {}),
               ...(magic === 'BWS1:commandFinalize'
                 ? { snapped: response.data?.result?.mergeSnapResults?.snappedComponents?.length || 0 }
                 : {}),
