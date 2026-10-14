@@ -21,6 +21,7 @@ pub use variants::{VariantConfig, by_root_dir_and_name};
 mod aspects;
 mod bitmap;
 mod files;
+mod first_env;
 mod glob;
 mod ignore;
 mod package_name;
@@ -40,7 +41,7 @@ use std::{
 };
 
 /// The env of env components.
-const ENV_OF_ENVS: &str = "teambit.envs/env";
+pub(super) const ENV_OF_ENVS: &str = "teambit.envs/env";
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Workspace {
@@ -148,10 +149,11 @@ impl Workspace {
                 .collect(),
             owning_dirs: owning_dirs(&bitmap.entries),
         };
-        let components = bitmap.entries
+        let mut components = bitmap.entries
             .iter()
             .map(|entry| loader.component(entry))
             .collect::<io::Result<Vec<_>>>()?;
+        first_env::resolve(&mut components, &loader.objects, core_aspect_ids)?;
         Ok(Self {
             root: root.to_owned(),
             scope_path,
