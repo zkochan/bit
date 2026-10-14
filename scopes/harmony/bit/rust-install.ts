@@ -28,7 +28,7 @@ export async function runRustInstall(): Promise<boolean> {
     result = await binding.install(
       process.argv.slice(2),
       process.cwd(),
-      JSON.stringify(await hostInfo()),
+      JSON.stringify(await hostInfo(root)),
       (method, payload) => host.serve(method, payload),
       (text) => {
         process.stdout.write(text);
@@ -87,7 +87,7 @@ function findWorkspaceRoot(cwd: string): string | undefined {
   return dir;
 }
 
-async function hostInfo() {
+async function hostInfo(root: string | undefined) {
   const [{ GLOBAL_CONFIG }, { getBitVersion }, { findCurrentBvmDir }, coreAspects, { currentDateAndTimeToFileName }] =
     await Promise.all([
       import('@teambit/legacy.constants'),
@@ -96,6 +96,17 @@ async function hostInfo() {
       import('./rust-install-core-aspects'),
       import('@teambit/legacy.consumer/dist/bitmap-history-file-id.js'),
     ]);
+  // the virtual-store directories this process loaded modules from (require.cache plus the
+  // recorded ESM loads) must survive the prune, as pnpmPruneModules leaves them alone.
+  let loadedVirtualStoreDirs: string[] = [];
+  if (root) {
+    try {
+      const { loadedVirtualStoreDirNames } = await import('@teambit/pnpm/dist/preserve-loaded-virtual-store-dirs.js');
+      loadedVirtualStoreDirs = [...loadedVirtualStoreDirNames(path.join(root, 'node_modules', '.pnpm'))];
+    } catch {
+      loadedVirtualStoreDirs = [];
+    }
+  }
   const chalk = (await import('chalk')).default;
   const { shouldDisableLoader } = await import('@teambit/legacy.logger');
   return {
@@ -109,6 +120,7 @@ async function hostInfo() {
     loader: !shouldDisableLoader,
     nonInteractive: process.argv.includes('--json'),
     fileId: currentDateAndTimeToFileName(),
+    loadedVirtualStoreDirs,
   };
 }
 

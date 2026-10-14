@@ -42,6 +42,10 @@ pub struct HostInfo {
     /// `currentDateAndTimeToFileName()` at command start: names the
     /// `workspace.jsonc` backup in local time.
     pub file_id: String,
+    /// `node_modules/.pnpm` directory names the host process loaded modules
+    /// from (`loadedVirtualStoreDirNames`): never pruned by this install.
+    #[serde(default)]
+    pub loaded_virtual_store_dirs: Vec<String>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
