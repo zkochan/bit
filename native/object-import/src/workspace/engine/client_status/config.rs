@@ -143,7 +143,7 @@ fn bitmap_targets(bitmap: &Value, config: &Value) -> io::Result<Vec<Target>> {
     let mut ids = HashSet::new();
     let mut targets = Vec::new();
     for (key, value) in entries {
-        if key == "$schema-version" {
+        if key == "$schema-version" || key == "_bit_lane" {
             continue;
         }
         // Object.keys puts integer-like property names first; decline those
@@ -308,7 +308,7 @@ pub(in crate::workspace::engine) fn context_bitmap_targets(
         .zip(
             entries
                 .iter()
-                .filter(|(key, _)| key.as_str() != "$schema-version"),
+                .filter(|(key, _)| !matches!(key.as_str(), "$schema-version" | "_bit_lane")),
         )
         .map(|(target, (_, entry))| {
             json!({"identity":target.id,"directory":target.directory,

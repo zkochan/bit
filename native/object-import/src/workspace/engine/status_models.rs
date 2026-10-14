@@ -7,6 +7,7 @@ pub(super) mod workspace_diff;
 mod history;
 mod history_population;
 mod index;
+mod lane;
 mod remotes;
 mod semantic;
 
@@ -31,6 +32,8 @@ pub(super) struct Request {
     include_heads: bool,
     #[serde(default)]
     stage_history: bool,
+    #[serde(default)]
+    current_lane_id: Option<String>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -87,6 +90,11 @@ fn load_overlay(
         raw: Budget::new(32 * 1024 * 1024),
         packed: Budget::new(32 * 1024 * 1024),
     };
+    let lane = request.current_lane_id
+        .as_deref()
+        .map(|id| lane::read(&request.root, &reader, id))
+        .transpose()?
+        .flatten();
     let mut models = pool.install(|| {
         items
             .par_iter()
@@ -97,11 +105,14 @@ fn load_overlay(
     let mut references = versions::references(&models, &request.targets)?;
     if request.include_heads {
         versions::include_heads(&models, &mut references)?;
+        if let Some(lane) = &lane {
+            versions::include_lane_heads(&lane.heads, &mut references)?;
+        }
     }
     let versions = versions::read(&reader, &references, pool)?;
     let semantics = stored_semantics(&versions, pool, stored_hashes)?;
     let (histories, pending_history) = if request.history {
-        let (histories, pending) = history::read(&reader, &models, request, pool)?;
+        let (histories, pending) = history::read(&reader, &models, request, lane.as_ref(), pool)?;
         (Some(histories), pending)
     } else {
         (None, Vec::new())
