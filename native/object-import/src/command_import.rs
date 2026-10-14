@@ -131,6 +131,7 @@ struct Writes {
     index: Value,
     index_changed: bool,
     lane_histories: Vec<Value>,
+    switch_tracking: Option<Vec<u8>>,
 }
 impl PreparedImport {
     pub(crate) fn virtual_remote(
