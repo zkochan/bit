@@ -113,3 +113,31 @@ verify. The scanner artifact lists only the scanner's own dependency closure.
 The engine's `readPackage` hooks are implemented natively and report the
 `pnpmfileChecksum` that Bit's TypeScript integration intended (`bit-1`).
 Lockfiles therefore stay compatible between both implementations.
+
+## Validation
+
+The same templates were installed with the TypeScript command (`BIT_NATIVE_INSTALL=off`) and natively:
+
+- plain install and repeat install
+- `bit install <pkg>`, `<pkg>@<version>`, `--save-prefix`, `-t peer`
+- `--skip-compile`, `--update`, `--lockfile-only`
+
+The comparison covers console output, `pnpm-lock.yaml` (including the `bit:` block and `pnpmfileChecksum`), `workspace.jsonc`, the `node_modules` tree, link targets and the generated component `package.json` files. All of these match. The only differences are throttled progress-line fragments.
+
+These install e2e suites pass on the native path:
+
+- `install`
+- `install-and-compile`
+- `install-missing-dependencies`
+- `dependencies/allow-scripts`
+- `root-components`
+
+## Known differences
+
+- Harmony's `loading N component(s)` and the importer's per-100-objects progress lines are not printed.
+- Lane `updateDependents` are not yet used for version resolution.
+- Configured user aspects and generator envs use the default package name. A custom `teambit.pkg/pkg` name is not applied.
+- `resolveFromEnv` policy links are not supported.
+- Aspect-type envs come from a fixed list of core aspect envs.
+- Aspect-registered dependency policy slots and custom env dependency detectors are not applied.
+- Workspaces configured with the yarn package manager use the TypeScript command, because yarn is a JavaScript package manager.
