@@ -326,6 +326,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "bit-cli"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bit-install",
+ "pnpm-diagnostics",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "bit-dependency-scanner"
 version = "0.1.0"
 dependencies = [
@@ -345,10 +359,12 @@ name = "bit-install"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "base64 0.22.1",
  "bit-dependency-scanner",
  "bit-object-import",
  "flate2",
  "futures-util",
+ "getrandom 0.3.4",
  "indexmap",
  "miette 7.6.0",
  "node-semver",
@@ -378,6 +394,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha1",
+ "sha2",
  "tar",
  "tempfile",
  "tokio",
