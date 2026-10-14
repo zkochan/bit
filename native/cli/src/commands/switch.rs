@@ -42,7 +42,7 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
                 &prepared.imports,
                 needs_checkout_progress,
                 prepared.import_count,
-            )
+            );
         },
     )
 }
