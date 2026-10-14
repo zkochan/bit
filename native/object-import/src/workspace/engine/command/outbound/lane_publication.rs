@@ -10,15 +10,23 @@ use std::{
 };
 
 pub(super) struct Prepared {
-    root: PathBuf,
+    workspace: Workspace,
     lane: Lane,
     expected_ids: HashSet<String>,
     objects: Objects,
     models: Vec<Model>,
+    published: PublishedState,
+    staged: Staged,
+}
+
+struct PublishedState {
     bitmap: Change,
     scope: Change,
     refs: Refs,
-    staged: Staged,
+}
+
+struct Workspace {
+    root: PathBuf,
     file_id: String,
 }
 
@@ -72,7 +80,10 @@ pub(super) fn prepare(input: &Prepare, selected: &LaneSelected) -> io::Result<Pr
         return Err(invalid("outbound lane publication acknowledgement"));
     }
     Ok(Prepared {
-        root: root.clone(),
+        workspace: Workspace {
+            root: root.clone(),
+            file_id: input.transport.bitmap_history_file_id.clone(),
+        },
         lane: Lane { scope: selected.scope.clone(), name: selected.name.clone() },
         expected_ids,
         objects: prepare_objects(root, selected)?,
@@ -84,21 +95,28 @@ pub(super) fn prepare(input: &Prepare, selected: &LaneSelected) -> io::Result<Pr
                 after: model.after.clone(),
             })
             .collect(),
-        bitmap: prepare_bitmap(root, selected)?,
-        scope: prepare_scope(root, selected)?,
-        refs: prepare_refs(root, selected)?,
+        published: PublishedState::prepare(root, selected)?,
         staged: prepare_staged(root, &selected.expected_ids)?,
-        file_id: input.transport.bitmap_history_file_id.clone(),
     })
+}
+
+impl PublishedState {
+    fn prepare(root: &Path, selected: &LaneSelected) -> io::Result<Self> {
+        Ok(Self {
+            bitmap: prepare_bitmap(root, selected)?,
+            scope: prepare_scope(root, selected)?,
+            refs: prepare_refs(root, selected)?,
+        })
+    }
 }
 
 fn prepare_objects(root: &Path, selected: &LaneSelected) -> io::Result<Objects> {
     Ok(Objects {
         index: fs::read(root.join(".bit/index.json"))?,
-        lane: object_bytes(root, &selected.hash)?,
-        history: object_bytes(root, &selected.history_hash)?,
-        lane_hash: selected.hash.clone(),
-        history_hash: selected.history_hash.clone(),
+        lane: object_bytes(root, &selected.hashes.lane)?,
+        history: object_bytes(root, &selected.hashes.history)?,
+        lane_hash: selected.hashes.lane.clone(),
+        history_hash: selected.hashes.history.clone(),
     })
 }
 
@@ -171,7 +189,7 @@ impl Prepared {
             if model.hash.len() != 40 || !model.hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
                 return Err(invalid("outbound lane model hash"));
             }
-            let path = self.root
+            let path = self.workspace.root
                 .join(".bit/objects")
                 .join(&model.hash[..2])
                 .join(&model.hash[2..]);
@@ -183,50 +201,59 @@ impl Prepared {
     }
 
     fn validate_files(&self) -> io::Result<bool> {
-        let root = &self.root;
-        Ok(fs::read(root.join(".bitmap"))? == self.bitmap.before
-            && fs::read(root.join(".bit/scope.json"))? == self.scope.before
+        let root = &self.workspace.root;
+        Ok(fs::read(root.join(".bitmap"))? == self.published.bitmap.before
+            && fs::read(root.join(".bit/scope.json"))? == self.published.scope.before
             && read_optional(&refs_path(root, &self.lane.scope, &self.lane.name))?
-                == self.refs.before
+                == self.published.refs.before
             && read_optional(&root.join(".bit/staged-snaps"))? == self.staged.snaps
             && fs::read(root.join(".bit/staged-config/main.json"))?
                 == self.staged.config.before)
     }
 
     fn validate_objects(&self) -> io::Result<bool> {
-        let root = &self.root;
+        let root = &self.workspace.root;
         Ok(fs::read(root.join(".bit/index.json"))? == self.objects.index
             && object_bytes(root, &self.objects.lane_hash)? == self.objects.lane
             && object_bytes(root, &self.objects.history_hash)? == self.objects.history)
     }
 
     fn publish(self) -> io::Result<()> {
-        let store = Store::new(self.root.join(".bit/objects"), None)?;
+        let store = Store::new(self.workspace.root.join(".bit/objects"), None)?;
         for model in &self.models {
             store.write(&model.hash, &model.after)?;
         }
-        write(&refs_path(&self.root, &self.lane.scope, &self.lane.name), &self.refs.after)?;
-        fs::write(self.root.join(".bit/staged-config/main.json"), &self.staged.config.after)?;
+        write(
+            &refs_path(&self.workspace.root, &self.lane.scope, &self.lane.name),
+            &self.published.refs.after,
+        )?;
+        fs::write(
+            self.workspace.root.join(".bit/staged-config/main.json"),
+            &self.staged.config.after,
+        )?;
         if self.staged.snaps.is_some() {
-            fs::remove_file(self.root.join(".bit/staged-snaps"))?;
+            fs::remove_file(self.workspace.root.join(".bit/staged-snaps"))?;
         }
-        fs::write(self.root.join(".bit/scope.json"), &self.scope.after)?;
-        if self.bitmap.after != self.bitmap.before {
+        fs::write(self.workspace.root.join(".bit/scope.json"), &self.published.scope.after)?;
+        if self.published.bitmap.after != self.published.bitmap.before {
             self.backup_bitmap()?;
-            write(&self.root.join(".bitmap"), &self.bitmap.after)?;
+            write(&self.workspace.root.join(".bitmap"), &self.published.bitmap.after)?;
         }
         Ok(())
     }
 
     fn backup_bitmap(&self) -> io::Result<()> {
-        let directory = self.root.join(".bit/bitmap-history");
+        let directory = self.workspace.root.join(".bit/bitmap-history");
         fs::create_dir_all(&directory)?;
-        fs::write(directory.join(format!(".bitmap-{}", self.file_id)), &self.bitmap.before)?;
+        fs::write(
+            directory.join(format!(".bitmap-{}", self.workspace.file_id)),
+            &self.published.bitmap.before,
+        )?;
         let mut metadata = fs::OpenOptions::new()
             .create(true)
             .append(true)
-            .open(self.root.join(".bit/bitmap-history-metadata.txt"))?;
-        writeln!(metadata, "{} export", self.file_id)?;
+            .open(self.workspace.root.join(".bit/bitmap-history-metadata.txt"))?;
+        writeln!(metadata, "{} export", self.workspace.file_id)?;
         metadata.sync_all()
     }
 }
