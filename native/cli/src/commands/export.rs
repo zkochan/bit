@@ -166,10 +166,19 @@ fn export(root: &Path, options: &Options) -> io::Result<Exported> {
         }
         Ok(_) => {}
         Err(error) => {
-            // Only a failed persist changed a remote: report it like `PersistFailed`.
-            let failure = persist_failure(&error.to_string(), &prepared.scopes).ok_or(error)?;
-            exported.persisted.truncate(failure.0 + 1);
-            exported.result = Err(failure.1);
+            // A failed validation or persist has already touched the remotes.
+            let message = error.to_string();
+            if let Some((index, failure)) = persist_failure(&message, &prepared.scopes) {
+                exported.persisted.truncate(index + 1);
+                exported.result = Err(failure);
+            } else if let Some(failure) = validation_failure(&message, &prepared.scopes) {
+                // Validation already cleaned the pending objects. Delegating
+                // would push and validate a second time against the remotes.
+                exported.persisted.clear();
+                exported.result = Err(failure);
+            } else {
+                return Err(error);
+            }
             return Ok(exported);
         }
     }
@@ -220,6 +229,14 @@ fn persist_failure(error: &str, scopes: &[String]) -> Option<(usize, String)> {
             "failed persisting to the following scopes: {scope}\nerrors:\n{scope} - {message}\n\nthe remote bit.dev will try to re-persist the data for the failed scopes.\n   \nthe following scopes were used for this export: {}",
             scopes.join(", "),
         ),
+    ))
+}
+
+fn validation_failure(error: &str, scopes: &[String]) -> Option<String> {
+    let (_, message) = error.split_once("outbound validate failed: ")?;
+    Some(format!(
+        "{message}\nthe following scopes were used for this export: {}",
+        scopes.join(", ")
     ))
 }
 
