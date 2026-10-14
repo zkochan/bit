@@ -82,6 +82,12 @@ pub struct AfterInstallResult {
     pub old_non_loaded_envs: Vec<String>,
     /// Number of components compiled, for the summary line.
     pub compiled: usize,
+    /// What compiling and writing the config files produced: the dist directories
+    /// (`BuildResult.distDirs`) and the config files written. `None` when a component
+    /// failed to compile, the config write failed or skipped files, or the host does not
+    /// report them.
+    #[serde(default)]
+    pub outputs: Option<Vec<PathBuf>>,
 }
 
 /// Callbacks implemented by JavaScript. Each is invoked only when the

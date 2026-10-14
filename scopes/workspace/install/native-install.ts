@@ -81,6 +81,8 @@ export async function runNativeInstall(
     loader: loader.isStarted,
     writeToConsole: legacyLogger.shouldWriteToConsole,
   });
+  // The module defines InProcessInstallHost before installNatively can be called.
+  // eslint-disable-next-line @typescript-eslint/no-use-before-define
   const host = new InProcessInstallHost({
     ...context,
     afterInstall: async (request) => {

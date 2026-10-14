@@ -267,6 +267,7 @@ async function afterInstall(request) {
     await install.reloadMovedEnvs();
     await install.reloadNonLoadedEnvs();
     let compiled = 0;
+    let distDirs = null;
     if (request.compile) {
       const { CompilationInitiator } = bitRequire('@teambit/compiler');
       const logger = loaded.get('teambit.harmony/logger').createLogger('teambit.workspace/install');
@@ -276,13 +277,32 @@ async function afterInstall(request) {
         .get('teambit.compilation/compiler')
         .compileOnWorkspace([], { initiator: CompilationInitiator.Install });
       compiled = results.length;
+      distDirs = cleanDistDirs(results);
       logger.consoleSuccess('compiling components', started);
     }
-    if (request.writeConfigFiles) await install.tryWriteConfigFiles(false);
-    return { oldNonLoadedEnvs: envs.getFailedToLoadEnvs(), compiled };
+    const configFiles = request.writeConfigFiles ? await install.tryWriteConfigFiles(false) : [];
+    // what native `bit install` snapshots: `null` unless both steps left a complete record.
+    const outputs = distDirs && configFiles ? [...distDirs, ...configFiles] : null;
+    return { oldNonLoadedEnvs: envs.getFailedToLoadEnvs(), compiled, outputs };
   } finally {
     workspace.inInstallContext = false;
   }
+}
+
+/**
+ * The dist directories of a compilation without errors, which native `bit install` snapshots to
+ * skip the next `afterInstall` when nothing changed. `null` when any component failed, or when the
+ * compiler does not report its directories.
+ */
+function cleanDistDirs(results) {
+  const distDirs = [];
+  for (const result of results) {
+    if (result.errors.length) return null;
+    if (result.skipped) continue;
+    if (!result.distDirs) return null;
+    distDirs.push(...result.distDirs);
+  }
+  return distDirs;
 }
 
 function loadHarmony() {

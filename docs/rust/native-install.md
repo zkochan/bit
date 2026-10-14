@@ -158,6 +158,42 @@ times, as in TypeScript, and does not record detector output. An entry written b
 an install that did not apply the detectors would be stale. A component a custom
 detector applies to is therefore always detected, and its entry is written again.
 
+## Repeat installs skip `afterInstall`
+
+`afterInstall` loads Harmony to compile the workspace and write its config files. On
+a repeat install that changed nothing, the native installer skips it and prints the
+compile step's success line itself.
+
+After a compilation without errors and a complete config write, the hosts return the
+paths both wrote: each compiled component's dist directories (`BuildResult.distDirs`,
+including injected directories) and the config files. Rust then writes a stamp to
+`<scope>/cache/native-install/after-install.json` with:
+
+- **an input fingerprint:** the bit version, `workspace.jsonc`, `.bitmap`,
+  `pnpm-lock.yaml`, and the size and modification time of every file under each
+  component directory except `node_modules`. The component loader also picks up files
+  `.bitmap` does not list, so directories are walked, not the `.bitmap` file lists.
+- **an output snapshot:** the size and modification time of every file in those paths.
+
+The next install skips the step only when both still match. Any source, config or
+package change, and any removed or edited output, runs it again.
+
+The step always runs:
+
+- for programmatic installs;
+- with `--skip-compile` or `--skip-write-config-files`;
+- when an env failed to load;
+- with the `no-fs-cache` feature;
+- when a `link:` or `file:` dependency resolves outside the workspace's components,
+  its `node_modules` and the directories bit links its core aspects from, because
+  such a package can change without any input changing.
+
+No stamp is written after compile errors, a failed config write, or a config write
+that left files bit did not generate, because each of those prints output every time.
+An installed bit whose hosts don't report these paths never writes one either. Bit's
+own code is identified by its version, so a development build changed without a
+version bump needs one full install, or removing the stamp.
+
 ## Crate layout (`native/install/src`)
 
 | Module | Responsibility | TypeScript reference |
