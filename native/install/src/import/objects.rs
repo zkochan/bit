@@ -296,14 +296,19 @@ fn add_row(index: &mut Value, row: &IndexRow) -> bool {
         index[key] = json!([]);
     }
     let Some(rows) = index[key].as_array_mut() else { return false };
-    if rows
-        .iter()
-        .any(|existing| existing["hash"].as_str() == Some(hash.as_str()))
-    {
-        return false;
+    let Some(existing) = rows
+        .iter_mut()
+        .find(|existing| existing["hash"].as_str() == Some(hash.as_str()))
+    else {
+        rows.push(entry);
+        return true;
+    };
+    // `ScopeIndex.addOne`: a lane found by hash takes the new id (`bit lane rename`).
+    if key == "lanes" && existing["id"] != entry["id"] {
+        existing["id"] = entry["id"].clone();
+        return true;
     }
-    rows.push(entry);
-    true
+    false
 }
 
 /// Write via a temporary sibling and rename, creating parent directories.

@@ -92,7 +92,7 @@ async fn import(
     };
     let written = importer.import(&ids).await?;
     if let Some(lane) = &remote_lane {
-        lane::save_lane_if_missing(&repo, lane)?;
+        lane::merge_and_save(&repo, lane, &lane::Identity::from_config(global))?;
     }
     Ok(ImportSummary { components: written.components.len(), objects: written.objects })
 }
