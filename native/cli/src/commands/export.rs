@@ -6,8 +6,8 @@
 //!
 //! The remotes change only when they persist the objects. A failure before
 //! that leaves them as they were (the pushed objects are cleaned), so the
-//! command declines and the Node.js CLI exports and reports. Ids, `--resume`,
-//! lanes and bit.cloud (hub) remotes run on the Node.js CLI.
+//! command declines and the Node.js CLI exports and reports. Lanes and
+//! bit.cloud (hub) remotes run on the Node.js CLI.
 
 mod report;
 
@@ -31,26 +31,67 @@ use std::{
 
 pub const COMMAND: Command = Command { name: "export", aliases: &["e"], run };
 
-/// `--origin-directly`, the only flag that runs natively.
-fn parse(args: &[&str]) -> Option<bool> {
-    match args {
-        [] => Some(false),
-        ["--origin-directly"] => Some(true),
-        _ => None,
+struct Options {
+    ids: Vec<String>,
+    origin_directly: bool,
+    resume: Option<String>,
+}
+
+/// The same bounded, explicit export grammar as the production JS adapter.
+fn parse(args: &[&str]) -> Option<Options> {
+    let mut options = Options { ids: Vec::new(), origin_directly: false, resume: None };
+    let mut args = args.iter().copied();
+    while let Some(arg) = args.next() {
+        match arg {
+            "--origin-directly" if !options.origin_directly => options.origin_directly = true,
+            "--resume" if options.resume.is_none() => {
+                let client_id = args.next()?;
+                if client_id.is_empty()
+                    || client_id.len() > 128
+                    || !client_id
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+                {
+                    return None;
+                }
+                options.resume = Some(client_id.to_owned());
+            }
+            id if valid_id(id) && options.ids.len() < 4096 => options.ids.push(id.to_owned()),
+            _ => return None,
+        }
     }
+    Some(options)
+}
+
+fn valid_id(id: &str) -> bool {
+    if id.is_empty()
+        || id.len() > 4096
+        || id.contains(['*', '?', '\0'])
+        || id.chars().any(char::is_whitespace)
+        || id.starts_with(['-', '/', '@'])
+    {
+        return false;
+    }
+    let (identity, version) = id
+        .split_once('@')
+        .map_or((id, None), |(identity, version)| (identity, Some(version)));
+    !identity.is_empty()
+        && !identity.contains('@')
+        && !identity.ends_with('/')
+        && version.is_none_or(|version| !version.is_empty() && !version.contains('@'))
 }
 
 fn run(args: &[OsString]) -> io::Result<Outcome> {
     let Some(arguments) = workspace_command::utf8_args(args) else {
         return Ok(Outcome::Declined("the arguments are not UTF-8".to_string()));
     };
-    let Some(origin_directly) = parse(&arguments[1..]) else {
+    let Some(options) = parse(&arguments[1..]) else {
         return Ok(Outcome::Declined("ids or flags outside the native export".to_string()));
     };
     let Some(root) = workspace::root(&env::current_dir()?) else {
         return Ok(Outcome::Declined("not inside a workspace".to_string()));
     };
-    let exported = match export(&root, origin_directly) {
+    let exported = match export(&root, &options) {
         Ok(exported) => exported,
         Err(error) => return Ok(Outcome::Declined(format!("export: {error}"))),
     };
@@ -104,9 +145,9 @@ impl Exported {
 
 /// Prepare, transfer and publish. An error is a decline: nothing changed
 /// on the remotes.
-fn export(root: &Path, origin_directly: bool) -> io::Result<Exported> {
+fn export(root: &Path, options: &Options) -> io::Result<Exported> {
     let mut engine = Engine::new()?;
-    let prepared = prepare(&mut engine, root, origin_directly)?;
+    let prepared = prepare(&mut engine, root, options)?;
     let token = prepared.token.clone();
     let mut exported = Exported {
         count: prepared.count,
@@ -142,11 +183,7 @@ fn export(root: &Path, origin_directly: bool) -> io::Result<Exported> {
 
 /// `commandOutboundPrepare` of the staged components, as the Node.js CLI
 /// would send it.
-fn prepare(
-    engine: &mut Engine,
-    root: &Path,
-    origin_directly: bool,
-) -> io::Result<report::Prepared> {
+fn prepare(engine: &mut Engine, root: &Path, options: &Options) -> io::Result<report::Prepared> {
     let cli = NodeCli::find()?;
     let config = cache_root().join("config");
     let prepared: Value = engine.request(&json!({
@@ -159,11 +196,11 @@ fn prepare(
         "bitDir": cli.bit_dir,
         "bitVersion": cli.version,
         "bitmapHistoryFileId": workspace_command::file_id(),
-        "clientId": client_id()?,
+        "clientId": options.resume.clone().map_or_else(client_id, Ok)?,
         "exportDate": now_ms().to_string(),
         "operation": "export",
-        "ids": [],
-        "options": { "originDirectly": origin_directly },
+        "ids": options.ids,
+        "options": { "originDirectly": options.origin_directly, "resume": options.resume },
     }))?;
     report::prepared(&prepared)
 }

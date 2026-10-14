@@ -2,10 +2,21 @@ use super::{parse, persist_failure};
 
 #[test]
 fn parses_the_native_flags() {
-    assert_eq!(parse(&[]), Some(false));
-    assert_eq!(parse(&["--origin-directly"]), Some(true));
-    for args in [&["s/a"][..], &["--resume", "x"], &["--all"], &["-e"]] {
-        assert_eq!(parse(args), None, "{args:?}");
+    let empty = parse(&[]).unwrap();
+    assert!(empty.ids.is_empty() && !empty.origin_directly && empty.resume.is_none());
+    let selected =
+        parse(&["s/a@1.0.0", "s/b", "--origin-directly", "--resume", "client-1"]).unwrap();
+    assert_eq!(selected.ids, ["s/a@1.0.0", "s/b"]);
+    assert!(selected.origin_directly);
+    assert_eq!(selected.resume.as_deref(), Some("client-1"));
+    for args in [
+        &["--resume"][..],
+        &["--resume", "bad:id"],
+        &["--all"],
+        &["-e"],
+        &["s/a", "--origin-directly", "--origin-directly"],
+    ] {
+        assert!(parse(args).is_none(), "{args:?}");
     }
 }
 
