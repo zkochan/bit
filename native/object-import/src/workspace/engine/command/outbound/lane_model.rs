@@ -5,7 +5,11 @@ use crate::transfer;
 use bit_client_transfer::tar::ObjectItem;
 use serde_json::Value;
 use sha1::{Digest, Sha1};
-use std::{collections::HashSet, fs, io, path::Path};
+use std::{
+    collections::HashSet,
+    fs, io,
+    path::{Path, PathBuf},
+};
 
 const MAX_BYTES: usize = 32 * 1024 * 1024;
 const MAX_OBJECTS: usize = 4096;
@@ -13,8 +17,7 @@ const MAX_OBJECTS: usize = 4096;
 pub(super) struct LaneSelected {
     pub(super) scope: String,
     pub(super) name: String,
-    pub(super) hash: String,
-    pub(super) history_hash: String,
+    pub(super) hashes: LaneHashes,
     pub(super) lane: Value,
     pub(super) objects: Vec<ObjectItem>,
     pub(super) component_ids: Vec<String>,
@@ -22,7 +25,37 @@ pub(super) struct LaneSelected {
     pub(super) models: Vec<model::ModelBytes>,
 }
 
+pub(super) struct LaneHashes {
+    pub(super) lane: String,
+    pub(super) history: String,
+}
+
 pub(super) fn select(input: &Prepare) -> io::Result<Option<LaneSelected>> {
+    let Some((scope, name)) = current_identity(input)? else {
+        return Ok(None);
+    };
+    let loaded = load_lane(input, &scope, &name)?;
+    let mut selected = select_components(input, &scope, &name, &loaded)?;
+    for hash in [&loaded.history_hash, &loaded.hash] {
+        selected.append(ObjectItem {
+            hash: hash.clone(),
+            compressed: read_compressed(&loaded.dir, hash)?,
+            scope: None,
+        })?;
+    }
+    Ok(Some(LaneSelected {
+        scope,
+        name,
+        hashes: LaneHashes { lane: loaded.hash, history: loaded.history_hash },
+        lane: loaded.lane,
+        objects: selected.objects,
+        component_ids: selected.component_ids,
+        expected_ids: selected.expected_ids,
+        models: selected.models,
+    }))
+}
+
+fn current_identity(input: &Prepare) -> io::Result<Option<(String, String)>> {
     let bitmap = crate::recovery::jsonc::parse(&fs::read(input.root.join(".bitmap"))?)?;
     let Some(current) = bitmap.get("_bit_lane") else {
         return Ok(None);
@@ -40,6 +73,18 @@ pub(super) fn select(input: &Prepare) -> io::Result<Option<LaneSelected>> {
         .filter(|value| !value.is_empty() && *value != "main")
         .ok_or_else(|| invalid("outbound lane name"))?
         .to_owned();
+    Ok(Some((scope, name)))
+}
+
+struct Loaded {
+    index: Value,
+    lane: Value,
+    hash: String,
+    history_hash: String,
+    dir: PathBuf,
+}
+
+fn load_lane(input: &Prepare, scope: &str, name: &str) -> io::Result<Loaded> {
     let index: Value = serde_json::from_slice(&fs::read(input.root.join(".bit/index.json"))?)?;
     let lane_row = index["lanes"]
         .as_array()
@@ -74,104 +119,153 @@ pub(super) fn select(input: &Prepare) -> io::Result<Option<LaneSelected>> {
     if history["scope"] != scope || history["name"] != name || history["laneHash"] != hash {
         return Err(invalid("outbound LaneHistory identity"));
     }
-    let rows = lane["components"].as_array().ok_or_else(|| invalid("outbound lane components"))?;
+    Ok(Loaded { index, lane, hash, history_hash, dir })
+}
+
+struct Selection {
+    objects: Vec<ObjectItem>,
+    seen: HashSet<String>,
+    budget: usize,
+    component_ids: Vec<String>,
+    expected_ids: Vec<String>,
+    models: Vec<model::ModelBytes>,
+}
+
+impl Selection {
+    fn new() -> Self {
+        Self {
+            objects: Vec::new(),
+            seen: HashSet::new(),
+            budget: 0,
+            component_ids: Vec::new(),
+            expected_ids: Vec::new(),
+            models: Vec::new(),
+        }
+    }
+    fn append(&mut self, item: ObjectItem) -> io::Result<()> {
+        if !self.seen.insert(item.hash.clone()) {
+            return Ok(());
+        }
+        self.budget = self.budget
+            .checked_add(item.compressed.len())
+            .ok_or_else(|| invalid("outbound object budget"))?;
+        if self.budget > MAX_BYTES || self.objects.len() >= MAX_OBJECTS {
+            return Err(invalid("outbound object budget"));
+        }
+        self.objects.push(item);
+        Ok(())
+    }
+}
+
+fn select_components(
+    input: &Prepare,
+    scope: &str,
+    name: &str,
+    loaded: &Loaded,
+) -> io::Result<Selection> {
+    let rows =
+        loaded.lane["components"].as_array().ok_or_else(|| invalid("outbound lane components"))?;
     if rows.len() > MAX_OBJECTS {
         return Err(invalid("outbound lane component budget"));
     }
     let component_rows =
-        index["components"].as_array().ok_or_else(|| invalid("outbound component index"))?;
-    let remote_heads = remote_heads(&input.root, &scope, &name)?;
-    let host = remote::configured_host(input, &scope)?;
+        loaded.index["components"].as_array().ok_or_else(|| invalid("outbound component index"))?;
+    let remote_heads = remote_heads(&input.root, scope, name)?;
+    let host = remote::configured_host(input, scope)?;
+    let context = ComponentContext { input, loaded, scope, name, host: &host };
     let mut seen_ids = HashSet::new();
-    let mut component_ids = Vec::new();
-    let mut expected_ids = Vec::new();
-    let mut models = Vec::new();
-    let mut objects = Vec::new();
-    let mut seen = HashSet::new();
-    let mut budget = 0;
+    let mut selected = Selection::new();
     for entry in rows {
-        if entry
-            .get("isDeleted")
-            .is_some_and(|value| value == true)
-        {
-            return Err(invalid("outbound deleted lane component"));
-        }
-        let component_scope = entry["id"]["scope"]
-            .as_str()
-            .filter(|value| !value.is_empty())
-            .ok_or_else(|| invalid("outbound lane component scope"))?;
-        let component_name = entry["id"]["name"]
-            .as_str()
-            .filter(|value| !value.is_empty())
-            .ok_or_else(|| invalid("outbound lane component name"))?;
-        let head = entry["head"].as_str().ok_or_else(|| invalid("outbound lane head"))?;
-        crate::merge_history::hash(head)?;
-        let id = format!("{component_scope}/{component_name}");
-        if !seen_ids.insert(id.clone()) {
+        let component = ComponentId::parse(entry)?;
+        if !seen_ids.insert(component.id.clone()) {
             return Err(invalid("outbound duplicate lane component"));
         }
         let previous_head = remote_heads
             .iter()
-            .find(|row| {
-                row["id"]["scope"] == component_scope && row["id"]["name"] == component_name
-            })
+            .find(|row| component.matches(row))
             .and_then(|row| row["head"].as_str());
-        if previous_head == Some(head) {
+        if previous_head == Some(component.head) {
             continue;
         }
         let row = component_rows
             .iter()
-            .find(|row| {
-                row["id"]["scope"] == component_scope && row["id"]["name"] == component_name
-            })
+            .find(|row| component.matches(row))
             .ok_or_else(|| invalid("outbound lane component model missing"))?;
-        let model_hash =
-            row["hash"].as_str().ok_or_else(|| invalid("outbound component model hash"))?;
-        let mut component = model::read_object(&dir, model_hash, "Component")?;
-        if component["scope"] != component_scope || component["name"] != component_name {
-            return Err(invalid("outbound component identity"));
-        }
-        let before = read_compressed(&dir, model_hash)?;
-        model::clear_and_mark_exported(
-            &mut component,
-            &scope,
-            &host,
-            &input.transport.export_date,
-        )?;
-        let after = model::encode(model_hash, "Component", &component)?;
-        let versions = lane_versions(&dir, head, previous_head, &scope, &name)?;
-        expected_ids.extend(
-            versions
-                .iter()
-                .map(|version| format!("{id}@{version}")),
-        );
-        for object in model::collect(&dir, model_hash, &after, &versions)? {
-            append(&mut objects, &mut seen, &mut budget, object)?;
-        }
-        models.push(model::ModelBytes { hash: model_hash.to_owned(), before, after });
-        component_ids.push(id.clone());
+        select_component(&context, &component, row, previous_head, &mut selected)?;
     }
-    for object_hash in [&history_hash, &hash] {
-        let bytes = read_compressed(&dir, object_hash)?;
-        // `read_object` above already validated the compressed object's type.
-        append(
-            &mut objects,
-            &mut seen,
-            &mut budget,
-            ObjectItem { hash: object_hash.clone(), compressed: bytes, scope: None },
-        )?;
+    Ok(selected)
+}
+
+struct ComponentId<'a> {
+    scope: &'a str,
+    name: &'a str,
+    head: &'a str,
+    id: String,
+}
+
+impl<'a> ComponentId<'a> {
+    fn parse(entry: &'a Value) -> io::Result<Self> {
+        if entry["isDeleted"] == true {
+            return Err(invalid("outbound deleted lane component"));
+        }
+        let scope = entry["id"]["scope"]
+            .as_str()
+            .filter(|scope| !scope.is_empty())
+            .ok_or_else(|| invalid("outbound lane component scope"))?;
+        let name = entry["id"]["name"]
+            .as_str()
+            .filter(|name| !name.is_empty())
+            .ok_or_else(|| invalid("outbound lane component name"))?;
+        let head = entry["head"].as_str().ok_or_else(|| invalid("outbound lane head"))?;
+        crate::merge_history::hash(head)?;
+        Ok(Self { scope, name, head, id: format!("{scope}/{name}") })
     }
-    Ok(Some(LaneSelected {
-        scope,
-        name,
-        hash,
-        history_hash,
-        lane,
-        objects,
-        component_ids,
-        expected_ids,
-        models,
-    }))
+    fn matches(&self, row: &Value) -> bool {
+        row["id"]["scope"] == self.scope && row["id"]["name"] == self.name
+    }
+}
+
+struct ComponentContext<'a> {
+    input: &'a Prepare,
+    loaded: &'a Loaded,
+    scope: &'a str,
+    name: &'a str,
+    host: &'a str,
+}
+
+fn select_component(
+    context: &ComponentContext<'_>,
+    id: &ComponentId<'_>,
+    row: &Value,
+    previous_head: Option<&str>,
+    selected: &mut Selection,
+) -> io::Result<()> {
+    let hash = row["hash"].as_str().ok_or_else(|| invalid("outbound component model hash"))?;
+    let dir = &context.loaded.dir;
+    let mut component = model::read_object(dir, hash, "Component")?;
+    if component["scope"] != id.scope || component["name"] != id.name {
+        return Err(invalid("outbound component identity"));
+    }
+    let before = read_compressed(dir, hash)?;
+    model::clear_and_mark_exported(
+        &mut component,
+        context.scope,
+        context.host,
+        &context.input.transport.export_date,
+    )?;
+    let after = model::encode(hash, "Component", &component)?;
+    let versions = lane_versions(dir, id.head, previous_head, context.scope, context.name)?;
+    selected.expected_ids.extend(
+        versions
+            .iter()
+            .map(|version| format!("{}@{version}", id.id)),
+    );
+    for object in model::collect(dir, hash, &after, &versions)? {
+        selected.append(object)?;
+    }
+    selected.models.push(model::ModelBytes { hash: hash.to_owned(), before, after });
+    selected.component_ids.push(id.id.clone());
+    Ok(())
 }
 
 fn remote_heads(root: &Path, scope: &str, name: &str) -> io::Result<Vec<Value>> {
@@ -206,53 +300,46 @@ fn lane_versions(
     let mut pending = vec![head.to_owned()];
     let mut seen = HashSet::new();
     while let Some(hash) = pending.pop() {
-        if !seen.insert(hash.clone()) {
-            continue;
-        }
-        if Some(hash.as_str()) == previous_head {
+        if !seen.insert(hash.clone()) || Some(hash.as_str()) == previous_head {
             continue;
         }
         if seen.len() > MAX_OBJECTS {
             return Err(invalid("outbound lane version budget"));
         }
-        let version = model::read_object(dir, &hash, "Version")?;
-        if version["unrelated"] == true || version["squashed"] == true {
-            return Err(invalid("outbound rewritten lane history"));
-        }
-        let origin = &version["origin"]["lane"];
-        if hash != head && (origin["scope"] != scope || origin["name"] != name) {
-            continue;
-        }
-        output.push(hash);
-        let parents =
-            version["parents"].as_array().ok_or_else(|| invalid("outbound lane parents"))?;
-        for parent in parents.iter().rev() {
-            let parent = parent.as_str().ok_or_else(|| invalid("outbound lane parent"))?;
-            crate::merge_history::hash(parent)?;
-            pending.push(parent.to_owned());
+        if let Some(parents) = selected_parents(dir, &hash, head, scope, name)? {
+            output.push(hash);
+            pending.extend(parents.into_iter().rev());
         }
     }
     output.reverse();
     Ok(output)
 }
 
-fn append(
-    objects: &mut Vec<ObjectItem>,
-    seen: &mut HashSet<String>,
-    budget: &mut usize,
-    item: ObjectItem,
-) -> io::Result<()> {
-    if !seen.insert(item.hash.clone()) {
-        return Ok(());
+fn selected_parents(
+    dir: &Path,
+    hash: &str,
+    head: &str,
+    scope: &str,
+    name: &str,
+) -> io::Result<Option<Vec<String>>> {
+    let version = model::read_object(dir, hash, "Version")?;
+    if version["unrelated"] == true || version["squashed"] == true {
+        return Err(invalid("outbound rewritten lane history"));
     }
-    *budget = budget
-        .checked_add(item.compressed.len())
-        .ok_or_else(|| invalid("outbound object budget"))?;
-    if *budget > MAX_BYTES || objects.len() >= MAX_OBJECTS {
-        return Err(invalid("outbound object budget"));
+    let origin = &version["origin"]["lane"];
+    if hash != head && (origin["scope"] != scope || origin["name"] != name) {
+        return Ok(None);
     }
-    objects.push(item);
-    Ok(())
+    let parents = version["parents"].as_array().ok_or_else(|| invalid("outbound lane parents"))?;
+    parents
+        .iter()
+        .map(|parent| {
+            let hash = parent.as_str().ok_or_else(|| invalid("outbound lane parent"))?;
+            crate::merge_history::hash(hash)?;
+            Ok(hash.to_owned())
+        })
+        .collect::<io::Result<Vec<_>>>()
+        .map(Some)
 }
 
 #[cfg(test)]
