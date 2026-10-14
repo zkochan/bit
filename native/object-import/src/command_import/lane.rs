@@ -86,10 +86,9 @@ impl PreparedImport {
         if let Some(existing) = tracking
             .iter()
             .find(|row| row["localLane"] == id.name)
+            && (existing["remoteLane"] != id.name || existing["remoteScope"] != id.scope)
         {
-            if existing["remoteLane"] != id.name || existing["remoteScope"] != id.scope {
-                return Err(invalid("switch lane alias already tracks another remote"));
-            }
+            return Err(invalid("switch lane alias already tracks another remote"));
         }
         tracking.push(
             serde_json::json!({"localLane":id.name,"remoteLane":id.name,"remoteScope":id.scope}),

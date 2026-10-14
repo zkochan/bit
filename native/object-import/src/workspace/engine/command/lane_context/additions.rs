@@ -26,7 +26,7 @@ pub(in crate::workspace::engine::command) fn prepare(
 }
 
 /// A switch can bring a lane-only component into a workspace whose existing
-/// component owns the parent of the default directory. ComponentWriter moves
+/// component owns the parent of the default directory. `ComponentWriter` moves
 /// the incoming directory's overlapping prefix aside (`alpha/gamma` becomes
 /// `alpha_1/gamma`) before writing. Resolve that case before retaining a plan.
 pub(in crate::workspace::engine::command) fn prepare_switch(
@@ -40,7 +40,7 @@ pub(in crate::workspace::engine::command) fn prepare_switch(
     let mut additions = Vec::new();
     for target in selected {
         let mut addition = prepare_one(imported, rows, settings, target)?;
-        relocate_nested(&mut addition, rows.values().chain(additions.iter()))?;
+        relocate_nested(&mut addition, &rows.values().chain(additions.iter()))?;
         validate_overlap(&addition, rows.values().chain(additions.iter()))?;
         let directory =
             addition["rootDir"].as_str().ok_or_else(|| invalid("switch destination"))?;
@@ -54,10 +54,10 @@ pub(in crate::workspace::engine::command) fn prepare_switch(
 
 fn relocate_nested<'a>(
     addition: &mut Value,
-    rows: impl Iterator<Item = &'a Value> + Clone,
+    rows: &(impl Iterator<Item = &'a Value> + Clone),
 ) -> io::Result<()> {
     let directory = addition["rootDir"].as_str().ok_or_else(|| invalid("switch destination"))?;
-    let parent = rows
+    let parent = (*rows)
         .clone()
         .filter_map(|row| row["rootDir"].as_str())
         .find(|root| directory.starts_with(&format!("{root}/")));
@@ -70,7 +70,7 @@ fn relocate_nested<'a>(
         let candidate = format!("{parent}_{index}{suffix}");
         crate::checkout::plan::relative_path(&candidate)?;
         addition["rootDir"] = json!(candidate);
-        if validate_overlap(addition, rows.clone()).is_ok() {
+        if validate_overlap(addition, (*rows).clone()).is_ok() {
             return Ok(());
         }
     }
