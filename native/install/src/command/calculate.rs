@@ -5,7 +5,7 @@
 use super::session::{Loaded, Session};
 use crate::{
     dependencies::{self, DependencyOptions, default_package_name, glob},
-    import::remotes::global_remotes,
+    import::{self, remotes::global_remotes},
     manifests::{
         self, ManifestContext, ManifestInput, ManifestOptions, ManifestOutcome, Policies,
         RemoteFilter,
@@ -199,9 +199,30 @@ fn dependency_options(
     Ok(DependencyOptions {
         core_aspects: session.info.core_aspects.clone(),
         merge_config,
-        update_dependents: Vec::new(),
+        update_dependents: update_dependents(loaded)?,
         use_cache: true,
     })
+}
+
+/// `getIdFromUpdateDependentsOnLane`: the current lane's hidden dependents, with
+/// their lane versions.
+fn update_dependents(loaded: &Loaded) -> io::Result<Vec<ComponentId>> {
+    let Some(lane) = &loaded.workspace.lane else { return Ok(Vec::new()) };
+    let lane_id = import::LaneId {
+        scope: lane.scope.clone(),
+        name: lane.name.clone(),
+        exported: lane.exported,
+    };
+    let repo = import::Repo::new(&loaded.workspace.scope_path);
+    Ok(import::local_update_dependents(&repo, &lane_id)?
+        .into_iter()
+        .map(|id| ComponentId {
+            scope: Some(id.scope),
+            default_scope: None,
+            name: id.name,
+            version: id.version,
+        })
+        .collect())
 }
 
 /// App components (ids without version): only root components install apps separately.

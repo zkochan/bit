@@ -60,6 +60,21 @@ impl RemoteLane {
     }
 }
 
+/// `updateDependents` of the lane object stored in the local scope
+/// (`workspace.getCurrentLaneObject()`): the dependents Ripple CI cascaded onto
+/// the lane, which version resolution prefers over the model. Main has no lane
+/// object; a lane the scope does not hold yet has no dependents.
+pub fn local_update_dependents(repo: &Repo, lane: &LaneId) -> io::Result<Vec<Id>> {
+    let Some(hash) = repo.lane_hash(&lane.scope, &lane.name)? else { return Ok(Vec::new()) };
+    let Some(object) = repo.read_json(&hash)? else { return Ok(Vec::new()) };
+    Ok(object["updateDependents"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|id| Id::parse(id.as_str()?).ok())
+        .collect())
+}
+
 /// Fetch the lane `.bitmap` points at. A lane that was never exported may not
 /// exist on its remote; that is not an error.
 pub async fn fetch_remote_lane(

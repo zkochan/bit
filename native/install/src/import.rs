@@ -7,6 +7,7 @@ pub(crate) mod remotes;
 
 pub use bitmap::{Bitmap, Id, LaneId};
 pub use fetch::FetchOptions;
+pub use lane::local_update_dependents;
 pub use objects::Repo;
 pub use tar::ObjectItem;
 

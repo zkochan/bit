@@ -1,10 +1,11 @@
 use super::{
-    bitmap,
+    bitmap::{self, Id, LaneId},
     component::{keep_existing_version, merge_component, merge_version_history},
     fetch::FetchOptions,
     http::{Network, Retry},
     import_current_objects,
-    objects::{Repo, component_hash, compress_json, parse, sha1_hex, version_history_hash},
+    lane::local_update_dependents,
+    objects::{IndexRow, Repo, component_hash, compress_json, parse, sha1_hex, version_history_hash},
     remotes::{Remote, symphony_url},
     tar::{self, ObjectItem},
 };
@@ -499,4 +500,24 @@ fn append(builder: &mut ::tar::Builder<Vec<u8>>, name: &str, data: &[u8]) -> std
     header.set_mode(0o644);
     header.set_cksum();
     builder.append_data(&mut header, name, data)
+}
+
+#[test]
+fn reads_update_dependents_of_the_local_lane_object() {
+    let dir = tempfile::tempdir().unwrap();
+    let repo = Repo::new(dir.path());
+    let lane = LaneId { scope: "org".into(), name: "feature".into(), exported: true };
+    assert!(local_update_dependents(&repo, &lane).unwrap().is_empty(), "no lane object yet");
+    let hash = "c".repeat(40);
+    let object = json!({
+        "name": "feature",
+        "scope": "org",
+        "components": [],
+        "updateDependents": ["org/ui/button@1.0.1", "not an id"],
+    });
+    repo.write_raw(&hash, &compress_json("Lane", &hash, &object).unwrap()).unwrap();
+    repo.index_add(&[IndexRow::Lane { scope: "org".into(), name: "feature".into(), hash }])
+        .unwrap();
+    let dependents = local_update_dependents(&repo, &lane).unwrap();
+    assert_eq!(dependents, [Id::parse("org/ui/button@1.0.1").unwrap()]);
 }

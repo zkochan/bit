@@ -17,10 +17,9 @@ export async function runRustInstall(): Promise<boolean> {
   if (typeof binding.install !== 'function') return required(`${addon} has no install export`);
   const { logger } = await import('@teambit/legacy.logger');
   const root = findWorkspaceRoot(process.cwd());
-  if (root) {
-    logger.commandHistoryBasePath = path.join(root, '.bit');
-    logger.writeCommandHistoryStart();
-  }
+  if (root) logger.commandHistoryBasePath = path.join(root, '.bit');
+  // the "started" history line is written once the native path owns the command: a help or
+  // yarn outcome falls back to the CLI parser, which writes its own line.
   const host = new InstallHost(root ?? process.cwd());
   const { prepareBuildScriptsPath } = await import('@teambit/pnpm/dist/build-scripts-path.js');
   prepareBuildScriptsPath();
@@ -36,10 +35,12 @@ export async function runRustInstall(): Promise<boolean> {
       }
     );
   } catch (error: any) {
+    logger.writeCommandHistoryStart();
     throw new BitError(error?.message ?? String(error));
   }
   const { outcome } = JSON.parse(result) as { outcome: 'installed' | 'help' | 'unsupported' };
   if (outcome !== 'installed') return false;
+  logger.writeCommandHistoryStart();
   await logger.exitAfterFlush(0, 'install');
   return true;
 }
