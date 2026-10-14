@@ -8,8 +8,7 @@
 //! so a relative path or a package name resolves from that module, not from the
 //! current directory.
 
-use super::objects::invalid;
-use crate::model::GlobalConfig;
+use crate::{GlobalConfig, invalid};
 use serde_json::Value;
 use std::{
     io,

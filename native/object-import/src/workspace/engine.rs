@@ -10,6 +10,7 @@ mod read;
 mod read_raw;
 mod resolve_dependencies;
 mod resolve_typescript;
+mod response;
 mod scan;
 mod source_overlay;
 mod status;
@@ -59,6 +60,8 @@ enum Request {
         request: Value,
     },
     CommandPrepare(command::input::Prepare),
+    CommandInboundPrepare(command::inbound::Prepare),
+    CommandInboundApply(command::inbound::Apply),
     CommandTagPrepare(command::resolve::Prepare),
     CommandTagPlan(command::resolve::Plan),
     CommandTagFinalize(command::resolve::Finalize),
@@ -131,20 +134,11 @@ struct Response {
     failed: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     data: Option<Value>,
+    /// Why a request failed, for diagnostics; callers decide on `failed`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
 }
-struct Output(Vec<u8>);
-impl Write for Output {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        if self.0.len() + bytes.len() > MAX_OUTPUT {
-            return Err(invalid("workspace output limit"));
-        }
-        self.0.extend_from_slice(bytes);
-        Ok(bytes.len())
-    }
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
+use response::Output;
 
 /// Read-only workspace operations return no partial results on unsupported data.
 pub(crate) fn serve(
@@ -173,8 +167,14 @@ pub(crate) fn serve(
             skipped: Vec::new(),
             failed: false,
             data: Some(data),
+            error: None,
         },
-        Err(_) => failure(id),
+        Err(error) => {
+            if std::env::var_os("BIT_RUST_INBOUND_DIAGNOSTIC").is_some() {
+                eprintln!("native inbound diagnostic: {error}");
+            }
+            Response { error: Some(error.to_string()), ..failure(id) }
+        }
     };
     let mut output = Output(Vec::new());
     if serde_json::to_writer(&mut output, &response).is_err() {
@@ -237,6 +237,12 @@ fn owned_command(
     pool: &rayon::ThreadPool,
 ) -> io::Result<(usize, Value)> {
     match request {
+        Request::CommandInboundPrepare(input) => {
+            pool.install(|| command::inbound::prepare(&input, &mut snapshots.command))
+        }
+        Request::CommandInboundApply(input) => {
+            pool.install(|| command::inbound::apply(&input, &mut snapshots.command))
+        }
         Request::CommandPlan(input) => command::plan(input, snapshots, pool),
         Request::CommandPolicyPrepare(input) => {
             pool.install(|| command::policy::prepare(input, &mut snapshots.command))
@@ -270,7 +276,15 @@ fn owned_command(
     }
 }
 fn failure(id: u32) -> Response {
-    Response { version: 1, id, completed: 0, skipped: Vec::new(), failed: true, data: None }
+    Response {
+        version: 1,
+        id,
+        completed: 0,
+        skipped: Vec::new(),
+        failed: true,
+        data: None,
+        error: None,
+    }
 }
 fn apply(request: Request, pool: &rayon::ThreadPool) -> io::Result<(usize, Value)> {
     match request {

@@ -1,0 +1,162 @@
+//! The checkout report: `checkoutOutput` of `@teambit/checkout`.
+
+use super::options::Options;
+use crate::commands::{
+    color::Chalk,
+    workspace_command::{
+        format::Formatter,
+        results::{Changed, Report, Results, hydrate, join_lines, listed},
+    },
+};
+use serde_json::Value;
+use std::io;
+
+/// `formatRustWorkspaceCommand(result, options)` for checkout.
+pub fn format(result: &Value, options: &Options, chalk: Chalk) -> io::Result<Report> {
+    let results = hydrate(result)?;
+    let report = Checkout { results: &results, options, format: Formatter::new(chalk) };
+    let skipped = !results.skipped.is_empty() && options.report_all() && !options.verbose;
+    let data = report.build(&report.skipped_minimal());
+    if !skipped {
+        return Ok(Report { data, code: 0, details: None });
+    }
+    let details = report.build(&report.skipped_detailed());
+    Ok(Report { data, code: 0, details: Some(details) })
+}
+
+/// `checkoutOutput(results, props)`.
+struct Checkout<'r> {
+    results: &'r Results,
+    options: &'r Options,
+    format: Formatter,
+}
+
+impl Checkout<'_> {
+    fn chalk(&self) -> Chalk {
+        self.format.chalk
+    }
+
+    /// `buildOutput(notCheckedOutSection)`.
+    fn build(&self, skipped: &str) -> String {
+        Formatter::join(&[
+            skipped.to_string(),
+            self.successful(),
+            listed(&self.format, "removed components", &self.results.removed),
+            listed(&self.format, "added components", &self.results.added),
+            self.conflict_summary(),
+            self.summary(),
+        ])
+    }
+
+    /// `getNotCheckedOutOutputMinimal`.
+    fn skipped_minimal(&self) -> String {
+        let count = self.results.skipped.len();
+        if count == 0 {
+            return String::new();
+        }
+        if self.options.report_all() && !self.options.verbose {
+            return self.format.details_hint(&format!("full list of {count} skipped component(s)"));
+        }
+        self.skipped_detailed()
+    }
+
+    /// `getNotCheckedOutOutputDetailed`.
+    fn skipped_detailed(&self) -> String {
+        let items: Vec<String> = self.results.skipped
+            .iter()
+            .map(|(id, message)| self.format.item(&format!("{} - {message}", id.display())))
+            .collect();
+        self.format.section("checkout skipped", "", &items)
+    }
+
+    /// `getSuccessfulOutput`.
+    fn successful(&self) -> String {
+        match self.results.components.as_slice() {
+            [] => String::new(),
+            [component] => self.successful_one(component),
+            components => self.successful_many(components),
+        }
+    }
+
+    fn successful_one(&self, component: &Changed) -> String {
+        let chalk = self.chalk();
+        let id = &component.id;
+        if self.to("reset") {
+            let title = format!("successfully reset {}", chalk.bold(&id.display()));
+            return self.format.success_summary(&title);
+        }
+        let version = if self.to("head") || self.to("latest") {
+            id.version.clone()
+        } else {
+            self.results.version.clone()
+        };
+        let version = version.unwrap_or_else(|| "undefined".to_string());
+        let title = format!(
+            "successfully switched {} to version {}",
+            chalk.bold(&id.without_version()),
+            chalk.bold(&version),
+        );
+        join_lines(&[
+            self.format.success_summary(&title),
+            self.results.apply_version_report(&self.format, false, false),
+        ])
+    }
+
+    fn successful_many(&self, components: &[Changed]) -> String {
+        if self.to("reset") {
+            let items: Vec<String> = components
+                .iter()
+                .map(|component| self.format.item(&component.id.display()))
+                .collect();
+            return self.format.section("reset components", "", &items);
+        }
+        let target = if self.to("head") {
+            "their head version".to_string()
+        } else if self.to("latest") {
+            "their latest version".to_string()
+        } else if self.to("main") {
+            "their main version".to_string()
+        } else {
+            let version = self.results.version.as_deref().unwrap_or("undefined");
+            format!("version {}", self.chalk().bold(version))
+        };
+        let title = format!("successfully switched {} components to {target}", components.len());
+        join_lines(&[
+            self.format.success_summary(&title),
+            self.results.apply_version_report(&self.format, true, self.to("head")),
+        ])
+    }
+
+    fn to(&self, name: &str) -> bool {
+        self.options.to == name
+    }
+
+    /// `getConflictSummary` with `conflictSummaryReport`.
+    fn conflict_summary(&self) -> String {
+        if self.results.components.is_empty() || !self.results.conflicts {
+            return String::new();
+        }
+        let title = self.format.title(&format!(
+            "{} files with conflicts summary",
+            self.format.warn_symbol(),
+        ));
+        let hint = self.format.hint(
+            "fix the conflicts above manually and then run \"bit install\".\nonce ready, snap/tag the components to persist the changes",
+        );
+        format!("{title}\n{}\n\n{hint}", self.results.conflict_lines(self.chalk()).join("\n"))
+    }
+
+    /// `getSummary`.
+    fn summary(&self) -> String {
+        let chalk = self.chalk();
+        format!(
+            "{}\nTotal Changed: {}\nTotal Unchanged: {}",
+            self.format.title("Checkout Summary"),
+            chalk.bold(&self.results.components.len().to_string()),
+            chalk.bold(&self.results.skipped.len().to_string()),
+        )
+    }
+}
+
+#[cfg(test)]
+mod report_tests;

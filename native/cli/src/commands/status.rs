@@ -11,13 +11,13 @@
 
 pub(super) mod cache;
 pub(super) mod capture;
+pub(super) mod fresh;
+pub(super) mod grammar;
 pub(super) mod js;
+pub(super) mod policy;
 
 mod collate;
-mod fresh;
-mod grammar;
 mod issues;
-mod policy;
 
 use super::engine::Engine;
 use crate::{commands::Command, history::History, native::Outcome, workspace};

@@ -5,7 +5,7 @@
 //! running Node's built-in modules, the bundled TypeScript version and the
 //! core aspect packages.
 
-mod dev_files;
+pub mod dev_files;
 mod node;
 
 use super::{
@@ -37,6 +37,37 @@ pub struct Pending {
     read_set: Value,
 }
 
+impl Pending {
+    /// A `dependencyCaches` entry of the engine.
+    pub fn from_cache(cache: &Value) -> io::Result<Self> {
+        let raw_data = cache.get("rawData").and_then(Value::as_str);
+        let cacheable = cache.get("cacheable").and_then(Value::as_bool);
+        let read_set = cache.get("readSet").filter(|read_set| read_set.is_array());
+        let (Some(raw_data), Some(cacheable), Some(read_set)) = (raw_data, cacheable, read_set)
+        else {
+            return Err(decline("command dependency cache receipt"));
+        };
+        Ok(Self {
+            identity: text(cache.get("identity"))?.to_string(),
+            raw_data: raw_data.to_string(),
+            cacheable,
+            read_set: read_set.clone(),
+        })
+    }
+
+    /// `<id>@<version>`.
+    pub fn identity(&self) -> &str {
+        &self.identity
+    }
+
+    /// The files the detection read, which the engine checks again before writing.
+    pub fn read_set(&self) -> &[Value] {
+        self.read_set
+            .as_array()
+            .map_or(&[], Vec::as_slice)
+    }
+}
+
 /// Facts about the Node.js CLI that are the same for every component.
 pub struct Facts {
     graph: Value,
@@ -45,13 +76,8 @@ pub struct Facts {
 
 impl Facts {
     pub fn new(home: &Path) -> io::Result<Self> {
-        let node = node::Node::find()?;
-        let graph = json!({
-            "home": home,
-            "builtins": node.builtins()?,
-            "detectorExtensions": DETECTOR_EXTENSIONS,
-            "typescript": node.typescript_version()?.as_deref() == Some(TYPESCRIPT),
-        });
+        let mut graph = dependency_grammar()?;
+        graph["home"] = json!(home);
         let ids: Vec<String> = serde_json::from_str(CORE_ASPECT_IDS).map_err(io::Error::other)?;
         let core_packages = ids
             .iter()
@@ -59,6 +85,18 @@ impl Facts {
             .collect();
         Ok(Self { graph, core_packages })
     }
+}
+
+/// `nativeDependencyGrammar()`: the running Node's built-in modules, the
+/// detector extensions and whether the bundled TypeScript is the one the
+/// engine reproduces.
+pub fn dependency_grammar() -> io::Result<Value> {
+    let node = node::Node::find()?;
+    Ok(json!({
+        "builtins": node.builtins()?,
+        "detectorExtensions": DETECTOR_EXTENSIONS,
+        "typescript": node.typescript_version()?.as_deref() == Some(TYPESCRIPT),
+    }))
 }
 
 /// `getCoreAspectPackageName`: `teambit.x/a/b` is `@teambit/a.b`.
@@ -123,7 +161,7 @@ impl Detection<'_> {
     }
 
     /// `freshDependencyDetection(context, files, policy)`.
-    fn detection(&self, files: &[String], policy: &Policy) -> io::Result<Value> {
+    pub fn detection(&self, files: &[String], policy: &Policy) -> io::Result<Value> {
         let workspace = &policy.input["policies"]["workspacePolicy"];
         let field = |name: &str| {
             workspace
@@ -150,7 +188,7 @@ impl Detection<'_> {
 pub fn commit(
     engine: &mut Engine,
     root: &Path,
-    pending: &[Pending],
+    pending: &[&Pending],
     reset: bool,
 ) -> io::Result<()> {
     for entry in pending {
