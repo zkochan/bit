@@ -35,7 +35,7 @@ fn component_files_apply_bit_and_user_ignore_rules() {
         rules
             .component_files("comps/missing", &[])
             .unwrap()
-            .is_empty()
+            .is_empty(),
     );
 }
 
@@ -55,7 +55,7 @@ fn track_all_files_keeps_generated_files_and_ignored_files_apply() {
     let mut rules = FileRules::load(dir.path(), &["*.bak".to_owned()], true).unwrap();
     assert_eq!(
         rules.component_files("c", &[]).unwrap(),
-        ["index.ts", "package.json", "tsconfig.json"]
+        ["index.ts", "package.json", "tsconfig.json"],
     );
 }
 
@@ -92,7 +92,7 @@ fn workspace_root_component_leaves_nested_components_out_and_honors_nested_ignor
             "docs/.gitignore",
             "docs/guide.md",
             "docs/sub/local.env"
-        ]
+        ],
     );
 }
 

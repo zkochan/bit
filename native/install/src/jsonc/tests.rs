@@ -14,7 +14,7 @@ fn round_trips_match_comment_json() {
         // characters, line separators), and a second pass may differ.
         match (Document::parse(expected), second) {
             (Ok(again), Some(second)) => {
-                assert_eq!(again.to_string(), *second, "{name}: second pass")
+                assert_eq!(again.to_string(), *second, "{name}: second pass");
             }
             (Err(_), None) => {}
             (again, second) => {
@@ -89,11 +89,11 @@ fn rejects_what_json_parse_rejects() {
         "// only a comment",
         "{ 'a': 1 }",
         "{ a: 1 }",
-        "{ \"a\": 01 }",
-        "{ \"a\": .5 }",
+        r#"{ "a": 01 }"#,
+        r#"{ "a": .5 }"#,
         "[1 2]",
-        "{ \"a\": 1 } x",
-        "{ \"a\": undefined }",
+        r#"{ "a": 1 } x"#,
+        r#"{ "a": undefined }"#,
         "/* open",
     ] {
         assert!(parse(input).is_err(), "{input:?} should not parse");

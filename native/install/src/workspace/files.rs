@@ -4,13 +4,13 @@
 //! (`.`) also honors nested ignore files and leaves nested components out.
 
 use super::{bitmap::WORKSPACE_ROOT_DIR, ignore::Ignore};
+use indexmap::IndexMap;
 use std::{
-    collections::HashMap,
     fs, io,
     path::{Path, PathBuf},
 };
 
-/// Ignored everywhere, even with `trackAllFiles` (`ALWAYS_IGNORE_LIST`).
+/// Ignored everywhere, even with `trackAllFiles`.
 pub const ALWAYS_IGNORE_LIST: [&str; 6] = [
     "**/.DS_Store",
     "**/.env",
@@ -19,10 +19,10 @@ pub const ALWAYS_IGNORE_LIST: [&str; 6] = [
     "**/component.json",
     "**/node_modules/**",
 ];
-/// Files Bit generates (`BIT_GENERATED_IGNORE_LIST`).
+/// Files Bit generates, ignored unless the workspace sets `trackAllFiles`.
 pub const BIT_GENERATED_IGNORE_LIST: [&str; 3] =
     ["package.json", "**/package-lock.json", "**/yarn.lock"];
-/// Ignored only at a component's root (`IGNORE_ROOT_ONLY_LIST`).
+/// Ignored only at a component's root.
 pub const IGNORE_ROOT_ONLY_LIST: [&str; 7] = [
     "tsconfig.json",
     ".eslintrc.json",
@@ -144,36 +144,36 @@ impl FileRules {
     /// Ignore files below the root whose directory is not ignored, shallowest
     /// first, `.bitignore` winning over `.gitignore`, rebased to their directory.
     fn nested_ignore_patterns(&mut self, paths: &[String]) -> io::Result<Vec<String>> {
-        let mut by_dir: Vec<(String, &str)> = Vec::new();
-        let mut positions = HashMap::new();
-        for path in paths {
-            let Some((file_dir, name)) = path.rsplit_once('/') else { continue };
-            if !matches!(name, GIT_IGNORE | BIT_IGNORE)
-                || self.git_ignore.ignores(&format!("{file_dir}/"))
-            {
-                continue;
-            }
-            match positions.get(file_dir) {
-                Some(&index) if name == BIT_IGNORE => {
-                    by_dir[index] = (file_dir.to_owned(), BIT_IGNORE)
-                }
-                Some(_) => {}
-                None => {
-                    positions.insert(file_dir.to_owned(), by_dir.len());
-                    by_dir.push((
-                        file_dir.to_owned(),
-                        if name == BIT_IGNORE { BIT_IGNORE } else { GIT_IGNORE },
-                    ));
-                }
-            }
-        }
-        by_dir.sort_by_key(|(dir, _)| dir.split('/').count());
         let mut patterns = Vec::new();
-        for (dir, name) in by_dir {
+        for (dir, name) in self.ignore_files_by_dir(paths) {
             let lines = ignore_file(&self.root.join(&dir).join(name))?;
             patterns.extend(lines.iter().map(|pattern| rebase_ignore_pattern(pattern, &dir)));
         }
         Ok(patterns)
+    }
+
+    /// The ignore file of each scanned directory below the root, in scan order
+    /// then by depth.
+    fn ignore_files_by_dir(&mut self, paths: &[String]) -> Vec<(String, &'static str)> {
+        let mut by_dir: IndexMap<String, &'static str> = IndexMap::new();
+        for path in paths {
+            let Some((file_dir, name)) = path.rsplit_once('/') else { continue };
+            let name = match name {
+                GIT_IGNORE => GIT_IGNORE,
+                BIT_IGNORE => BIT_IGNORE,
+                _ => continue,
+            };
+            // git does not descend into an ignored directory.
+            if self.git_ignore.ignores(&format!("{file_dir}/")) {
+                continue;
+            }
+            if name == BIT_IGNORE || !by_dir.contains_key(file_dir) {
+                by_dir.insert(file_dir.to_owned(), name);
+            }
+        }
+        let mut by_dir: Vec<_> = by_dir.into_iter().collect();
+        by_dir.sort_by_key(|(dir, _)| dir.split('/').count());
+        by_dir
     }
 }
 
@@ -265,7 +265,7 @@ impl Scan<'_> {
             Err(error)
                 if matches!(
                     error.kind(),
-                    io::ErrorKind::NotFound | io::ErrorKind::NotADirectory
+                    io::ErrorKind::NotFound | io::ErrorKind::NotADirectory,
                 ) =>
             {
                 return Ok(());

@@ -8,12 +8,12 @@
 //! order, no newline between a leading block comment and `{`, partial string
 //! escaping).
 
+pub use node::{Comment, Comments, Node, Object};
+
 mod lexer;
 mod node;
 mod parser;
 mod stringify;
-
-pub use node::{Comment, Comments, Node, Object};
 
 use indexmap::IndexMap;
 use serde_json::Value;

@@ -190,13 +190,16 @@ impl<'a> Merger<'a> {
             self.resolver.resolve(&mut entry, prefer);
             kept.push(entry);
         }
-        let kept = self.filter_envs(kept, origin);
+        let kept = self.filter_envs(kept);
         self.lists.push(kept);
     }
 
     /// `filterEnvsFromExtensionsIfNeeded`: once an origin set the env, later
     /// origins cannot set another one.
-    fn filter_envs(&mut self, mut entries: Vec<AspectEntry>, origin: Origin) -> Vec<AspectEntry> {
+    ///
+    /// Model entries already carry the workspace version of a workspace env
+    /// (see [`Resolver`]), which is what Bit does for them here.
+    fn filter_envs(&mut self, entries: Vec<AspectEntry>) -> Vec<AspectEntry> {
         let envs_entry = entries
             .iter()
             .find(|entry| entry.id == ENVS_ASPECT);
@@ -208,30 +211,7 @@ impl<'a> Merger<'a> {
         });
         let has_envs = envs_entry.is_some() || entries.iter().any(|entry| is_core_env(&entry.id));
         if self.env_found && has_envs {
-            entries.retain(|entry| {
-                let is_env = env
-                    .as_deref()
-                    .is_some_and(|env| {
-                        entry.id == env || aspect_id_without_version(&entry.id) == env
-                    });
-                !is_env && !is_core_env(&entry.id)
-            });
-            for entry in &mut entries {
-                if entry.id == ENVS_ASPECT
-                    && let Value::Object(config) = &mut entry.config
-                {
-                    config.remove("env");
-                }
-            }
-            return entries;
-        }
-        if let (Some(env), Origin::ModelSpecific | Origin::ModelNonSpecific) = (&env, origin) {
-            for entry in entries
-                .iter_mut()
-                .filter(|entry| !entry.core && aspect_id_without_version(&entry.id) == env)
-            {
-                self.resolver.resolve(entry, true);
-            }
+            return drop_envs(entries, env.as_deref());
         }
         self.env_found |= env.is_some();
         entries
@@ -260,6 +240,24 @@ pub fn merge_lists(lists: Vec<Vec<AspectEntry>>) -> Vec<AspectEntry> {
         }
     }
     merged
+}
+
+/// Remove the env entries of a list whose env an earlier origin already set,
+/// and the `env` of its `teambit.envs/envs` config.
+fn drop_envs(mut entries: Vec<AspectEntry>, env: Option<&str>) -> Vec<AspectEntry> {
+    entries.retain(|entry| {
+        let is_env =
+            env.is_some_and(|env| entry.id == env || aspect_id_without_version(&entry.id) == env);
+        !is_env && !is_core_env(&entry.id)
+    });
+    for entry in &mut entries {
+        if entry.id == ENVS_ASPECT
+            && let Value::Object(config) = &mut entry.config
+        {
+            config.remove("env");
+        }
+    }
+    entries
 }
 
 fn is_core_env(id: &str) -> bool {

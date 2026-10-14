@@ -1,10 +1,5 @@
 //! Global bit config, `workspace.jsonc` aspects, `dependency-resolver` settings and `scope.json`.
 
-mod global;
-mod merge_config;
-mod scope_json;
-mod workspace_config;
-
 pub use global::{EffectiveConfig, keys, load_global_config};
 pub(crate) use merge_config::truthy;
 pub use merge_config::{MergeConfig, MergeConfigComponent};
@@ -15,14 +10,26 @@ pub use workspace_config::{
     WorkspaceSettings, aspect_id_without_version,
 };
 
+mod global;
+mod merge_config;
+mod scope_json;
+mod workspace_config;
+
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// The `teambit.dependencies/dependency-resolver` entry of `workspace.jsonc`
 /// (`dependency-resolver-workspace-config.ts`). Unknown keys are kept in `rest`.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(
+    dylint_lib = "perfectionist",
+    expect(
+        perfectionist::too_many_struct_fields,
+        reason = "The fields mirror the dependency-resolver section of workspace.jsonc."
+    )
+)]
 pub struct DependencyResolverConfig {
     /// `{ dependencies, peerDependencies }`; values are a range or `{ version, preserve }`.
     #[serde(default)]

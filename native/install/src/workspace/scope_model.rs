@@ -17,7 +17,7 @@ use std::{
 const MAX_OBJECT_BYTES: u64 = 64 * 1024 * 1024;
 
 /// What install needs from a component's scope objects.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct ModelData {
     pub binding_prefix: Option<String>,
     /// The Version's `extensions` array, as stored.

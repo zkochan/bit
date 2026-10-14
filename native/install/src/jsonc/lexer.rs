@@ -181,34 +181,39 @@ impl Lexer<'_> {
 /// after an optional minus sign.
 fn is_json_number(raw: &str) -> bool {
     let bytes = raw.as_bytes();
-    let digits = |from: usize| {
-        bytes[from..]
-            .iter()
-            .take_while(|byte| byte.is_ascii_digit())
-            .count()
-    };
-    let integer = digits(0);
+    let integer = digits(bytes);
     if integer == 0 || (integer > 1 && bytes[0] == b'0') {
         return false;
     }
-    let mut index = integer;
-    if bytes.get(index) == Some(&b'.') {
-        let fraction = digits(index + 1);
-        if fraction == 0 {
-            return false;
-        }
-        index += 1 + fraction;
-    }
-    if matches!(bytes.get(index), Some(b'e' | b'E')) {
-        index += 1;
-        if matches!(bytes.get(index), Some(b'+' | b'-')) {
-            index += 1;
-        }
-        let exponent = digits(index);
-        if exponent == 0 {
-            return false;
-        }
-        index += exponent;
-    }
-    index == bytes.len()
+    let rest = &bytes[integer..];
+    let Some(fraction) = fraction(rest) else { return false };
+    let rest = &rest[fraction..];
+    exponent(rest) == Some(rest.len())
+}
+
+fn digits(bytes: &[u8]) -> usize {
+    bytes
+        .iter()
+        .take_while(|byte| byte.is_ascii_digit())
+        .count()
+}
+
+/// The length of an optional `.digits` part; `None` when the dot has no digits.
+fn fraction(bytes: &[u8]) -> Option<usize> {
+    let Some(rest) = bytes.strip_prefix(b".") else { return Some(0) };
+    let count = digits(rest);
+    (count > 0).then_some(count + 1)
+}
+
+/// The length of an optional `e[+-]digits` part; `None` when it has no digits.
+fn exponent(bytes: &[u8]) -> Option<usize> {
+    let Some(rest) = bytes
+        .strip_prefix(b"e")
+        .or_else(|| bytes.strip_prefix(b"E"))
+    else {
+        return Some(0);
+    };
+    let sign = usize::from(matches!(rest.first(), Some(b'+' | b'-')));
+    let count = digits(&rest[sign..]);
+    (count > 0).then_some(1 + sign + count)
 }

@@ -146,7 +146,7 @@ fn loads_bitmap_entries() {
         workspace.lane
             .as_ref()
             .map(|lane| (lane.id(), lane.exported)),
-        Some(("org.local/dev".to_owned(), true))
+        Some(("org.local/dev".to_owned(), true)),
     );
     let names: Vec<_> = workspace.components
         .iter()
@@ -157,7 +157,7 @@ fn loads_bitmap_entries() {
     assert_eq!(
         special.id.default_scope.as_deref(),
         Some("org.local"),
-        "falls back to the workspace default scope"
+        "falls back to the workspace default scope",
     );
     let gone = &workspace.entries[4];
     assert!(gone.is_removed() && !gone.owns_its_dir());
@@ -177,7 +177,7 @@ fn merges_component_config_in_bit_precedence() {
     // `.bitmap` config wins over the matching variant.
     assert_eq!(
         button.config["teambit.dependencies/dependency-resolver"],
-        json!({ "policy": { "dependencies": { "lodash": "4" } } })
+        json!({ "policy": { "dependencies": { "lodash": "4" } } }),
     );
     // component.json without `propagate` stops variants; its "-" removes the aspect.
     let special = &workspace.components[1];
@@ -199,7 +199,7 @@ fn reads_model_aspects_and_binding_prefix_from_the_scope() {
     assert!(!imported.config.contains_key("teambit.harmony/aspect"));
     assert_eq!(
         imported.config["teambit.pkg/pkg"],
-        json!({ "packageJson": { "name": "custom-{name}" } })
+        json!({ "packageJson": { "name": "custom-{name}" } }),
     );
     assert_eq!(imported.config["org.remote/some-aspect@2.0.0"], json!({ "k": 1 }));
     assert_eq!(imported.package_name, "custom-imported");
@@ -225,5 +225,5 @@ fn bitmap_errors() {
     let bitmap = Bitmap::load(dir.path(), Some("d")).unwrap();
     assert_eq!(bitmap.entries[0].id.name, "x/y");
     assert_eq!(bitmap.entries[0].id.default_scope.as_deref(), Some("d"));
-    assert!(bitmap.entries[0].is_available_on_current_lane);
+    assert!(bitmap.entries[0].lanes.available_on_current_lane);
 }

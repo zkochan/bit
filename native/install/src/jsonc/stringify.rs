@@ -63,13 +63,13 @@ fn quote(value: &str) -> String {
     output.push('"');
     for char in value.chars() {
         match char {
-            '\u{8}' => output.push_str("\\b"),
-            '\t' => output.push_str("\\t"),
-            '\n' => output.push_str("\\n"),
-            '\u{c}' => output.push_str("\\f"),
-            '\r' => output.push_str("\\r"),
-            '"' => output.push_str("\\\""),
-            '\\' => output.push_str("\\\\"),
+            '\u{8}' => output.push_str(r"\b"),
+            '\t' => output.push_str(r"\t"),
+            '\n' => output.push_str(r"\n"),
+            '\u{c}' => output.push_str(r"\f"),
+            '\r' => output.push_str(r"\r"),
+            '"' => output.push_str(r#"\""#),
+            '\\' => output.push_str(r"\\"),
             _ => output.push(char),
         }
     }

@@ -72,7 +72,7 @@ fn loads_workspace_jsonc() {
     assert!(
         !user
             .iter()
-            .any(|id| id.starts_with("file:") || id == "teambit.react/react")
+            .any(|id| id.starts_with("file:") || id == "teambit.react/react"),
     );
     assert!(config.aspect("my-org.my-scope/my-aspect").is_some());
     assert_eq!(config.root_components_path(dir.path()), dir.path().join("node_modules/.bit_roots"));
@@ -85,7 +85,7 @@ fn missing_or_invalid_workspace_jsonc_fails() {
     fs::write(dir.path().join("workspace.jsonc"), "{ nope }").unwrap();
     assert_eq!(
         WorkspaceConfig::load(dir.path()).unwrap_err().kind(),
-        std::io::ErrorKind::InvalidData
+        std::io::ErrorKind::InvalidData,
     );
 }
 
@@ -126,7 +126,7 @@ fn global_config_layers() {
     assert!(config.get_bool("registry").is_err());
     assert_eq!(
         EffectiveConfig::env_variable_name("network.fetch_retries"),
-        "BIT_CONFIG_NETWORK_FETCH_RETRIES"
+        "BIT_CONFIG_NETWORK_FETCH_RETRIES",
     );
     assert_eq!(EffectiveConfig::default().cloud_domain(), "bit.cloud");
 }
@@ -176,30 +176,30 @@ fn merge_config_entries() {
     assert_eq!(component.config["org.s/env@1.0.0"], json!({}));
     assert_eq!(
         component.config["teambit.dependencies/dependency-resolver"],
-        json!({ "policy": { "dependencies": { "a": "1" } } })
+        json!({ "policy": { "dependencies": { "a": "1" } } }),
     );
     assert_eq!(
         component.auto_deps["dependencies"],
-        json!([{ "name": "b", "version": "2", "force": false }])
+        json!([{ "name": "b", "version": "2", "force": false }]),
     );
     assert_eq!(
         config
             .workspace_policy()
             .unwrap()
             .unwrap()["dependencies"],
-        json!({ "x": "^1" })
+        json!({ "x": "^1" }),
     );
     assert!(
         config
             .component("org.s/conflicted")
             .unwrap()
-            .is_none()
+            .is_none(),
     );
     assert!(
         config
             .component("org.s/missing")
             .unwrap()
-            .is_none()
+            .is_none(),
     );
     assert!(MergeConfig::parse("[*] a\nnot json").component("a").is_err());
 }

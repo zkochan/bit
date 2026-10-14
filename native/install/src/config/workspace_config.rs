@@ -20,8 +20,15 @@ pub const ENVS_ASPECT: &str = "teambit.envs/envs";
 const INTERNAL_PROPS: [&str; 3] = ["$schema", "$schemaVersion", "require"];
 
 /// `teambit.workspace/workspace` settings (`WorkspaceExtensionProps`).
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(
+    dylint_lib = "perfectionist",
+    expect(
+        perfectionist::too_many_struct_fields,
+        reason = "The fields mirror the teambit.workspace/workspace section of workspace.jsonc."
+    )
+)]
 pub struct WorkspaceSettings {
     pub name: Option<String>,
     pub icon: Option<String>,
@@ -43,7 +50,7 @@ pub struct WorkspaceSettings {
 }
 
 /// `workspace.jsonc`, parsed.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct WorkspaceConfig {
     pub path: PathBuf,
     /// Every top-level key except `$schema`, `$schemaVersion` and `require`, in
@@ -113,11 +120,11 @@ impl WorkspaceConfig {
             .map(|(_, value)| value)
     }
 
-    fn typed<T: Default + for<'de> Deserialize<'de>>(&self, id: &str) -> io::Result<T> {
+    fn typed<Config: Default + for<'de> Deserialize<'de>>(&self, id: &str) -> io::Result<Config> {
         match self.aspect(id) {
             Some(value @ Value::Object(_)) => serde_json::from_value(value.clone())
                 .map_err(|error| invalid_config(&self.path, &error)),
-            _ => Ok(T::default()),
+            _ => Ok(Config::default()),
         }
     }
 

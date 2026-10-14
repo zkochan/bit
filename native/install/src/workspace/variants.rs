@@ -17,7 +17,7 @@ struct ItemMatch {
 const NO_MATCH: ItemMatch = ItemMatch { matched: false, specificity: -1.0, excluded: false };
 
 /// The variants matching a component, merged.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct VariantConfig {
     /// Aspect configs of the matches, most specific first, until one stops propagation.
     pub extensions: Vec<Map<String, Value>>,
@@ -33,6 +33,16 @@ pub fn by_root_dir_and_name(
     root_dir: &str,
     name: &str,
 ) -> io::Result<VariantConfig> {
+    Ok(merge_matches(sorted_matches(variants, root_dir, name)?))
+}
+
+/// The matching variants by specificity, descending; lodash
+/// `sortBy(...).reverse()` puts the later of two equal patterns first.
+fn sorted_matches<'a>(
+    variants: &'a [(String, Map<String, Value>)],
+    root_dir: &str,
+    name: &str,
+) -> io::Result<Vec<(f64, &'a Map<String, Value>)>> {
     let mut matches = Vec::new();
     for (pattern, config) in variants {
         let found = is_match_pattern(root_dir, name, pattern)?;
@@ -40,9 +50,13 @@ pub fn by_root_dir_and_name(
             matches.push((found.specificity, config));
         }
     }
-    // lodash `sortBy(...).reverse()`: stable ascending, then reversed.
     matches.sort_by(|left, right| left.0.total_cmp(&right.0));
     matches.reverse();
+    Ok(matches)
+}
+
+/// Aspects of the matches until one stops propagation; the first default scope.
+fn merge_matches(matches: Vec<(f64, &Map<String, Value>)>) -> VariantConfig {
     let mut result =
         VariantConfig { propagate: true, max_specificity: -1.0, ..VariantConfig::default() };
     result.max_specificity = matches.first().map_or(-1.0, |(specificity, _)| *specificity);
@@ -67,7 +81,7 @@ pub fn by_root_dir_and_name(
             result.propagate = false;
         }
     }
-    Ok(result)
+    result
 }
 
 /// `isMatchPattern`: comma-separated items; the most specific decides the
@@ -106,7 +120,7 @@ fn is_match_item(root_dir: &str, name: &str, item: &str) -> io::Result<ItemMatch
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 format!(
-                    "variant \"{item}\" is not valid. glob patterns are not supported for file paths. by default variants are applied to all sub-directories"
+                    r#"variant "{item}" is not valid. glob patterns are not supported for file paths. by default variants are applied to all sub-directories"#,
                 ),
             ));
         }

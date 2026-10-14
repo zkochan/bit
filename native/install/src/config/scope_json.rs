@@ -25,7 +25,7 @@ pub struct TrackLane {
     pub remote_scope: String,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Lanes {
     #[serde(default)]
@@ -34,8 +34,8 @@ pub struct Lanes {
     pub new: Vec<String>,
 }
 
-/// `<scope>/scope.json` (`ScopeJson`).
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+/// `<scope>/scope.json`, the local scope's settings.
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScopeJson {
     #[serde(default)]
@@ -51,9 +51,9 @@ pub struct ScopeJson {
     pub config: IndexMap<String, String>,
 }
 
-fn strings<'de, D: serde::Deserializer<'de>>(
-    deserializer: D,
-) -> Result<IndexMap<String, String>, D::Error> {
+fn strings<'de, Source: serde::Deserializer<'de>>(
+    deserializer: Source,
+) -> Result<IndexMap<String, String>, Source::Error> {
     let map: Option<IndexMap<String, Value>> = Option::deserialize(deserializer)?;
     Ok(map
         .unwrap_or_default()

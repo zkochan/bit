@@ -7,17 +7,8 @@
 //! and the package name. Nothing is filtered out: [`BitmapEntry`] says whether
 //! an entry is removed or unavailable on the current lane.
 
-mod aspects;
-mod bitmap;
-mod files;
-mod glob;
-mod ignore;
-mod package_name;
-mod scope_model;
-mod variants;
-
 pub use aspects::{AspectEntry, CORE_ENVS, DEFAULT_ENV};
-pub use bitmap::{BITMAP, Bitmap, BitmapEntry, LaneInfo, WORKSPACE_ROOT_DIR};
+pub use bitmap::{BITMAP, Bitmap, BitmapEntry, LaneFlags, LaneInfo, WORKSPACE_ROOT_DIR};
 pub use files::{
     ALWAYS_IGNORE_LIST, BIT_GENERATED_IGNORE_LIST, FileRules, IGNORE_ROOT_ONLY_LIST,
     rebase_ignore_pattern, user_ignore_list,
@@ -26,6 +17,15 @@ pub use ignore::Ignore;
 pub use package_name::{binding_prefix_by_default_scope, component_package_name};
 pub use scope_model::{ModelData, ScopeObjects, sha1_hex};
 pub use variants::{VariantConfig, by_root_dir_and_name};
+
+mod aspects;
+mod bitmap;
+mod files;
+mod glob;
+mod ignore;
+mod package_name;
+mod scope_model;
+mod variants;
 
 use crate::{
     config::{MergeConfig, WorkspaceConfig, aspect_id_without_version, scope_path},
@@ -42,7 +42,7 @@ use std::{
 /// The env of env components.
 const ENV_OF_ENVS: &str = "teambit.envs/env";
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Workspace {
     pub root: PathBuf,
     /// The local scope (`.bit` or `.git/bit`).
@@ -95,6 +95,18 @@ fn json_file(path: &Path) -> io::Result<Option<Manifest>> {
     }
 }
 
+/// Root dirs of the components that own their directory now, other than the
+/// workspace root: what the workspace-root component's scan leaves out.
+fn owning_dirs(entries: &[BitmapEntry]) -> Vec<String> {
+    entries
+        .iter()
+        .filter(|entry| {
+            entry.owns_its_dir() && !matches!(entry.root_dir.as_str(), WORKSPACE_ROOT_DIR | "")
+        })
+        .map(|entry| entry.root_dir.trim_end_matches('/').to_owned())
+        .collect()
+}
+
 /// Shared inputs of every component's load.
 struct Loader<'a> {
     root: &'a Path,
@@ -134,15 +146,7 @@ impl Workspace {
                 .iter()
                 .map(|entry| entry.id.clone())
                 .collect(),
-            owning_dirs: bitmap.entries
-                .iter()
-                .filter(|entry| {
-                    entry.owns_its_dir()
-                        && entry.root_dir != WORKSPACE_ROOT_DIR
-                        && !entry.root_dir.is_empty()
-                })
-                .map(|entry| entry.root_dir.trim_end_matches('/').to_owned())
-                .collect(),
+            owning_dirs: owning_dirs(&bitmap.entries),
         };
         let components = bitmap.entries
             .iter()

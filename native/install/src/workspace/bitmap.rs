@@ -43,10 +43,19 @@ pub struct BitmapEntry {
     pub root_dir: String,
     /// The entry's `config`: aspect id → config or `"-"`.
     pub config: Option<Map<String, Value>>,
-    pub on_lanes_only: bool,
-    pub local_only: bool,
-    pub is_available_on_current_lane: bool,
+    pub lanes: LaneFlags,
     pub next_version: Option<Value>,
+}
+
+/// How an entry relates to lanes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct LaneFlags {
+    /// `onLanesOnly`: the component exists only on lanes, not on main.
+    pub on_lanes_only: bool,
+    /// `localOnly`: never exported.
+    pub local_only: bool,
+    /// `isAvailableOnCurrentLane`, `true` unless written.
+    pub available_on_current_lane: bool,
 }
 
 impl BitmapEntry {
@@ -65,11 +74,11 @@ impl BitmapEntry {
     /// Owns its directory now: available on the current lane and not removed.
     #[must_use]
     pub fn owns_its_dir(&self) -> bool {
-        self.is_available_on_current_lane && !self.is_removed()
+        self.lanes.available_on_current_lane && !self.is_removed()
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Bitmap {
     pub path: Option<PathBuf>,
     pub schema: Option<String>,
@@ -132,7 +141,7 @@ fn throw_for_duplicate_root_dirs(path: &Path, json: &Map<String, Value>) -> io::
         if !seen.insert(root_dir) {
             return Err(invalid(
                 path,
-                &format!("rootDir \"{root_dir}\" of \"{key}\" is used by another component"),
+                &format!(r#"rootDir "{root_dir}" of "{key}" is used by another component"#),
             ));
         }
     }
@@ -147,16 +156,16 @@ fn string(value: &Value, field: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
-fn entry(
+fn component_id(
     path: &Path,
     key: &str,
     value: &Value,
     default_scope: Option<&str>,
-) -> io::Result<BitmapEntry> {
+) -> io::Result<ComponentId> {
     if value.get("scope").is_none() {
         return Err(invalid(
             path,
-            &format!(".bitmap entry for {key} is missing \"scope\" property"),
+            &format!(r#".bitmap entry for {key} is missing "scope" property"#),
         ));
     }
     let scope = string(value, "scope");
@@ -164,7 +173,7 @@ fn entry(
     if scope.is_some() && version.is_none() {
         return Err(invalid(
             path,
-            &format!(".bitmap entry of \"{key}\" has a scope-name but no version"),
+            &format!(r#".bitmap entry of "{key}" has a scope-name but no version"#),
         ));
     }
     // Before schema 17 the default scope was not written when it was the workspace's.
@@ -175,27 +184,37 @@ fn entry(
                 .then(|| default_scope.map(str::to_owned))
                 .flatten()
         });
-    let id = ComponentId {
+    Ok(ComponentId {
         scope,
         default_scope,
         name: string(value, "name").unwrap_or_else(|| key.to_owned()),
         version,
-    };
+    })
+}
+
+fn entry(
+    path: &Path,
+    key: &str,
+    value: &Value,
+    default_scope: Option<&str>,
+) -> io::Result<BitmapEntry> {
     let flag = |field: &str| value.get(field).is_some_and(crate::config::truthy);
     Ok(BitmapEntry {
         key: key.to_owned(),
-        id,
+        id: component_id(path, key, value, default_scope)?,
         main_file: string(value, "mainFile").unwrap_or_default(),
         root_dir: string(value, "rootDir").unwrap_or_default(),
         config: value
             .get("config")
             .and_then(Value::as_object)
             .cloned(),
-        on_lanes_only: flag("onLanesOnly"),
-        local_only: flag("localOnly"),
-        is_available_on_current_lane: value
-            .get("isAvailableOnCurrentLane")
-            .is_none_or(crate::config::truthy),
+        lanes: LaneFlags {
+            on_lanes_only: flag("onLanesOnly"),
+            local_only: flag("localOnly"),
+            available_on_current_lane: value
+                .get("isAvailableOnCurrentLane")
+                .is_none_or(crate::config::truthy),
+        },
         next_version: value
             .get("nextVersion")
             .filter(|next| !next.is_null())

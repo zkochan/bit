@@ -1,6 +1,8 @@
-use crate::model::ComponentId;
-use crate::workspace::{
-    binding_prefix_by_default_scope, by_root_dir_and_name, component_package_name, glob,
+use crate::{
+    model::ComponentId,
+    workspace::{
+        binding_prefix_by_default_scope, by_root_dir_and_name, component_package_name, glob,
+    },
 };
 use pretty_assertions::assert_eq;
 use serde_json::{Map, Value, json};
@@ -90,15 +92,15 @@ fn package_names() {
     assert_eq!(component_package_name(&new, None, &none), "@my-scope/button");
     assert_eq!(
         component_package_name(&scoped, Some("@bit"), &none),
-        "@bit/teambit.react.ui.button"
+        "@bit/teambit.react.ui.button",
     );
     assert_eq!(
         component_package_name(&scoped, Some("@other"), &none),
-        "@other/teambit.react.ui.button"
+        "@other/teambit.react.ui.button",
     );
     let pkg = json!({ "teambit.pkg/pkg": { "packageJson": { "name": "@{owner}/{scope}--{name}{{x}}" } } });
     assert_eq!(
         component_package_name(&scoped, None, pkg.as_object().unwrap()),
-        "@teambit/react--ui.button{x}"
+        "@teambit/react--ui.button{x}",
     );
 }

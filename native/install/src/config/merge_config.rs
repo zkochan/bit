@@ -11,14 +11,14 @@ const POLICY_FIELDS: [&str; 3] = ["dependencies", "devDependencies", "peerDepend
 /// The config-merge file a lane merge leaves at the workspace root
 /// (`merge-conflict`, `MergeConflictFile`): one JSON config per component id
 /// (without version), plus the deprecated `WORKSPACE` entry.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct MergeConfig {
     conflicts: IndexMap<String, String>,
 }
 
 /// A component's config-merge entry after `adjustEnvsOnConfigObject` and
 /// `extractAutoDepsFromConfig`.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct MergeConfigComponent {
     /// Aspect id → config. The dependency-resolver policy keeps only `force`
     /// entries, as objects.
@@ -80,7 +80,7 @@ impl MergeConfig {
             Err(error) => Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(
-                    "unable to parse the merge-conflict entry for {id} as the JSON is invalid. err: {error}"
+                    "unable to parse the merge-conflict entry for {id} as the JSON is invalid. err: {error}",
                 ),
             )),
         }

@@ -1,9 +1,3 @@
-use super::workspace_config::config_string;
-use crate::model::GlobalConfig;
-use indexmap::IndexMap;
-use serde_json::Value;
-use std::{env, fs, io, path::Path};
-
 /// `bit config` keys read during install (`@teambit/legacy.constants`).
 pub mod keys {
     pub const CLOUD_DOMAIN: &str = "cloud_domain";
@@ -39,6 +33,12 @@ pub mod keys {
     pub const DEFAULT_CLOUD_DOMAIN: &str = "bit.cloud";
 }
 
+use super::workspace_config::config_string;
+use crate::model::GlobalConfig;
+use indexmap::IndexMap;
+use serde_json::Value;
+use std::{env, fs, io, path::Path};
+
 /// `<dir>/config.json`, Bit's global config (`GlobalConfig.load`). A missing
 /// file is an empty config; Bit would create it, install does not need to.
 pub fn load_global_config(dir: &Path) -> io::Result<GlobalConfig> {
@@ -61,7 +61,7 @@ pub fn load_global_config(dir: &Path) -> io::Result<GlobalConfig> {
 /// `configGetter`: `BIT_CONFIG_*` environment variables, then the workspace
 /// layer (`teambit.harmony/config-store`), the scope layer (`scope.json`
 /// `config`) and the global config, in that order of precedence.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct EffectiveConfig {
     store: IndexMap<String, String>,
 }
@@ -119,7 +119,7 @@ impl EffectiveConfig {
             Some(value) => Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(
-                    "the configuration \"{key}\" has an invalid value \"{value}\". it should be boolean"
+                    r#"the configuration "{key}" has an invalid value "{value}". it should be boolean"#,
                 ),
             )),
         }
@@ -135,7 +135,7 @@ impl EffectiveConfig {
             .ok_or_else(|| {
                 io::Error::new(
                     io::ErrorKind::InvalidData,
-                    format!("config of \"{key}\" is invalid. Expected number, got \"{value}\""),
+                    format!(r#"config of "{key}" is invalid. Expected number, got "{value}""#),
                 )
             })
     }

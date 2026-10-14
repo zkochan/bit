@@ -13,7 +13,7 @@ struct Rule {
 }
 
 /// An ordered rule set with node-ignore's per-path cache.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Ignore {
     rules: Vec<Rule>,
     cache: HashMap<String, bool>,
@@ -26,9 +26,9 @@ impl Ignore {
     }
 
     /// `ignore().add(patterns)`: blank lines and `#` comments are skipped.
-    pub fn add<S: AsRef<str>>(
+    pub fn add<Pattern: AsRef<str>>(
         &mut self,
-        patterns: impl IntoIterator<Item = S>,
+        patterns: impl IntoIterator<Item = Pattern>,
     ) -> io::Result<&mut Self> {
         for pattern in patterns {
             let pattern = pattern.as_ref();
@@ -116,14 +116,14 @@ fn is_object_prototype_key(path: &str) -> bool {
             | "toString"
             | "valueOf"
             | "__proto__"
-            | "toLocaleString"
+            | "toLocaleString",
     )
 }
 
 /// `_createRule`.
 fn rule(pattern: &str) -> io::Result<Rule> {
     let (negative, body) = parts(pattern);
-    Ok(Rule { regex: make_regex(&body, negative)?, negative })
+    Ok(Rule { regex: compile(&body, negative)?, negative })
 }
 
 /// A leading `!` negates; a leading `\!` or `\#` is a literal `!` or `#`.
@@ -131,9 +131,9 @@ fn parts(pattern: &str) -> (bool, String) {
     let (negative, body) = pattern
         .strip_prefix('!')
         .map_or((false, pattern), |body| (true, body));
-    let body = if let Some(rest) = body.strip_prefix("\\!") {
+    let body = if let Some(rest) = body.strip_prefix(r"\!") {
         format!("!{rest}")
-    } else if let Some(rest) = body.strip_prefix("\\#") {
+    } else if let Some(rest) = body.strip_prefix(r"\#") {
         format!("#{rest}")
     } else {
         body.to_owned()
@@ -167,7 +167,7 @@ fn prefix() -> Vec<Replacer> {
         }),
         replacer(r"\\\s", true, |_, _, _| " ".to_owned()),
         // Escape regular expression metacharacters.
-        replacer(r"[\\\^$.|?*+()\[{]", true, |found, text, _| format!("\\{}", found.as_str(text))),
+        replacer(r"[\\\^$.|?*+()\[{]", true, |found, text, _| format!(r"\{}", found.as_str(text))),
         replacer(r"^\/", false, |_, _, _| "^".to_owned()),
         replacer(r"\/", true, |_, _, _| r"\/".to_owned()),
         // A leading `**/` matches in all directories.
@@ -195,7 +195,7 @@ fn suffix() -> Vec<Replacer> {
             let body = head.map_or_else(|| "[^/]*".to_owned(), |head| format!("{head}[^/]+"));
             format!(r"{body}(?=$|\/$)")
         }),
-        replacer(r"\\\\\\", true, |_, _, _| "\\".to_owned()),
+        replacer(r"\\\\\\", true, |_, _, _| r"\".to_owned()),
     ]
 }
 
@@ -219,13 +219,13 @@ fn replacers(negative: bool) -> &'static [Replacer] {
     })
 }
 
-/// `make_regex`: compile [`source`] case-insensitively.
-fn make_regex(pattern: &str, negative: bool) -> io::Result<Regex> {
+/// node-ignore's regular expression for a pattern: [`source`], case-insensitive.
+fn compile(pattern: &str, negative: bool) -> io::Result<Regex> {
     Regex::with_flags(&source(pattern, negative), "i")
         .map_err(|error| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("invalid ignore pattern \"{pattern}\": {error}"),
+                format!(r#"invalid ignore pattern "{pattern}": {error}"#),
             )
         })
 }
