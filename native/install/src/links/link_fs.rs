@@ -10,7 +10,7 @@ use std::{
 /// How [`create_link_or_symlink`] links a path (`avoidHardLink` in TypeScript).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum LinkKind {
-    /// A relative symlink (`symlink-dir`), even for files.
+    /// An absolute symlink, as `Symlink.write` creates for component files.
     Symlink,
     /// A hard link for files; directories fall back to an absolute symlink (a junction on Windows).
     HardLinkOrSymlink,
@@ -63,7 +63,7 @@ pub(super) fn create_link_or_symlink(
         fs::create_dir_all(parent)?;
     }
     let linked = match kind {
-        LinkKind::Symlink => symlink_relative(src, dest),
+        LinkKind::Symlink => symlink_absolute(src, dest),
         LinkKind::HardLinkOrSymlink => hard_link_or_symlink(src, dest),
     };
     linked.or_else(|error| link_failure(src, dest, &error))

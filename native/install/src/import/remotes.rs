@@ -121,7 +121,7 @@ pub fn not_found_or_denied(scope: &str) -> io::Error {
     )
 }
 
-fn global_remotes(dir: &Path) -> io::Result<IndexMap<String, String>> {
+pub(crate) fn global_remotes(dir: &Path) -> io::Result<IndexMap<String, String>> {
     match fs::read(dir.join(GLOBAL_REMOTES)) {
         Ok(bytes) => Ok(serde_json::from_slice::<IndexMap<String, Value>>(&bytes)
             .map_err(|_| invalid("invalid global-remotes.json"))?

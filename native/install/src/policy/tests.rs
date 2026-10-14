@@ -39,6 +39,9 @@ impl Host for TestHost {
     async fn package_json_props(&self, _component: &str) -> io::Result<Value> {
         Ok(Value::Null)
     }
+    async fn transform_package_json(&self, _component: &str, manifest: Value) -> io::Result<Value> {
+        Ok(manifest)
+    }
     async fn after_install(&self, _request: AfterInstall) -> io::Result<AfterInstallResult> {
         Ok(AfterInstallResult::default())
     }

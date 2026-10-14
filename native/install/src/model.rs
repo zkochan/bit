@@ -209,6 +209,10 @@ pub struct EnvPolicy {
     /// The policy came from `getDependencies()` because the env has no `env.jsonc`
     /// (`envsWithoutManifest` in TypeScript).
     pub without_manifest: bool,
+    /// The host could not load the env to ask for its policy
+    /// (`getFailedToLoadEnvs` in TypeScript).
+    #[serde(default)]
+    pub failed_to_load: bool,
 }
 
 /// Bit's global configuration (`bit config`), keyed by the config key

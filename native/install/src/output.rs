@@ -22,6 +22,7 @@ pub enum Style {
     Red,
     Cyan,
     Blue,
+    Gray,
     Bold,
 }
 
@@ -33,6 +34,7 @@ impl Style {
             Self::Red => (31, 39),
             Self::Cyan => (36, 39),
             Self::Blue => (34, 39),
+            Self::Gray => (90, 39),
             Self::Bold => (1, 22),
         }
     }
@@ -80,7 +82,9 @@ impl Output {
             return text.to_string();
         }
         let (open, close) = style.codes();
-        format!("\u{1b}[{open}m{text}\u{1b}[{close}m")
+        // chalk re-opens the outer style after a nested style closes it.
+        let nested = text.replace(&format!("\u{1b}[{close}m"), &format!("\u{1b}[{close}m\u{1b}[{open}m"));
+        format!("\u{1b}[{open}m{nested}\u{1b}[{close}m")
     }
 
     /// `logger.setStatusLine(text)`: restart the loader with `text`.
@@ -149,6 +153,12 @@ impl Output {
     pub fn print(&self, text: &str) {
         self.stop();
         self.line(text);
+    }
+
+    /// Where raw output goes, for the package manager's reporter.
+    #[must_use]
+    pub fn sink(&self) -> Sink {
+        Arc::clone(&self.sink)
     }
 
     /// Write raw package manager output.

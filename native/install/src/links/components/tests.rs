@@ -32,7 +32,11 @@ impl Host for FakeHost {
             .lock()
             .unwrap()
             .push(component.to_owned());
-        Ok(json!({ "main": "dist/{main}.js" }))
+        Ok(json!({ "props": { "main": "dist/{main}.js" } }))
+    }
+
+    async fn transform_package_json(&self, _component: &str, manifest: Value) -> io::Result<Value> {
+        Ok(manifest)
     }
 
     async fn after_install(&self, _request: AfterInstall) -> io::Result<AfterInstallResult> {
@@ -117,12 +121,12 @@ fn replaces_the_engine_symlink_with_a_linked_package() {
             .is_symlink(),
     );
     let link = fs::read_link(package_dir.join("lib/util.ts")).unwrap();
-    assert_eq!(link, Path::new("../../../../comps/foo/lib/util.ts"));
+    assert_eq!(link, root.join("comps/foo/lib/util.ts"));
     let manifest: Value =
         serde_json::from_str(&fs::read_to_string(package_dir.join("package.json")).unwrap())
             .unwrap();
     assert_eq!(manifest["main"], json!("dist/index.js"));
-    assert_eq!(*host.calls.lock().unwrap(), ["org.scope/foo"]);
+    assert_eq!(*host.calls.lock().unwrap(), ["teambit.harmony/node"]);
     let again = run(root, &[foo], &host, false);
     assert!(!again.package_json_changed);
     assert!(again.components[0].links.iter().all(|link| link.existed_before));

@@ -22,6 +22,8 @@ export async function runRustInstall(): Promise<boolean> {
     logger.writeCommandHistoryStart();
   }
   const host = new InstallHost(root ?? process.cwd());
+  const { prepareBuildScriptsPath } = await import('@teambit/pnpm/dist/build-scripts-path.js');
+  prepareBuildScriptsPath();
   let result: string;
   try {
     result = await binding.install(
@@ -36,8 +38,10 @@ export async function runRustInstall(): Promise<boolean> {
   } catch (error: any) {
     throw new BitError(error?.message ?? String(error));
   }
-  const outcome = JSON.parse(result) as { outcome: 'installed' | 'help' };
-  return outcome.outcome !== 'help';
+  const { outcome } = JSON.parse(result) as { outcome: 'installed' | 'help' | 'unsupported' };
+  if (outcome !== 'installed') return false;
+  await logger.exitAfterFlush(0, 'install');
+  return true;
 }
 
 type NativeInstall = (
@@ -71,12 +75,14 @@ function findWorkspaceRoot(cwd: string): string | undefined {
 }
 
 async function hostInfo() {
-  const [{ GLOBAL_CONFIG }, { getBitVersion }, { findCurrentBvmDir }, coreAspects] = await Promise.all([
-    import('@teambit/legacy.constants'),
-    import('@teambit/bit.get-bit-version'),
-    import('@teambit/bvm.path'),
-    import('./rust-install-core-aspects'),
-  ]);
+  const [{ GLOBAL_CONFIG }, { getBitVersion }, { findCurrentBvmDir }, coreAspects, { currentDateAndTimeToFileName }] =
+    await Promise.all([
+      import('@teambit/legacy.constants'),
+      import('@teambit/bit.get-bit-version'),
+      import('@teambit/bvm.path'),
+      import('./rust-install-core-aspects'),
+      import('@teambit/legacy.consumer/dist/bitmap-history-file-id.js'),
+    ]);
   const chalk = (await import('chalk')).default;
   const { shouldDisableLoader } = await import('@teambit/legacy.logger');
   return {
@@ -88,7 +94,8 @@ async function hostInfo() {
     columns: process.stdout.isTTY ? process.stdout.columns : null,
     color: chalk.level > 0,
     loader: !shouldDisableLoader,
-    nonInteractive: !process.stdout.isTTY,
+    nonInteractive: process.argv.includes('--json'),
+    fileId: currentDateAndTimeToFileName(),
   };
 }
 
@@ -105,7 +112,9 @@ class InstallHost {
       case 'appTypes':
         return JSON.stringify(await this.appTypes());
       case 'packageJsonProps':
-        return JSON.stringify(await this.packageJsonProps(input.component));
+        return JSON.stringify(await this.packageJsonProps(input.envId));
+      case 'transformPackageJson':
+        return JSON.stringify(await this.transformPackageJson(input.component, input.manifest));
       case 'afterInstall':
         return JSON.stringify(await this.afterInstall(input));
       case 'confirm':
@@ -120,15 +129,8 @@ class InstallHost {
       const { getNodeDependencyPolicy } = await import('@teambit/node/dist/default-dependency-policy.js');
       return getNodeDependencyPolicy();
     }
-    const harmony = await this.loadHarmony();
-    const envs = harmony.get<any>('teambit.envs/envs');
-    let definition = envs.getEnvDefinitionByStringId(envId);
-    if (!definition) {
-      const workspace = harmony.get<any>('teambit.workspace/workspace');
-      await workspace.loadAspects([envId], false, undefined, { throwOnError: false, hideMissingModuleError: true });
-      definition = envs.getEnvDefinitionByStringId(envId);
-    }
-    const policy = await definition?.env?.getDependencies?.();
+    const env = await this.env(envId);
+    const policy = await env?.getDependencies?.();
     return policy ?? null;
   }
 
@@ -137,12 +139,30 @@ class InstallHost {
     return harmony.get<any>('teambit.harmony/application').getAppPatterns();
   }
 
-  private async packageJsonProps(componentId: string) {
+  /** The env's `getPackageJsonProps()` and whether it implements `modifyPackageJson()`. */
+  private async packageJsonProps(envId: string) {
+    if (envId === 'teambit.harmony/node') {
+      const { getCjsPackageJsonProps } = await import('@teambit/typescript/dist/cjs-package-json-props.js');
+      return { props: getCjsPackageJsonProps(), modifiesPackageJson: false };
+    }
+    const env = await this.env(envId);
+    return {
+      props: env?.getPackageJsonProps?.() ?? {},
+      modifiesPackageJson: typeof env?.modifyPackageJson === 'function',
+    };
+  }
+
+  private async transformPackageJson(componentId: string, manifest: Record<string, any>) {
     const harmony = await this.loadHarmony();
     const workspace = harmony.get<any>('teambit.workspace/workspace');
-    const pkg = harmony.get<any>('teambit.pkg/pkg');
     const component = await workspace.get(await workspace.resolveComponentId(componentId));
-    return pkg.getPackageJsonModifications(component);
+    const env = harmony.get<any>('teambit.envs/envs').getOrCalculateEnv(component).env;
+    return env.modifyPackageJson(component, manifest);
+  }
+
+  private async env(envId: string) {
+    const env = await this.env(envId);
+    return definition?.env;
   }
 
   private async afterInstall(request: { compile: boolean; writeConfigFiles: boolean; clearCache: boolean }) {

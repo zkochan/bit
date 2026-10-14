@@ -386,7 +386,7 @@ fn forced_harmony_and_direct_links_are_kept_or_dropped() {
 }
 
 fn env_policy(peers: Vec<PolicyEntry>) -> EnvPolicy {
-    EnvPolicy { component: Vec::new(), self_policy: peers, without_manifest: false }
+    EnvPolicy { component: Vec::new(), self_policy: peers, ..EnvPolicy::default() }
 }
 
 #[test]

@@ -2,13 +2,14 @@
 
 use super::{
     link_fs::{LinkKind, create_link_or_symlink, hard_link_directory, is_symlink, remove_path},
-    package_json::{PackageJsonContext, SOURCE_DIR, generate},
+    package_json::{PackageJsonContext, SOURCE_DIR, finish, transformed},
 };
 use crate::{
     host::Host,
     model::{ComponentDependencies, Manifest, WorkspaceComponent},
 };
 use indexmap::IndexMap;
+use serde_json::{Map, Value, json};
 use std::{
     collections::BTreeMap,
     fs, io,
@@ -74,9 +75,11 @@ pub async fn link_components(
         .filter(|comp| comp.root_dir != ".")
         .collect();
     let injected = read_injected_deps(root)?;
+    let envs = env_props(&components, host).await?;
     let mut result = LinkResult::default();
     for component in &components {
-        let (links, changed) = link_component(root, component, host, options, &injected).await?;
+        let context = LinkContext { host, options, injected: &injected, envs: &envs };
+        let (links, changed) = link_component(root, component, &context).await?;
         result.components.push(links);
         result.package_json_changed |= changed;
     }
@@ -90,13 +93,47 @@ pub async fn link_components(
     Ok(result)
 }
 
+/// The env `package.json` props of every env whose components get a generated manifest.
+async fn env_props(
+    components: &[&WorkspaceComponent],
+    host: &dyn Host,
+) -> io::Result<IndexMap<String, EnvProps>> {
+    let mut envs = IndexMap::new();
+    for component in components.iter().filter(|component| !component.has_package_json) {
+        if envs.contains_key(&component.env_id) {
+            continue;
+        }
+        let response = host.package_json_props(&component.env_id).await?;
+        let props = EnvProps {
+            props: response.get("props").cloned().unwrap_or_else(|| json!({})),
+            modifies: response.get("modifiesPackageJson").and_then(Value::as_bool) == Some(true),
+        };
+        envs.insert(component.env_id.clone(), props);
+    }
+    Ok(envs)
+}
+
+/// `getPackageJsonProps()` of an env and whether it implements `modifyPackageJson()`.
+const PKG_ASPECT: &str = "teambit.pkg/pkg";
+
+struct EnvProps {
+    props: Value,
+    modifies: bool,
+}
+
+struct LinkContext<'a> {
+    host: &'a dyn Host,
+    options: &'a ComponentLinkOptions<'a>,
+    injected: &'a InjectedDeps,
+    envs: &'a IndexMap<String, EnvProps>,
+}
+
 async fn link_component(
     root: &Path,
     component: &WorkspaceComponent,
-    host: &dyn Host,
-    options: &ComponentLinkOptions<'_>,
-    injected: &InjectedDeps,
+    context: &LinkContext<'_>,
 ) -> io::Result<(ComponentLinks, bool)> {
+    let LinkContext { options, injected, .. } = *context;
     let package_dir = root.join("node_modules").join(&component.package_name);
     let (new_links, existing) = plan_file_links(root, component, &package_dir);
     if is_symlink(&package_dir) {
@@ -104,7 +141,7 @@ async fn link_component(
     }
     let mut changed = false;
     if !component.has_package_json {
-        let manifest = package_json(component, host, options).await?;
+        let manifest = package_json(component, context).await?;
         changed = write_package_json(&package_dir.join("package.json"), &manifest)?;
     }
     for link in &new_links {
@@ -147,18 +184,54 @@ fn plan_file_links(
 
 async fn package_json(
     component: &WorkspaceComponent,
-    host: &dyn Host,
-    options: &ComponentLinkOptions<'_>,
+    context: &LinkContext<'_>,
 ) -> io::Result<Manifest> {
-    let props = host.package_json_props(&component.id.to_string_without_version()).await?;
-    let context = PackageJsonContext {
+    let options = context.options;
+    let env = context.envs.get(&component.env_id);
+    let package_context = PackageJsonContext {
         dependencies: options.dependencies.get(&component.id.to_string_without_version()),
         cloud_domain: options.cloud_domain,
-        props,
+        props: merge_props(env.map(|env| &env.props), component),
         windows: options.windows,
         is_aspect: options.aspect_env_ids.iter().any(|env| env_matches(env, &component.env_id)),
     };
-    Ok(generate(component, &context))
+    let mut manifest = transformed(component, &package_context);
+    if env.is_some_and(|env| env.modifies) {
+        let id = component.id.to_string_without_version();
+        let modified = context.host.transform_package_json(&id, Value::Object(manifest)).await?;
+        manifest = match modified {
+            Value::Object(manifest) => manifest,
+            _ => return Err(io::Error::other(format!("modifyPackageJson of {id} returned no object"))),
+        };
+    }
+    Ok(finish(manifest, component, &package_context))
+}
+
+/// `mergePackageJsonProps`: the env's props, then the component's `teambit.pkg/pkg`
+/// `packageJson` config; `files` arrays concatenate and the dependency keys are dropped.
+fn merge_props(env: Option<&Value>, component: &WorkspaceComponent) -> Value {
+    let mut merged = Map::new();
+    let config = component.config
+        .get(PKG_ASPECT)
+        .and_then(|pkg| pkg.get("packageJson"));
+    for props in [env, config].into_iter().flatten() {
+        let Value::Object(props) = props else { continue };
+        let files: Vec<Value> = [merged.get("files"), props.get("files")]
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_array)
+            .flatten()
+            .cloned()
+            .collect();
+        merged.extend(props.clone());
+        if !files.is_empty() {
+            merged.insert("files".into(), Value::Array(files));
+        }
+    }
+    for key in ["extensions", "dependencies", "devDependencies", "peerDependencies"] {
+        merged.remove(key);
+    }
+    Value::Object(merged)
 }
 
 /// An env id matches with or without the version of the component's env.

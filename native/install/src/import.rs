@@ -17,7 +17,7 @@ mod lane;
 mod objects;
 mod persist;
 mod plan;
-mod remotes;
+pub(crate) mod remotes;
 mod tar;
 
 use crate::{host::HostInfo, model::GlobalConfig, output::Output};

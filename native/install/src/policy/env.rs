@@ -49,6 +49,7 @@ pub fn from_config(config: &Value, include_legacy_peers: bool) -> io::Result<Env
         component: merge(vec![legacy, uniq(new_entries)]),
         self_policy: uniq(self_policy),
         without_manifest: false,
+        failed_to_load: false,
     })
 }
 

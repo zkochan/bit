@@ -33,14 +33,14 @@ fn may_link_target_refuses_real_directories_unless_installed_locally() {
 
 #[cfg(unix)]
 #[test]
-fn symlink_kind_creates_a_relative_symlink() {
+fn symlink_kind_creates_an_absolute_symlink() {
     let dir = tempfile::tempdir().unwrap();
     let src = dir.path().join("src/file.ts");
     fs::create_dir_all(src.parent().unwrap()).unwrap();
     fs::write(&src, "content").unwrap();
     let dest = dir.path().join("node_modules/pkg/file.ts");
     create_link_or_symlink(&src, &dest, LinkKind::Symlink, false).unwrap();
-    assert_eq!(fs::read_link(&dest).unwrap(), Path::new("../../src/file.ts"));
+    assert_eq!(fs::read_link(&dest).unwrap(), src);
     assert_eq!(fs::read_to_string(&dest).unwrap(), "content");
 }
 

@@ -21,8 +21,9 @@ pub(super) struct PackageJsonContext<'a> {
     pub is_aspect: bool,
 }
 
-/// Build the manifest written to `node_modules/<pkg>/package.json`.
-pub(super) fn generate(
+/// The manifest after `createFromComponent` and the dependency-resolver and pkg transformers,
+/// before an env's `modifyPackageJson`.
+pub(super) fn transformed(
     component: &WorkspaceComponent,
     context: &PackageJsonContext<'_>,
 ) -> Manifest {
@@ -31,6 +32,15 @@ pub(super) fn generate(
     if let Value::Object(props) = &context.props {
         manifest.extend(props.clone());
     }
+    manifest
+}
+
+/// `NodeModuleLinker.createPackageJson` after the transformers.
+pub(super) fn finish(
+    mut manifest: Manifest,
+    component: &WorkspaceComponent,
+    context: &PackageJsonContext<'_>,
+) -> Manifest {
     replace_placeholders(&mut manifest, component);
     if context.windows {
         manifest.insert("types".into(), format!("{SOURCE_DIR}/{}", component.main_file).into());
@@ -42,6 +52,15 @@ pub(super) fn generate(
         add_exports_types(&mut manifest);
     }
     manifest
+}
+
+/// Build the manifest written to `node_modules/<pkg>/package.json` without an env transform.
+#[cfg(test)]
+pub(super) fn generate(
+    component: &WorkspaceComponent,
+    context: &PackageJsonContext<'_>,
+) -> Manifest {
+    finish(transformed(component, context), component, context)
 }
 
 /// `createFromComponent(dir, component, addExportProperty = true)`. An unversioned component

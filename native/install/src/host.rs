@@ -39,6 +39,9 @@ pub struct HostInfo {
     pub loader: bool,
     /// The process runs with `--json`/non-interactive output.
     pub non_interactive: bool,
+    /// `currentDateAndTimeToFileName()` at command start: names the
+    /// `workspace.jsonc` backup in local time.
+    pub file_id: String,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -81,9 +84,13 @@ pub trait Host: Send + Sync {
     /// File patterns of registered application types, used to find apps.
     async fn app_types(&self) -> io::Result<Vec<String>>;
 
-    /// Generated `package.json` props contributed by the component's env and
-    /// aspects (`PackageJsonTransformer`s); `component` is the component id.
-    async fn package_json_props(&self, component: &str) -> io::Result<Value>;
+    /// `package.json` props of an env: `{ props, modifiesPackageJson }`, where
+    /// `props` is the env's `getPackageJsonProps()` and `modifiesPackageJson`
+    /// tells whether it implements `modifyPackageJson()`.
+    async fn package_json_props(&self, env_id: &str) -> io::Result<Value>;
+
+    /// Run the env's `modifyPackageJson(component, manifest)` on a generated manifest.
+    async fn transform_package_json(&self, component: &str, manifest: Value) -> io::Result<Value>;
 
     /// Compile and write config files with the canonical JavaScript aspects.
     async fn after_install(&self, request: AfterInstall) -> io::Result<AfterInstallResult>;

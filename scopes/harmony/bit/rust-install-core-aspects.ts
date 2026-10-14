@@ -1,10 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import {
-  getAspectDir,
-  getCoreAspectName,
-  getCoreAspectPackageName,
-} from '@teambit/aspect-loader/dist/core-aspects.js';
+import { getAspectDir, getCoreAspectName, getCoreAspectPackageName } from '@teambit/aspect-loader/dist/core-aspects.js';
 import coreAspectIds from './core-aspect-ids.json';
 
 const BIT_ASPECT_ID = 'teambit.harmony/bit';

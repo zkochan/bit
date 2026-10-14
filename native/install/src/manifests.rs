@@ -11,7 +11,7 @@ mod deps;
 mod env_root;
 mod intersect;
 mod root_components;
-mod semver;
+pub(crate) mod semver;
 mod versions;
 
 use crate::{

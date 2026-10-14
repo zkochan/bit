@@ -36,7 +36,8 @@ pub type OutputCallback = ThreadsafeFunction<String, (), String, Status, false>;
     clippy::trailing_empty_array,
     reason = "napi-derive generates a trailing zero-sized array in its FFI trampoline"
 )]
-/// Result of [`install`]: `{ outcome: "installed", components }` or `{ outcome: "help" }`.
+/// Result of [`install`]: `{ outcome: "installed", components }`, `{ outcome: "help" }`,
+/// or `{ outcome: "unsupported" }` for workspaces the TypeScript command installs.
 #[napi]
 pub async fn install(
     argv: Vec<String>,
@@ -82,6 +83,7 @@ fn run_blocking(
             json!({ "outcome": "installed", "components": summary.components })
         }
         Outcome::Help => json!({ "outcome": "help" }),
+        Outcome::Unsupported => json!({ "outcome": "unsupported" }),
     };
     Ok(result.to_string())
 }
@@ -112,8 +114,12 @@ impl Host for JsHost {
         self.call("appTypes", json!({})).await
     }
 
-    async fn package_json_props(&self, component: &str) -> io::Result<Value> {
-        self.call("packageJsonProps", json!({ "component": component })).await
+    async fn package_json_props(&self, env_id: &str) -> io::Result<Value> {
+        self.call("packageJsonProps", json!({ "envId": env_id })).await
+    }
+
+    async fn transform_package_json(&self, component: &str, manifest: Value) -> io::Result<Value> {
+        self.call("transformPackageJson", json!({ "component": component, "manifest": manifest })).await
     }
 
     async fn after_install(&self, request: AfterInstall) -> io::Result<AfterInstallResult> {
