@@ -41,14 +41,19 @@ impl Object {
     /// ascending, then the rest in insertion order.
     #[must_use]
     pub fn ordered_keys(&self) -> Vec<&String> {
-        let mut indexes: Vec<(u32, &String)> = self
-            .entries
+        let mut indexes: Vec<(u32, &String)> = self.entries
             .keys()
             .filter_map(|key| array_index(key).map(|index| (index, key)))
             .collect();
         indexes.sort_by_key(|(index, _)| *index);
-        let rest = self.entries.keys().filter(|key| array_index(key).is_none());
-        indexes.into_iter().map(|(_, key)| key).chain(rest).collect()
+        let rest = self.entries
+            .keys()
+            .filter(|key| array_index(key).is_none());
+        indexes
+            .into_iter()
+            .map(|(_, key)| key)
+            .chain(rest)
+            .collect()
     }
 }
 
@@ -66,7 +71,12 @@ impl Node {
             Self::Bool(value) => Value::Bool(*value),
             Self::Number(value) => number(*value),
             Self::String(value) => Value::String(value.clone()),
-            Self::Array(items, _) => Value::Array(items.iter().map(Self::to_value).collect()),
+            Self::Array(items, _) => Value::Array(
+                items
+                    .iter()
+                    .map(Self::to_value)
+                    .collect(),
+            ),
             Self::Object(object) => {
                 let map: Map<String, Value> = object
                     .ordered_keys()
@@ -86,9 +96,18 @@ impl Node {
             Value::Bool(value) => Self::Bool(*value),
             Value::Number(value) => Self::Number(value.as_f64().unwrap_or(f64::NAN)),
             Value::String(value) => Self::String(value.clone()),
-            Value::Array(items) => Self::Array(items.iter().map(Self::from_value).collect(), Comments::new()),
+            Value::Array(items) => Self::Array(
+                items
+                    .iter()
+                    .map(Self::from_value)
+                    .collect(),
+                Comments::new(),
+            ),
             Value::Object(map) => Self::Object(Object {
-                entries: map.iter().map(|(key, value)| (key.clone(), Self::from_value(value))).collect(),
+                entries: map
+                    .iter()
+                    .map(|(key, value)| (key.clone(), Self::from_value(value)))
+                    .collect(),
                 comments: Comments::new(),
             }),
         }

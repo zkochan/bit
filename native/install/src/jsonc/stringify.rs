@@ -78,7 +78,11 @@ fn quote(value: &str) -> String {
 }
 
 fn number(value: f64) -> String {
-    if value.is_finite() { ryu_js::Buffer::new().format_finite(value).to_owned() } else { "null".to_owned() }
+    if value.is_finite() {
+        ryu_js::Buffer::new().format_finite(value).to_owned()
+    } else {
+        "null".to_owned()
+    }
 }
 
 pub(super) fn node(value: &Node, gap: &str) -> String {
@@ -102,7 +106,13 @@ struct Members<'a> {
 
 impl Members<'_> {
     fn comments(&self, prefix: &str, key: &str) -> String {
-        process(self.comments.get(&format!("{prefix}:{key}")).map(Vec::as_slice), &self.deeper_gap, false)
+        process(
+            self.comments
+                .get(&format!("{prefix}:{key}"))
+                .map(Vec::as_slice),
+            &self.deeper_gap,
+            false,
+        )
     }
 
     fn open(&mut self, first: bool, key: &str) {
@@ -127,7 +137,8 @@ impl Members<'_> {
 
 fn array(items: &[Node], comments: &Comments, gap: &str) -> String {
     let deeper_gap = format!("{gap}{INDENT}");
-    let mut members = Members { comments, deeper_gap, inside: String::new(), after_comma: String::new() };
+    let mut members =
+        Members { comments, deeper_gap, inside: String::new(), after_comma: String::new() };
     for (index, item) in items.iter().enumerate() {
         let key = index.to_string();
         members.open(index == 0, &key);
@@ -140,9 +151,17 @@ fn array(items: &[Node], comments: &Comments, gap: &str) -> String {
 
 fn object(object: &Object, gap: &str) -> String {
     let deeper_gap = format!("{gap}{INDENT}");
-    let mut members =
-        Members { comments: &object.comments, deeper_gap, inside: String::new(), after_comma: String::new() };
-    for (index, key) in object.ordered_keys().into_iter().enumerate() {
+    let mut members = Members {
+        comments: &object.comments,
+        deeper_gap,
+        inside: String::new(),
+        after_comma: String::new(),
+    };
+    for (index, key) in object
+        .ordered_keys()
+        .into_iter()
+        .enumerate()
+    {
         members.open(index == 0, key);
         let value = node(&object.entries[key], &members.deeper_gap);
         let entry = format!(

@@ -80,10 +80,15 @@ impl WorkspaceConfig {
 
     pub fn from_value(path: PathBuf, value: Value) -> io::Result<Self> {
         let Value::Object(raw) = value else {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, format!("{} must be an object", path.display())));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("{} must be an object", path.display()),
+            ));
         };
-        let aspects: IndexMap<String, Value> =
-            raw.into_iter().filter(|(key, _)| !INTERNAL_PROPS.contains(&key.as_str())).collect();
+        let aspects: IndexMap<String, Value> = raw
+            .into_iter()
+            .filter(|(key, _)| !INTERNAL_PROPS.contains(&key.as_str()))
+            .collect();
         let mut config = Self { path, aspects, ..Self::default() };
         config.workspace = config.typed(WORKSPACE_ASPECT)?;
         config.dependency_resolver = config.typed(DEPENDENCY_RESOLVER_ASPECT)?;
@@ -102,14 +107,16 @@ impl WorkspaceConfig {
     #[must_use]
     pub fn aspect(&self, id: &str) -> Option<&Value> {
         let id = aspect_id_without_version(id);
-        self.aspects.iter().find(|(key, _)| aspect_id_without_version(key) == id).map(|(_, value)| value)
+        self.aspects
+            .iter()
+            .find(|(key, _)| aspect_id_without_version(key) == id)
+            .map(|(_, value)| value)
     }
 
     fn typed<T: Default + for<'de> Deserialize<'de>>(&self, id: &str) -> io::Result<T> {
         match self.aspect(id) {
-            Some(value @ Value::Object(_)) => {
-                serde_json::from_value(value.clone()).map_err(|error| invalid_config(&self.path, &error))
-            }
+            Some(value @ Value::Object(_)) => serde_json::from_value(value.clone())
+                .map_err(|error| invalid_config(&self.path, &error)),
             _ => Ok(T::default()),
         }
     }
@@ -126,13 +133,24 @@ impl WorkspaceConfig {
         self.aspect(id)
             .and_then(|config| config.get(field))
             .and_then(Value::as_array)
-            .map(|items| items.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+            .map(|items| {
+                items
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .map(str::to_owned)
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
     fn config_store(&self) -> IndexMap<String, String> {
-        let Some(Value::Object(store)) = self.aspect(CONFIG_STORE_ASPECT) else { return IndexMap::new() };
-        store.iter().filter_map(|(key, value)| Some((key.clone(), config_string(value)?))).collect()
+        let Some(Value::Object(store)) = self.aspect(CONFIG_STORE_ASPECT) else {
+            return IndexMap::new();
+        };
+        store
+            .iter()
+            .filter_map(|(key, value)| Some((key.clone(), config_string(value)?)))
+            .collect()
     }
 
     /// `extensionsIds` without core aspects and `file:` ids: the user aspects
@@ -142,7 +160,11 @@ impl WorkspaceConfig {
         self.aspects
             .keys()
             .filter(|key| !key.starts_with("file:"))
-            .filter(|key| !core_ids.iter().any(|core| core == aspect_id_without_version(key)))
+            .filter(|key| {
+                !core_ids
+                    .iter()
+                    .any(|core| core == aspect_id_without_version(key))
+            })
             .cloned()
             .collect()
     }
@@ -150,9 +172,7 @@ impl WorkspaceConfig {
     /// `<rootComponentsDirectory or node_modules>/.bit_roots`, absolute.
     #[must_use]
     pub fn root_components_path(&self, root: &Path) -> PathBuf {
-        let base = self
-            .workspace
-            .root_components_directory
+        let base = self.workspace.root_components_directory
             .as_deref()
             .map_or_else(|| root.join("node_modules"), |dir| root.join(dir));
         base.join(".bit_roots")
@@ -169,5 +189,8 @@ pub(super) fn config_string(value: &Value) -> Option<String> {
 }
 
 fn invalid_config(path: &Path, error: &dyn std::fmt::Display) -> io::Error {
-    io::Error::new(io::ErrorKind::InvalidData, format!("failed parsing {}: {error}", path.display()))
+    io::Error::new(
+        io::ErrorKind::InvalidData,
+        format!("failed parsing {}: {error}", path.display()),
+    )
 }

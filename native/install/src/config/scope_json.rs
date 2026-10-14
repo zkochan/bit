@@ -51,7 +51,9 @@ pub struct ScopeJson {
     pub config: IndexMap<String, String>,
 }
 
-fn strings<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<IndexMap<String, String>, D::Error> {
+fn strings<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<IndexMap<String, String>, D::Error> {
     let map: Option<IndexMap<String, Value>> = Option::deserialize(deserializer)?;
     Ok(map
         .unwrap_or_default()
@@ -65,9 +67,13 @@ impl ScopeJson {
     pub fn load(scope: &Path) -> io::Result<Self> {
         let path = scope.join("scope.json");
         match fs::read_to_string(&path) {
-            Ok(text) => serde_json::from_str(&text).map_err(|error| {
-                io::Error::new(io::ErrorKind::InvalidData, format!("failed parsing {}: {error}", path.display()))
-            }),
+            Ok(text) => serde_json::from_str(&text)
+                .map_err(|error| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("failed parsing {}: {error}", path.display()),
+                    )
+                }),
             Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(Self::default()),
             Err(error) => Err(error),
         }
@@ -76,6 +82,8 @@ impl ScopeJson {
     /// The remote lane a local lane tracks.
     #[must_use]
     pub fn tracking(&self, local_lane: &str) -> Option<&TrackLane> {
-        self.lanes.tracking.iter().find(|lane| lane.local_lane == local_lane)
+        self.lanes.tracking
+            .iter()
+            .find(|lane| lane.local_lane == local_lane)
     }
 }

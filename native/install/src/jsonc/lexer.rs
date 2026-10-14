@@ -47,7 +47,11 @@ fn is_line_terminator(char: char) -> bool {
 
 impl Lexer<'_> {
     fn bump_line(&mut self, char: char) {
-        if char == '\r' && self.chars.peek().is_some_and(|(_, next)| *next == '\n') {
+        if char == '\r'
+            && self.chars
+                .peek()
+                .is_some_and(|(_, next)| *next == '\n')
+        {
             return;
         }
         if is_line_terminator(char) {
@@ -109,7 +113,9 @@ impl Lexer<'_> {
             } else if char == quote {
                 let raw = &self.text[start..=index];
                 // `JSON.parse` of the raw token: single quotes are rejected here.
-                return serde_json::from_str(raw).map(Kind::String).map_err(|_| invalid(format!("Unexpected token {quote}")));
+                return serde_json::from_str(raw)
+                    .map(Kind::String)
+                    .map_err(|_| invalid(format!("Unexpected token {quote}")));
             }
         }
         Err(invalid("Unexpected token ILLEGAL"))
@@ -129,7 +135,11 @@ impl Lexer<'_> {
 
     fn block(&mut self, body: usize) -> io::Result<Kind> {
         while let Some((index, char)) = self.chars.next() {
-            if char == '*' && self.chars.peek().is_some_and(|(_, next)| *next == '/') {
+            if char == '*'
+                && self.chars
+                    .peek()
+                    .is_some_and(|(_, next)| *next == '/')
+            {
                 self.chars.next();
                 return Ok(Kind::Block(self.text[body..index].to_owned()));
             }
@@ -150,11 +160,14 @@ impl Lexer<'_> {
         if !is_json_number(raw) {
             return Err(invalid(format!("Unexpected token {}", &raw[..1])));
         }
-        raw.parse().map(Kind::Number).map_err(|_| invalid("Unexpected number"))
+        raw.parse()
+            .map(Kind::Number)
+            .map_err(|_| invalid("Unexpected number"))
     }
 
     fn word(&mut self, start: usize) -> io::Result<Kind> {
-        let word = self.take_while(start, |char| char.is_alphanumeric() || char == '_' || char == '$');
+        let word =
+            self.take_while(start, |char| char.is_alphanumeric() || char == '_' || char == '$');
         match word {
             "true" => Ok(Kind::Bool(true)),
             "false" => Ok(Kind::Bool(false)),
@@ -168,7 +181,12 @@ impl Lexer<'_> {
 /// after an optional minus sign.
 fn is_json_number(raw: &str) -> bool {
     let bytes = raw.as_bytes();
-    let digits = |from: usize| bytes[from..].iter().take_while(|byte| byte.is_ascii_digit()).count();
+    let digits = |from: usize| {
+        bytes[from..]
+            .iter()
+            .take_while(|byte| byte.is_ascii_digit())
+            .count()
+    };
     let integer = digits(0);
     if integer == 0 || (integer > 1 && bytes[0] == b'0') {
         return false;

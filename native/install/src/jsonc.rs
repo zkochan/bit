@@ -70,7 +70,9 @@ impl Document {
                 *node = Node::Object(Object::default());
             }
             let Node::Object(object) = node else { unreachable!("replaced by an object above") };
-            node = object.entries.entry((*key).to_owned()).or_insert_with(|| Node::Object(Object::default()));
+            node = object.entries
+                .entry((*key).to_owned())
+                .or_insert_with(|| Node::Object(Object::default()));
         }
         if !matches!(node, Node::Object(_)) {
             *node = Node::Object(Object::default());
@@ -86,7 +88,8 @@ impl Document {
             self.root = Node::from_value(value);
             return;
         };
-        self.object_mut(parent).entries.insert((*key).to_owned(), Node::from_value(value));
+        self.object_mut(parent).entries
+            .insert((*key).to_owned(), Node::from_value(value));
     }
 
     /// `delete obj[key]` at `path`. The property's comments stay attached to

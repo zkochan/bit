@@ -6,11 +6,13 @@ mod scope_json;
 mod workspace_config;
 
 pub use global::{EffectiveConfig, keys, load_global_config};
+pub(crate) use merge_config::truthy;
 pub use merge_config::{MergeConfig, MergeConfigComponent};
 pub use scope_json::{ScopeJson, TrackLane, scope_path};
 pub use workspace_config::{
-    CONFIG_STORE_ASPECT, DEPENDENCY_RESOLVER_ASPECT, ENVS_ASPECT, GENERATOR_ASPECT, VARIANTS_ASPECT,
-    WORKSPACE_ASPECT, WORKSPACE_CONFIG_FILES_ASPECT, WorkspaceConfig, WorkspaceSettings, aspect_id_without_version,
+    CONFIG_STORE_ASPECT, DEPENDENCY_RESOLVER_ASPECT, ENVS_ASPECT, GENERATOR_ASPECT,
+    VARIANTS_ASPECT, WORKSPACE_ASPECT, WORKSPACE_CONFIG_FILES_ASPECT, WorkspaceConfig,
+    WorkspaceSettings, aspect_id_without_version,
 };
 
 use indexmap::IndexMap;

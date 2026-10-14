@@ -129,7 +129,10 @@ impl Parser {
     /// Leading inline comments after a comma belong to the previous property.
     fn assign_after(&mut self) {
         let Some(unassigned) = self.unassigned.as_mut() else { return };
-        let count = unassigned.iter().take_while(|comment| comment.inline).count();
+        let count = unassigned
+            .iter()
+            .take_while(|comment| comment.inline)
+            .count();
         if count == 0 {
             return;
         }
@@ -216,7 +219,10 @@ impl Parser {
     }
 
     fn walk(&mut self) -> io::Result<Node> {
-        let kind = self.current().map(|token| token.kind.clone()).ok_or_else(|| self.unexpected())?;
+        let kind = self
+            .current()
+            .map(|token| token.kind.clone())
+            .ok_or_else(|| self.unexpected())?;
         match kind {
             Kind::Punct('{') => {
                 self.next();

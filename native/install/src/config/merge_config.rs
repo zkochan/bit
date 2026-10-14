@@ -41,12 +41,17 @@ impl MergeConfig {
     #[must_use]
     pub fn parse(text: &str) -> Self {
         let divider = "-".repeat(80);
-        let kept: Vec<&str> = text.split('\n').filter(|line| *line != divider && !line.starts_with('#')).collect();
+        let kept: Vec<&str> = text
+            .split('\n')
+            .filter(|line| *line != divider && !line.starts_with('#'))
+            .collect();
         let joined = kept.join("\n");
         let conflicts = joined
             .split(ID_PREFIX)
             .filter_map(|item| {
-                let (raw_id, rest) = item.split_once('\n').unwrap_or((item, ""));
+                let (raw_id, rest) = item
+                    .split_once('\n')
+                    .unwrap_or((item, ""));
                 let id = raw_id.trim();
                 (!id.is_empty()).then(|| (id.to_owned(), rest.to_owned()))
             })
@@ -63,13 +68,20 @@ impl MergeConfig {
     /// conflict markers (Bit logs those and ignores the entry); invalid JSON
     /// without markers is an error.
     fn parsed(&self, id: &str) -> io::Result<Option<Value>> {
-        let Some(content) = self.conflicts.get(id).filter(|content| !content.is_empty()) else { return Ok(None) };
+        let Some(content) = self.conflicts
+            .get(id)
+            .filter(|content| !content.is_empty())
+        else {
+            return Ok(None);
+        };
         match serde_json::from_str(content) {
             Ok(value) => Ok(Some(value)),
             Err(_) if content.contains("<<<<<<<") || content.contains(">>>>>>>") => Ok(None),
             Err(error) => Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("unable to parse the merge-conflict entry for {id} as the JSON is invalid. err: {error}"),
+                format!(
+                    "unable to parse the merge-conflict entry for {id} as the JSON is invalid. err: {error}"
+                ),
             )),
         }
     }
@@ -86,7 +98,10 @@ impl MergeConfig {
     /// `[{ name, version }]` arrays as objects.
     pub fn workspace_policy(&self) -> io::Result<Option<Map<String, Value>>> {
         let Some(data) = self.parsed(WORKSPACE_ID)? else { return Ok(None) };
-        let Some(Value::Object(mut policy)) = data.get(DEPENDENCY_RESOLVER_ASPECT).and_then(|dr| dr.get("policy")).cloned()
+        let Some(Value::Object(mut policy)) = data
+            .get(DEPENDENCY_RESOLVER_ASPECT)
+            .and_then(|dr| dr.get("policy"))
+            .cloned()
         else {
             return Ok(Some(Map::new()));
         };
@@ -102,9 +117,19 @@ impl MergeConfig {
 
 /// `adjustEnvsOnConfigObject`: `{ env: "x@1" }` becomes `{ env: "x" }` plus a `"x@1": {}` entry.
 fn adjust_envs(config: &mut Map<String, Value>) {
-    let Some(env) = config.get(ENVS_ASPECT).and_then(|envs| envs.get("env")).and_then(Value::as_str) else { return };
+    let Some(env) = config
+        .get(ENVS_ASPECT)
+        .and_then(|envs| envs.get("env"))
+        .and_then(Value::as_str)
+    else {
+        return;
+    };
     let env = env.to_owned();
-    let id = env.split('@').next().unwrap_or_default().to_owned();
+    let id = env
+        .split('@')
+        .next()
+        .unwrap_or_default()
+        .to_owned();
     config.insert(ENVS_ASPECT.to_owned(), serde_json::json!({ "env": id }));
     config.insert(env, Value::Object(Map::new()));
 }
@@ -113,7 +138,9 @@ fn adjust_envs(config: &mut Map<String, Value>) {
 /// entries (kept, as an object) and the rest (returned).
 fn extract_auto_deps(config: &mut Map<String, Value>) -> Map<String, Value> {
     let mut auto_deps = Map::new();
-    let Some(Value::Object(policy)) = config.get_mut(DEPENDENCY_RESOLVER_ASPECT).and_then(|dr| dr.get_mut("policy"))
+    let Some(Value::Object(policy)) = config
+        .get_mut(DEPENDENCY_RESOLVER_ASPECT)
+        .and_then(|dr| dr.get_mut("policy"))
     else {
         return auto_deps;
     };
@@ -136,7 +163,13 @@ fn entries_to_object<'a>(entries: impl Iterator<Item = &'a Value>) -> Map<String
     entries
         .filter_map(|entry| {
             let name = entry.get("name")?.as_str()?;
-            Some((name.to_owned(), entry.get("version").cloned().unwrap_or(Value::Null)))
+            Some((
+                name.to_owned(),
+                entry
+                    .get("version")
+                    .cloned()
+                    .unwrap_or(Value::Null),
+            ))
         })
         .collect()
 }
@@ -146,7 +179,9 @@ pub(crate) fn truthy(value: &Value) -> bool {
     match value {
         Value::Null => false,
         Value::Bool(value) => *value,
-        Value::Number(number) => number.as_f64().is_some_and(|number| number != 0.0 && !number.is_nan()),
+        Value::Number(number) => number
+            .as_f64()
+            .is_some_and(|number| number != 0.0 && !number.is_nan()),
         Value::String(value) => !value.is_empty(),
         Value::Array(_) | Value::Object(_) => true,
     }

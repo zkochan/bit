@@ -1,7 +1,9 @@
 //! Expected output of comment-json 4.2.5 `stringify(parse(input), undefined, 2)` and of
 //! a second pass over that output, recorded with the version Bit ships. Do not edit by hand.
 pub(super) const CASES: &[(&str, &str, &str, Option<&str>)] = &[
-    ("quirks", r####"/**
+    (
+        "quirks",
+        r#"/**
  * header
  **/
 {
@@ -20,7 +22,8 @@ pub(super) const CASES: &[(&str, &str, &str, Option<&str>)] = &[
   // trailing in obj
 }
 // after all
-"####, r####"/**
+"#,
+        r#"/**
  * header
  **/{
   "2": null,
@@ -40,8 +43,12 @@ pub(super) const CASES: &[(&str, &str, &str, Option<&str>)] = &[
   "f": "ab\"c\\dé",
   "g": 1000
 }
-// after all"####, None),
-    ("workspace", r####"/**
+// after all"#,
+        None,
+    ),
+    (
+        "workspace",
+        r#"/**
  * this is the main configuration file of your bit workspace.
  * for full documentation, please see: https://bit.dev/reference/workspace/workspace-json
  **/
@@ -90,7 +97,8 @@ pub(super) const CASES: &[(&str, &str, &str, Option<&str>)] = &[
     "enableWorkspaceConfigWrite": true
   }
 }
-"####, r####"/**
+"#,
+        r#"/**
  * this is the main configuration file of your bit workspace.
  * for full documentation, please see: https://bit.dev/reference/workspace/workspace-json
  **/{
@@ -137,7 +145,9 @@ pub(super) const CASES: &[(&str, &str, &str, Option<&str>)] = &[
   "teambit.workspace/workspace-config-files": {
     "enableWorkspaceConfigWrite": true
   }
-}"####, Some(r####"/**
+}"#,
+        Some(
+            r#"/**
  * this is the main configuration file of your bit workspace.
  * for full documentation, please see: https://bit.dev/reference/workspace/workspace-json
  **/{
@@ -184,8 +194,12 @@ pub(super) const CASES: &[(&str, &str, &str, Option<&str>)] = &[
   "teambit.workspace/workspace-config-files": {
     "enableWorkspaceConfigWrite": true
   }
-}"####)),
-    ("trailing_commas", r####"{
+}"#,
+        ),
+    ),
+    (
+        "trailing_commas",
+        r#"{
   "a": [
     1,
     2, // two
@@ -194,7 +208,8 @@ pub(super) const CASES: &[(&str, &str, &str, Option<&str>)] = &[
     "c": 1, // one
     // dangling
   },
-}"####, r####"{
+}"#,
+        r#"{
   "a": [
     1,
     2 // two
@@ -203,7 +218,9 @@ pub(super) const CASES: &[(&str, &str, &str, Option<&str>)] = &[
     "c": 1
     // dangling
   }
-}"####, Some(r####"{
+}"#,
+        Some(
+            r#"{
   "a": [
     1,
     2 // two
@@ -212,8 +229,12 @@ pub(super) const CASES: &[(&str, &str, &str, Option<&str>)] = &[
     "c": 1
     // dangling
   }
-}"####)),
-    ("empty_with_comments", r####"{
+}"#,
+        ),
+    ),
+    (
+        "empty_with_comments",
+        r#"{
   "a": [ // inside empty array
   ],
   "b": {
@@ -221,7 +242,8 @@ pub(super) const CASES: &[(&str, &str, &str, Option<&str>)] = &[
   },
   "c": [],
   "d": {}
-}"####, r####"{
+}"#,
+        r#"{
   "a": [ // inside empty array
   ],
   "b": {
@@ -229,7 +251,9 @@ pub(super) const CASES: &[(&str, &str, &str, Option<&str>)] = &[
   },
   "c": [],
   "d": {}
-}"####, Some(r####"{
+}"#,
+        Some(
+            r#"{
   "a": [ // inside empty array
   ],
   "b": {
@@ -237,12 +261,17 @@ pub(super) const CASES: &[(&str, &str, &str, Option<&str>)] = &[
   },
   "c": [],
   "d": {}
-}"####)),
-    ("nested", r####"// leading line
+}"#,
+        ),
+    ),
+    (
+        "nested",
+        r#"// leading line
 // second line
 {"x":{"y":[{"z":null},{"w":false}],"s":"tab\there\u00e9\u2028"},"n":-0.5,"big":12345678901234567890}
 // trailing one
-/* trailing two */"####, r####"// leading line
+/* trailing two */"#,
+        r#"// leading line
 // second line
 {
   "x": {
@@ -260,46 +289,69 @@ pub(super) const CASES: &[(&str, &str, &str, Option<&str>)] = &[
   "big": 12345678901234567000
 }
 // trailing one
-/* trailing two */"####, None),
-    ("crlf", r####"{
+/* trailing two */"#,
+        None,
+    ),
+    (
+        "crlf",
+        r#"{
   // c1
   "a": 1, /* c2 */ // c3
   "b": 2
 }
-"####, r####"{
+"#,
+        r#"{
   // c1
   "a": 1, /* c2 */ // c3
   "b": 2
-}"####, Some(r####"{
+}"#,
+        Some(
+            r#"{
   // c1
   "a": 1, /* c2 */ // c3
   "b": 2
-}"####)),
-    ("between", r####"{
+}"#,
+        ),
+    ),
+    (
+        "between",
+        r#"{
   "a" // after prop line
   : 1,
   "b": /* before value */ "x" /* after value */ , /* after comma */
   /* own line */ "c": 3
-}"####, r####"{
+}"#,
+        r#"{
   "a" // after prop line
   : 1,
   "b": /* before value */ "x" /* after value */, /* after comma *//* own line */
   "c": 3
-}"####, Some(r####"{
+}"#,
+        Some(
+            r#"{
   "a" // after prop line
   : 1,
   "b": /* before value */ "x" /* after value */, /* after comma */ /* own line */
   "c": 3
-}"####)),
-    ("root_array", r####"[ /* start */ 1, 2 ] // end"####, r####"[ /* start */
+}"#,
+        ),
+    ),
+    (
+        "root_array",
+        r"[ /* start */ 1, 2 ] // end",
+        r"[ /* start */
   1,
   2
-] // end"####, Some(r####"[ /* start */
+] // end",
+        Some(
+            r"[ /* start */
   1,
   2
-] // end"####)),
+] // end",
+        ),
+    ),
 ];
-pub(super) const POLICY_EDIT: &str = r####"/**
+pub(super) const POLICY_EDIT: &str = r#"/**
  * this is the main configuration file of your bit workspace.
  * for full documentation, please see: https://bit.dev/reference/workspace/workspace-json
  **/{
@@ -347,8 +399,8 @@ pub(super) const POLICY_EDIT: &str = r####"/**
   "teambit.workspace/workspace-config-files": {
     "enableWorkspaceConfigWrite": true
   }
-}"####;
-pub(super) const READD_EDIT: &str = r####"/**
+}"#;
+pub(super) const READD_EDIT: &str = r#"/**
  * this is the main configuration file of your bit workspace.
  * for full documentation, please see: https://bit.dev/reference/workspace/workspace-json
  **/{
@@ -397,4 +449,4 @@ pub(super) const READD_EDIT: &str = r####"/**
       ]
     }
   }
-}"####;
+}"#;

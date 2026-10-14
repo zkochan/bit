@@ -51,9 +51,10 @@ pub fn load_global_config(dir: &Path) -> io::Result<GlobalConfig> {
     match serde_json::from_str(&text) {
         Ok(Value::Object(map)) => Ok(map.into_iter().collect()),
         Ok(_) => Ok(GlobalConfig::new()),
-        Err(error) => {
-            Err(io::Error::new(io::ErrorKind::InvalidData, format!("failed parsing {}: {error}", path.display())))
-        }
+        Err(error) => Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("failed parsing {}: {error}", path.display()),
+        )),
     }
 }
 
@@ -72,10 +73,20 @@ impl EffectiveConfig {
         scope: &IndexMap<String, String>,
         workspace: &IndexMap<String, String>,
     ) -> Self {
-        let mut store: IndexMap<String, String> =
-            global.iter().filter_map(|(key, value)| Some((key.clone(), config_string(value)?))).collect();
-        store.extend(scope.iter().map(|(key, value)| (key.clone(), value.clone())));
-        store.extend(workspace.iter().map(|(key, value)| (key.clone(), value.clone())));
+        let mut store: IndexMap<String, String> = global
+            .iter()
+            .filter_map(|(key, value)| Some((key.clone(), config_string(value)?)))
+            .collect();
+        store.extend(
+            scope
+                .iter()
+                .map(|(key, value)| (key.clone(), value.clone())),
+        );
+        store.extend(
+            workspace
+                .iter()
+                .map(|(key, value)| (key.clone(), value.clone())),
+        );
         Self { store }
     }
 
@@ -107,7 +118,9 @@ impl EffectiveConfig {
             Some("false") => Ok(Some(false)),
             Some(value) => Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("the configuration \"{key}\" has an invalid value \"{value}\". it should be boolean"),
+                format!(
+                    "the configuration \"{key}\" has an invalid value \"{value}\". it should be boolean"
+                ),
             )),
         }
     }
@@ -117,12 +130,14 @@ impl EffectiveConfig {
         let Some(value) = self.get(key) else { return Ok(None) };
         let trimmed = value.trim();
         let number = if trimmed.is_empty() { Some(0.0) } else { trimmed.parse::<f64>().ok() };
-        number.map(Some).ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("config of \"{key}\" is invalid. Expected number, got \"{value}\""),
-            )
-        })
+        number
+            .map(Some)
+            .ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("config of \"{key}\" is invalid. Expected number, got \"{value}\""),
+                )
+            })
     }
 
     /// `getCloudDomain()`.

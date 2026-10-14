@@ -1,6 +1,6 @@
 use super::{
-    DependencyResolverConfig, EffectiveConfig, MergeConfig, ScopeJson, WorkspaceConfig, aspect_id_without_version, keys,
-    load_global_config, scope_path,
+    DependencyResolverConfig, EffectiveConfig, MergeConfig, ScopeJson, WorkspaceConfig,
+    aspect_id_without_version, keys, load_global_config, scope_path,
 };
 use crate::model::GlobalConfig;
 use indexmap::IndexMap;
@@ -57,7 +57,10 @@ fn loads_workspace_jsonc() {
     assert!(config.dependency_resolver.has_root_components());
     assert_eq!(config.dependency_resolver.strict_ssl, Some(json!("false")));
     assert_eq!(config.dependency_resolver.policy["dependencies"]["lodash"], json!("^4.0.0"));
-    let patterns: Vec<_> = config.variants.iter().map(|(pattern, _)| pattern.as_str()).collect();
+    let patterns: Vec<_> = config.variants
+        .iter()
+        .map(|(pattern, _)| pattern.as_str())
+        .collect();
     assert_eq!(patterns, ["*", "{ui/*}"]);
     assert_eq!(config.generator_envs, ["bitdev.node/node-env"]);
     assert!(config.enable_workspace_config_write);
@@ -66,7 +69,11 @@ fn loads_workspace_jsonc() {
     let core = vec!["teambit.workspace/workspace".to_owned(), "teambit.react/react".to_owned()];
     let user = config.user_aspect_ids(&core);
     assert!(user.contains(&"my-org.my-scope/my-aspect@1.0.0".to_owned()));
-    assert!(!user.iter().any(|id| id.starts_with("file:") || id == "teambit.react/react"));
+    assert!(
+        !user
+            .iter()
+            .any(|id| id.starts_with("file:") || id == "teambit.react/react")
+    );
     assert!(config.aspect("my-org.my-scope/my-aspect").is_some());
     assert_eq!(config.root_components_path(dir.path()), dir.path().join("node_modules/.bit_roots"));
 }
@@ -76,7 +83,10 @@ fn missing_or_invalid_workspace_jsonc_fails() {
     let dir = tempdir().unwrap();
     assert_eq!(WorkspaceConfig::load(dir.path()).unwrap_err().kind(), std::io::ErrorKind::NotFound);
     fs::write(dir.path().join("workspace.jsonc"), "{ nope }").unwrap();
-    assert_eq!(WorkspaceConfig::load(dir.path()).unwrap_err().kind(), std::io::ErrorKind::InvalidData);
+    assert_eq!(
+        WorkspaceConfig::load(dir.path()).unwrap_err().kind(),
+        std::io::ErrorKind::InvalidData
+    );
 }
 
 #[test]
@@ -101,17 +111,23 @@ fn dependency_resolver_defaults() {
 fn global_config_layers() {
     let dir = tempdir().unwrap();
     assert!(load_global_config(dir.path()).unwrap().is_empty());
-    fs::write(dir.path().join("config.json"), r#"{"user.token":"t","registry":"g","n":5}"#).unwrap();
+    fs::write(dir.path().join("config.json"), r#"{"user.token":"t","registry":"g","n":5}"#)
+        .unwrap();
     let global: GlobalConfig = load_global_config(dir.path()).unwrap();
-    let scope: IndexMap<String, String> = [("registry".to_owned(), "s".to_owned())].into_iter().collect();
-    let workspace: IndexMap<String, String> = [("cloud_domain".to_owned(), "w".to_owned())].into_iter().collect();
+    let scope: IndexMap<String, String> =
+        std::iter::once(("registry".to_owned(), "s".to_owned())).collect();
+    let workspace: IndexMap<String, String> =
+        std::iter::once(("cloud_domain".to_owned(), "w".to_owned())).collect();
     let config = EffectiveConfig::new(&global, &scope, &workspace);
     assert_eq!(config.get(keys::USER_TOKEN).as_deref(), Some("t"));
     assert_eq!(config.get(keys::REGISTRY_URL).as_deref(), Some("s"));
     assert_eq!(config.cloud_domain(), "w");
     assert_eq!(config.get_number("n").unwrap(), Some(5.0));
     assert!(config.get_bool("registry").is_err());
-    assert_eq!(EffectiveConfig::env_variable_name("network.fetch_retries"), "BIT_CONFIG_NETWORK_FETCH_RETRIES");
+    assert_eq!(
+        EffectiveConfig::env_variable_name("network.fetch_retries"),
+        "BIT_CONFIG_NETWORK_FETCH_RETRIES"
+    );
     assert_eq!(EffectiveConfig::default().cloud_domain(), "bit.cloud");
 }
 
@@ -152,16 +168,38 @@ fn merge_config_entries() {
         ws = r#"{"teambit.dependencies/dependency-resolver":{"policy":{"dependencies":[{"name":"x","version":"^1"}]}}}"#,
     );
     let config = MergeConfig::parse(&text);
-    let component = config.component("org.s/comp").unwrap().unwrap();
+    let component = config
+        .component("org.s/comp")
+        .unwrap()
+        .unwrap();
     assert_eq!(component.config["teambit.envs/envs"], json!({ "env": "org.s/env" }));
     assert_eq!(component.config["org.s/env@1.0.0"], json!({}));
     assert_eq!(
         component.config["teambit.dependencies/dependency-resolver"],
         json!({ "policy": { "dependencies": { "a": "1" } } })
     );
-    assert_eq!(component.auto_deps["dependencies"], json!([{ "name": "b", "version": "2", "force": false }]));
-    assert_eq!(config.workspace_policy().unwrap().unwrap()["dependencies"], json!({ "x": "^1" }));
-    assert!(config.component("org.s/conflicted").unwrap().is_none());
-    assert!(config.component("org.s/missing").unwrap().is_none());
+    assert_eq!(
+        component.auto_deps["dependencies"],
+        json!([{ "name": "b", "version": "2", "force": false }])
+    );
+    assert_eq!(
+        config
+            .workspace_policy()
+            .unwrap()
+            .unwrap()["dependencies"],
+        json!({ "x": "^1" })
+    );
+    assert!(
+        config
+            .component("org.s/conflicted")
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        config
+            .component("org.s/missing")
+            .unwrap()
+            .is_none()
+    );
     assert!(MergeConfig::parse("[*] a\nnot json").component("a").is_err());
 }
