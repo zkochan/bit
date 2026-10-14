@@ -277,6 +277,7 @@ export class InstallMain {
           envs: this.envs,
           app: this.app,
           aspectLoader: this.aspectLoader,
+          dependencyResolver: this.dependencyResolver,
           logger: this.logger,
           afterInstall: (request) => this.nativeAfterInstall(request),
         },

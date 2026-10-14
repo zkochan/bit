@@ -4,6 +4,7 @@ import { BitError } from '@teambit/bit-error';
 import type { AspectLoaderMain } from '@teambit/aspect-loader';
 import { getAspectDir, getCoreAspectName, getCoreAspectPackageName } from '@teambit/aspect-loader';
 import type { ApplicationMain } from '@teambit/application';
+import type { DependencyResolverMain } from '@teambit/dependency-resolver';
 import type { EnvsMain } from '@teambit/envs';
 import type { Logger } from '@teambit/logger';
 import type { Workspace } from '@teambit/workspace';
@@ -24,6 +25,7 @@ export type NativeInstallContext = {
   envs: EnvsMain;
   app: ApplicationMain;
   aspectLoader: AspectLoaderMain;
+  dependencyResolver: DependencyResolverMain;
   logger: Logger;
   /** The body of one TypeScript install cycle after the package manager: env reloads, compile, config files. */
   afterInstall: (request: AfterInstallRequest) => Promise<AfterInstallResult>;
@@ -259,6 +261,8 @@ export class InProcessInstallHost {
         return JSON.stringify(this.context.app.getAppPatterns());
       case 'devPatterns':
         return JSON.stringify(await this.devPatterns(input.envId));
+      case 'dependencyPolicies':
+        return JSON.stringify(await this.dependencyPolicies(input.extensionIds));
       case 'packageJsonProps':
         return JSON.stringify(await this.packageJsonProps(input.envId));
       case 'transformPackageJson':
@@ -288,6 +292,16 @@ export class InProcessInstallHost {
       docs: await call('getDocsDevPatterns'),
       compositions: await call('getCompositionsDevPatterns'),
     };
+  }
+
+  /**
+   * The dependency policies aspects registered (`registerDependenciesPolicies`), as
+   * `[[registrar, policy], ...]`, once the aspects the components configure are loaded.
+   */
+  private async dependencyPolicies(extensionIds: string[]) {
+    const { workspace, dependencyResolver } = this.context;
+    await workspace.loadAspects(extensionIds, false, undefined, { throwOnError: false, hideMissingModuleError: true });
+    return dependencyResolver['policiesRegistry'].toArray();
   }
 
   private async packageJsonProps(envId: string) {

@@ -13,6 +13,7 @@ JavaScript function through a thread-safe function. The callbacks are:
 | Callback | Why it is JavaScript |
 | --- | --- |
 | `envPolicy` | The dependency policy of a core env, or of a legacy env without `env.jsonc`, comes from the env's `getDependencies()` |
+| `dependencyPolicies` | Aspects and env aspects register dependency policies in their providers (`registerDependenciesPolicies`) |
 | `appTypes` | Aspects register application types (file patterns) |
 | `packageJsonProps` | Envs and aspects transform the generated `node_modules/<pkg>/package.json` |
 | `afterInstall` | Compilation (env compilers) and workspace config files (env config writers) |
@@ -161,6 +162,40 @@ The engine's `readPackage` hooks are implemented natively and report the
 `pnpmfileChecksum` that Bit's TypeScript integration intended (`bit-1`).
 Lockfiles therefore stay compatible between both implementations.
 
+## Registered dependency policies
+
+Policies registered through `registerDependenciesPolicies` are the slots layer of
+`mergeVariantPolicies`: a component gets the registration whose registrar is, or
+contains, one of the extension ids it configures. Registering runs in an aspect's
+provider, so the host loads the candidate aspects and returns the registry. To
+keep `bit install` from loading Harmony where nothing can register, the
+candidates are the configured extension ids that are not core aspects (core
+aspects and core envs never register one), and the component's env only when it
+is an env aspect:
+
+- An env whose own env is `teambit.envs/env` is an env plugin (`*.bit-env.*`). It
+  is loaded without a provider, so it cannot register a policy and is not a
+  candidate. This holds whether or not it has an `env.jsonc`.
+- Any other non-core env is an aspect whose provider may register one, with or
+  without an `env.jsonc`. A workspace env is classified by its own env, an
+  external env by the Version the scope holds. An env the scope does not hold
+  is a candidate, since only loading it tells.
+
+Most custom envs are env plugins, so their workspaces make no host call before
+the package manager. An env aspect without an `env.jsonc` already loads Harmony
+for `envPolicy`, so it adds no load either.
+
+## `resolveFromEnv` links
+
+Without root components, a policy entry marked `resolveFromEnv` is linked at the
+root from where the component's env resolves it (`linkDepsResolvedFromEnv`). The
+env's directory is a core env's directory in the running bit, or its package in
+the workspace `node_modules`: a workspace env under its package name, an external
+env under the name the scope records for its Version (`getPackageName`, which
+applies a `teambit.pkg/pkg` `packageJson.name`). That is the name the env is
+installed under; the default name is used only when the scope does not hold the
+env. The root-components env package (`_getEnvPackage`) uses the same name.
+
 ## Pre-install import
 
 The import requests what `importCurrentObjects` requests, and nothing more:
@@ -209,8 +244,6 @@ programmatic entry.
 ## Known differences
 
 - Custom env dependency detectors (`getDepDetectors`) are not applied; detection uses the built-in JavaScript/TypeScript, style and MDX extraction.
-- Dependency policies an env registers in its own provider are not collected: the host is asked for registered policies only when a component configures a non-env, non-core extension.
-- `resolveFromEnv` links of an external env use the env's default package name; a custom `teambit.pkg/pkg` name is not applied there.
 - Workspaces configured with the yarn package manager use the TypeScript command, because yarn is a JavaScript package manager.
 
 ## CI

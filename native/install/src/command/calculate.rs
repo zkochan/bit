@@ -15,7 +15,7 @@ use crate::{
         WorkspaceComponent,
     },
     policy::{self, is_core_env, split_version},
-    workspace::ScopeObjects,
+    workspace::{ScopeObjects, external_env_packages},
 };
 use indexmap::IndexMap;
 use serde_json::Value;
@@ -59,9 +59,7 @@ pub async fn calculate(
     let components = loaded.components();
     let env_policies = policy::load_env_policies(&session.root, &components, session.host).await?;
     let workspace_policy = workspace_policy(loaded)?;
-    let mut options = dependency_options(session, loaded, &components)?;
-    options.policy_slots =
-        policy::slots::registry(&components, &session.info.core_aspects, session.host).await?;
+    let options = options_with_slots(session, loaded, &components).await?;
     let dependencies = dependencies::compute(
         &session.root,
         &components,
@@ -72,8 +70,8 @@ pub async fn calculate(
         session.host,
     )
     .await?;
-    let linked_root_deps =
-        &with_env_links(session, loaded, linked_root_deps, &components, &dependencies);
+    let (linked_root_deps, env_packages) =
+        &with_env_links(session, loaded, linked_root_deps, &components, &dependencies)?;
     let apps = apps(session, loaded, &components).await?;
     let root_policy = root_policy(session, loaded, workspace_policy)?;
     // `getWorkspaceManifest` announces the manifest creation (`createFromComponents`).
@@ -88,6 +86,7 @@ pub async fn calculate(
             root_policy: &root_policy,
             linked_root_deps,
             apps: &apps,
+            env_packages,
         },
     )?;
     session.output.success(DEDUPING, None);
@@ -98,29 +97,47 @@ pub async fn calculate(
     Ok(Calculated { components, env_policies, dependencies, outcome })
 }
 
-/// `linkDepsResolvedFromEnv`: off with root components.
+/// The dependency options with the policies aspects register (the slots layer).
+async fn options_with_slots(
+    session: &Session<'_>,
+    loaded: &Loaded,
+    components: &[WorkspaceComponent],
+) -> io::Result<DependencyOptions> {
+    let mut options = dependency_options(session, loaded, components)?;
+    let objects = ScopeObjects::new(&loaded.workspace.scope_path);
+    options.policy_slots =
+        policy::slots::registry(components, &session.info.core_aspects, &objects, session.host)
+            .await?;
+    Ok(options)
+}
+
+/// `linkDepsResolvedFromEnv` (off with root components), and the external env packages
+/// the links resolve from, which the manifests reuse.
 fn with_env_links(
     session: &Session<'_>,
     loaded: &Loaded,
     linked_root_deps: &DependencyMap,
     components: &[WorkspaceComponent],
     dependencies: &IndexMap<String, ComponentDependencies>,
-) -> DependencyMap {
+) -> io::Result<(DependencyMap, IndexMap<String, String>)> {
+    let env_packages =
+        external_env_packages(components, &ScopeObjects::new(&loaded.workspace.scope_path))?;
     let mut links = linked_root_deps.clone();
     if loaded.config.dependency_resolver.has_root_components() {
-        return links;
+        return Ok((links, env_packages));
     }
     let env_links = crate::links::resolved_from_env_links(
         &session.root,
         session.info,
         components,
         dependencies,
+        &env_packages,
     );
     for message in &env_links.messages {
         session.output.console(message);
     }
     links.extend(env_links.links);
-    links
+    Ok((links, env_packages))
 }
 
 struct Inputs<'a> {
@@ -130,6 +147,7 @@ struct Inputs<'a> {
     root_policy: &'a [PolicyEntry],
     linked_root_deps: &'a DependencyMap,
     apps: &'a [String],
+    env_packages: &'a IndexMap<String, String>,
 }
 
 fn plan(
@@ -144,7 +162,6 @@ fn plan(
         loaded.config.root_components_path(&session.root),
     );
     let remote_filter = remote_filter(session, loaded)?;
-    let env_packages = env_packages(inputs.components);
     manifests::plan(&ManifestInput {
         root: &session.root,
         components: inputs.components,
@@ -157,7 +174,7 @@ fn plan(
             remote_filter: Some(&remote_filter),
             core_aspects: &session.info.core_aspects,
             apps: inputs.apps,
-            env_packages: &env_packages,
+            env_packages: inputs.env_packages,
         },
     })
 }
@@ -308,21 +325,6 @@ async fn apps(
         })
         .map(|component| component.id.to_string_without_version())
         .collect())
-}
-
-/// Package names of envs that are neither core nor workspace components.
-fn env_packages(components: &[WorkspaceComponent]) -> IndexMap<String, String> {
-    let mut packages = IndexMap::new();
-    for component in components {
-        let env = split_version(&component.env_id).0;
-        let local = components
-            .iter()
-            .any(|candidate| candidate.id.to_string_without_version() == env);
-        if !is_core_env(env) && !local {
-            packages.insert(env.to_string(), default_package_name(&parse_id(env)));
-        }
-    }
-    packages
 }
 
 /// `generateFilterFnForDepsFromLocalRemote`: remotes from `scope.json` and the global
