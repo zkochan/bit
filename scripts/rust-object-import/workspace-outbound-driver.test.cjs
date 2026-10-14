@@ -19,7 +19,7 @@ const receipt = {
   applied: true,
 };
 
-test('outbound parser admits staged and explicit scoped export only', () => {
+test('outbound parser admits staged, scoped, and unique short-name export', () => {
   const { parseRustWorkspaceOutbound: parse } = load('rust-workspace-outbound-options');
   assert.deepEqual(parse(['export']), { ids: [], originDirectly: false });
   assert.deepEqual(parse(['e', '--origin-directly', 'qualification.alpha/alpha']), options);
@@ -27,8 +27,8 @@ test('outbound parser admits staged and explicit scoped export only', () => {
     ids: ['qualification.alpha/alpha@1.0.0'],
     originDirectly: false,
   });
+  assert.deepEqual(parse(['export', 'alpha']), { ids: ['alpha'], originDirectly: false });
   for (const args of [
-    ['export', 'alpha'],
     ['export', '*'],
     ['export', '--json'],
     ['export', '--all'],
@@ -83,13 +83,18 @@ test('outbound driver validates before publication and propagates failures after
   });
   const events = [];
   let failApply = false;
+  let clientId;
   capture.withRustClientRequest = async (callback, propagate) => {
     try {
       return await callback(async (input) => {
         events.push(input.kind);
-        if (input.kind === 'commandOutboundPrepare') return { token: 'held', owner: 'rust', nothingToExport: true };
+        if (input.kind === 'commandOutboundPrepare') {
+          clientId = input.clientId;
+          return { token: 'held', owner: 'rust', nothingToExport: true, scopes: [] };
+        }
         if (failApply) throw new Error('failed after outbound apply');
-        if (input.kind === 'commandOutboundApply') return { token: 'held', owner: 'rust', pending: false };
+        if (input.kind === 'commandOutboundApply')
+          return { token: 'held', owner: 'rust', pending: false, scopes: [], clientId, objectCount: 0 };
         return { ...receipt, componentsIds: [], newIdsOnRemote: [] };
       });
     } catch (error) {
