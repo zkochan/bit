@@ -78,8 +78,18 @@ fn prepare(
         .as_u64()
         .filter(|count| *count <= 4096)
         .ok_or_else(|| io::Error::other("native switch import progress receipt"))?;
-    let imports =
+    let mut imports =
         if options.skip_fetch { Vec::new() } else { remote_imports(planned.plan.get("progress"))? };
+    if imports.iter().any(|import| import.reason.is_some())
+        && let Some(checkout) = imports.last_mut()
+        && checkout.reason.is_none()
+        && checkout.requested > 0
+    {
+        checkout.requested =
+            usize::try_from(import_count).map_err(|_| decline("switch fetched checkout count"))?;
+        checkout.components = import_count;
+        checkout.objects = 0;
+    }
     Ok(PreparedSwitch { planned, report, import_count, imports })
 }
 
