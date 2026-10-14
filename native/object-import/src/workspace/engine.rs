@@ -59,6 +59,8 @@ enum Request {
         request: Value,
     },
     CommandPrepare(command::input::Prepare),
+    CommandInboundPrepare(command::inbound::Prepare),
+    CommandInboundApply(command::inbound::Apply),
     CommandTagPrepare(command::resolve::Prepare),
     CommandTagPlan(command::resolve::Plan),
     CommandTagFinalize(command::resolve::Finalize),
@@ -178,7 +180,12 @@ pub(crate) fn serve(
             data: Some(data),
             error: None,
         },
-        Err(error) => Response { error: Some(error.to_string()), ..failure(id) },
+        Err(error) => {
+            if std::env::var_os("BIT_RUST_INBOUND_DIAGNOSTIC").is_some() {
+                eprintln!("native inbound diagnostic: {error}");
+            }
+            Response { error: Some(error.to_string()), ..failure(id) }
+        }
     };
     let mut output = Output(Vec::new());
     if serde_json::to_writer(&mut output, &response).is_err() {
@@ -241,6 +248,12 @@ fn owned_command(
     pool: &rayon::ThreadPool,
 ) -> io::Result<(usize, Value)> {
     match request {
+        Request::CommandInboundPrepare(input) => {
+            pool.install(|| command::inbound::prepare(&input, &mut snapshots.command))
+        }
+        Request::CommandInboundApply(input) => {
+            pool.install(|| command::inbound::apply(&input, &mut snapshots.command))
+        }
         Request::CommandPlan(input) => command::plan(input, snapshots, pool),
         Request::CommandPolicyPrepare(input) => {
             pool.install(|| command::policy::prepare(input, &mut snapshots.command))
