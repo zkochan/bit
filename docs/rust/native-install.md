@@ -77,20 +77,47 @@ reloads `workspace.jsonc` when the native installer changed it
 component directory map. The native installer writes the `onPostInstall` event,
 so it is not published again.
 
+The calling command may have changed the workspace config in memory without
+writing it (`setExtension`). The TypeScript install reads those changes, and
+`persistConfig` writes them along with its own edits because it writes the whole
+config. The native installer reads and edits `workspace.jsonc` on disk. So when
+the parsed file and the in-memory config differ in content (comments and
+formatting aside), `native-install.ts` first writes the in-memory config the way
+`persistConfig` does: `WorkspaceConfig.write`, with a history backup whose reason
+is `install`. The native installer then sees those changes and edits on top of
+them. One difference remains: the TypeScript install writes pending changes only
+when it edits the config itself, while the native path writes them before every
+call. When the native installer edits nothing, the file already holds what the
+calling command would write later.
+
 | `WorkspaceInstallOptions` | Native |
 | --- | --- |
-| `lifecycleType`, `savePrefix`, `updateAll`, `addMissingDeps`, `skipUnavailable`, `recurringInstall`, `lockfileOnly`, `restoreFromDependenciesGraph`, `allowScripts`, `skipPrune` | same option |
+| `lifecycleType`, `savePrefix`, `updateAll`, `addMissingDeps`, `skipUnavailable`, `recurringInstall`, `lockfileOnly`, `restoreFromDependenciesGraph`, `allowScripts`, `skipPrune`, `copyPeerToRuntimeOnComponents` | same option |
+| `copyPeerToRuntimeOnRoot` | same option; unset means `true` |
+| `addMissingPeers` | same option. Missing peers, like added packages and missing deps, use `lifecycleType` or `runtime` (`_addPackages`). `bit install --add-missing-peers` sets the lifecycle to `peer`, as `install.cmd.tsx` does |
 | `dedupe` | `skipDedupe: !dedupe` (unset means no dedupe, as in TypeScript) |
 | `import` | `skipImport: !import` (unset means no import) |
 | `compile`, `writeConfigFiles`, `includeOptionalDeps` | skipped only when `false` |
 | `updateExisting`, `skipIfExisting` | `existingEntries`: `skip`, else `update`, else `fail` (`EntryAlreadyExist`) |
 | `optimizeReportForNonTerminal` | `appendOnly` reporter |
-| `showExternalPackageManagerPrompt` | `externalPrompt`; without it, external package manager mode keeps the TypeScript path (it writes `package.json` instead of installing) |
-| `dependenciesGraph` (explicit graph) | TypeScript path |
-| `copyPeerToRuntimeOnRoot: false`, `copyPeerToRuntimeOnComponents: true` | TypeScript path |
-| `addMissingPeers` without `lifecycleType: 'peer'` | TypeScript path (TypeScript adds them as runtime dependencies) |
+| `showExternalPackageManagerPrompt` | `externalPrompt`. Without it, external package manager mode writes the dependencies to `package.json` instead of installing (below) |
+| `dependenciesGraph` (explicit graph) | `dependenciesGraph`: the serialized graph (`DependenciesGraph.serialize()`). It comes before the graphs `restoreFromDependenciesGraph` reads, and like them it is restored only with root components. A conversion failure fails the install only with `restoreFromDependenciesGraph` (`failOnDependenciesGraphError`) |
 
-Workspaces using yarn, `BIT_NATIVE_INSTALL=off` and a missing addon also keep the
+External package manager mode without `showExternalPackageManagerPrompt` follows
+`writeDependenciesToPackageJson`. The root manifest is calculated as
+`_getComponentsManifests(installer, mergedRootPolicy, { dedupe: true,
+includeAllEnvPeers: false })` calculates it: the root copies no peers to its
+dependencies and gets no env peers. There is no dependency filter and no linked
+root dependency. Without `resolveEnvPeersFromRoot`, components get only the env
+peers they use or list in their own policy, plus `react-dom` along with `react`.
+`{ ...devDependencies, ...dependencies }` of that manifest is set in the root
+`package.json`'s `dependencies`, keeping the file's indentation and newlines
+(`detect-indent`, `detect-newline`, `stringify-package`). The skip notice follows.
+Nothing is imported, installed or compiled, and no `onPostInstall` event is
+written. The addon returns `{ outcome: "skipped" }`, and `InstallMain.install`
+returns an empty component map without reloading the config or clearing caches.
+
+Workspaces using yarn, `BIT_NATIVE_INSTALL=off` and a missing addon keep the
 TypeScript implementation; `BIT_NATIVE_INSTALL_REQUIRE=on` turns the last two into
 errors.
 

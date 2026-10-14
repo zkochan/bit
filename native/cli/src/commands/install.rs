@@ -45,6 +45,11 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
         }
         Ok(Installed::Help) => Ok(Outcome::Declined("--help".to_string())),
         Ok(Installed::Unsupported) => Ok(Outcome::Declined("unsupported workspace".to_string())),
+        // `bit install` always asks before leaving external package manager mode.
+        Ok(Installed::Skipped) => {
+            history.end(true);
+            Ok(Outcome::Exit(ExitCode::SUCCESS))
+        }
         Err(error) => {
             history.end(false);
             eprintln!("{}", terminal.red(&error.to_string()));
