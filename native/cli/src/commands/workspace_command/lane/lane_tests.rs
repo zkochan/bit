@@ -38,7 +38,7 @@ fn receipt_parts() {
     assert!(squash_hashes(&json!({ "squashMessageHashes": ["nope"] })).is_err());
     assert_eq!(
         other_lane(&json!({ "lane": { "otherId": { "scope": "s", "name": "dev" } } })).unwrap(),
-        "s/dev"
+        "s/dev",
     );
     assert!(other_lane(&json!({ "lane": { "otherId": { "scope": "", "name": "dev" } } })).is_err());
 }
