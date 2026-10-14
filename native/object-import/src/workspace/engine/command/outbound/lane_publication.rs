@@ -11,25 +11,43 @@ use std::{
 
 pub(super) struct Prepared {
     root: PathBuf,
+    lane: Lane,
+    expected_ids: HashSet<String>,
+    objects: Objects,
+    models: Vec<Model>,
+    bitmap: Change,
+    scope: Change,
+    refs: Refs,
+    staged: Staged,
+    file_id: String,
+}
+
+struct Lane {
     scope: String,
     name: String,
-    expected_ids: HashSet<String>,
-    index_before: Vec<u8>,
-    lane_before: Vec<u8>,
-    history_before: Vec<u8>,
+}
+
+struct Objects {
+    index: Vec<u8>,
+    lane: Vec<u8>,
+    history: Vec<u8>,
     lane_hash: String,
     history_hash: String,
-    models: Vec<Model>,
-    bitmap_before: Vec<u8>,
-    bitmap_after: Vec<u8>,
-    scope_before: Vec<u8>,
-    scope_after: Vec<u8>,
-    refs_before: Option<Vec<u8>>,
-    refs_after: Vec<u8>,
-    staged_before: Option<Vec<u8>>,
-    staged_config_before: Vec<u8>,
-    staged_config_after: Vec<u8>,
-    file_id: String,
+}
+
+struct Change {
+    before: Vec<u8>,
+    after: Vec<u8>,
+}
+
+struct Refs {
+    before: Option<Vec<u8>>,
+    after: Vec<u8>,
+}
+
+struct Staged {
+    snaps: Option<Vec<u8>>,
+    config: Change,
 }
 
 struct Model {
@@ -40,12 +58,10 @@ struct Model {
 
 pub(super) fn prepare(input: &Prepare, selected: &LaneSelected) -> io::Result<Prepared> {
     let root = &input.root;
-    let scope = &selected.scope;
-    let name = &selected.name;
-    safe_segment(scope)?;
-    safe_segment(name)?;
+    safe_segment(&selected.scope)?;
+    safe_segment(&selected.name)?;
     super::super::bitmap::validate_history_file_id(&input.transport.bitmap_history_file_id)?;
-    if selected.lane["scope"] != *scope || selected.lane["name"] != *name {
+    if selected.lane["scope"] != selected.scope || selected.lane["name"] != selected.name {
         return Err(invalid("outbound lane publication identity"));
     }
     let expected_ids = selected.expected_ids
@@ -55,45 +71,11 @@ pub(super) fn prepare(input: &Prepare, selected: &LaneSelected) -> io::Result<Pr
     if expected_ids.len() != selected.expected_ids.len() {
         return Err(invalid("outbound lane publication acknowledgement"));
     }
-    let components = selected.lane["components"]
-        .as_array()
-        .ok_or_else(|| invalid("outbound lane publication components"))?;
-    if components.len() > 4096 {
-        return Err(invalid("outbound lane publication bounds"));
-    }
-    let refs_after = serde_json::to_vec_pretty(components)?;
-    let lane_before = object_bytes(root, &selected.hash)?;
-    let history_before = object_bytes(root, &selected.history_hash)?;
-    let refs_before = read_optional(&refs_path(root, scope, name))?;
-    let bitmap_before = fs::read(root.join(".bitmap"))?;
-    if bitmap_before.len() > 4 * 1024 * 1024 {
-        return Err(invalid("outbound lane bitmap bounds"));
-    }
-    let bitmap_after = export_bitmap(&bitmap_before, scope, name)?;
-    let scope_before = fs::read(root.join(".bit/scope.json"))?;
-    if scope_before.len() > 4 * 1024 * 1024 {
-        return Err(invalid("outbound lane scope bounds"));
-    }
-    let scope_after = export_scope(&scope_before, name)?;
-    let staged_before = read_optional(&root.join(".bit/staged-snaps"))?;
-    if staged_before
-        .as_ref()
-        .is_some_and(|bytes| bytes.len() > 4 * 1024 * 1024)
-    {
-        return Err(invalid("outbound lane staged snap bounds"));
-    }
-    let staged_config_before = fs::read(root.join(".bit/staged-config/main.json"))?;
-    let staged_config_after = export_staged_config(&staged_config_before, &expected_ids)?;
     Ok(Prepared {
         root: root.clone(),
-        scope: scope.clone(),
-        name: name.clone(),
+        lane: Lane { scope: selected.scope.clone(), name: selected.name.clone() },
         expected_ids,
-        index_before: fs::read(root.join(".bit/index.json"))?,
-        lane_before,
-        history_before,
-        lane_hash: selected.hash.clone(),
-        history_hash: selected.history_hash.clone(),
+        objects: prepare_objects(root, selected)?,
         models: selected.models
             .iter()
             .map(|model| Model {
@@ -102,17 +84,70 @@ pub(super) fn prepare(input: &Prepare, selected: &LaneSelected) -> io::Result<Pr
                 after: model.after.clone(),
             })
             .collect(),
-        bitmap_before,
-        bitmap_after,
-        scope_before,
-        scope_after,
-        refs_before,
-        refs_after,
-        staged_before,
-        staged_config_before,
-        staged_config_after,
+        bitmap: prepare_bitmap(root, selected)?,
+        scope: prepare_scope(root, selected)?,
+        refs: prepare_refs(root, selected)?,
+        staged: prepare_staged(root, &selected.expected_ids)?,
         file_id: input.transport.bitmap_history_file_id.clone(),
     })
+}
+
+fn prepare_objects(root: &Path, selected: &LaneSelected) -> io::Result<Objects> {
+    Ok(Objects {
+        index: fs::read(root.join(".bit/index.json"))?,
+        lane: object_bytes(root, &selected.hash)?,
+        history: object_bytes(root, &selected.history_hash)?,
+        lane_hash: selected.hash.clone(),
+        history_hash: selected.history_hash.clone(),
+    })
+}
+
+fn prepare_bitmap(root: &Path, selected: &LaneSelected) -> io::Result<Change> {
+    let before = fs::read(root.join(".bitmap"))?;
+    if before.len() > 4 * 1024 * 1024 {
+        return Err(invalid("outbound lane bitmap bounds"));
+    }
+    let after = export_bitmap(&before, &selected.scope, &selected.name)?;
+    Ok(Change { before, after })
+}
+
+fn prepare_scope(root: &Path, selected: &LaneSelected) -> io::Result<Change> {
+    let before = fs::read(root.join(".bit/scope.json"))?;
+    if before.len() > 4 * 1024 * 1024 {
+        return Err(invalid("outbound lane scope bounds"));
+    }
+    let after = export_scope(&before, &selected.name)?;
+    Ok(Change { before, after })
+}
+
+fn prepare_refs(root: &Path, selected: &LaneSelected) -> io::Result<Refs> {
+    let components = selected.lane["components"]
+        .as_array()
+        .ok_or_else(|| invalid("outbound lane publication components"))?;
+    if components.len() > 4096 {
+        return Err(invalid("outbound lane publication bounds"));
+    }
+    Ok(Refs {
+        before: read_optional(&refs_path(root, &selected.scope, &selected.name))?,
+        after: serde_json::to_vec_pretty(components)?,
+    })
+}
+
+fn prepare_staged(root: &Path, expected_ids: &[String]) -> io::Result<Staged> {
+    let snaps = read_optional(&root.join(".bit/staged-snaps"))?;
+    if snaps
+        .as_ref()
+        .is_some_and(|bytes| bytes.len() > 4 * 1024 * 1024)
+    {
+        return Err(invalid("outbound lane staged snap bounds"));
+    }
+    let before = fs::read(root.join(".bit/staged-config/main.json"))?;
+    let expected = expected_ids
+        .iter()
+        .cloned()
+        .collect::<HashSet<_>>();
+    let after = export_staged_config(&before, &expected)?;
+    Ok(Staged { snaps, config: Change { before, after } })
 }
 
 impl Prepared {
@@ -129,23 +164,14 @@ impl Prepared {
     }
 
     fn validate(&self) -> io::Result<()> {
-        let root = &self.root;
-        if fs::read(root.join(".bit/index.json"))? != self.index_before
-            || fs::read(root.join(".bitmap"))? != self.bitmap_before
-            || fs::read(root.join(".bit/scope.json"))? != self.scope_before
-            || read_optional(&refs_path(root, &self.scope, &self.name))? != self.refs_before
-            || read_optional(&root.join(".bit/staged-snaps"))? != self.staged_before
-            || fs::read(root.join(".bit/staged-config/main.json"))? != self.staged_config_before
-            || object_bytes(root, &self.lane_hash)? != self.lane_before
-            || object_bytes(root, &self.history_hash)? != self.history_before
-        {
+        if !self.validate_files()? || !self.validate_objects()? {
             return Err(invalid("outbound lane local state changed"));
         }
         for model in &self.models {
             if model.hash.len() != 40 || !model.hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
                 return Err(invalid("outbound lane model hash"));
             }
-            let path = root
+            let path = self.root
                 .join(".bit/objects")
                 .join(&model.hash[..2])
                 .join(&model.hash[2..]);
@@ -156,20 +182,38 @@ impl Prepared {
         Ok(())
     }
 
+    fn validate_files(&self) -> io::Result<bool> {
+        let root = &self.root;
+        Ok(fs::read(root.join(".bitmap"))? == self.bitmap.before
+            && fs::read(root.join(".bit/scope.json"))? == self.scope.before
+            && read_optional(&refs_path(root, &self.lane.scope, &self.lane.name))?
+                == self.refs.before
+            && read_optional(&root.join(".bit/staged-snaps"))? == self.staged.snaps
+            && fs::read(root.join(".bit/staged-config/main.json"))?
+                == self.staged.config.before)
+    }
+
+    fn validate_objects(&self) -> io::Result<bool> {
+        let root = &self.root;
+        Ok(fs::read(root.join(".bit/index.json"))? == self.objects.index
+            && object_bytes(root, &self.objects.lane_hash)? == self.objects.lane
+            && object_bytes(root, &self.objects.history_hash)? == self.objects.history)
+    }
+
     fn publish(self) -> io::Result<()> {
         let store = Store::new(self.root.join(".bit/objects"), None)?;
         for model in &self.models {
             store.write(&model.hash, &model.after)?;
         }
-        write(&refs_path(&self.root, &self.scope, &self.name), &self.refs_after)?;
-        fs::write(self.root.join(".bit/staged-config/main.json"), &self.staged_config_after)?;
-        if self.staged_before.is_some() {
+        write(&refs_path(&self.root, &self.lane.scope, &self.lane.name), &self.refs.after)?;
+        fs::write(self.root.join(".bit/staged-config/main.json"), &self.staged.config.after)?;
+        if self.staged.snaps.is_some() {
             fs::remove_file(self.root.join(".bit/staged-snaps"))?;
         }
-        fs::write(self.root.join(".bit/scope.json"), &self.scope_after)?;
-        if self.bitmap_after != self.bitmap_before {
+        fs::write(self.root.join(".bit/scope.json"), &self.scope.after)?;
+        if self.bitmap.after != self.bitmap.before {
             self.backup_bitmap()?;
-            write(&self.root.join(".bitmap"), &self.bitmap_after)?;
+            write(&self.root.join(".bitmap"), &self.bitmap.after)?;
         }
         Ok(())
     }
@@ -177,7 +221,7 @@ impl Prepared {
     fn backup_bitmap(&self) -> io::Result<()> {
         let directory = self.root.join(".bit/bitmap-history");
         fs::create_dir_all(&directory)?;
-        fs::write(directory.join(format!(".bitmap-{}", self.file_id)), &self.bitmap_before)?;
+        fs::write(directory.join(format!(".bitmap-{}", self.file_id)), &self.bitmap.before)?;
         let mut metadata = fs::OpenOptions::new()
             .create(true)
             .append(true)
