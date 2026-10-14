@@ -55,8 +55,50 @@ module:
 - the core aspect package list.
 
 `BIT_NATIVE_INSTALL=off` routes the command to the previous TypeScript
-implementation. The TypeScript implementation stays in place for programmatic
-installs from other commands.
+implementation.
+
+## Programmatic installs
+
+Other commands install through `InstallMain.install` (`bit import`, `bit new`,
+`bit fork`, `bit rename`, `bit merge`, `bit clone`, `bit lane import`, `bit eject`,
+generators creating components, the IDE API). Those calls also run on the native
+installer: `scopes/workspace/install/native-install.ts` calls the addon's
+`installWithOptions` with the options as JSON, and the running Harmony instance
+serves the host callbacks. `afterInstall` runs the TypeScript cycle body on the
+loaded aspects (global virtual store bridge, `setOldNonLoadedEnvs`, env reloads,
+compile, config files) without loading Harmony again.
+
+In programmatic mode the native installer prints neither the command's runner
+line, its "Resolving component dependencies" line nor the summary, and does not
+resolve component ids among the packages, as `InstallMain.install` does not. It
+returns the old non-loaded envs (`getOldNonLoadedEnvs`). The TypeScript side then
+reloads `workspace.jsonc` when the native installer changed it
+(`triggerOnWorkspaceConfigChange`), clears the workspace cache and returns the
+component directory map. The native installer writes the `onPostInstall` event,
+so it is not published again.
+
+| `WorkspaceInstallOptions` | Native |
+| --- | --- |
+| `lifecycleType`, `savePrefix`, `updateAll`, `addMissingDeps`, `skipUnavailable`, `recurringInstall`, `lockfileOnly`, `restoreFromDependenciesGraph`, `allowScripts`, `skipPrune` | same option |
+| `dedupe` | `skipDedupe: !dedupe` (unset means no dedupe, as in TypeScript) |
+| `import` | `skipImport: !import` (unset means no import) |
+| `compile`, `writeConfigFiles`, `includeOptionalDeps` | skipped only when `false` |
+| `updateExisting`, `skipIfExisting` | `existingEntries`: `skip`, else `update`, else `fail` (`EntryAlreadyExist`) |
+| `optimizeReportForNonTerminal` | `appendOnly` reporter |
+| `showExternalPackageManagerPrompt` | `externalPrompt`; without it, external package manager mode keeps the TypeScript path (it writes `package.json` instead of installing) |
+| `dependenciesGraph` (explicit graph) | TypeScript path |
+| `copyPeerToRuntimeOnRoot: false`, `copyPeerToRuntimeOnComponents: true` | TypeScript path |
+| `addMissingPeers` without `lifecycleType: 'peer'` | TypeScript path (TypeScript adds them as runtime dependencies) |
+
+Workspaces using yarn, `BIT_NATIVE_INSTALL=off` and a missing addon also keep the
+TypeScript implementation; `BIT_NATIVE_INSTALL_REQUIRE=on` turns the last two into
+errors.
+
+Output follows Bit's logger. The native installer prints status and success
+lines while Bit's loader exists, and console lines without a loader only when
+`logger.shouldWriteToConsole` is on. Like `PnpmPackageManager.install`, it turns
+the loader on after the package manager, and status lines are not shown on CI
+(`logger.setStatusLine`).
 
 ## Crate layout (`native/install/src`)
 
