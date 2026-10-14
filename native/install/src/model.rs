@@ -181,3 +181,22 @@ pub struct InstallPlan {
     /// Non-root manifest names (`externalDependencies` with root components).
     pub external_dependencies: Vec<String>,
 }
+
+/// The dependency policy an env contributes (`env.jsonc`, or `getDependencies()`
+/// through the host for envs without one).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnvPolicy {
+    /// Applied to every component using the env (peers use `supportedRange`).
+    pub component: Vec<PolicyEntry>,
+    /// The env's own peers (`env.jsonc` `peers[]` with `version`, `force: true`,
+    /// `source: "env-own"`): installed at the root and for the env component itself.
+    pub self_policy: Vec<PolicyEntry>,
+    /// The policy came from `getDependencies()` because the env has no `env.jsonc`
+    /// (`envsWithoutManifest` in TypeScript).
+    pub without_manifest: bool,
+}
+
+/// Bit's global configuration (`bit config`), keyed by the config key
+/// (`user.token`, `registry`, `proxy`, ...).
+pub type GlobalConfig = IndexMap<String, Value>;
