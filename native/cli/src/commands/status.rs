@@ -149,16 +149,15 @@ fn read<Prepared>(
     let targets = result_targets(&context, &capture.components, &compared, &issues)?;
     let semver = grammar::snapshot(semver_values(&context, &targets)?.iter().map(String::as_str))
         .ok_or_else(|| decline("status semver grammar limits"))?;
-    let current_lane_id = match context.get("currentLaneId") {
-        Some(id) => text(Some(id))?.to_string(),
-        None => {
-            let scope = text(
-                context
-                    .get("scope")
-                    .and_then(|scope| scope.get("name")),
-            )?;
-            format!("{scope}/main")
-        }
+    let current_lane_id = if let Some(id) = context.get("currentLaneId") {
+        text(Some(id))?.to_string()
+    } else {
+        let scope = text(
+            context
+                .get("scope")
+                .and_then(|scope| scope.get("name")),
+        )?;
+        format!("{scope}/main")
     };
     let mut result: Value = engine.request(&json!({
         "kind": "statusResult",
