@@ -142,7 +142,13 @@ fn existing_lane_only_marker_is_retained_in_staged_configuration() {
     bitmap["_bit_lane"] = json!({"id":{"scope":"scope","name":"feature"},"exported":true});
     bitmap["alpha"]["onLanesOnly"] = json!(true);
     fs::write(bitmap_path, serde_json::to_vec(&bitmap).unwrap()).unwrap();
-    let prepared = prepare(
+    let mut prepared = super::Prepared {
+        proofs: Vec::new(),
+        writes: Vec::new(),
+        links: Vec::new(),
+        copies: Vec::new(),
+    };
+    super::staged::prepare(
         &directory.0,
         &[Input {
             identity: "scope/alpha",
@@ -150,9 +156,10 @@ fn existing_lane_only_marker_is_retained_in_staged_configuration() {
             hash: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             version: &version,
         }],
-        false,
+        &mut prepared,
     )
     .unwrap();
+    prepared.validate().unwrap();
     let staged = directory.0.join(".bit/staged-config/scope/feature.json");
     let bytes = &prepared.writes
         .iter()
