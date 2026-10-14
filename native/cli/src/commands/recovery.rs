@@ -148,7 +148,17 @@ impl Prepared {
         if targets.len() > 4096 {
             return Err(decline("recovery target limit"));
         }
-        let capture = capture::capture(&mut engine, root, &home, &context, targets)?;
+        let capture = capture::capture_with(
+            &mut engine,
+            root,
+            &home,
+            &context,
+            targets,
+            capture::CaptureOptions {
+                incomplete_reset: options.kind == Kind::Component,
+                ..Default::default()
+            },
+        )?;
         let versions = workspace_command::semver_values(Some("reset"), &context)?;
         let semver = grammar::snapshot(versions.iter().map(String::as_str))
             .ok_or_else(|| decline("recovery semver grammar"))?;
