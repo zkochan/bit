@@ -10,6 +10,7 @@ mod read;
 mod read_raw;
 mod resolve_dependencies;
 mod resolve_typescript;
+mod response;
 mod scan;
 mod source_overlay;
 mod status;
@@ -137,19 +138,7 @@ struct Response {
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<String>,
 }
-struct Output(Vec<u8>);
-impl Write for Output {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        if self.0.len() + bytes.len() > MAX_OUTPUT {
-            return Err(invalid("workspace output limit"));
-        }
-        self.0.extend_from_slice(bytes);
-        Ok(bytes.len())
-    }
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
+use response::Output;
 
 /// Read-only workspace operations return no partial results on unsupported data.
 pub(crate) fn serve(
