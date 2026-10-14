@@ -136,7 +136,8 @@ pub(super) fn targets(root: &Path, config: &Value) -> io::Result<Vec<Target>> {
 }
 fn bitmap_targets(bitmap: &Value, config: &Value) -> io::Result<Vec<Target>> {
     let entries = bitmap.as_object().ok_or_else(|| invalid("status bitmap"))?;
-    if bitmap["$schema-version"] != "17.0.0" || entries.len() > 4097 {
+    let metadata_rows = 1 + usize::from(entries.contains_key("_bit_lane"));
+    if bitmap["$schema-version"] != "17.0.0" || entries.len() > 4096 + metadata_rows {
         return Err(invalid("status bitmap schema or count"));
     }
     let mut roots = HashSet::new();
