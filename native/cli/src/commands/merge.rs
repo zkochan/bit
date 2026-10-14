@@ -25,6 +25,9 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
     if let Some(resolve) = resolve::parse(&argv[1..]) {
         return resolve::run(args, &resolve);
     }
+    if let Some(abort) = super::recovery::parse_component(&argv[1..]) {
+        return super::recovery::run(args, &abort);
+    }
     let Some(options) = options::parse(&argv[1..]) else {
         return Ok(Outcome::Declined("outside the native merge grammar".to_string()));
     };

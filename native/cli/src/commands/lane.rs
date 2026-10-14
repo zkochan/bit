@@ -27,6 +27,11 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
         Some("current") => current::current(args, &argv[2..]),
         Some("show") => show::show(args, &argv[2..]),
         Some("merge") => merge(args, &argv),
+        Some("merge-abort") => super::recovery::parse_lane(&argv[2..])
+            .map_or_else(
+                || Ok(Outcome::Declined("outside the native lane merge-abort grammar".to_string())),
+                |options| super::recovery::run(args, &options),
+            ),
         _ => Ok(Outcome::Declined("a lane command outside the native grammar".to_string())),
     }
 }
