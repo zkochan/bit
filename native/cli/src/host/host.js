@@ -76,6 +76,7 @@ async function handle(line) {
 const handlers = {
   hostInfo,
   envPolicy: ({ envId }) => envPolicy(envId),
+  devPatterns: ({ envId }) => devPatterns(envId),
   appTypes,
   packageJsonProps: ({ envId }) => packageJsonProps(envId),
   transformPackageJson: ({ component, manifest }) => transformPackageJson(component, manifest),
@@ -171,6 +172,23 @@ async function envPolicy(envId) {
   const env = await loadEnv(envId);
   const policy = await env?.getDependencies?.();
   return policy ?? null;
+}
+
+/**
+ * The env's dev-file pattern methods, each `null` when the env does not implement it.
+ * The node env implements none of them.
+ */
+async function devPatterns(envId) {
+  if (envId === 'teambit.harmony/node') return { devPatterns: null, tests: null, docs: null, compositions: null };
+  const env = await loadEnv(envId);
+  if (!env) return null;
+  const call = async (method) => (typeof env[method] === 'function' ? await env[method]() : null);
+  return {
+    devPatterns: await call('getDevPatterns'),
+    tests: await call('getTestsDevPatterns'),
+    docs: await call('getDocsDevPatterns'),
+    compositions: await call('getCompositionsDevPatterns'),
+  };
 }
 
 async function appTypes() {
