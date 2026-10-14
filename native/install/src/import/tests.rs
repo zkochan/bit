@@ -240,9 +240,12 @@ fn imports_bitmap_versions_with_dependencies_from_a_file_remote() {
     )
     .unwrap();
     assert_eq!(refs[0], json!({ "id": { "scope": "remote", "name": "comp1" }, "head": comp1 }));
-    assert!(output.starts_with(
-        "- importing missing objects\n- importing components\n✔ importing components (completed in "
-    ));
+    assert!(
+        output.starts_with(
+            "- importing missing objects\n- importing components\n- importing 1 components of their latest on main\n- successfully imported 1 components of their latest on main\n- import 1 components with their dependencies (if missing)\n- importing 1 components for getting missing versions and dependencies\n- successfully imported 2 components for getting missing versions and dependencies\n✔ importing components (completed in "
+        ),
+        "{output}",
+    );
     let (again, _) = run_import(&fixture);
     assert_eq!(again.objects, 0, "an up-to-date workspace fetches nothing new");
 }
@@ -523,4 +526,129 @@ fn reads_update_dependents_of_the_local_lane_object() {
         .unwrap();
     let dependents = local_update_dependents(&repo, &lane).unwrap();
     assert_eq!(dependents, [Id::parse("org/ui/button@1.0.1").unwrap()]);
+}
+
+/// A bare `lane-scope` remote holding only the lane object `dev`, which lists
+/// `remote/comp1` at `head` (its objects live on `remote`).
+fn lane_only_remote(dir: &Path, head: &str) -> PathBuf {
+    let scope = dir.join("lane-scope");
+    fs::create_dir_all(&scope).unwrap();
+    fs::write(scope.join("scope.json"), r#"{ "name": "lane-scope" }"#).unwrap();
+    let repo = Repo::new(&scope);
+    let hash = sha1_hex("dev-lane");
+    let object = json!({
+        "name": "dev",
+        "scope": "lane-scope",
+        "components": [{ "id": { "scope": "remote", "name": "comp1" }, "head": head }],
+        "log": { "date": "1700000000000" },
+        "schema": "1.0.0",
+    });
+    write(&repo, "Lane", &hash, &object);
+    repo.index_add(&[IndexRow::Lane { scope: "lane-scope".into(), name: "dev".into(), hash }])
+        .unwrap();
+    scope
+}
+
+#[test]
+fn lane_components_the_lane_scope_lacks_are_retried_from_their_own_scope() {
+    let (fixture, comp1) = fixture(true, &["comp1"]);
+    let lane_scope = lane_only_remote(fixture.root.parent().unwrap(), &comp1);
+    let remote = fixture.root
+        .parent()
+        .unwrap()
+        .join("remote");
+    let scope_json = json!({ "name": "ws-local", "remotes": {
+        "remote": format!("file://{}", remote.display()),
+        "lane-scope": format!("file://{}", lane_scope.display()),
+    } });
+    fs::write(fixture.scope_dir.join("scope.json"), scope_json.to_string()).unwrap();
+    let bitmap = format!(
+        r#"{{ "comp1": {{ "name": "comp1", "scope": "remote", "version": "{comp1}", "mainFile": "index.ts", "rootDir": "comp1" }},
+"_bit_lane": {{ "id": {{ "scope": "lane-scope", "name": "dev" }}, "exported": true }},
+"$schema-version": "17.0.0" }}"#,
+    );
+    fs::write(fixture.root.join(".bitmap"), bitmap).unwrap();
+    let (summary, output) = run_import(&fixture);
+    let repo = Repo::new(&fixture.scope_dir);
+    assert!(repo.exists(&comp1), "fetched from the component's own scope");
+    assert_eq!(summary.components, 1);
+    assert!(
+        output.contains("- importing 1 components for getting missing versions and dependencies (retrying from original scope)\n"),
+        "{output}",
+    );
+    let refs: Value = serde_json::from_slice(
+        &fs::read(fixture.scope_dir.join("refs/remotes/lane-scope/dev")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(refs[0]["head"], json!(comp1));
+    assert!(!repo.exists(&sha1_hex("dev-lane")), "a lane the scope lacks is not written");
+}
+
+#[test]
+fn remotes_are_fetched_concurrently_in_group_order() {
+    let dir = TempDir::new().unwrap();
+    let mut hosts = serde_json::Map::new();
+    for name in ["second", "first"] {
+        let scope = dir.path().join(name);
+        fs::create_dir_all(&scope).unwrap();
+        fs::write(scope.join("scope.json"), r#"{ "name": "remote" }"#).unwrap();
+        tag(&Repo::new(&scope), "comp1", &[], false);
+        hosts.insert(name.into(), json!(format!("file://{}", scope.display())));
+    }
+    let global = GlobalConfig::default();
+    let remotes =
+        super::remotes::Remotes::load(&json!({ "remotes": hosts }), dir.path(), &global).unwrap();
+    let network = Network::new(&global, "1.0.0", None).unwrap();
+    let fetcher = super::fetch::Fetcher { remotes: &remotes, network: &network, concurrency: 2 };
+    let grouped: indexmap::IndexMap<String, Vec<String>> = [
+        ("second".to_string(), vec!["remote/comp1".to_string()]),
+        ("first".to_string(), vec!["remote/comp1".to_string()]),
+    ]
+    .into_iter()
+    .collect();
+    let fetched = runtime()
+        .block_on(fetcher.fetch(&grouped, &FetchOptions::latest(None, false)))
+        .unwrap();
+    let scopes: Vec<&String> = fetched.keys().collect();
+    assert_eq!(scopes, ["second", "first"]);
+    assert!(
+        fetched
+            .values()
+            .all(|items| !items.is_empty()),
+    );
+}
+
+#[test]
+fn the_fetch_concurrency_comes_from_the_bit_config() {
+    let global = |value: Value| -> GlobalConfig {
+        std::iter::once(("concurrency.fetch".to_string(), value)).collect()
+    };
+    assert_eq!(super::fetch::concurrency(&GlobalConfig::default()), 15);
+    assert_eq!(super::fetch::concurrency(&global(json!("4"))), 4);
+    assert_eq!(super::fetch::concurrency(&global(json!(7))), 7);
+    assert_eq!(super::fetch::concurrency(&global(json!(0))), 15, "0 falls back like `|| 15`");
+}
+
+#[test]
+fn progress_restarts_the_loader_every_hundred_objects() {
+    let (sink, written) = recorder();
+    let output = Output::new(false, false, true, sink);
+    let Some(progress) = super::persist::Progress::new(&output, "importing 1 components now")
+    else {
+        return; // `CI` is set: `showProgress` prints nothing.
+    };
+    let dir = TempDir::new().unwrap();
+    let repo = Repo::new(dir.path());
+    let items: Vec<ObjectItem> = (0..150)
+        .map(|index| {
+            let content = format!("source {index}");
+            let hash = sha1_hex(&content);
+            let compressed = super::objects::compress("Source", &hash, content.as_bytes()).unwrap();
+            ObjectItem { hash, compressed, scope: None }
+        })
+        .collect();
+    let fetched: super::fetch::PerRemote = std::iter::once(("remote".to_string(), items)).collect();
+    let result = super::persist::persist(&repo, &fetched, Some(&progress)).unwrap();
+    assert_eq!(result.objects, 150);
+    assert_eq!(*written.lock().unwrap(), "- importing 1 components now. downloaded 100 objects.\n");
 }
