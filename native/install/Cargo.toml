@@ -25,14 +25,19 @@ pnpm-store-dir = { workspace = true }
 pnpm-tarball = { workspace = true }
 pnpm-workspace = { workspace = true }
 async-trait = "0.1"
+flate2 = { version = "1.1", default-features = false, features = ["zlib-rs"] }
 indexmap = { version = "2", features = ["serde"] }
 node-semver = "2"
+rayon = "1.11"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
+sha1 = "0.10"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "fs"] }
 
 [dev-dependencies]
+pretty_assertions = "1"
 tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt"] }
 
 [lints]
 workspace = true
