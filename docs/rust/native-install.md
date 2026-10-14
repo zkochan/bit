@@ -79,7 +79,34 @@ the engine version Bit ships (`workspace.jsonc`). It also repeats pnpm's
 pnpm's `deps-restorer` embeds `cas-loader.mjs.inc`, a bundle that pnpm builds
 and does not commit. It is only used by pnpm's experimental CAS store loader,
 which Bit never enables. Before a build, `node scripts/rust/prepare-pnpm-engine.mjs`
-writes a stub that fails loudly into the pinned checkout.
+writes a stub that fails loudly into the pinned checkout. The script is
+idempotent; every CI job runs it after fetching and before compiling, including
+the Alpine release container. It must also run after a restored `~/.cargo/git`
+cache.
+
+## Packaging
+
+The engine ships inside `bit-workspace.node`, the addon of the packaged
+object-import helper. The artifact's source identity covers `native/install`.
+
+Third-party notices take each crate's own license files where it publishes them.
+Otherwise they use pinned texts from
+`scripts/rust-dependency-analysis/artifacts/licenses/sources.json`:
+
+- **pnpm engine crates:** the MIT `pnpm-*` crates use the pnpm repository's root
+  `LICENSE` at the pinned revision. The packager checks it against the checkout.
+- **`pnpr-*` crates:** they reach the engine through `pnpm-pnpr-client` and name
+  a `license-file` with PolyForm Shield 1.0.0. That is not an OSI license. The
+  file is included verbatim and its hash is checked.
+- **A few crates.io crates without license files:** their upstream text, or the
+  canonical SPDX text with the crate authors as copyright holders. Each is
+  pinned by version and VCS revision.
+
+The engine raises the dependency count to about 560 crates. Each distinct
+license text is therefore written once, and later crates reference it by
+digest. For `aarch64-apple-darwin` that keeps the notices at about 1.5 MB, well
+inside the 4 MiB bound that packaging, installation and runtime discovery
+verify. The scanner artifact lists only the scanner's own dependency closure.
 
 ## Lockfile compatibility
 
