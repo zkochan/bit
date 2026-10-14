@@ -63,6 +63,7 @@ pub(super) struct Retained {
     root: PathBuf,
     client_id: String,
     pending: Vec<Pending>,
+    selected_order: HashMap<String, usize>,
     network: NetworkConfig,
     publication: Option<publication::Prepared>,
     transferred: bool,
@@ -91,6 +92,11 @@ pub(in crate::workspace::engine) fn prepare(
     validate(input)?;
     let selected = model::select(input)?;
     let count = selected.len();
+    let selected_order = selected
+        .iter()
+        .enumerate()
+        .map(|(index, item)| (format!("{}/{}", item.scope, item.name), index))
+        .collect();
     state.sequence = state.sequence.wrapping_add(1);
     let token = format!("outbound-{}", state.sequence);
     let mut hosts = HashMap::new();
@@ -143,6 +149,7 @@ pub(in crate::workspace::engine) fn prepare(
         root: input.root.clone(),
         client_id: input.transport.client_id.clone(),
         pending,
+        selected_order,
         network: NetworkConfig {
             global_config_dir: input.transport.global_config_dir.clone(),
             node_executable: input.transport.node_executable.clone(),
@@ -230,6 +237,13 @@ pub(in crate::workspace::engine) fn apply(
     for batch in &retained.pending {
         exported_ids.extend(actions.persist(retained, batch)?);
     }
+    exported_ids.sort_by_key(|id| {
+        let identity = id.rsplit_once('@').map_or(id.as_str(), |(name, _)| name);
+        retained.selected_order
+            .get(identity)
+            .copied()
+            .unwrap_or(usize::MAX)
+    });
     retained.exported_ids = exported_ids;
     retained.transferred = true;
     Ok((
