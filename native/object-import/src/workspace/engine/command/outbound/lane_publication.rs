@@ -15,6 +15,10 @@ pub(super) struct Prepared {
     name: String,
     expected_ids: HashSet<String>,
     index_before: Vec<u8>,
+    lane_before: Vec<u8>,
+    history_before: Vec<u8>,
+    lane_hash: String,
+    history_hash: String,
     models: Vec<Model>,
     bitmap_before: Vec<u8>,
     bitmap_after: Vec<u8>,
@@ -58,6 +62,8 @@ pub(super) fn prepare(input: &Prepare, selected: &LaneSelected) -> io::Result<Pr
         return Err(invalid("outbound lane publication bounds"));
     }
     let refs_after = serde_json::to_vec_pretty(components)?;
+    let lane_before = object_bytes(root, &selected.hash)?;
+    let history_before = object_bytes(root, &selected.history_hash)?;
     let refs_before = read_optional(&refs_path(root, scope, name))?;
     let bitmap_before = fs::read(root.join(".bitmap"))?;
     if bitmap_before.len() > 4 * 1024 * 1024 {
@@ -84,6 +90,10 @@ pub(super) fn prepare(input: &Prepare, selected: &LaneSelected) -> io::Result<Pr
         name: name.clone(),
         expected_ids,
         index_before: fs::read(root.join(".bit/index.json"))?,
+        lane_before,
+        history_before,
+        lane_hash: selected.hash.clone(),
+        history_hash: selected.history_hash.clone(),
         models: selected.models
             .iter()
             .map(|model| Model {
@@ -126,6 +136,8 @@ impl Prepared {
             || read_optional(&refs_path(root, &self.scope, &self.name))? != self.refs_before
             || read_optional(&root.join(".bit/staged-snaps"))? != self.staged_before
             || fs::read(root.join(".bit/staged-config/main.json"))? != self.staged_config_before
+            || object_bytes(root, &self.lane_hash)? != self.lane_before
+            || object_bytes(root, &self.history_hash)? != self.history_before
         {
             return Err(invalid("outbound lane local state changed"));
         }
@@ -247,6 +259,17 @@ fn refs_path(root: &Path, scope: &str, name: &str) -> PathBuf {
     root.join(".bit/refs/remotes")
         .join(scope)
         .join(name)
+}
+
+fn object_bytes(root: &Path, hash: &str) -> io::Result<Vec<u8>> {
+    if hash.len() != 40 || !hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(invalid("outbound lane object hash"));
+    }
+    fs::read(
+        root.join(".bit/objects")
+            .join(&hash[..2])
+            .join(&hash[2..]),
+    )
 }
 
 fn read_optional(path: &Path) -> io::Result<Option<Vec<u8>>> {
