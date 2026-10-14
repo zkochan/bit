@@ -301,7 +301,9 @@ export class InProcessInstallHost {
       case 'dependencyPolicies':
         return JSON.stringify(await this.dependencyPolicies(input.extensionIds));
       case 'detectDependencies':
-        return JSON.stringify(await this.detectDependencies(input.envId, input.files));
+        return JSON.stringify(
+          await this.detectDependencies(input.envId, input.files, input.componentDir, input.aspectIds)
+        );
       case 'packageJsonProps':
         return JSON.stringify(await this.packageJsonProps(input.envId));
       case 'transformPackageJson':
@@ -343,10 +345,20 @@ export class InProcessInstallHost {
     return dependencyResolver['policiesRegistry'].toArray();
   }
 
-  /** The import specifiers custom detectors find in `files` (`detectWithCustomDetectors`). */
-  private async detectDependencies(envId: string, files: string[]) {
+  /**
+   * The import specifiers custom detectors find in `files` (`detectWithCustomDetectors`). The
+   * workspace aspects (`aspectIds`) are loaded already when the CLI started with `loadAspects`;
+   * loading them again is a no-op.
+   */
+  private async detectDependencies(envId: string, files: string[], componentDir: string, aspectIds?: string[]) {
+    if (aspectIds?.length) {
+      await this.context.workspace.loadAspects(aspectIds, false, undefined, {
+        throwOnError: false,
+        hideMissingModuleError: true,
+      });
+    }
     const env = await this.env(envId);
-    return detectWithCustomDetectors(env?.getDepDetectors?.(), files);
+    return detectWithCustomDetectors(env?.getDepDetectors?.(), files, componentDir);
   }
 
   private async packageJsonProps(envId: string) {

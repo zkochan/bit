@@ -78,7 +78,8 @@ const handlers = {
   envPolicy: ({ envId }) => envPolicy(envId),
   devPatterns: ({ envId }) => devPatterns(envId),
   dependencyPolicies: ({ extensionIds }) => dependencyPolicies(extensionIds),
-  detectDependencies: ({ envId, files }) => detectDependencies(envId, files),
+  detectDependencies: ({ envId, files, componentDir, aspectIds }) =>
+    detectDependencies(envId, files, componentDir, aspectIds),
   appTypes,
   packageJsonProps: ({ envId }) => packageJsonProps(envId),
   transformPackageJson: ({ component, manifest }) => transformPackageJson(component, manifest),
@@ -206,12 +207,18 @@ async function dependencyPolicies(extensionIds) {
 
 /**
  * The import specifiers custom detectors find in `files`: the env's `getDepDetectors()`, then
- * the detectors aspects registered (`registerDetector`); `null` when there are none.
+ * the detectors aspects registered (`registerDetector`); `null` when there are none. `aspectIds`
+ * are the workspace aspects the CLI loads on start (`getNotLoadedConfiguredExtensions`), which
+ * `loadBit` does not.
  */
-async function detectDependencies(envId, files) {
+async function detectDependencies(envId, files, componentDir, aspectIds) {
+  if (aspectIds?.length) {
+    const workspace = (await loadHarmony()).get('teambit.workspace/workspace');
+    await workspace.loadAspects(aspectIds, false, undefined, { throwOnError: false, hideMissingModuleError: true });
+  }
   const env = await loadEnv(envId);
   const { detectWithCustomDetectors } = bitRequire('@teambit/dependency-resolver/dist/custom-detectors.js');
-  return detectWithCustomDetectors(env?.getDepDetectors?.(), files);
+  return detectWithCustomDetectors(env?.getDepDetectors?.(), files, componentDir);
 }
 
 async function appTypes() {

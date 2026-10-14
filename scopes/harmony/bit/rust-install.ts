@@ -154,7 +154,9 @@ class InstallHost {
       case 'dependencyPolicies':
         return JSON.stringify(await this.dependencyPolicies(input.extensionIds));
       case 'detectDependencies':
-        return JSON.stringify(await this.detectDependencies(input.envId, input.files));
+        return JSON.stringify(
+          await this.detectDependencies(input.envId, input.files, input.componentDir, input.aspectIds)
+        );
       case 'packageJsonProps':
         return JSON.stringify(await this.packageJsonProps(input.envId));
       case 'transformPackageJson':
@@ -209,12 +211,18 @@ class InstallHost {
 
   /**
    * The import specifiers custom detectors find in `files`: the env's `getDepDetectors()`, then
-   * the detectors aspects registered (`registerDetector`); `null` when there are none.
+   * the detectors aspects registered (`registerDetector`); `null` when there are none. `aspectIds`
+   * are the workspace aspects the CLI loads on start (`getNotLoadedConfiguredExtensions`), which
+   * `loadBit` does not.
    */
-  private async detectDependencies(envId: string, files: string[]) {
+  private async detectDependencies(envId: string, files: string[], componentDir: string, aspectIds?: string[]) {
+    if (aspectIds?.length) {
+      const workspace = (await this.loadHarmony()).get<any>('teambit.workspace/workspace');
+      await workspace.loadAspects(aspectIds, false, undefined, { throwOnError: false, hideMissingModuleError: true });
+    }
     const env = await this.env(envId);
     const { detectWithCustomDetectors } = await import('@teambit/dependency-resolver/dist/custom-detectors.js');
-    return detectWithCustomDetectors(env?.getDepDetectors?.(), files);
+    return detectWithCustomDetectors(env?.getDepDetectors?.(), files, componentDir);
   }
 
   private async appTypes(): Promise<string[]> {
