@@ -157,7 +157,8 @@ impl Repo {
             .into_iter()
             .flatten()
             .find(|row| {
-                row["id"]["scope"].as_str() == Some(scope) && row["id"]["name"].as_str() == Some(name)
+                row["id"]["scope"].as_str() == Some(scope)
+                    && row["id"]["name"].as_str() == Some(name)
             })
             .and_then(|row| row["hash"].as_str())
             .map(str::to_owned))

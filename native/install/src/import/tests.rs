@@ -5,7 +5,9 @@ use super::{
     http::{Network, Retry},
     import_current_objects,
     lane::local_update_dependents,
-    objects::{IndexRow, Repo, component_hash, compress_json, parse, sha1_hex, version_history_hash},
+    objects::{
+        IndexRow, Repo, component_hash, compress_json, parse, sha1_hex, version_history_hash,
+    },
     remotes::{Remote, symphony_url},
     tar::{self, ObjectItem},
 };
@@ -515,7 +517,8 @@ fn reads_update_dependents_of_the_local_lane_object() {
         "components": [],
         "updateDependents": ["org/ui/button@1.0.1", "not an id"],
     });
-    repo.write_raw(&hash, &compress_json("Lane", &hash, &object).unwrap()).unwrap();
+    repo.write_raw(&hash, &compress_json("Lane", &hash, &object).unwrap())
+        .unwrap();
     repo.index_add(&[IndexRow::Lane { scope: "org".into(), name: "feature".into(), hash }])
         .unwrap();
     let dependents = local_update_dependents(&repo, &lane).unwrap();

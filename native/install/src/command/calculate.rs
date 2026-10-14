@@ -15,6 +15,7 @@ use crate::{
         WorkspaceComponent,
     },
     policy::{self, is_core_env, split_version},
+    workspace::ScopeObjects,
 };
 use indexmap::IndexMap;
 use serde_json::Value;
@@ -59,7 +60,7 @@ pub async fn calculate(
     )
     .await?;
     let apps = apps(session, loaded, &components).await?;
-    let root_policy = root_policy(session, loaded, workspace_policy);
+    let root_policy = root_policy(session, loaded, workspace_policy)?;
     let outcome = plan(
         session,
         loaded,
@@ -126,12 +127,14 @@ fn workspace_policy(loaded: &Loaded) -> io::Result<Vec<PolicyEntry>> {
 
 /// `addConfiguredAspectsToWorkspacePolicy` and `addConfiguredGeneratorEnvsToWorkspacePolicy`:
 /// aspects and envs configured in `workspace.jsonc` but not in the workspace are installed
-/// at the root (`skipIfExisting`).
+/// at the root (`skipIfExisting`), under the package name their scope objects record
+/// (`getPackageName`), or the default name when the scope does not hold them.
 fn root_policy(
     session: &Session<'_>,
     loaded: &Loaded,
     mut policy: Vec<PolicyEntry>,
-) -> Vec<PolicyEntry> {
+) -> io::Result<Vec<PolicyEntry>> {
+    let objects = ScopeObjects::new(&loaded.workspace.scope_path);
     let aspects = loaded.config.user_aspect_ids(&session.core_ids());
     let envs = loaded.config.generator_envs
         .iter()
@@ -143,7 +146,8 @@ fn root_policy(
         if in_workspace(loaded, &component_id) {
             continue;
         }
-        let package = default_package_name(&component_id);
+        let package = stored_package_name(&objects, &component_id, version)?
+            .unwrap_or_else(|| default_package_name(&component_id));
         if policy
             .iter()
             .any(|entry| entry.name == package)
@@ -163,7 +167,19 @@ fn root_policy(
             source: None,
         });
     }
-    policy
+    Ok(policy)
+}
+
+/// The package name the scope records for `id` at `version` (its head without one).
+fn stored_package_name(
+    objects: &ScopeObjects,
+    id: &ComponentId,
+    version: Option<&str>,
+) -> io::Result<Option<String>> {
+    let versioned = ComponentId { version: version.map(str::to_owned), ..id.clone() };
+    Ok(objects
+        .component_or_head(&versioned)?
+        .map(|model| model.package_name(id)))
 }
 
 fn in_workspace(loaded: &Loaded, id: &ComponentId) -> bool {
