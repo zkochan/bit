@@ -212,13 +212,13 @@ impl Prepared {
             .as_ref()
             .map(|dirs| {
                 format!(
-                    "\nThe following directories introduced by the merge will be deleted: {dirs}"
+                    "\nThe following directories introduced by the merge will be deleted: {dirs}",
                 )
             })
             .unwrap_or_default();
         format!(
             "Code changes that were done since the last lane-merge will be lost.{directories}\nThe .bitmap and workspace.jsonc files will be restored to the state before the merge.\nThis action is irreversible.\n{}",
-            chalk.bold("Do you want to continue? [yes(y)/no(n)]")
+            chalk.bold("Do you want to continue? [yes(y)/no(n)]"),
         )
     }
 
