@@ -54,7 +54,8 @@ impl PreparedImport {
             store.write_index(&bytes)?;
         }
         if let Some(bytes) = &self.writes.switch_tracking {
-            let scope = self.environment.local_directory.parent()
+            let scope = self.environment.local_directory
+                .parent()
                 .ok_or_else(|| invalid("switch scope directory"))?;
             write_file(&scope.join("scope.json"), bytes)?;
         }

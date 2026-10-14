@@ -125,6 +125,7 @@ struct Cache {
     lane_sources: HashMap<String, String>,
     lane_reason: Option<String>,
     fetched_lane: Option<lane::Record>,
+    switch_existing_versions: bool,
 }
 struct Writes {
     remote_objects: Vec<(PathBuf, String, Value)>,

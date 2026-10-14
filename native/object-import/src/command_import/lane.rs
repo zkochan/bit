@@ -50,6 +50,9 @@ impl Id {
 }
 
 impl PreparedImport {
+    pub(crate) fn switch_existing_versions(&mut self) {
+        self.cache.switch_existing_versions = true;
+    }
     /// Stage the local alias Node records when a remote switch first tracks a
     /// lane. The scope file is captured with the fetched objects and written
     /// by the same import owner before the workspace bitmap is published.
@@ -62,25 +65,35 @@ impl PreparedImport {
             .parent()
             .ok_or_else(|| invalid("switch scope directory"))?
             .join("scope.json");
-        let mut scope = self.capture.json(&path)?
+        let mut scope = self.capture
+            .json(&path)?
             .ok_or_else(|| invalid("switch scope configuration missing"))?;
         if scope.get("lanes").is_none() {
             scope["lanes"] = serde_json::json!({"current":"main","tracking":[],"new":[]});
         }
-        let tracking = scope["lanes"]["tracking"].as_array_mut()
+        let tracking = scope["lanes"]["tracking"]
+            .as_array_mut()
             .ok_or_else(|| invalid("switch lane tracking configuration"))?;
         if tracking.len() >= 4096 {
             return Err(invalid("switch lane tracking budget"));
         }
-        if tracking.iter().any(|row| row["remoteLane"] == id.name && row["remoteScope"] == id.scope) {
+        if tracking
+            .iter()
+            .any(|row| row["remoteLane"] == id.name && row["remoteScope"] == id.scope)
+        {
             return Ok(());
         }
-        if let Some(existing) = tracking.iter().find(|row| row["localLane"] == id.name) {
+        if let Some(existing) = tracking
+            .iter()
+            .find(|row| row["localLane"] == id.name)
+        {
             if existing["remoteLane"] != id.name || existing["remoteScope"] != id.scope {
                 return Err(invalid("switch lane alias already tracks another remote"));
             }
         }
-        tracking.push(serde_json::json!({"localLane":id.name,"remoteLane":id.name,"remoteScope":id.scope}));
+        tracking.push(
+            serde_json::json!({"localLane":id.name,"remoteLane":id.name,"remoteScope":id.scope}),
+        );
         let mut output = Vec::new();
         let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
         let mut serializer = serde_json::Serializer::with_formatter(&mut output, formatter);

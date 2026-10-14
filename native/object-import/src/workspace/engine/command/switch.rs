@@ -47,8 +47,7 @@ fn validate_options(request: &Prepare) -> io::Result<()> {
         || request.options.message.is_some()
         || request.options.all
         || request.options.no_snap;
-    let lane = !options.skip_fetch
-        || options.workspace_only
+    let lane = options.workspace_only
         || options.include_deps
         || options.exclude_non_lane_comps
         || options.no_auto_snap;
@@ -56,7 +55,7 @@ fn validate_options(request: &Prepare) -> io::Result<()> {
     if checkout || lane || merge {
         return Err(invalid("switch requires canonical lane options"));
     }
-    if options.name.contains('/') && options.name != "main" {
+    if options.skip_fetch && options.name.contains('/') && options.name != "main" {
         return Err(invalid("switch accepts a local lane name"));
     }
     Ok(())
@@ -73,7 +72,31 @@ impl LaneSelection {
         if current == destination {
             return Err(invalid("already checked out to requested lane"));
         }
-        let lane = imported.load_lane(&destination)?;
+        if !request.options.lane.as_ref().unwrap().skip_fetch {
+            let settings = config::configuration_for_command(&request.root, true)?;
+            let visible = super::lane_context::visibility::targets(&bitmap, &settings)?;
+            let identities = visible
+                .iter()
+                .map(|target| {
+                    target["identity"]
+                        .as_str()
+                        .ok_or_else(|| invalid("switch main refresh identity"))
+                        .map(str::to_owned)
+                })
+                .collect::<io::Result<Vec<_>>>()?;
+            imported.refresh_lane_main(&identities)?;
+            imported.switch_existing_versions();
+        }
+        let lane = imported.resolve_other_lane(
+            &destination,
+            request.options.lane.as_ref().unwrap().skip_fetch,
+        )?;
+        if !request.options.lane.as_ref().unwrap().skip_fetch && imported.fetched_lane().is_some() {
+            if !imported.lane_import_histories().is_empty() {
+                return Err(invalid("switch fetched lane history requires canonical handling"));
+            }
+            imported.stage_switch_tracking(&destination)?;
+        }
         let current_lane = imported.load_lane(&current)?;
         validate_lane(&destination, lane.as_ref())?;
         validate_lane(&current, current_lane.as_ref())?;
@@ -102,6 +125,7 @@ impl LaneSelection {
             self.additions(&request.root, &context, &settings)?;
         context["lane"] = json!({"currentId":self.current,"switchId":self.destination,
             "switchExported":self.lane.as_ref().is_some_and(|record| !record.is_new),
+            "switchFetched":self.imported.fetched_lane().is_some(),
             "switchLaneOnly":self.lane_only,"switchLaneHeads":heads,
             "additions":additions,"addedTargets":added_targets,"targets":selected});
         Ok(context)
@@ -327,6 +351,12 @@ pub(super) fn import_count(
         .len();
     if context["lane"]["switchId"]["name"] == "main" {
         return Ok(targets.len() + additions);
+    }
+    if context["lane"]["switchFetched"] == true {
+        return context["lane"]["switchLaneHeads"]
+            .as_object()
+            .map(serde_json::Map::len)
+            .ok_or_else(|| invalid("switch fetched head count"));
     }
     let staged = match std::fs::read_to_string(root.join(".bit/staged-snaps")) {
         Ok(value) => value,
