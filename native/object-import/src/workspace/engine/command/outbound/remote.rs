@@ -240,7 +240,8 @@ fn network(retained: &Retained) -> io::Result<Network> {
             Err(error) if error.kind() == io::ErrorKind::NotFound => GlobalConfig::new(),
             Err(error) => return Err(error),
         };
-    let local: Value = serde_json::from_slice(&fs::read(retained.root.join(".bit/scope.json"))?)?;
+    let local: Value =
+        serde_json::from_slice(&fs::read(retained.network.root.join(".bit/scope.json"))?)?;
     let local_name = local["name"].as_str().ok_or_else(|| invalid("outbound local scope"))?;
     Network::new(
         &config,

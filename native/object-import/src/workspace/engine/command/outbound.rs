@@ -61,7 +61,6 @@ pub(in crate::workspace::engine) struct Finalize {
 
 pub(super) struct Retained {
     token: String,
-    root: PathBuf,
     client_id: String,
     pending: Vec<Pending>,
     selected_order: HashMap<String, usize>,
@@ -83,6 +82,7 @@ struct ResumeContext {
 }
 
 struct NetworkConfig {
+    root: PathBuf,
     global_config_dir: PathBuf,
     node_executable: PathBuf,
     bit_dir: PathBuf,
@@ -123,7 +123,6 @@ pub(in crate::workspace::engine) fn prepare(
     let receipt = prepare_receipt(&token, count, &pending);
     state.outbound = Some(Retained {
         token,
-        root: input.root.clone(),
         client_id: input.transport.client_id.clone(),
         pending,
         selected_order,
@@ -187,6 +186,7 @@ fn prepare_receipt(token: &str, count: usize, pending: &[Pending]) -> Value {
 
 fn network(input: &Prepare) -> NetworkConfig {
     NetworkConfig {
+        root: input.root.clone(),
         global_config_dir: input.transport.global_config_dir.clone(),
         node_executable: input.transport.node_executable.clone(),
         bit_dir: input.transport.bit_dir.clone(),
@@ -358,9 +358,12 @@ fn validate(input: &Prepare) -> io::Result<()> {
         || input.transport.client_id.is_empty()
         || input.transport.export_date.is_empty()
         || input.transport.token.is_some()
-        || input.options.resume
-            .as_deref()
-            .is_some_and(|resume| resume != input.transport.client_id)
+    {
+        return Err(invalid("outbound command requires canonical lifecycle"));
+    }
+    if input.options.resume
+        .as_deref()
+        .is_some_and(|resume| resume != input.transport.client_id)
     {
         return Err(invalid("outbound command requires canonical lifecycle"));
     }
