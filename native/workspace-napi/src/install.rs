@@ -6,6 +6,13 @@
 //! serves the callbacks components implement in JavaScript and returns a
 //! promise of a JSON string; `output(text)` receives all terminal output.
 
+// napi-derive expands `#[napi] async fn` into a module-level trampoline whose
+// generated `NapiRefContainer` ends in `[napi_ref; 0]`.
+#![expect(
+    clippy::trailing_empty_array,
+    reason = "napi-derive generates a trailing zero-sized array in its FFI trampoline"
+)]
+
 use async_trait::async_trait;
 use bit_install::{AfterInstall, AfterInstallResult, Host, HostInfo, Outcome};
 use napi::{
@@ -30,12 +37,6 @@ pub type HostCallback = ThreadsafeFunction<
 /// `(text) => void`, written to `process.stdout` by the caller.
 pub type OutputCallback = ThreadsafeFunction<String, (), String, Status, false>;
 
-// napi-derive expands `#[napi] async fn` into a trampoline whose generated
-// `NapiRefContainer` ends in `[napi_ref; 0]`; it cannot be annotated at its definition.
-#[allow(
-    clippy::trailing_empty_array,
-    reason = "napi-derive generates a trailing zero-sized array in its FFI trampoline"
-)]
 /// Result of [`install`]: `{ outcome: "installed", components }`, `{ outcome: "help" }`,
 /// or `{ outcome: "unsupported" }` for workspaces the TypeScript command installs.
 #[napi]
@@ -93,7 +94,11 @@ struct JsHost {
 }
 
 impl JsHost {
-    async fn call<T: DeserializeOwned>(&self, method: &str, payload: Value) -> io::Result<T> {
+    async fn call<Response: DeserializeOwned>(
+        &self,
+        method: &str,
+        payload: Value,
+    ) -> io::Result<Response> {
         let payload = payload.to_string();
         let promise = self.callback
             .call_async(FnArgs::from((method.to_string(), payload)))
