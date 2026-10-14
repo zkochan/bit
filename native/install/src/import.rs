@@ -3,6 +3,11 @@
 //! objects of every exported `.bitmap` id (`importAccordingToBitMap`); on a
 //! remote lane it first fetches the lane object (`importObjectsOnLane`).
 
+pub use bitmap::{Bitmap, Id, LaneId};
+pub use fetch::FetchOptions;
+pub use objects::Repo;
+pub use tar::ObjectItem;
+
 mod bitmap;
 mod component;
 mod fetch;
@@ -14,11 +19,6 @@ mod persist;
 mod plan;
 mod remotes;
 mod tar;
-
-pub use bitmap::{Bitmap, Id, LaneId};
-pub use fetch::FetchOptions;
-pub use objects::Repo;
-pub use tar::ObjectItem;
 
 use crate::{host::HostInfo, model::GlobalConfig, output::Output};
 use fetch::Fetcher;
@@ -33,7 +33,7 @@ use std::{fs, io, path::Path, time::Instant};
 const IMPORTING: &str = "importing components";
 
 /// What the import added to the workspace scope.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct ImportSummary {
     /// Component objects received (merged or added).
     pub components: usize,

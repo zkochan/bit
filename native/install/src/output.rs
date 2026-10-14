@@ -63,7 +63,14 @@ struct Spinner {
 impl Output {
     #[must_use]
     pub fn new(color: bool, tty: bool, loader: bool, sink: Sink) -> Self {
-        Self { color, tty, loader, sink, state: Arc::default(), spinning: Arc::new(AtomicBool::new(false)) }
+        Self {
+            color,
+            tty,
+            loader,
+            sink,
+            state: Arc::default(),
+            spinning: Arc::new(AtomicBool::new(false)),
+        }
     }
 
     /// `chalk.<style>(text)`; plain text when colors are off.

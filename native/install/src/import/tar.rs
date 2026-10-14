@@ -45,7 +45,7 @@ pub fn read(bytes: &[u8]) -> io::Result<Vec<ObjectItem>> {
     {
         let metadata = start.unwrap_or_default();
         return Err(io::Error::other(format!(
-            "server terminated the stream unexpectedly (metadata: {metadata})"
+            "server terminated the stream unexpectedly (metadata: {metadata})",
         )));
     }
     Ok(items)
@@ -60,34 +60,4 @@ fn item(name: &str, compressed: Vec<u8>) -> io::Result<ObjectItem> {
         return Err(invalid(&format!("invalid object ref: {name:?}")));
     }
     Ok(ObjectItem { hash: hash.to_string(), compressed, scope })
-}
-
-/// Serialize objects the way a remote does.
-#[cfg(test)]
-pub fn write(items: &[ObjectItem], scope_name: &str) -> io::Result<Vec<u8>> {
-    let mut builder = ::tar::Builder::new(Vec::new());
-    append(
-        &mut builder,
-        START,
-        serde_json::json!({ "schema": SCHEMA, "scopeName": scope_name }).to_string().as_bytes(),
-    )?;
-    for item in items {
-        let name = match &item.scope {
-            Some(scope) => format!("{scope}/{}", item.hash),
-            None => item.hash.clone(),
-        };
-        append(&mut builder, &name, &item.compressed)?;
-    }
-    let end = serde_json::json!({ "numOfFiles": items.len(), "scopeName": scope_name });
-    append(&mut builder, END, end.to_string().as_bytes())?;
-    builder.into_inner()
-}
-
-#[cfg(test)]
-fn append(builder: &mut ::tar::Builder<Vec<u8>>, name: &str, data: &[u8]) -> io::Result<()> {
-    let mut header = ::tar::Header::new_ustar();
-    header.set_size(data.len() as u64);
-    header.set_mode(0o644);
-    header.set_cksum();
-    builder.append_data(&mut header, name, data)
 }

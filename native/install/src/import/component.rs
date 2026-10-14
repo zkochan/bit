@@ -76,7 +76,7 @@ fn merge_conflict(component: &Value, conflicts: &[Value]) -> io::Error {
     let id = format!(
         "{}/{}",
         component["scope"].as_str().unwrap_or_default(),
-        component["name"].as_str().unwrap_or_default()
+        component["name"].as_str().unwrap_or_default(),
     );
     let versions: Vec<&str> = conflicts
         .iter()
@@ -89,7 +89,7 @@ to resolve it and merge your local and remote changes, please do the following:
 2) bit import
 3) bit checkout head {id}
 once your changes are merged with the new remote version, you can tag and export a new version of the component to the remote scope.",
-        versions.join(", ")
+        versions.join(", "),
     ))
 }
 
@@ -219,7 +219,7 @@ fn apply_actions(
             "orphan" if !merged.versions.contains_key(tag) => {
                 merged.orphaned.insert(tag.clone(), json!(hash));
             }
-            "orphan" => return Err(invalid(&format!("unable to save orphanedVersion \"{tag}\""))),
+            "orphan" => return Err(invalid(&format!(r#"unable to save orphanedVersion "{tag}""#))),
             _ => return Err(invalid("component merge action")),
         }
     }

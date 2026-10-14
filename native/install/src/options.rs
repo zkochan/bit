@@ -7,8 +7,12 @@ use serde::{Deserialize, Serialize};
 use std::io;
 
 /// Parsed `bit install` flags. Field docs name the CLI flag.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(
+    dylint_lib = "perfectionist",
+    expect(perfectionist::too_many_struct_fields, reason = "One field per `bit install` flag.")
+)]
 pub struct InstallOptions {
     /// `[packages...]`
     pub packages: Vec<String>,
@@ -97,18 +101,27 @@ pub fn parse(argv: &[String]) -> io::Result<Parsed> {
             return Ok(Parsed::Help);
         }
         let flag = flag(&name)?;
-        let value = match (flag.arity, inline) {
-            (Arity::Switch, None) => None,
-            (Arity::Switch, Some(value)) => Some(value),
-            (Arity::Value, Some(value)) => Some(value),
-            (Arity::Value, None) => args
-                .next_if(|next| !next.starts_with('-'))
-                .cloned(),
-        };
+        let value = flag_value(flag.arity, inline, &mut args);
         apply(&mut options, &mut scripts, flag.key, value)?;
     }
     options.allow_scripts = scripts.finish();
     Ok(Parsed::Install(Box::new(options)))
+}
+
+/// A switch takes only an inline `=value`; a value flag also takes the next
+/// argument unless it is another flag.
+fn flag_value<'a>(
+    arity: Arity,
+    inline: Option<String>,
+    args: &mut std::iter::Peekable<impl Iterator<Item = &'a String>>,
+) -> Option<String> {
+    match (arity, inline) {
+        (_, Some(value)) => Some(value),
+        (Arity::Switch, None) => None,
+        (Arity::Value, None) => args
+            .next_if(|next| !next.starts_with('-'))
+            .cloned(),
+    }
 }
 
 #[derive(Clone, Copy)]

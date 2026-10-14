@@ -22,7 +22,7 @@ impl Retry {
     fn from_config(global: &GlobalConfig) -> Self {
         let number = |key: &str, default: u64| {
             config_str(global, key)
-                .and_then(|v| v.parse().ok())
+                .and_then(|value| value.parse().ok())
                 .unwrap_or(default)
         };
         Self {
@@ -140,7 +140,7 @@ async fn throw_for_status(response: Response) -> io::Result<Response> {
         response
             .status()
             .canonical_reason()
-            .unwrap_or_default()
+            .unwrap_or_default(),
     );
     let url = response.url().to_string();
     let parsed: Value = response.json().await.unwrap_or(Value::Null);
@@ -158,17 +158,17 @@ fn remote_error(code: Option<u64>, error: &Value, url: &str, message: String) ->
     match code {
         Some(127) => io::Error::new(
             io::ErrorKind::NotFound,
-            format!("error: component \"{}\" was not found", text("id")),
+            format!(r#"error: component "{}" was not found"#, text("id")),
         ),
         Some(128 | 130) => io::Error::new(
             io::ErrorKind::PermissionDenied,
             format!(
-                "error: permission to scope {url} was denied\nsee troubleshooting at https://legacy-docs.bit.dev/setup-authentication#authentication-issues"
+                "error: permission to scope {url} was denied\nsee troubleshooting at https://legacy-docs.bit.dev/setup-authentication#authentication-issues",
             ),
         ),
         Some(129) => io::Error::new(
             io::ErrorKind::NotFound,
-            format!("error: remote scope \"{}\" was not found.", text("name")),
+            format!(r#"error: remote scope "{}" was not found."#, text("name")),
         ),
         Some(132 | 133) => io::Error::other(message),
         _ => unexpected(&message),

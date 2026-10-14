@@ -153,15 +153,20 @@ impl Importer<'_> {
                 continue;
             }
             for dependency in flattened(&version) {
-                if dependency.scope == self.local_scope || dependencies.contains(&dependency) {
-                    continue;
-                }
-                if !matches!(self.local_build(&dependency)?, Some(true)) {
+                if self.needs_dependency(&dependency, &dependencies)? {
                     dependencies.push(dependency);
                 }
             }
         }
         Ok(dependencies)
+    }
+
+    /// A remote dependency not yet queued whose local Version is missing or unbuilt.
+    fn needs_dependency(&self, dependency: &Id, queued: &[Id]) -> io::Result<bool> {
+        if dependency.scope == self.local_scope || queued.contains(dependency) {
+            return Ok(false);
+        }
+        Ok(!matches!(self.local_build(dependency)?, Some(true)))
     }
 
     /// Whether the local Version of `id` was built; `None` when it is missing.

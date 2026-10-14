@@ -85,7 +85,7 @@ impl Collector {
             .ok_or_else(|| {
                 io::Error::new(
                     io::ErrorKind::NotFound,
-                    format!("lane \"{name}\" was not found in scope \"{scope}\""),
+                    format!(r#"lane "{name}" was not found in scope "{scope}""#),
                 )
             })?;
         self.push_raw(&hash)
@@ -98,16 +98,11 @@ impl Collector {
         lane: Option<&Value>,
         options: &FetchOptions,
     ) -> io::Result<()> {
-        let delta = options.selection.return_nothing_if_given_version_exists;
-        let stop_at = if delta { id.version.clone() } else { None };
-        let requested = if delta { id.with_version(None) } else { id.clone() };
-        let requested = lane.and_then(|lane| lane_head(lane, &requested)).unwrap_or(requested);
+        let (requested, stop_at) = requested_id(id, lane, options);
         let Some(selected) = self.select(&requested, options.selection.ignore_missing_head)? else {
             return Ok(());
         };
-        if stop_at.is_some_and(|stop| {
-            resolve_version(&selected.component, &stop).as_deref() == Some(selected.hash.as_str())
-        }) {
+        if stop_at.is_some_and(|stop| reached_head(&selected, &stop)) {
             return Ok(());
         }
         let version = self.load_version(&selected)?;
@@ -296,4 +291,19 @@ fn lane_head(lane: &Value, id: &Id) -> Option<Id> {
         })
         .and_then(|entry| entry["head"].as_str())
         .map(|head| id.with_version(Some(head.to_string())))
+}
+
+/// The id to serve for one requested id, and the version a `component-delta`
+/// fetch stops at (`returnNothingIfGivenVersionExists`).
+fn requested_id(id: &Id, lane: Option<&Value>, options: &FetchOptions) -> (Id, Option<String>) {
+    let delta = options.selection.return_nothing_if_given_version_exists;
+    let stop_at = if delta { id.version.clone() } else { None };
+    let requested = if delta { id.with_version(None) } else { id.clone() };
+    let requested = lane.and_then(|lane| lane_head(lane, &requested)).unwrap_or(requested);
+    (requested, stop_at)
+}
+
+/// The client already has the selected head.
+fn reached_head(selected: &Selected, stop: &str) -> bool {
+    resolve_version(&selected.component, stop).as_deref() == Some(selected.hash.as_str())
 }

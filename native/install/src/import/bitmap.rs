@@ -7,7 +7,7 @@ use std::{fs, io, path::Path};
 const LANE_KEY: &str = "_bit_lane";
 
 /// An exported component id with its `.bitmap` version.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Id {
     pub scope: String,
     pub name: String,
@@ -47,7 +47,7 @@ impl Id {
         Ok(Self {
             scope: scope.to_string(),
             name: name.to_string(),
-            version: version.filter(|v| !v.is_empty()),
+            version: version.filter(|version| !version.is_empty()),
         })
     }
 }
@@ -68,7 +68,7 @@ impl LaneId {
 }
 
 /// The parts of `.bitmap` the import reads.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Bitmap {
     /// All exported ids (`getAllBitIdsFromAllLanes`, filtered by `hasScope`).
     pub ids: Vec<Id>,

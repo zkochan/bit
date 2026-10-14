@@ -14,7 +14,7 @@ pub type DependencyMap = IndexMap<String, String>;
 
 /// A component id as Bit prints it: `scope/name@version`. `scope` is `None` for
 /// a new component that has only a `defaultScope`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct ComponentId {
     pub scope: Option<String>,
     pub default_scope: Option<String>,
@@ -40,7 +40,7 @@ impl ComponentId {
 }
 
 /// The dependency lifecycle of a policy entry or a detected dependency.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Lifecycle {
     Runtime,
@@ -63,6 +63,13 @@ impl Lifecycle {
 /// One entry of a workspace, variant or env dependency policy.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(
+    dylint_lib = "perfectionist",
+    expect(
+        perfectionist::too_many_struct_fields,
+        reason = "The fields mirror the TypeScript policy entry shape."
+    )
+)]
 pub struct PolicyEntry {
     pub name: String,
     pub version: String,
@@ -117,7 +124,7 @@ pub struct ComponentDependency {
 
 /// The dependency data of one workspace component, as the TypeScript
 /// `dependency-resolver` aspect data stores it after component load.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ComponentDependencies {
     pub packages: Vec<PackageDependency>,
@@ -128,7 +135,7 @@ pub struct ComponentDependencies {
     pub missing_packages: MissingPackages,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MissingPackages {
     pub runtime: Vec<String>,
@@ -138,6 +145,13 @@ pub struct MissingPackages {
 /// A component tracked in `.bitmap`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(
+    dylint_lib = "perfectionist",
+    expect(
+        perfectionist::too_many_struct_fields,
+        reason = "The fields mirror what the TypeScript install reads from a loaded component."
+    )
+)]
 pub struct WorkspaceComponent {
     pub id: ComponentId,
     /// Workspace-relative root dir as written in `.bitmap` (`/`-separated).
@@ -169,7 +183,7 @@ pub struct Project {
 }
 
 /// Everything the engine needs to install the workspace once.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InstallPlan {
     /// The workspace root first, then components, then `.bit_roots` projects.
@@ -184,7 +198,7 @@ pub struct InstallPlan {
 
 /// The dependency policy an env contributes (`env.jsonc`, or `getDependencies()`
 /// through the host for envs without one).
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvPolicy {
     /// Applied to every component using the env (peers use `supportedRange`).

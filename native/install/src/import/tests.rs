@@ -107,7 +107,7 @@ fn fixture(graph: bool, bitmap_ids: &[&str]) -> (Fixture, String) {
         .collect();
     let bitmap = format!(
         "/* generated */\n{{\n{},\n\"$schema-version\": \"17.0.0\"\n}}",
-        entries.join(",\n")
+        entries.join(",\n"),
     );
     fs::write(root.join(".bitmap"), bitmap).unwrap();
     let config_dir = dir.path().join("global");
@@ -163,7 +163,7 @@ fn tar_round_trips_and_reports_server_errors() {
     let hash = sha1_hex("x");
     let items =
         vec![ObjectItem { hash, compressed: b"abc".to_vec(), scope: Some("remote".into()) }];
-    let bytes = tar::write(&items, "remote").unwrap();
+    let bytes = tar_write(&items, "remote").unwrap();
     assert_eq!(tar::read(&bytes).unwrap(), items);
     let mut builder = ::tar::Builder::new(Vec::new());
     let mut header = ::tar::Header::new_ustar();
@@ -177,7 +177,7 @@ fn tar_round_trips_and_reports_server_errors() {
 
 #[test]
 fn truncated_streams_are_rejected() {
-    let bytes = tar::write(&[], "remote").unwrap();
+    let bytes = tar_write(&[], "remote").unwrap();
     let mut builder = ::tar::Builder::new(Vec::new());
     for entry in ::tar::Archive::new(&bytes[..]).entries().unwrap() {
         let mut entry = entry.unwrap();
@@ -225,7 +225,7 @@ fn imports_bitmap_versions_with_dependencies_from_a_file_remote() {
     assert!(repo.exists(&comp1));
     assert!(
         repo.exists(&component_hash("remote", "comp2")),
-        "flattened dependency without a graph"
+        "flattened dependency without a graph",
     );
     assert!(repo.exists(&sha1_hex("remote")), "ScopeMeta");
     assert_eq!(summary.components, 2);
@@ -273,13 +273,13 @@ fn component(versions: &Value, head: &str, state: Option<Value>) -> Value {
 
 #[test]
 fn merges_incoming_tags_and_moves_the_head() {
-    let a = "a".repeat(40);
-    let b = "b".repeat(40);
-    let existing = component(&json!({ "0.0.1": a }), &a, None);
-    let incoming = component(&json!({ "0.0.1": a, "0.0.2": b }), &b, None);
+    let first = "a".repeat(40);
+    let second = "b".repeat(40);
+    let existing = component(&json!({ "0.0.1": first }), &first, None);
+    let incoming = component(&json!({ "0.0.1": first, "0.0.2": second }), &second, None);
     let merged = merge_component(Some(&existing), &incoming, true).unwrap();
-    assert_eq!(merged["versions"], json!({ "0.0.1": a, "0.0.2": b }));
-    assert_eq!(merged["head"], json!(b));
+    assert_eq!(merged["versions"], json!({ "0.0.1": first, "0.0.2": second }));
+    assert_eq!(merged["head"], json!(second));
     let keys: Vec<_> = merged
         .as_object()
         .unwrap()
@@ -291,20 +291,20 @@ fn merges_incoming_tags_and_moves_the_head() {
 
 #[test]
 fn non_origin_tags_become_orphaned_and_local_heads_stay() {
-    let a = "a".repeat(40);
-    let b = "b".repeat(40);
+    let first = "a".repeat(40);
+    let second = "b".repeat(40);
     let state = json!({ "versions": { "0.0.1": { "local": true } } });
-    let existing = component(&json!({ "0.0.1": a }), &a, Some(state));
-    let incoming = component(&json!({ "0.0.2": b }), &b, None);
+    let existing = component(&json!({ "0.0.1": first }), &first, Some(state));
+    let incoming = component(&json!({ "0.0.2": second }), &second, None);
     let merged = merge_component(Some(&existing), &incoming, false).unwrap();
-    assert_eq!(merged["orphanedVersions"], json!({ "0.0.2": b }));
-    assert_eq!(merged["head"], json!(a));
-    let conflicting = component(&json!({ "0.0.1": b }), &b, None);
+    assert_eq!(merged["orphanedVersions"], json!({ "0.0.2": second }));
+    assert_eq!(merged["head"], json!(first));
+    let conflicting = component(&json!({ "0.0.1": second }), &second, None);
     let error = merge_component(Some(&existing), &conflicting, true).unwrap_err();
     assert!(
         error
             .to_string()
-            .starts_with("error: versions conflict occurred while importing the component s/c.")
+            .starts_with("error: versions conflict occurred while importing the component s/c."),
     );
 }
 
@@ -344,7 +344,7 @@ fn serve_once(status: &'static str, body: Vec<u8>) -> (String, thread::JoinHandl
         let request = read_request(&mut stream);
         let head = format!(
             "HTTP/1.1 {status}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
-            body.len()
+            body.len(),
         );
         stream.write_all(head.as_bytes()).unwrap();
         stream.write_all(&body).unwrap();
@@ -379,7 +379,7 @@ fn read_request(stream: &mut std::net::TcpStream) -> String {
 fn fetches_over_http_with_bit_headers() {
     let hash = sha1_hex("o");
     let items = vec![ObjectItem { hash, compressed: b"z".to_vec(), scope: None }];
-    let (url, server) = serve_once("200 OK", tar::write(&items, "remote").unwrap());
+    let (url, server) = serve_once("200 OK", tar_write(&items, "remote").unwrap());
     let global: GlobalConfig =
         std::iter::once(("user.token".to_string(), json!("secret"))).collect();
     let network = Network::new(&global, "1.2.3", Some("ws-local")).unwrap();
@@ -400,7 +400,7 @@ fn fetches_over_http_with_bit_headers() {
             request
                 .to_ascii_lowercase()
                 .contains(&header.to_ascii_lowercase()),
-            "{header}"
+            "{header}",
         );
     }
     let body: Value = serde_json::from_str(request.split_once("\r\n\r\n").unwrap().1).unwrap();
@@ -419,7 +419,7 @@ fn maps_http_errors_like_the_remote_error_handler() {
         .block_on(network.fetch(&url, &[], &FetchOptions::lanes()))
         .unwrap_err();
     server.join().unwrap();
-    assert_eq!(error.to_string(), "error: remote scope \"missing\" was not found.");
+    assert_eq!(error.to_string(), r#"error: remote scope "missing" was not found."#);
 }
 
 /// Compare with the canonical import of a real workspace: set
@@ -466,9 +466,37 @@ fn object_hashes(dir: &Path) -> Vec<String> {
             hashes.push(format!(
                 "{}{}",
                 prefix.file_name().to_string_lossy(),
-                name.to_string_lossy()
+                name.to_string_lossy(),
             ));
         }
     }
     hashes
+}
+
+/// Serialize objects the way a remote does.
+fn tar_write(items: &[ObjectItem], scope_name: &str) -> std::io::Result<Vec<u8>> {
+    let mut builder = ::tar::Builder::new(Vec::new());
+    append(
+        &mut builder,
+        ".BIT.START",
+        serde_json::json!({ "schema": "1.0.0", "scopeName": scope_name }).to_string().as_bytes(),
+    )?;
+    for item in items {
+        let name = match &item.scope {
+            Some(scope) => format!("{scope}/{}", item.hash),
+            None => item.hash.clone(),
+        };
+        append(&mut builder, &name, &item.compressed)?;
+    }
+    let end = serde_json::json!({ "numOfFiles": items.len(), "scopeName": scope_name });
+    append(&mut builder, ".BIT.END", end.to_string().as_bytes())?;
+    builder.into_inner()
+}
+
+fn append(builder: &mut ::tar::Builder<Vec<u8>>, name: &str, data: &[u8]) -> std::io::Result<()> {
+    let mut header = ::tar::Header::new_ustar();
+    header.set_size(data.len() as u64);
+    header.set_mode(0o644);
+    header.set_cksum();
+    builder.append_data(&mut header, name, data)
 }

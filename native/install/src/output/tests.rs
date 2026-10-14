@@ -23,7 +23,10 @@ fn pretty_time_uses_the_largest_whole_unit() {
 fn paints_only_with_colors() {
     let (sink, _) = recorder();
     assert_eq!(Output::new(false, false, true, Arc::clone(&sink)).paint(Style::Cyan, "x"), "x");
-    assert_eq!(Output::new(true, false, true, sink).paint(Style::Cyan, "x"), "\u{1b}[36mx\u{1b}[39m");
+    assert_eq!(
+        Output::new(true, false, true, sink).paint(Style::Cyan, "x"),
+        "\u{1b}[36mx\u{1b}[39m",
+    );
 }
 
 #[test]
@@ -37,7 +40,7 @@ fn writes_like_ora_without_a_tty() {
     output.failure("broken");
     assert_eq!(
         *written.lock().unwrap(),
-        "- importing missing objects\n  plain\n✔ done\n⚠ careful\n✖ broken\n"
+        "- importing missing objects\n  plain\n✔ done\n⚠ careful\n✖ broken\n",
     );
 }
 

@@ -29,7 +29,7 @@ pub struct FetchOptions {
 }
 
 /// What to collect around each requested version.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Traversal {
     /// Backward compatibility with remotes older than 0.0.900.
@@ -42,7 +42,7 @@ pub struct Traversal {
 }
 
 /// Which components a remote returns.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Selection {
     pub include_artifacts: bool,
@@ -168,7 +168,7 @@ impl Fetcher<'_> {
             }
             io::Error::other(format!(
                 "unable to import the following component(s): {}.\nthe remote scope \"{scope}\" was not found",
-                ids.join(", ")
+                ids.join(", "),
             ))
         })?;
         match remote {
@@ -190,6 +190,6 @@ fn failed_scopes(failed: &[(&String, io::Error)]) -> io::Error {
     io::Error::other(format!(
         "unexpected network error has occurred during fetching scopes: {}\nserver responded with the following error messages:\n{}",
         names.join(", "),
-        messages.join("\n")
+        messages.join("\n"),
     ))
 }

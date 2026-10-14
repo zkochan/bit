@@ -7,8 +7,15 @@ use serde_json::Value;
 use std::{io, path::PathBuf};
 
 /// Facts about the running `bit` process, collected once by the JavaScript entry point.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(
+    dylint_lib = "perfectionist",
+    expect(
+        perfectionist::too_many_struct_fields,
+        reason = "One flat record of process facts serialized from JavaScript."
+    )
+)]
 pub struct HostInfo {
     /// `@teambit/bit` package dir of the running bit (`mainAspect.path`).
     pub bit_dir: PathBuf,
@@ -34,7 +41,7 @@ pub struct HostInfo {
     pub non_interactive: bool,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CoreAspect {
     pub id: String,
@@ -43,7 +50,7 @@ pub struct CoreAspect {
 }
 
 /// Work handed back to JavaScript after the packages are installed and linked.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AfterInstall {
     pub compile: bool,
@@ -52,7 +59,7 @@ pub struct AfterInstall {
     pub clear_cache: bool,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AfterInstallResult {
     /// Envs whose policy is only known after loading them (legacy envs without

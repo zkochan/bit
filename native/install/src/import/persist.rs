@@ -16,7 +16,7 @@ use std::{collections::BTreeSet, io};
 pub const MAIN: &str = "main";
 
 /// What one fetch added to the scope.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Written {
     pub objects: usize,
     /// Hashes of the Component objects received.

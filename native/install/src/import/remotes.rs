@@ -11,7 +11,7 @@ use std::{
     sync::Mutex,
 };
 
-/// `GLOBAL_REMOTES` in `GLOBAL_CONFIG`.
+/// [`GLOBAL_REMOTES`] in `GLOBAL_CONFIG`.
 const GLOBAL_REMOTES: &str = "global-remotes.json";
 const CFG_CLOUD_DOMAIN: &str = "cloud_domain";
 const CFG_SYMPHONY_URL: &str = "symphony_url";
@@ -116,7 +116,7 @@ pub fn not_found_or_denied(scope: &str) -> io::Error {
     io::Error::new(
         io::ErrorKind::NotFound,
         format!(
-            "unable to find the remote scope \"{scope}\" or you don't have access to this scope, please make sure you are logged in"
+            r#"unable to find the remote scope "{scope}" or you don't have access to this scope, please make sure you are logged in"#,
         ),
     )
 }
