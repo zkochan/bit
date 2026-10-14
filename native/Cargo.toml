@@ -16,6 +16,7 @@ pnpm-package-manager = { git = "https://github.com/pnpm/pnpm", rev = "343f3c4198
 pnpm-package-manifest = { git = "https://github.com/pnpm/pnpm", rev = "343f3c4198b43dce5e58bc7de9927cb96aed59fc" }
 pnpm-reporter = { git = "https://github.com/pnpm/pnpm", rev = "343f3c4198b43dce5e58bc7de9927cb96aed59fc" }
 pnpm-resolving-default-resolver = { git = "https://github.com/pnpm/pnpm", rev = "343f3c4198b43dce5e58bc7de9927cb96aed59fc" }
+pnpm-resolving-deps-resolver = { git = "https://github.com/pnpm/pnpm", rev = "343f3c4198b43dce5e58bc7de9927cb96aed59fc" }
 pnpm-resolving-npm-resolver = { git = "https://github.com/pnpm/pnpm", rev = "343f3c4198b43dce5e58bc7de9927cb96aed59fc" }
 pnpm-resolving-parse-wanted-dependency = { git = "https://github.com/pnpm/pnpm", rev = "343f3c4198b43dce5e58bc7de9927cb96aed59fc" }
 pnpm-resolving-resolver-base = { git = "https://github.com/pnpm/pnpm", rev = "343f3c4198b43dce5e58bc7de9927cb96aed59fc" }
