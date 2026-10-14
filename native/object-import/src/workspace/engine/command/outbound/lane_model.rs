@@ -140,12 +140,16 @@ pub(super) fn select(input: &Prepare) -> io::Result<Option<LaneSelected>> {
         )?;
         let after = model::encode(model_hash, "Component", &component)?;
         let versions = lane_versions(&dir, head, previous_head, &scope, &name)?;
+        expected_ids.extend(
+            versions
+                .iter()
+                .map(|version| format!("{id}@{version}")),
+        );
         for object in model::collect(&dir, model_hash, &after, &versions)? {
             append(&mut objects, &mut seen, &mut budget, object)?;
         }
         models.push(model::ModelBytes { hash: model_hash.to_owned(), before, after });
         component_ids.push(id.clone());
-        expected_ids.push(format!("{id}@{head}"));
     }
     for object_hash in [&history_hash, &hash] {
         let bytes = read_compressed(&dir, object_hash)?;
@@ -250,3 +254,6 @@ fn append(
     objects.push(item);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests;
