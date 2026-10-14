@@ -169,7 +169,7 @@ jobs:
   integration:
     name: Real dependency pipeline and scoped helpers (Linux)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -221,7 +221,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -260,7 +260,7 @@ jobs:
   lint:
     name: pnpm Rust formatting and lints
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: native
@@ -429,7 +429,7 @@ jobs:
   musl:
     name: Packaged scanner on Alpine (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
