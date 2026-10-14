@@ -40,7 +40,10 @@ fn entry_command(cli: &NodeCli, args: &[OsString]) -> Command {
     command.arg(&cli.entry).args(args);
     // bvm's wrapper exports its Node's directory at the front of PATH for the
     // whole process tree; scripts the CLI spawns then run the same Node.
-    if let Some(dir) = cli.node.parent().filter(|_| cli.node.is_absolute()) {
+    if let Some(dir) = cli.node
+        .parent()
+        .filter(|_| cli.node.is_absolute() || cli.node.has_root())
+    {
         command.env("PATH", path_with(dir, env::var_os("PATH")));
     }
     command

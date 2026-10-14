@@ -6,6 +6,7 @@ use std::{
 use tempfile::TempDir;
 
 const ENTRY: &str = "node_modules/@teambit/bit/bin/bit";
+const NODE: &str = if cfg!(windows) { "node.exe" } else { "bin/node" };
 
 fn write(path: &Path, content: &str) {
     fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -19,8 +20,7 @@ fn bvm(root: &Path, node_versions: &[&str]) -> PathBuf {
         write(
             &bvm.join("nodejs")
                 .join(version)
-                .join("bin")
-                .join("node"),
+                .join(NODE),
             "",
         );
     }
@@ -101,7 +101,7 @@ fn entry_beside_executable_uses_newest_bvm_node() {
     let cli = entry(find_in(&environment).unwrap());
     assert_eq!(cli.source, Source::BesideExecutable);
     assert_eq!(cli.entry, install.join(ENTRY));
-    assert_eq!(cli.node, bvm.join("nodejs/24.3.1/bin/node"));
+    assert_eq!(cli.node, bvm.join("nodejs/24.3.1").join(NODE));
     assert_eq!(cli.bit_dir, Some(install.join("node_modules/@teambit/bit")));
     assert_eq!(cli.bvm_link, None);
 }
@@ -114,7 +114,7 @@ fn bvm_default_link_reports_the_link_directory() {
     let cli = entry(find_in(&environment).unwrap());
     assert_eq!(cli.source, Source::BvmLink);
     assert_eq!(cli.entry, bvm.join("links/bit").join(ENTRY));
-    assert_eq!(cli.node, bvm.join("nodejs/22.22.0/bin/node"));
+    assert_eq!(cli.node, bvm.join("nodejs/22.22.0").join(NODE));
     assert_eq!(cli.bvm_link, Some(bvm.join("links/bit")));
     assert_eq!(cli.bit_dir, Some(bvm.join("links/bit/node_modules/@teambit/bit")));
 }

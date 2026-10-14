@@ -77,7 +77,10 @@ impl Host {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit());
-        if let Some(dir) = self.cli.node.parent().filter(|_| self.cli.node.is_absolute()) {
+        if let Some(dir) = self.cli.node
+            .parent()
+            .filter(|_| self.cli.node.is_absolute() || self.cli.node.has_root())
+        {
             command.env("PATH", delegate::path_with(dir, env::var_os("PATH")));
         }
         if self.color {
