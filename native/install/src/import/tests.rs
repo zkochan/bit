@@ -388,7 +388,7 @@ fn fetches_over_http_with_bit_headers() {
     let (url, server) = serve_once("200 OK", tar_write(&items, "remote").unwrap());
     let global: GlobalConfig =
         std::iter::once(("user.token".to_string(), json!("secret"))).collect();
-    let network = Network::new(&global, "1.2.3", Some("ws-local")).unwrap();
+    let network = Network::new(&global, "1.2.3", Some("ws-local"), None).unwrap();
     let options = FetchOptions::latest(None, true);
     let fetched = runtime()
         .block_on(network.fetch(&url, &["remote/comp1".into()], &options))
@@ -420,7 +420,7 @@ fn fetches_over_http_with_bit_headers() {
 fn maps_http_errors_like_the_remote_error_handler() {
     let body = json!({ "error": { "code": 129, "name": "missing" } }).to_string().into_bytes();
     let (url, server) = serve_once("500 Internal Server Error", body);
-    let network = Network::new(&GlobalConfig::default(), "1.0.0", None).unwrap();
+    let network = Network::new(&GlobalConfig::default(), "1.0.0", None, None).unwrap();
     let error = runtime()
         .block_on(network.fetch(&url, &[], &FetchOptions::lanes()))
         .unwrap_err();
@@ -598,7 +598,7 @@ fn remotes_are_fetched_concurrently_in_group_order() {
     let global = GlobalConfig::default();
     let remotes =
         super::remotes::Remotes::load(&json!({ "remotes": hosts }), dir.path(), &global).unwrap();
-    let network = Network::new(&global, "1.0.0", None).unwrap();
+    let network = Network::new(&global, "1.0.0", None, None).unwrap();
     let fetcher = super::fetch::Fetcher { remotes: &remotes, network: &network, concurrency: 2 };
     let grouped: indexmap::IndexMap<String, Vec<String>> = [
         ("second".to_string(), vec!["remote/comp1".to_string()]),
@@ -651,4 +651,39 @@ fn progress_restarts_the_loader_every_hundred_objects() {
     let result = super::persist::persist(&repo, &fetched, Some(&progress)).unwrap();
     assert_eq!(result.objects, 150);
     assert_eq!(*written.lock().unwrap(), "- importing 1 components now. downloaded 100 objects.\n");
+}
+
+#[test]
+fn the_token_flag_wins_over_the_configured_token() {
+    let (url, server) = serve_once("200 OK", tar_write(&[], "remote").unwrap());
+    let global: GlobalConfig =
+        std::iter::once(("user.token".to_string(), json!("configured"))).collect();
+    let network = Network::new(&global, "1.0.0", None, Some("from-flag")).unwrap();
+    runtime()
+        .block_on(network.fetch(&url, &[], &FetchOptions::lanes()))
+        .unwrap();
+    let request = server
+        .join()
+        .unwrap()
+        .to_ascii_lowercase();
+    assert!(request.contains("authorization: bearer from-flag"), "{request}");
+    assert!(!request.contains("configured"));
+}
+
+#[test]
+fn socket_settings_come_from_the_network_config() {
+    let global: GlobalConfig = [
+        ("network.fetch_timeout".to_string(), json!("250")),
+        ("network.max_sockets".to_string(), json!("3")),
+        ("network.local_address".to_string(), json!("127.0.0.1")),
+    ]
+    .into_iter()
+    .collect();
+    Network::new(&global, "1.0.0", None, None).expect("valid settings build a client");
+    let invalid: GlobalConfig =
+        std::iter::once(("network.local_address".to_string(), json!("not-an-ip"))).collect();
+    let error = Network::new(&invalid, "1.0.0", None, None)
+        .err()
+        .expect("an invalid local address is rejected");
+    assert_eq!(error.to_string(), "invalid network.local_address: not-an-ip");
 }

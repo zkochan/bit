@@ -46,6 +46,10 @@ pub struct HostInfo {
     /// from (`loadedVirtualStoreDirNames`): never pruned by this install.
     #[serde(default)]
     pub loaded_virtual_store_dirs: Vec<String>,
+    /// `--token`: the bearer token for remote requests, over `user.token`
+    /// (`globalFlags.token` in `Http.getToken`).
+    #[serde(default)]
+    pub token: Option<String>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]

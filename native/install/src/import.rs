@@ -74,7 +74,8 @@ async fn import(
         .unwrap_or_default()
         .to_string();
     let remotes = Remotes::load(&scope_json, &info.global_config_dir, global)?;
-    let network = Network::new(global, &info.bit_version, Some(&local_scope))?;
+    let network =
+        Network::new(global, &info.bit_version, Some(&local_scope), info.token.as_deref())?;
     let fetcher =
         Fetcher { remotes: &remotes, network: &network, concurrency: fetch::concurrency(global) };
     let repo = Repo::new(scope_dir);
