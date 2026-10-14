@@ -24,6 +24,8 @@ const ASPECT_ENVS: [&str; 3] = [
 
 /// The `link:` dependencies of the root manifest (`calculateLinkedDeps`).
 pub fn root_links(session: &Session<'_>, loaded: &Loaded) -> io::Result<DependencyMap> {
+    // `calculateLinks` loads the components (`getComponentsDirectory`) first.
+    session.loading(loaded);
     session.output.status(LINKING);
     let started = Instant::now();
     let config = &loaded.config.dependency_resolver;

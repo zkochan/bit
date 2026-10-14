@@ -21,6 +21,9 @@ use indexmap::IndexMap;
 use serde_json::Value;
 use std::io;
 
+/// `getWorkspaceManifest`'s status line around the manifest creation.
+const DEDUPING: &str = "deduping dependencies for installation";
+
 /// One calculation of what to install.
 pub struct Calculated {
     pub components: Vec<WorkspaceComponent>,
@@ -47,6 +50,12 @@ pub async fn calculate(
     loaded: &Loaded,
     linked_root_deps: &DependencyMap,
 ) -> io::Result<Calculated> {
+    // The TypeScript command loads the components twice before the manifests:
+    // `linkCodemods` right after the root links, then `getComponentsDirectory`
+    // in `_getComponentsManifests`. The native linker runs after this
+    // calculation and loads nothing, so both lines belong here.
+    session.loading(loaded);
+    session.loading(loaded);
     let components = loaded.components();
     let env_policies = policy::load_env_policies(&session.root, &components, session.host).await?;
     let workspace_policy = workspace_policy(loaded)?;
@@ -61,6 +70,8 @@ pub async fn calculate(
     .await?;
     let apps = apps(session, loaded, &components).await?;
     let root_policy = root_policy(session, loaded, workspace_policy)?;
+    // `getWorkspaceManifest` announces the manifest creation (`createFromComponents`).
+    session.output.status(DEDUPING);
     let outcome = plan(
         session,
         loaded,
@@ -73,6 +84,11 @@ pub async fn calculate(
             apps: &apps,
         },
     )?;
+    session.output.success(DEDUPING, None);
+    // The component loads the TypeScript command performs while it finishes
+    // the manifests of the engine run.
+    session.loading(loaded);
+    session.loading(loaded);
     Ok(Calculated { components, env_policies, dependencies, outcome })
 }
 
