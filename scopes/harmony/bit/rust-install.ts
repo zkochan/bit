@@ -161,7 +161,14 @@ class InstallHost {
   }
 
   private async env(envId: string) {
-    const env = await this.env(envId);
+    const harmony = await this.loadHarmony();
+    const envs = harmony.get<any>('teambit.envs/envs');
+    let definition = envs.getEnvDefinitionByStringId(envId);
+    if (!definition) {
+      const workspace = harmony.get<any>('teambit.workspace/workspace');
+      await workspace.loadAspects([envId], false, undefined, { throwOnError: false, hideMissingModuleError: true });
+      definition = envs.getEnvDefinitionByStringId(envId);
+    }
     return definition?.env;
   }
 

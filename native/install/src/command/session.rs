@@ -54,6 +54,7 @@ pub fn find_root(cwd: &Path) -> io::Result<PathBuf> {
 /// The workspace state the command acts on.
 pub struct Loaded {
     pub config: WorkspaceConfig,
+    /// The layered `bit config` (environment, workspace, scope, global).
     pub global: GlobalConfig,
     pub effective: EffectiveConfig,
     pub workspace: Workspace,
@@ -63,10 +64,12 @@ pub struct Loaded {
 impl Loaded {
     pub fn load(session: &Session<'_>) -> io::Result<Self> {
         let config = WorkspaceConfig::load(&session.root)?;
-        let global = load_global_config(&session.info.global_config_dir)?;
         let workspace = Workspace::load(&session.root, &config, &session.core_ids())?;
         let scope = ScopeJson::load(&workspace.scope_path)?;
-        let effective = EffectiveConfig::new(&global, &scope.config, &config.config_store);
+        let stored = load_global_config(&session.info.global_config_dir)?;
+        let effective = EffectiveConfig::new(&stored, &scope.config, &config.config_store);
+        // `configGetter`: environment, workspace, scope, then the global config.
+        let global = effective.merged();
         let engine = engine::settings(
             &session.root,
             &config.dependency_resolver,

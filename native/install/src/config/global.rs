@@ -31,6 +31,39 @@ pub mod keys {
     pub const NETWORK_KEY: &str = "network.key";
     /// The cloud domain when `cloud_domain` is unset.
     pub const DEFAULT_CLOUD_DOMAIN: &str = "bit.cloud";
+
+    /// Every key above, for resolving `BIT_CONFIG_*` overrides.
+    pub const ALL: [&str; 29] = [
+        CLOUD_DOMAIN,
+        REGISTRY_URL,
+        USER_TOKEN,
+        USER_NAME,
+        USER_EMAIL,
+        ENABLE_GLOBAL_VIRTUAL_STORE,
+        PACKAGE_MANAGER_CACHE,
+        FORCE_LOCAL_BUILD,
+        PROXY,
+        HTTPS_PROXY,
+        PROXY_NO_PROXY,
+        PROXY_CA,
+        PROXY_CA_FILE,
+        PROXY_STRICT_SSL,
+        PROXY_CERT,
+        PROXY_KEY,
+        FETCH_RETRIES,
+        FETCH_RETRY_FACTOR,
+        FETCH_RETRY_MINTIMEOUT,
+        FETCH_RETRY_MAXTIMEOUT,
+        FETCH_TIMEOUT,
+        LOCAL_ADDRESS,
+        MAX_SOCKETS,
+        NETWORK_CONCURRENCY,
+        NETWORK_CA,
+        NETWORK_CA_FILE,
+        NETWORK_STRICT_SSL,
+        NETWORK_CERT,
+        NETWORK_KEY,
+    ];
 }
 
 use super::workspace_config::config_string;
@@ -138,6 +171,22 @@ impl EffectiveConfig {
                     format!(r#"config of "{key}" is invalid. Expected number, got "{value}""#),
                 )
             })
+    }
+
+    /// The layered config as one map, as `configGetter` would answer each install key:
+    /// what the engine and the import read.
+    #[must_use]
+    pub fn merged(&self) -> GlobalConfig {
+        let mut merged: GlobalConfig = self.store
+            .iter()
+            .map(|(key, value)| (key.clone(), Value::String(value.clone())))
+            .collect();
+        for key in keys::ALL {
+            if let Some(value) = self.get(key) {
+                merged.insert(key.to_owned(), Value::String(value));
+            }
+        }
+        merged
     }
 
     /// `getCloudDomain()`.
