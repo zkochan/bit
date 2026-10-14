@@ -77,12 +77,9 @@ fn extensions(
     subject.component.config
         .keys()
         .filter_map(|key| extension_id(workspace, key))
-        .map(|mut id| {
-            if let Some(version) =
-                versions::resolve(workspace, subject, inputs, &id, Lifecycle::Dev, None)
-            {
-                id.version = Some(version);
-            }
+        .map(|id| {
+            let id = versions::resolve(workspace, subject, inputs, &id, Lifecycle::Dev, None)
+                .unwrap_or(id);
             let package_name = workspace.package_name(&id);
             component(id, package_name, Lifecycle::Dev, true)
         })

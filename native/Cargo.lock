@@ -410,6 +410,7 @@ dependencies = [
  "napi",
  "napi-build",
  "napi-derive",
+ "pnpm-diagnostics",
  "serde",
  "serde_json",
  "tokio",

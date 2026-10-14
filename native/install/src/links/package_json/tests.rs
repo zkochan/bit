@@ -43,12 +43,14 @@ fn keys(manifest: &Map<String, Value>) -> Vec<&str> {
 }
 
 #[test]
-fn new_component_has_no_version_homepage_or_export_flag() {
+fn new_component_is_0_0_1_new_without_homepage() {
     let manifest = generate(&component(None, None), &context(Value::Null));
+    assert_eq!(manifest["version"], "0.0.1-new");
     assert_eq!(
         keys(&manifest),
         [
             "name",
+            "version",
             "main",
             "componentId",
             "dependencies",

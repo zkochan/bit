@@ -45,7 +45,7 @@ pub(super) fn finish(
     if context.windows {
         manifest.insert("types".into(), format!("{SOURCE_DIR}/{}", component.main_file).into());
     }
-    normalize_version(&mut manifest, component.id.version.is_none());
+    normalize_version(&mut manifest);
     manifest.insert("_bit_local".into(), true.into());
     manifest.insert("source".into(), component.main_file.clone().into());
     if context.is_aspect {
@@ -63,15 +63,14 @@ pub(super) fn generate(
     finish(transformed(component, context), component, context)
 }
 
-/// `createFromComponent(dir, component, addExportProperty = true)`. An unversioned component
-/// keeps a `null` `version` slot so a transformer's `version` lands in the same position, as the
-/// JavaScript `undefined` does; [`normalize_version`] drops it.
+/// `createFromComponent(dir, component, addExportProperty = true)`.
 fn base(component: &WorkspaceComponent, context: &PackageJsonContext<'_>) -> Manifest {
     let id = &component.id;
     let packages = |lifecycle| packages_of(context.dependencies, lifecycle);
     let mut manifest = Map::new();
     manifest.insert("name".into(), component.package_name.clone().into());
-    manifest.insert("version".into(), id.version.clone().map_or(Value::Null, Value::String));
+    // A new component's legacy version is `latest`, written as `0.0.1-new`.
+    manifest.insert("version".into(), id.version.clone().unwrap_or_else(|| "latest".into()).into());
     if let Some(scope) = &id.scope {
         let path = scope.replacen('.', "/", 1);
         let homepage = format!("https://{}/{path}/{}", context.cloud_domain, id.name);
@@ -192,13 +191,10 @@ fn replace_recursive(value: &mut Value, values: &Placeholders) {
 }
 
 /// `latest` becomes `0.0.1-new`, a snap becomes `0.0.0-<hash>`; an unset version is dropped.
-fn normalize_version(manifest: &mut Manifest, unversioned: bool) {
+fn normalize_version(manifest: &mut Manifest) {
     match manifest.get_mut("version") {
         Some(Value::String(version)) if version == "latest" => *version = "0.0.1-new".into(),
         Some(Value::String(version)) => *version = snap_to_semver(version),
-        Some(Value::Null) if unversioned => {
-            manifest.shift_remove("version");
-        }
         _ => {}
     }
 }

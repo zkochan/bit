@@ -35,17 +35,18 @@ pub fn update(
         let mut dependencies = std::mem::take(&mut detected.components[index]);
         for dependency in &mut dependencies {
             let package = dependency.package_name.clone();
-            if let Some(version) =
+            if let Some(id) =
                 resolve(workspace, subject, inputs, &dependency.id, *lifecycle, package.as_deref())
             {
-                dependency.id.version = Some(version);
+                dependency.id = id;
             }
         }
         detected.components[index] = dependencies;
     }
 }
 
-/// `resolveVersion`: the first strategy that yields a versioned id.
+/// `resolveVersion`: the id of the first strategy that yields one. The `.bitmap`
+/// strategy yields the workspace id itself, even without a version (a new component).
 pub fn resolve(
     workspace: &Workspace<'_>,
     subject: &Subject<'_>,
@@ -53,25 +54,28 @@ pub fn resolve(
     id: &ComponentId,
     lifecycle: Lifecycle,
     package: Option<&str>,
-) -> Option<String> {
-    let bitmap = || workspace.bitmap_id(id).and_then(|found| found.version.clone());
+) -> Option<ComponentId> {
+    let versioned = |version: Option<String>| {
+        version.map(|version| ComponentId { version: Some(version), ..id.clone() })
+    };
     let from_package = || id.version.clone();
-    let strategies: [&dyn Fn() -> Option<String>; 8] = [
-        &|| from_overrides(workspace, inputs, id, lifecycle, package?),
-        &bitmap,
+    let strategies: [&dyn Fn() -> Option<ComponentId>; 8] = [
+        &|| versioned(from_overrides(workspace, inputs, id, lifecycle, package?)),
+        &|| workspace.bitmap_id(id).cloned(),
         &|| {
             workspace.options.update_dependents
                 .iter()
                 .find(|dependent| same(dependent, id))
-                .and_then(|dependent| dependent.version.clone())
+                .filter(|dependent| dependent.version.is_some())
+                .cloned()
         },
         &|| {
-            from_package()
+            versioned(from_package())
                 .filter(|_| package.is_some_and(|name| workspace.manifest[0].contains_key(name)))
         },
-        &|| from_merge_config(inputs.merge_config, package?),
+        &|| versioned(from_merge_config(inputs.merge_config, package?)),
         &|| {
-            from_package()
+            versioned(from_package())
                 .filter(|_| package.is_some_and(|name| in_fields(inputs.auto_detect, name)))
         },
         &|| {
@@ -79,9 +83,10 @@ pub fn resolve(
                 .components()
                 .into_iter()
                 .find(|dependency| same(&dependency.id, id))
-                .and_then(|dependency| dependency.id.version)
+                .map(|dependency| dependency.id)
+                .filter(|found| found.version.is_some())
         },
-        &from_package,
+        &|| versioned(from_package()),
     ];
     strategies.iter().find_map(|strategy| strategy())
 }

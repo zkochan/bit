@@ -132,6 +132,13 @@ impl Host for JsHost {
     }
 }
 
+/// Honor the `TRACE` env var for the engine, as `@pnpm/napi` does: an addon has
+/// no `main`, so the subscriber is installed when the module loads.
+#[napi_derive::module_init]
+fn init_tracing() {
+    pnpm_diagnostics::enable_tracing_by_env();
+}
+
 fn failure(error: impl std::fmt::Display) -> napi::Error {
     napi::Error::from_reason(error.to_string())
 }

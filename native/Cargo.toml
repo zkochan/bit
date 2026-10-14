@@ -7,6 +7,7 @@ resolver = "3"
 [workspace.dependencies]
 pnpm-config = { git = "https://github.com/pnpm/pnpm", rev = "343f3c4198b43dce5e58bc7de9927cb96aed59fc" }
 pnpm-default-reporter = { git = "https://github.com/pnpm/pnpm", rev = "343f3c4198b43dce5e58bc7de9927cb96aed59fc" }
+pnpm-diagnostics = { git = "https://github.com/pnpm/pnpm", rev = "343f3c4198b43dce5e58bc7de9927cb96aed59fc" }
 pnpm-deps-path = { git = "https://github.com/pnpm/pnpm", rev = "343f3c4198b43dce5e58bc7de9927cb96aed59fc" }
 pnpm-hooks = { git = "https://github.com/pnpm/pnpm", rev = "343f3c4198b43dce5e58bc7de9927cb96aed59fc" }
 pnpm-lockfile = { git = "https://github.com/pnpm/pnpm", rev = "343f3c4198b43dce5e58bc7de9927cb96aed59fc" }
