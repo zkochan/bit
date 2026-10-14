@@ -10,7 +10,7 @@ fn abort_grammars_select_only_explicit_noninteractive_operations() {
     assert!(parse_component(&["--abort", "--abort"]).is_none());
     assert!(parse_lane(&["--silent"]).is_some());
     assert_eq!(parse_lane(&["-s", "-x"]).unwrap().kind, Kind::Lane);
-    assert!(parse_lane(&[]).is_none());
+    assert!(!parse_lane(&[]).unwrap().silent);
     assert!(parse_lane(&["--silent", "component"]).is_none());
 }
 

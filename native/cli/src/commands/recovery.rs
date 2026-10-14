@@ -9,6 +9,7 @@ use super::{
     color::Chalk,
     engine::Engine,
     ids::Id,
+    install::confirm,
     installation::{self, Installer},
     status::{
         cache,
@@ -35,6 +36,7 @@ pub(super) struct Options {
     pattern: Option<String>,
     skip_install: bool,
     verbose: bool,
+    silent: bool,
 }
 
 pub(super) fn parse_component(args: &[&str]) -> Option<Options> {
@@ -63,10 +65,10 @@ fn parse(args: &[&str], kind: Kind) -> Option<Options> {
             _ => return None,
         }
     }
-    if kind == Kind::Component && !abort || kind == Kind::Lane && !silent {
+    if kind == Kind::Component && !abort {
         return None;
     }
-    Some(Options { kind, pattern, skip_install, verbose })
+    Some(Options { kind, pattern, skip_install, verbose, silent })
 }
 
 fn valid_pattern(pattern: &str) -> bool {
@@ -105,6 +107,12 @@ pub(super) fn run(args: &[OsString], options: &Options) -> io::Result<Outcome> {
     };
     let command = if options.kind == Kind::Lane { "merge-abort" } else { "merge" };
     workspace_command::execute_then(&root, args, command, |output| {
+        if options.kind == Kind::Lane && !options.silent {
+            output.stop();
+            if !confirm(&prepared.prompt(Chalk::detect(args)))? {
+                return Err(io::Error::other("operation aborted"));
+            }
+        }
         execute(&root, args, output, prepared, installer)
     })
 }
@@ -117,6 +125,7 @@ struct Prepared {
     progress: Option<Progress>,
     ids: Vec<String>,
     kind: Kind,
+    removed_directories: Option<String>,
 }
 
 impl Prepared {
@@ -176,7 +185,41 @@ impl Prepared {
         format_result(&result, options.kind, Chalk::detect(&[]))?;
         let progress = Progress::parse(plan.get("progress"))?;
         let ids = install_ids(&result, options.kind)?;
-        Ok(Self { engine, token, context, capture, progress, ids, kind: options.kind })
+        let removed_directories = if options.kind == Kind::Lane {
+            array(result.get("restoredItems"), "restored items")?
+                .iter()
+                .filter_map(Value::as_str)
+                .find_map(|item| {
+                    item.strip_prefix("deleted components directories: ").map(str::to_string)
+                })
+        } else {
+            None
+        };
+        Ok(Self {
+            engine,
+            token,
+            context,
+            capture,
+            progress,
+            ids,
+            kind: options.kind,
+            removed_directories,
+        })
+    }
+
+    fn prompt(&self, chalk: Chalk) -> String {
+        let directories = self.removed_directories
+            .as_ref()
+            .map(|dirs| {
+                format!(
+                    "\nThe following directories introduced by the merge will be deleted: {dirs}"
+                )
+            })
+            .unwrap_or_default();
+        format!(
+            "Code changes that were done since the last lane-merge will be lost.{directories}\nThe .bitmap and workspace.jsonc files will be restored to the state before the merge.\nThis action is irreversible.\n{}",
+            chalk.bold("Do you want to continue? [yes(y)/no(n)]")
+        )
     }
 
     fn commit(&mut self, root: &Path) -> io::Result<Value> {
