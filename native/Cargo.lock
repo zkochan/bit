@@ -370,6 +370,7 @@ dependencies = [
  "pretty_assertions",
  "rayon",
  "regress",
+ "ryu-js",
  "serde",
  "serde_json",
  "sha1",

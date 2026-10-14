@@ -30,6 +30,7 @@ indexmap = { version = "2", features = ["serde"] }
 node-semver = "2"
 rayon = "1.11"
 regress = "=0.12.0"
+ryu-js = "=1.0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 sha1 = "0.10"
