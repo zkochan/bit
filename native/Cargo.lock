@@ -370,10 +370,12 @@ dependencies = [
  "pretty_assertions",
  "rayon",
  "regress",
+ "reqwest",
  "ryu-js",
  "serde",
  "serde_json",
  "sha1",
+ "tar",
  "tempfile",
  "tokio",
 ]

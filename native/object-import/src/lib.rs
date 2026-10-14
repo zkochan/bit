@@ -1,5 +1,8 @@
 pub use import_stream::ImportStream;
 pub use inspection::InspectionSnapshot;
+/// Native import merge decisions (`kind: component | version | versionHistory | ...`).
+pub use operation::plan as plan_import_operation;
+/// Bit's JSONC reader (comments and trailing commas), used for `.bitmap`.
 pub use recovery::jsonc::parse as parse_jsonc;
 pub use session::{WorkspaceDispatcher, WorkspaceSession};
 pub use workspace::engine::{
