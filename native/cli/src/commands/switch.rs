@@ -39,7 +39,9 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
             for import in &prepared.imports {
                 import.render(output);
             }
-            render_import(output, prepared.import_count);
+            if options.skip_fetch {
+                render_import(output, prepared.import_count);
+            }
         },
     )
 }
