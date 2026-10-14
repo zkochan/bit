@@ -215,6 +215,9 @@ fn hard_link_entry(src: &Path, is_symlink: bool, targets: &[PathBuf]) -> io::Res
 
 fn symlink_each(source: &Path, targets: &[PathBuf]) -> io::Result<()> {
     for target in targets {
+        // `read_dir` order is platform-defined: a symlinked directory can come
+        // before any entry that would have created the destination.
+        fs::create_dir_all(target.parent().unwrap_or_else(|| Path::new("")))?;
         remove_path(target)?;
         symlink_relative(source, target)?;
     }

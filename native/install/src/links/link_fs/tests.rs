@@ -111,3 +111,22 @@ fn hard_link_directory_mirrors_files_and_skips_node_modules() {
     assert!(!dest.join("node_modules").exists());
     assert!(!dest.join("broken").exists());
 }
+
+#[cfg(unix)]
+#[test]
+fn hard_link_directory_creates_the_destination_for_a_symlinked_directory() {
+    use std::os::unix::fs::symlink;
+    let dir = tempfile::tempdir().unwrap();
+    let src = dir.path().join("pkg");
+    fs::create_dir_all(&src).unwrap();
+    fs::create_dir_all(dir.path().join("shared")).unwrap();
+    symlink(dir.path().join("shared"), src.join("shared")).unwrap();
+    let dest = dir.path().join("roots/env/node_modules/pkg");
+    hard_link_directory(&src, std::slice::from_ref(&dest)).unwrap();
+    assert!(
+        fs::symlink_metadata(dest.join("shared"))
+            .unwrap()
+            .file_type()
+            .is_symlink(),
+    );
+}
