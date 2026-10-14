@@ -77,6 +77,7 @@ const handlers = {
   hostInfo,
   envPolicy: ({ envId }) => envPolicy(envId),
   devPatterns: ({ envId }) => devPatterns(envId),
+  dependencyPolicies: ({ extensionIds }) => dependencyPolicies(extensionIds),
   appTypes,
   packageJsonProps: ({ envId }) => packageJsonProps(envId),
   transformPackageJson: ({ component, manifest }) => transformPackageJson(component, manifest),
@@ -189,6 +190,17 @@ async function devPatterns(envId) {
     docs: await call('getDocsDevPatterns'),
     compositions: await call('getCompositionsDevPatterns'),
   };
+}
+
+/**
+ * The dependency policies aspects registered (`registerDependenciesPolicies`), as
+ * `[[registrar, policy], ...]`, once the aspects the components configure are loaded.
+ */
+async function dependencyPolicies(extensionIds) {
+  const loaded = await loadHarmony();
+  const workspace = loaded.get('teambit.workspace/workspace');
+  await workspace.loadAspects(extensionIds, false, undefined, { throwOnError: false, hideMissingModuleError: true });
+  return loaded.get('teambit.dependencies/dependency-resolver').policiesRegistry.toArray();
 }
 
 async function appTypes() {

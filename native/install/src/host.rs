@@ -102,6 +102,14 @@ pub trait Host: Send + Sync {
         Ok(None)
     }
 
+    /// The dependency policies aspects registered (`registerDependenciesPolicies`),
+    /// as `[[registrar, policy], ...]`, after loading `extension_ids`: the aspects the
+    /// components configure that may register one. `None` when the host cannot load them.
+    async fn dependency_policies(&self, extension_ids: &[String]) -> io::Result<Option<Value>> {
+        let _ = extension_ids;
+        Ok(None)
+    }
+
     /// `package.json` props of an env: `{ props, modifiesPackageJson }`, where
     /// `props` is the env's `getPackageJsonProps()` and `modifiesPackageJson`
     /// tells whether it implements `modifyPackageJson()`.

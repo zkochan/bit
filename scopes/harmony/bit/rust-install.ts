@@ -151,6 +151,8 @@ class InstallHost {
         return JSON.stringify(await this.appTypes());
       case 'devPatterns':
         return JSON.stringify(await this.devPatterns(input.envId));
+      case 'dependencyPolicies':
+        return JSON.stringify(await this.dependencyPolicies(input.extensionIds));
       case 'packageJsonProps':
         return JSON.stringify(await this.packageJsonProps(input.envId));
       case 'transformPackageJson':
@@ -190,6 +192,17 @@ class InstallHost {
       docs: await call('getDocsDevPatterns'),
       compositions: await call('getCompositionsDevPatterns'),
     };
+  }
+
+  /**
+   * The dependency policies aspects registered (`registerDependenciesPolicies`), as
+   * `[[registrar, policy], ...]`, once the aspects the components configure are loaded.
+   */
+  private async dependencyPolicies(extensionIds: string[]) {
+    const harmony = await this.loadHarmony();
+    const workspace = harmony.get<any>('teambit.workspace/workspace');
+    await workspace.loadAspects(extensionIds, false, undefined, { throwOnError: false, hideMissingModuleError: true });
+    return harmony.get<any>('teambit.dependencies/dependency-resolver').policiesRegistry.toArray();
   }
 
   private async appTypes(): Promise<string[]> {
