@@ -1,0 +1,83 @@
+//! The JavaScript host. Only behavior that components or aspects implement in
+//! JavaScript goes through it; everything else is computed natively.
+
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::{io, path::PathBuf};
+
+/// Facts about the running `bit` process, collected once by the JavaScript entry point.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostInfo {
+    /// `@teambit/bit` package dir of the running bit (`mainAspect.path`).
+    pub bit_dir: PathBuf,
+    /// `<bvm>/versions/<v>/bit-<v>` when bit runs from bvm.
+    pub bvm_dir: Option<PathBuf>,
+    /// Core aspects: `[aspect id, package name, package dir]`.
+    pub core_aspects: Vec<CoreAspect>,
+    /// Non-aspect core packages linked like aspects (`@teambit/legacy`, `@teambit/harmony`).
+    pub core_packages: Vec<CoreAspect>,
+    /// `process.execPath`.
+    pub node_path: PathBuf,
+    /// Bit's global config dir (`GLOBAL_CONFIG`).
+    pub global_config_dir: PathBuf,
+    /// The running bit version.
+    pub bit_version: String,
+    /// Terminal columns, when stdout is a TTY.
+    pub columns: Option<u32>,
+    pub color: bool,
+    /// The process runs with `--json`/non-interactive output.
+    pub non_interactive: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoreAspect {
+    pub id: String,
+    pub package_name: String,
+    pub dir: PathBuf,
+}
+
+/// Work handed back to JavaScript after the packages are installed and linked.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AfterInstall {
+    pub compile: bool,
+    pub write_config_files: bool,
+    /// Some env failed to load before the install; clear caches first.
+    pub clear_cache: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AfterInstallResult {
+    /// Envs whose policy is only known after loading them (legacy envs without
+    /// `env.jsonc`) that still failed to load: the recurring install trigger.
+    pub old_non_loaded_envs: Vec<String>,
+    /// Number of components compiled, for the summary line.
+    pub compiled: usize,
+}
+
+/// Callbacks implemented by JavaScript. Each is invoked only when the
+/// workspace actually needs it.
+#[async_trait]
+pub trait Host: Send + Sync {
+    /// Dependency policy (`EnvPolicyConfigObject`) of an env that has no
+    /// `env.jsonc`: core envs and legacy envs implementing `getDependencies()`.
+    /// `None` when the env cannot be loaded.
+    async fn env_policy(&self, env_id: &str) -> io::Result<Option<Value>>;
+
+    /// File patterns of registered application types, used to find apps.
+    async fn app_types(&self) -> io::Result<Vec<String>>;
+
+    /// Generated `package.json` props contributed by the component's env and
+    /// aspects (`PackageJsonTransformer`s); `component` is the component id.
+    async fn package_json_props(&self, component: &str) -> io::Result<Value>;
+
+    /// Compile and write config files with the canonical JavaScript aspects.
+    async fn after_install(&self, request: AfterInstall) -> io::Result<AfterInstallResult>;
+
+    /// Ask a yes/no question on the terminal.
+    async fn confirm(&self, question: &str) -> io::Result<bool>;
+}
