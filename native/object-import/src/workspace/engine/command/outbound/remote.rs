@@ -111,7 +111,7 @@ fn check_client_id(client: &str) -> io::Result<()> {
         || client.is_empty()
         || !client
             .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
+            .all(|byte| byte.is_ascii_alphanumeric() || b"_-".contains(&byte))
     {
         return Err(invalid("outbound client id"));
     }

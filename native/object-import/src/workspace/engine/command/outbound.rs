@@ -20,7 +20,7 @@ pub(in crate::workspace::engine) struct Prepare {
     operation: String,
     ids: Vec<String>,
     #[serde(rename = "options")]
-    _options: Options,
+    options: Options,
     #[serde(flatten)]
     transport: Transport,
 }
@@ -44,6 +44,7 @@ struct Transport {
 struct Options {
     #[serde(rename = "originDirectly")]
     _origin_directly: bool,
+    resume: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -64,6 +65,7 @@ pub(super) struct Retained {
     client_id: String,
     pending: Vec<Pending>,
     selected_order: HashMap<String, usize>,
+    resume: Option<ResumeContext>,
     network: NetworkConfig,
     publication: Option<publication::Prepared>,
     /// The ids the remotes persisted, once the objects are transferred.
@@ -74,6 +76,10 @@ struct Pending {
     scope: String,
     host: String,
     objects: Vec<ObjectItem>,
+}
+
+struct ResumeContext {
+    selected: Vec<(String, String, String)>,
 }
 
 struct NetworkConfig {
@@ -97,6 +103,14 @@ pub(in crate::workspace::engine) fn prepare(
         .enumerate()
         .map(|(index, item)| (format!("{}/{}", item.scope, item.name), index))
         .collect();
+    let resume = input.options.resume
+        .as_ref()
+        .map(|_| ResumeContext {
+            selected: selected
+                .iter()
+                .map(|item| (item.scope.clone(), item.name.clone(), item.version.clone()))
+                .collect(),
+        });
     state.sequence = state.sequence.wrapping_add(1);
     let token = format!("outbound-{}", state.sequence);
     let hosts = hosts(input, &selected)?;
@@ -113,6 +127,7 @@ pub(in crate::workspace::engine) fn prepare(
         client_id: input.transport.client_id.clone(),
         pending,
         selected_order,
+        resume,
         network: network(input),
         publication,
         transferred: None,
@@ -229,6 +244,13 @@ pub(in crate::workspace::engine) fn apply(
     let mut actions = remote::Actions::new(retained)?;
     push_and_validate(retained, &mut actions)?;
     let exported_ids = persist(retained, &mut actions)?;
+    if let Some(context) = retained.resume.take() {
+        if let Some(plan) = retained.publication.as_mut() {
+            plan.resume_acknowledgement(&context.selected, &exported_ids)?;
+        } else if !exported_ids.is_empty() {
+            return Err(invalid("outbound resume acknowledgement"));
+        }
+    }
     retained.transferred = Some(exported_ids);
     let objects = retained.pending
         .iter()
@@ -245,10 +267,12 @@ pub(in crate::workspace::engine) fn apply(
 /// Push every batch, then validate them all; a failure cleans the pushed
 /// pending objects.
 fn push_and_validate(retained: &Retained, actions: &mut remote::Actions) -> io::Result<()> {
-    for (pushed, batch) in retained.pending.iter().enumerate() {
-        if let Err(error) = remote::push(retained, batch) {
-            cleanup(retained, actions, &retained.pending[..pushed]);
-            return Err(error);
+    if retained.resume.is_none() {
+        for (pushed, batch) in retained.pending.iter().enumerate() {
+            if let Err(error) = remote::push(retained, batch) {
+                cleanup(retained, actions, &retained.pending[..pushed]);
+                return Err(error);
+            }
         }
     }
     // Every batch is validated; the first failure is reported.
@@ -257,7 +281,9 @@ fn push_and_validate(retained: &Retained, actions: &mut remote::Actions) -> io::
         .filter_map(|batch| actions.validate(retained, batch).err())
         .collect();
     let Some(error) = errors.into_iter().next() else { return Ok(()) };
-    cleanup(retained, actions, &retained.pending);
+    if retained.resume.is_none() {
+        cleanup(retained, actions, &retained.pending);
+    }
     Err(io::Error::new(error.kind(), format!("outbound validate failed: {error}")))
 }
 
@@ -332,6 +358,9 @@ fn validate(input: &Prepare) -> io::Result<()> {
         || input.transport.client_id.is_empty()
         || input.transport.export_date.is_empty()
         || input.transport.token.is_some()
+        || input.options.resume
+            .as_deref()
+            .is_some_and(|resume| resume != input.transport.client_id)
     {
         return Err(invalid("outbound command requires canonical lifecycle"));
     }
