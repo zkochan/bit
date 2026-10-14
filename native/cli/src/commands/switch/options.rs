@@ -12,25 +12,62 @@ pub struct Options {
 }
 
 pub fn parse(args: &[&str]) -> Option<Options> {
-    let mut lane = None;
-    let mut skip_fetch = false;
-    let mut skip_install = false;
-    let mut verbose = false;
-    let mut force_ours = false;
-    let mut force_theirs = false;
+    let mut parsed = Parsed::default();
     for arg in args {
-        match *arg {
-            "--skip-fetch" if !skip_fetch => skip_fetch = true,
-            "-x" | "--skip-dependency-installation" if !skip_install => skip_install = true,
-            "--verbose" if !verbose => verbose = true,
-            "--force-ours" if !force_ours && !force_theirs => force_ours = true,
-            "--force-theirs" if !force_theirs && !force_ours => force_theirs = true,
-            name if lane.is_none() && valid_lane(name) => lane = Some(name.to_string()),
-            _ => return None,
-        }
+        parsed.accept(arg)?;
     }
-    Some(Options { lane: lane?, verbose, force_ours, force_theirs })
-        .filter(|_| skip_fetch && skip_install)
+    parsed.finish()
+}
+
+#[derive(Default)]
+struct Parsed {
+    lane: Option<String>,
+    skip_fetch: bool,
+    skip_install: bool,
+    verbose: bool,
+    force_ours: bool,
+    force_theirs: bool,
+}
+
+impl Parsed {
+    fn accept(&mut self, arg: &str) -> Option<()> {
+        if arg.starts_with('-') {
+            return self.flag(arg);
+        }
+        if self.lane.is_some() || !valid_lane(arg) {
+            return None;
+        }
+        self.lane = Some(arg.to_string());
+        Some(())
+    }
+
+    fn flag(&mut self, arg: &str) -> Option<()> {
+        let slot = match arg {
+            "--skip-fetch" => &mut self.skip_fetch,
+            "-x" | "--skip-dependency-installation" => &mut self.skip_install,
+            "--verbose" => &mut self.verbose,
+            "--force-ours" if !self.force_theirs => &mut self.force_ours,
+            "--force-theirs" if !self.force_ours => &mut self.force_theirs,
+            _ => return None,
+        };
+        if *slot {
+            return None;
+        }
+        *slot = true;
+        Some(())
+    }
+
+    fn finish(self) -> Option<Options> {
+        if !self.skip_fetch || !self.skip_install {
+            return None;
+        }
+        Some(Options {
+            lane: self.lane?,
+            verbose: self.verbose,
+            force_ours: self.force_ours,
+            force_theirs: self.force_theirs,
+        })
+    }
 }
 
 fn valid_lane(lane: &str) -> bool {
@@ -61,22 +98,4 @@ impl Options {
 }
 
 #[cfg(test)]
-mod options_tests {
-    use super::*;
-
-    #[test]
-    fn accepts_only_local_full_switches() {
-        assert_eq!(parse(&["s/dev", "--skip-fetch", "-x"]).unwrap().lane, "s/dev");
-        assert_eq!(parse(&["--skip-fetch", "main", "-x"]).unwrap().lane, "main");
-        assert!(parse(&["s/dev", "-x"]).is_none());
-        assert!(parse(&["s/dev", "--skip-fetch"]).is_none());
-        assert!(parse(&["s/dev", "--skip-fetch", "-x", "--branch"]).is_none());
-        assert!(parse(&["s/dev", "--skip-fetch", "-x", "--pattern", "foo"]).is_none());
-        assert!(parse(&["s/dev", "--skip-fetch", "-x", "-x"]).is_none());
-        assert!(parse(&["s/dev", "--skip-fetch", "-x", "--force-ours"]).unwrap().force_ours);
-        assert!(parse(&["s/dev", "--skip-fetch", "-x", "--force-theirs"]).unwrap().force_theirs);
-        assert!(
-            parse(&["s/dev", "--skip-fetch", "-x", "--force-ours", "--force-theirs"]).is_none()
-        );
-    }
-}
+mod options_tests;

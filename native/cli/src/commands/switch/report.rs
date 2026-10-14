@@ -48,7 +48,7 @@ fn build(results: &Results, options: &Options, formatter: &Formatter, minimal: b
         formatter.section("switch skipped", "", &items)
     };
     let lane_success = formatter.success_summary(&format!(
-        "successfully set \"{}\" as the active lane",
+        r#"successfully set "{}" as the active lane"#,
         formatter.chalk.bold(&options.lane),
     ));
     let success = if results.components.is_empty() {
@@ -65,26 +65,4 @@ fn build(results: &Results, options: &Options, formatter: &Formatter, minimal: b
 }
 
 #[cfg(test)]
-mod report_tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn reports_an_empty_switch() {
-        let report = format(
-            &json!({"components":[],"failedComponents":[]}),
-            &Options {
-                lane: "main".into(),
-                verbose: false,
-                force_ours: false,
-                force_theirs: false,
-            },
-            Chalk::new(false),
-        )
-        .unwrap();
-        assert_eq!(
-            report.data,
-            "No components have been changed.\n✔ successfully set \"main\" as the active lane",
-        );
-    }
-}
+mod report_tests;
