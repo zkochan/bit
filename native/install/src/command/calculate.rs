@@ -4,7 +4,7 @@
 
 use super::session::{Loaded, Session};
 use crate::{
-    dependencies::{self, DependencyOptions, default_package_name, glob},
+    dependencies::{self, DependencyOptions, DevPatternConfig, default_package_name, glob},
     import::{self, remotes::global_remotes},
     manifests::{
         self, ManifestContext, ManifestInput, ManifestOptions, ManifestOutcome, Policies,
@@ -66,6 +66,7 @@ pub async fn calculate(
         &env_policies,
         loaded.workspace.root_package_json.as_ref(),
         &dependency_options(session, loaded, &components)?,
+        session.host,
     )
     .await?;
     let apps = apps(session, loaded, &components).await?;
@@ -233,6 +234,7 @@ fn dependency_options(
         merge_config,
         update_dependents: update_dependents(loaded)?,
         use_cache: true,
+        dev_patterns: DevPatternConfig::from_aspects(&|id| loaded.config.aspect(id).cloned()),
     })
 }
 

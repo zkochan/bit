@@ -88,6 +88,16 @@ pub trait Host: Send + Sync {
     /// File patterns of registered application types, used to find apps.
     async fn app_types(&self) -> io::Result<Vec<String>>;
 
+    /// Dev-file patterns an env implements in JavaScript:
+    /// `{ devPatterns, tests, docs, compositions }`, the env's `getDevPatterns()`,
+    /// `getTestsDevPatterns()`, `getDocsDevPatterns()` and `getCompositionsDevPatterns()`
+    /// (each `null` when the env does not implement it). `None` when the env
+    /// cannot be loaded.
+    async fn dev_patterns(&self, env_id: &str) -> io::Result<Option<Value>> {
+        let _ = env_id;
+        Ok(None)
+    }
+
     /// `package.json` props of an env: `{ props, modifiesPackageJson }`, where
     /// `props` is the env's `getPackageJsonProps()` and `modifiesPackageJson`
     /// tells whether it implements `modifyPackageJson()`.

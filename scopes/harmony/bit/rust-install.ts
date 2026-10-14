@@ -136,6 +136,8 @@ class InstallHost {
         return JSON.stringify(await this.envPolicy(input.envId));
       case 'appTypes':
         return JSON.stringify(await this.appTypes());
+      case 'devPatterns':
+        return JSON.stringify(await this.devPatterns(input.envId));
       case 'packageJsonProps':
         return JSON.stringify(await this.packageJsonProps(input.envId));
       case 'transformPackageJson':
@@ -157,6 +159,24 @@ class InstallHost {
     const env = await this.env(envId);
     const policy = await env?.getDependencies?.();
     return policy ?? null;
+  }
+
+  /**
+   * The dev-file patterns an env implements in JavaScript (`getDevPatterns`,
+   * `getTestsDevPatterns`, `getDocsDevPatterns`, `getCompositionsDevPatterns`), each
+   * `null` when the env does not implement it; `null` when the env cannot be loaded.
+   */
+  private async devPatterns(envId: string) {
+    if (envId === 'teambit.harmony/node') return { devPatterns: null, tests: null, docs: null, compositions: null };
+    const env = await this.env(envId);
+    if (!env) return null;
+    const call = async (method: string) => (typeof env[method] === 'function' ? await env[method]() : null);
+    return {
+      devPatterns: await call('getDevPatterns'),
+      tests: await call('getTestsDevPatterns'),
+      docs: await call('getDocsDevPatterns'),
+      compositions: await call('getCompositionsDevPatterns'),
+    };
   }
 
   private async appTypes(): Promise<string[]> {
