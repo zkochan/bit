@@ -29,7 +29,7 @@ pub(super) fn run(
             pool,
         ),
         input::Operation::Switch => {
-            planning::checkout(&mut record, input.current, &input.semver, snapshots, pool)
+            super::switch::plan(&mut record, input.current, &input.semver, snapshots, pool)
         }
     })?;
     if record.request.operation == input::Operation::Switch {

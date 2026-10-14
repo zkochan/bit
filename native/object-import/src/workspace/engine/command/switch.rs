@@ -1,9 +1,12 @@
 //! Local, ordinary lane switches reuse checkout capture, transition and bitmap publication.
 //! Resolve the complete target set before the command retains a writable plan.
-use super::{input::Prepare, invalid, prepare, repository};
+use super::{Record, capture, input::Prepare, invalid, planning, prepare, repository};
 use crate::{
     command_import,
-    workspace::engine::{client_status::config, status_context},
+    workspace::{
+        engine::{client_status::config, status_context},
+        snapshots,
+    },
 };
 use serde_json::{Value, json};
 use std::{
@@ -26,7 +29,7 @@ pub(super) fn context(
     pool: &rayon::ThreadPool,
 ) -> io::Result<(Value, Option<command_import::PreparedImport>)> {
     validate_options(request)?;
-    let selection = LaneSelection::load(request)?;
+    let mut selection = LaneSelection::load(request)?;
     let mut context = selection.metadata(request, pool)?;
     prepare::extend_models(request, pool, &mut context, Some(&selection.imported))?;
     if selection.current.is_main() && staged_main(&request.root, &context)? {
@@ -77,7 +80,7 @@ impl LaneSelection {
         Ok(Self { imported, bitmap, current, destination, lane, current_lane, lane_only })
     }
 
-    fn metadata(&self, request: &Prepare, pool: &rayon::ThreadPool) -> io::Result<Value> {
+    fn metadata(&mut self, request: &Prepare, pool: &rayon::ThreadPool) -> io::Result<Value> {
         let input = status_context::Request {
             root: request.root.clone(),
             home: request.home.clone(),
@@ -95,10 +98,54 @@ impl LaneSelection {
                 });
         }
         let heads = validate_membership(&context, self)?;
+        let (additions, added_targets, selected) =
+            self.additions(&request.root, &context, &settings)?;
         context["lane"] = json!({"currentId":self.current,"switchId":self.destination,
             "switchExported":self.lane.as_ref().is_some_and(|record| !record.is_new),
-            "switchLaneOnly":self.lane_only,"switchLaneHeads":heads});
+            "switchLaneOnly":self.lane_only,"switchLaneHeads":heads,
+            "additions":additions,"addedTargets":added_targets,"targets":selected});
         Ok(context)
+    }
+
+    fn additions(
+        &mut self,
+        root: &std::path::Path,
+        context: &Value,
+        settings: &Value,
+    ) -> io::Result<(Vec<Value>, Vec<Value>, Vec<Value>)> {
+        let tracked = context["targets"]
+            .as_array()
+            .ok_or_else(|| invalid("switch targets"))?
+            .iter()
+            .filter_map(|target| target["identity"].as_str())
+            .collect::<HashSet<_>>();
+        let selected = entries(self.lane.as_ref())?
+            .into_iter()
+            .filter(|entry| {
+                !tracked.contains(entry.identity.as_str())
+                    && !self.lane_only.contains(&entry.identity)
+            })
+            .map(|entry| {
+                json!({"identity":entry.identity,"head":entry.head,"visible":false,"hidden":false,
+                "currentIdPresent":false,"bitmapPresent":false})
+            })
+            .collect::<Vec<_>>();
+        let identity_bitmap =
+            super::lane_context::visibility::identity_bitmap(&self.bitmap, settings)?;
+        let additions = super::lane_context::additions::prepare_switch(
+            &mut self.imported,
+            root,
+            &identity_bitmap,
+            settings,
+            &selected,
+        )?;
+        for row in &selected {
+            let identity =
+                row["identity"].as_str().ok_or_else(|| invalid("switch addition identity"))?;
+            self.lane_only.insert(identity.to_owned());
+        }
+        let targets = super::lane_context::additions::targets(&additions, &selected);
+        Ok((additions, targets, selected))
     }
 }
 
@@ -162,12 +209,12 @@ fn validate_membership(
         if entry.hidden {
             return Err(invalid("switch hidden lane component requires canonical handling"));
         }
+    }
+    for entry in &current_heads {
         if !tracked.contains(entry.identity.as_str())
             && !selection.lane_only.contains(&entry.identity)
         {
-            return Err(invalid(
-                "switch lane component addition/removal requires canonical handling",
-            ));
+            return Err(invalid("switch current lane component absent from bitmap"));
         }
     }
     Ok(lane_heads
@@ -214,6 +261,33 @@ fn target_version(context: &Value, target: &Value) -> io::Result<String> {
     Ok(super::selection::versions::label(&model, head))
 }
 
+pub(super) fn plan(
+    record: &mut Record,
+    current: Vec<Value>,
+    semver: &Value,
+    snapshots: &mut snapshots::State,
+    pool: &rayon::ThreadPool,
+) -> io::Result<planning::Planned> {
+    let mut planned = planning::checkout(record, current, semver, snapshots, pool)?;
+    let additions = record.context["lane"]["additions"]
+        .as_array()
+        .ok_or_else(|| invalid("switch additions"))?
+        .clone();
+    for destination in &additions {
+        let scope =
+            destination["scope"].as_str().ok_or_else(|| invalid("switch addition scope"))?;
+        let name = destination["name"].as_str().ok_or_else(|| invalid("switch addition name"))?;
+        let head =
+            destination["version"].as_str().ok_or_else(|| invalid("switch addition head"))?;
+        let identity = format!("{scope}/{name}");
+        planned.captured.push(capture::addition(&identity, destination)?);
+        let selected = json!({"kind":"target","version":head,"merge":false});
+        let index = planned.captured.len() - 1;
+        planning::prepare_one(record, &mut planned, index, &selected, snapshots)?;
+    }
+    Ok(planned)
+}
+
 fn staged_main(root: &std::path::Path, context: &Value) -> io::Result<bool> {
     let bytes = match std::fs::read(root.join(".bit/staged-snaps")) {
         Ok(bytes) => bytes,
@@ -247,26 +321,44 @@ pub(super) fn import_count(
     context: &Value,
     targets: &[Value],
 ) -> io::Result<usize> {
+    let additions = context["lane"]["addedTargets"]
+        .as_array()
+        .ok_or_else(|| invalid("switch addition count"))?
+        .len();
     if context["lane"]["switchId"]["name"] == "main" {
-        return Ok(targets.len());
+        return Ok(targets.len() + additions);
     }
     let staged = match std::fs::read_to_string(root.join(".bit/staged-snaps")) {
         Ok(value) => value,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(targets.len()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            return Ok(targets.len() + additions);
+        }
         Err(error) => return Err(error),
     };
     let local = staged
         .lines()
         .map(str::trim)
         .collect::<HashSet<_>>();
-    Ok(targets
+    let new_imports = context["lane"]["addedTargets"]
+        .as_array()
+        .unwrap()
         .iter()
         .filter(|target| {
-            let identity = target["identity"].as_str().unwrap_or_default();
-            let version = target["switchVersion"].as_str().unwrap_or_default();
-            context["lane"]["switchLaneHeads"].get(identity).is_none() || !local.contains(version)
+            target["version"]
+                .as_str()
+                .is_none_or(|version| !local.contains(version))
         })
-        .count())
+        .count();
+    Ok(new_imports
+        + targets
+            .iter()
+            .filter(|target| {
+                let identity = target["identity"].as_str().unwrap_or_default();
+                let version = target["switchVersion"].as_str().unwrap_or_default();
+                context["lane"]["switchLaneHeads"].get(identity).is_none()
+                    || !local.contains(version)
+            })
+            .count())
 }
 
 pub(super) fn append_skipped(
@@ -287,6 +379,12 @@ pub(super) fn append_skipped(
         if targets
             .iter()
             .any(|target| target["identity"] == identity)
+            || context["lane"]["addedTargets"]
+                .as_array()
+                .is_some_and(|rows| {
+                    rows.iter()
+                        .any(|row| row["identity"] == identity)
+                })
         {
             continue;
         }
