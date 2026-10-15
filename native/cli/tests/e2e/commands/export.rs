@@ -279,7 +279,7 @@ fn cross_scope_forked_lane_export_matches_node() {
     let native = helper.native_run("export --fork-lane-new-scope");
     assert_eq!(native.stdout, node.stdout);
     assert_eq!(native.stderr, node.stderr);
-    assert_eq!(remote_index_by_identity(&fork_remote), remote_index_by_identity(&node_remote),);
+    assert_eq!(remote_index_by_identity(&fork_remote), remote_index_by_identity(&node_remote));
     assert_eq!(object_names(&fork_remote), object_names(&node_remote));
     for path in [
         ".bitmap".to_owned(),
