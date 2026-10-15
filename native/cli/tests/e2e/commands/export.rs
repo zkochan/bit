@@ -1,6 +1,7 @@
 //! `e2e/commands/export.e2e.ts`.
 
 use crate::helper::{FOO_FIXTURE, Helper, config, parse, setup};
+use serde_json::Value;
 use std::{ffi::OsStr, fs, path::Path};
 
 #[test]
@@ -28,8 +29,8 @@ fn selected_staged_export_matches_node() {
     assert_eq!(native.stdout, node.stdout);
     assert_eq!(native.stderr, node.stderr);
     assert_eq!(
-        parse(&fs::read_to_string(helper.scopes.remote_path.join("index.json")).unwrap()),
-        parse(&fs::read_to_string(node_remote.join("index.json")).unwrap()),
+        remote_index_by_identity(&helper.scopes.remote_path),
+        remote_index_by_identity(&node_remote),
     );
     assert_eq!(object_names(&helper.scopes.remote_path), object_names(&node_remote));
     for path in [".bitmap", ".bit/index.json", ".bit/scope.json"] {
@@ -70,8 +71,8 @@ fn multiple_selected_components_match_node() {
     assert_eq!(native.stdout, node.stdout);
     assert_eq!(native.stderr, node.stderr);
     assert_eq!(
-        parse(&fs::read_to_string(helper.scopes.remote_path.join("index.json")).unwrap()),
-        parse(&fs::read_to_string(node_remote.join("index.json")).unwrap()),
+        remote_index_by_identity(&helper.scopes.remote_path),
+        remote_index_by_identity(&node_remote),
     );
     assert_eq!(object_names(&helper.scopes.remote_path), object_names(&node_remote));
 }
@@ -90,8 +91,8 @@ fn selected_scoped_version_matches_node() {
     assert_eq!(native.stdout, node.stdout);
     assert_eq!(native.stderr, node.stderr);
     assert_eq!(
-        parse(&fs::read_to_string(helper.scopes.remote_path.join("index.json")).unwrap()),
-        parse(&fs::read_to_string(node_remote.join("index.json")).unwrap()),
+        remote_index_by_identity(&helper.scopes.remote_path),
+        remote_index_by_identity(&node_remote),
     );
     assert_eq!(object_names(&helper.scopes.remote_path), object_names(&node_remote));
 }
@@ -151,8 +152,8 @@ fn assert_reexport(helper: &Helper, ids: &str, flag: &str) {
     assert_eq!(native.stdout, node.stdout);
     assert_eq!(native.stderr, node.stderr);
     assert_eq!(
-        parse(&fs::read_to_string(helper.scopes.remote_path.join("index.json")).unwrap()),
-        parse(&fs::read_to_string(node_remote.join("index.json")).unwrap()),
+        remote_index_by_identity(&helper.scopes.remote_path),
+        remote_index_by_identity(&node_remote),
     );
     assert_eq!(object_names(&helper.scopes.remote_path), object_names(&node_remote));
     for path in [".bitmap", ".bit/index.json", ".bit/scope.json"] {
@@ -174,6 +175,25 @@ fn assert_reexport(helper: &Helper, ids: &str, flag: &str) {
         Helper::cmd_in_with(&node_root, "status --json", &[("BIT_NATIVE", OsStr::new("off"))]);
     let native_status = helper.native_run("status --json");
     assert_eq!(parse(&native_status.stdout), parse(&node_status.stdout));
+}
+
+/// Node may persist independent Component index rows in either completion order.
+fn remote_index_by_identity(scope: &Path) -> Value {
+    let mut index = parse(&fs::read_to_string(scope.join("index.json")).unwrap());
+    index["components"]
+        .as_array_mut()
+        .unwrap()
+        .sort_by(|a, b| {
+            a["id"]["scope"]
+                .as_str()
+                .cmp(&b["id"]["scope"].as_str())
+                .then_with(|| {
+                    a["id"]["name"]
+                        .as_str()
+                        .cmp(&b["id"]["name"].as_str())
+                })
+        });
+    index
 }
 
 fn object_names(scope: &Path) -> Vec<String> {
@@ -259,10 +279,7 @@ fn cross_scope_forked_lane_export_matches_node() {
     let native = helper.native_run("export --fork-lane-new-scope");
     assert_eq!(native.stdout, node.stdout);
     assert_eq!(native.stderr, node.stderr);
-    assert_eq!(
-        parse(&fs::read_to_string(fork_remote.join("index.json")).unwrap()),
-        parse(&fs::read_to_string(node_remote.join("index.json")).unwrap()),
-    );
+    assert_eq!(remote_index_by_identity(&fork_remote), remote_index_by_identity(&node_remote),);
     assert_eq!(object_names(&fork_remote), object_names(&node_remote));
     for path in [
         ".bitmap".to_owned(),
@@ -397,8 +414,8 @@ fn fresh_lane_component_export_matches_node() {
     assert_eq!(native.stdout, node.stdout);
     assert_eq!(native.stderr, node.stderr);
     assert_eq!(
-        parse(&fs::read_to_string(helper.scopes.remote_path.join("index.json")).unwrap()),
-        parse(&fs::read_to_string(node_remote.join("index.json")).unwrap()),
+        remote_index_by_identity(&helper.scopes.remote_path),
+        remote_index_by_identity(&node_remote),
     );
     for path in [
         ".bitmap".to_owned(),
