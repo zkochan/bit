@@ -152,7 +152,10 @@ impl Plan {
         let history = json!({"name":name,"scope":scope,"laneHash":lane_hash,"history":{history_key:{"log":history_log,"components":history_components,"updateDependents":[]}}});
         lanes.push(json!({"id":id,"hash":lane_hash}));
         let tracking = scope_json["lanes"]["tracking"].as_array_mut().ok_or_else(invalid)?;
-        if tracking.iter().any(|row| row["localLane"] == options.alias) {
+        if tracking
+            .iter()
+            .any(|row| row["localLane"] == options.alias)
+        {
             return Err(invalid());
         }
         tracking.push(json!({"localLane":options.alias,"remoteLane":name,"remoteScope":scope}));
