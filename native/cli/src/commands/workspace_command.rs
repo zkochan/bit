@@ -71,6 +71,20 @@ pub struct Request<'r> {
 
 /// `commandPrepare`, the capture and `commandPlan`.
 pub fn plan(root: &Path, request: &Request<'_>) -> io::Result<Planned> {
+    plan_with(root, request, false)
+}
+
+/// Validate a merge's snapshot step without allocating or serializing the
+/// snapshot. The caller may then materialize a separate no-snap plan, install,
+/// and create the real snapshot from the installed workspace.
+pub fn plan_snapshot_preview(root: &Path, request: &Request<'_>) -> io::Result<Planned> {
+    if request.operation != "merge" {
+        return Err(decline("snapshot preview operation"));
+    }
+    plan_with(root, request, true)
+}
+
+fn plan_with(root: &Path, request: &Request<'_>, preview_snapshot: bool) -> io::Result<Planned> {
     if cache::no_fs_cache(root) {
         return Err(decline("no-fs-cache may be enabled"));
     }
@@ -98,7 +112,7 @@ pub fn plan(root: &Path, request: &Request<'_>) -> io::Result<Planned> {
     }
     let mut steps =
         Steps { engine: &mut engine, root, home: &home, token: &token, context: &context };
-    let capture = steps.stages(&mut plan, capture, request)?;
+    let capture = steps.stages(&mut plan, capture, request, preview_snapshot)?;
     Ok(Planned { engine, token, context, capture, plan, apply: "commandApply" })
 }
 
@@ -118,6 +132,7 @@ impl Steps<'_> {
         plan: &mut Value,
         capture: Capture,
         request: &Request<'_>,
+        preview_snapshot: bool,
     ) -> io::Result<Capture> {
         let mut caches = Vec::new();
         if plan.get("policyPreparation").is_some() {
@@ -130,7 +145,7 @@ impl Steps<'_> {
         }
         let snap_failed = plan.get("snapFailed") == Some(&Value::Bool(true));
         let mut capture = if plan.get("needsSnap").is_some() || snap_failed {
-            self.prepare_snapshot(plan, &caches, request)?
+            self.prepare_snapshot(plan, &caches, request, preview_snapshot)?
         } else {
             capture
         };

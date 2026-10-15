@@ -59,10 +59,15 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
         return install::execute_snapping(
             &root,
             args,
-            &options,
-            &planned,
-            progress.as_ref(),
-            installer,
+            install::Snapping {
+                options: options.request(),
+                message: options.message.as_deref(),
+                mode: report::Mode { verbose: options.verbose, lane: false },
+                planned: &planned,
+                progress: progress.as_ref(),
+                installer,
+                materialized: None,
+            },
         );
     }
     install::execute(&root, args, planned, report, progress.as_ref(), installer)
