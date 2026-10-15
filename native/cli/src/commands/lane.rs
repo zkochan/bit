@@ -54,7 +54,7 @@ fn merge(args: &[OsString], argv: &[&str]) -> io::Result<Outcome> {
     let request =
         Request { operation: "merge", options: options.request(), to: None, verify_fresh: true };
     let mode = report::Mode { verbose: options.verbose, lane: true };
-    let planned = if installer.is_some() && options.no_squash() {
+    let planned = if installer.is_some() && !options.no_snap() {
         let mut no_snap = options.request();
         no_snap["noSnap"] = Value::Bool(true);
         no_snap
@@ -65,7 +65,7 @@ fn merge(args: &[OsString], argv: &[&str]) -> io::Result<Outcome> {
             Request { operation: "merge", options: no_snap, to: None, verify_fresh: true };
         std::thread::scope(|scope| {
             let preview = scope.spawn(|| workspace_command::plan_snapshot_preview(&root, &request));
-            let materialized = workspace_command::plan(&root, &no_snap_request);
+            let materialized = workspace_command::plan_internal_no_snap(&root, &no_snap_request);
             let preview = preview
                 .join()
                 .map_err(|_| io::Error::other("merge snapshot preview thread panicked"))??;
@@ -83,7 +83,7 @@ fn merge(args: &[OsString], argv: &[&str]) -> io::Result<Outcome> {
         Ok(prepared) => prepared,
         Err(error) => return Ok(Outcome::Declined(format!("lane merge: {error}"))),
     };
-    if installer.is_some() && options.no_squash() && planned.plan.get("needsSnap").is_some() {
+    if installer.is_some() && !options.no_snap() && planned.plan.get("needsSnap").is_some() {
         return install::execute_snapping(
             &root,
             args,

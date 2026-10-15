@@ -71,7 +71,7 @@ pub struct Request<'r> {
 
 /// `commandPrepare`, the capture and `commandPlan`.
 pub fn plan(root: &Path, request: &Request<'_>) -> io::Result<Planned> {
-    plan_with(root, request, false)
+    plan_with(root, request, false, false)
 }
 
 /// Validate a merge's snapshot step without allocating or serializing the
@@ -81,10 +81,27 @@ pub fn plan_snapshot_preview(root: &Path, request: &Request<'_>) -> io::Result<P
     if request.operation != "merge" {
         return Err(decline("snapshot preview operation"));
     }
-    plan_with(root, request, true)
+    plan_with(root, request, true, false)
 }
 
-fn plan_with(root: &Path, request: &Request<'_>, preview_snapshot: bool) -> io::Result<Planned> {
+/// The materialization half of a default lane merge that will install and
+/// snap in the same invocation. Direct `--no-snap` still follows Node's guard.
+pub fn plan_internal_no_snap(root: &Path, request: &Request<'_>) -> io::Result<Planned> {
+    if request.operation != "merge"
+        || request.options["noSnap"] != true
+        || request.options.get("lane").is_none()
+    {
+        return Err(decline("internal lane materialization options"));
+    }
+    plan_with(root, request, false, true)
+}
+
+fn plan_with(
+    root: &Path,
+    request: &Request<'_>,
+    preview_snapshot: bool,
+    internal_materialization: bool,
+) -> io::Result<Planned> {
     if cache::no_fs_cache(root) {
         return Err(decline("no-fs-cache may be enabled"));
     }
@@ -102,7 +119,7 @@ fn plan_with(root: &Path, request: &Request<'_>, preview_snapshot: bool) -> io::
         "dependencyReadSet": capture.dependency_read_set(),
         "semver": semver,
     });
-    lane::validate(&request.options, &context)?;
+    lane::validate(&request.options, &context, internal_materialization)?;
     if let Some(ids) = lane::pattern_ids(&request.options, &context)? {
         plan_request["lanePatternIds"] = json!(ids);
     }
