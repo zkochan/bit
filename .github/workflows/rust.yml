@@ -198,7 +198,9 @@ jobs:
             ~/.cargo/git
             native/target/debug
           key: rust-status-diff-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('native/rust-toolchain.toml', 'native/Cargo.lock') }}
-          restore-keys: rust-status-diff-${{ runner.os }}-${{ runner.arch }}-
+          restore-keys: |
+            rust-status-diff-${{ runner.os }}-${{ runner.arch }}-
+            rust-test-${{ runner.os }}-${{ runner.arch }}-
       - name: Cache the Node.js CLI
         id: bvm-cache
         uses: actions/cache@v4
