@@ -55,6 +55,8 @@ fn serve(listener: &TcpListener, stop: &AtomicBool, always_taken: bool) {
 }
 
 fn respond(connection: &mut TcpStream, always_taken: bool) -> io::Result<()> {
+    // Windows accepted sockets inherit the listener's nonblocking mode.
+    connection.set_nonblocking(false)?;
     connection.set_read_timeout(Some(Duration::from_secs(2)))?;
     let mut buffer = [0; 8192];
     let length = connection.read(&mut buffer)?;
@@ -124,7 +126,7 @@ fn explicitly_chosen_versions_do_not_query_the_registry() {
 }
 
 #[test]
-fn registry_handles_a_disconnected_client_before_the_next_request() {
+fn registry_handles_disconnected_clients_and_delayed_request_headers() {
     let registry = Registry::new(false);
     let address = registry.url.strip_prefix("http://").unwrap();
     drop(TcpStream::connect(address).unwrap());
@@ -135,5 +137,31 @@ fn registry_handles_a_disconnected_client_before_the_next_request() {
     connection.write_all(b"GET /package/0.0.3 HTTP/1.1\r\nHost: localhost\r\n\r\n").unwrap();
     let mut response = String::new();
     connection.read_to_string(&mut response).unwrap();
+    assert!(response.starts_with("HTTP/1.1 404 Not Found"), "{response}");
+}
+
+#[test]
+fn accepted_nonblocking_streams_wait_for_request_headers() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let address = listener.local_addr().unwrap();
+    let (ready, accepted) = std::sync::mpsc::channel();
+    let worker = thread::spawn(move || {
+        let (mut connection, _) = listener.accept().unwrap();
+        connection.set_nonblocking(true).unwrap();
+        ready.send(()).unwrap();
+        respond(&mut connection, false).unwrap();
+    });
+    let mut connection = TcpStream::connect(address).unwrap();
+    accepted
+        .recv_timeout(Duration::from_secs(3))
+        .unwrap();
+    thread::sleep(Duration::from_millis(30));
+    connection
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    connection.write_all(b"GET /package/0.0.3 HTTP/1.1\r\nHost: localhost\r\n\r\n").unwrap();
+    let mut response = String::new();
+    connection.read_to_string(&mut response).unwrap();
+    worker.join().unwrap();
     assert!(response.starts_with("HTTP/1.1 404 Not Found"), "{response}");
 }

@@ -42,7 +42,10 @@ fn enable(helper: &Helper) {
             "initial",
         ],
     ] {
+        // Git may detach automatic maintenance after commit. Keep this fixture's
+        // repository quiescent while clone_workspace takes its exact file snapshot.
         let output = Command::new("git")
+            .args(["-c", "maintenance.auto=false", "-c", "gc.auto=0"])
             .args(args)
             .current_dir(root)
             .output()

@@ -73,11 +73,17 @@ The JavaScript host uses a Rust-owned private `.cjs` file rather than an inline
 command-line script, preserving Windows process-creation limits. Its session owns
 the file until the child exits; cleanup is tested on success and callback failure.
 
+The registry fixture explicitly restores blocking mode on accepted sockets, including
+Windows sockets inheriting a nonblocking listener. Real TCP regressions cover a
+disconnected client and delayed headers on an explicitly nonblocking socket. Autosync
+fixtures disable automatic Git maintenance before copying their repository; copy
+failures remain strict and identify the source and destination.
+
 ## Validation record
 
 All required local checks passed: pinned formatter, Clippy, Dylint, rustdoc,
 workspace tests (1,201 passed; one existing ignored case), the complete ported
-suite (377 passed), and the porting inventory check. The release workspace build
+suite (378 passed), and the porting inventory check. The release workspace build
 also passed with warnings denied.
 
 On Linux x64, five alternating fresh-copy pairs per command produced these medians:
