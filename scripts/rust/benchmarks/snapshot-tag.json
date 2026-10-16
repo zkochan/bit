@@ -156,5 +156,6 @@
       },
       "stage": "/var/tmp/bit-native-bench-2bzzv7r3"
     }
-  }
+  },
+  "measured_native_commit": "cbb644c6cc773ce5ac89451b16705d86c0baa431"
 }

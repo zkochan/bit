@@ -70,7 +70,7 @@ operation. Product acknowledgement checks remain strict.
 ## Validation record
 
 All required local checks passed: pinned formatter, Clippy, Dylint, rustdoc,
-workspace tests (1,198 passed; one existing ignored case), the complete ported
+workspace tests (1,199 passed; one existing ignored case), the complete ported
 suite (375 passed), and the porting inventory check. The release workspace build
 also passed with warnings denied.
 
@@ -88,7 +88,7 @@ normalized; Rust diagnostic trace lines are removed from stderr. Every Rust run
 was checked for native execution without delegation. The callback gain is modest:
 these commands still execute the same published Harmony providers and hooks.
 
-The [measurement record](snapshot-tag-benchmark.json) contains every sample,
+The [measurement record](../../scripts/rust/benchmarks/snapshot-tag.json) contains every sample,
 commands, source/helper/binary SHA-256 fingerprints, fixture paths and raw log
 directories. The ordinary fixture is the durable two-component status/diff
 workspace; the callback fixture is the compiled `callback_workspace(false)` setup
