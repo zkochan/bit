@@ -77,17 +77,17 @@ the file until the child exits; cleanup is tested on success and callback failur
 
 All required local checks passed: pinned formatter, Clippy, Dylint, rustdoc,
 workspace tests (1,201 passed; one existing ignored case), the complete ported
-suite (376 passed), and the porting inventory check. The release workspace build
+suite (377 passed), and the porting inventory check. The release workspace build
 also passed with warnings denied.
 
 On Linux x64, five alternating fresh-copy pairs per command produced these medians:
 
 | Workload | Node 2.2.94 | Rust release | Node / Rust |
 | --- | ---: | ---: | ---: |
-| Ordinary snap | 864.752 ms | 307.261 ms | 2.81× |
-| Ordinary tag | 857.512 ms | 318.203 ms | 2.69× |
-| Callback snap | 847.001 ms | 804.101 ms | 1.05× |
-| Callback tag | 871.213 ms | 795.123 ms | 1.10× |
+| Ordinary snap | 835.051 ms | 289.172 ms | 2.89× |
+| Ordinary tag | 862.526 ms | 289.988 ms | 2.97× |
+| Callback snap | 866.918 ms | 813.980 ms | 1.07× |
+| Callback tag | 872.776 ms | 796.997 ms | 1.10× |
 
 All twenty complete stdout/stderr pairs match. Only newly allocated snap refs are
 normalized; Rust diagnostic trace lines are removed from stderr. Every Rust run

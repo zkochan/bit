@@ -4,8 +4,8 @@ use super::soft::{bitmap, compare_command};
 use crate::helper::{FOO_FIXTURE, Helper, config};
 use std::{
     ffi::OsStr,
-    io::{Read, Write},
-    net::TcpListener,
+    io::{self, Read, Write},
+    net::{TcpListener, TcpStream},
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -35,36 +35,41 @@ impl Registry {
 impl Drop for Registry {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
-        self.thread
-            .take()
-            .unwrap()
-            .join()
-            .unwrap();
+        if let Err(panic) = self.thread.take().unwrap().join()
+            && !thread::panicking()
+        {
+            std::panic::resume_unwind(panic);
+        }
     }
 }
 
 fn serve(listener: &TcpListener, stop: &AtomicBool, always_taken: bool) {
     while !stop.load(Ordering::Relaxed) {
         if let Ok((mut connection, _)) = listener.accept() {
-            let mut buffer = [0; 8192];
-            let length = connection.read(&mut buffer).unwrap();
-            let request = String::from_utf8_lossy(&buffer[..length]);
-            let taken = always_taken
-                || request
-                    .lines()
-                    .next()
-                    .unwrap_or_default()
-                    .contains("/0.0.2 ");
-            let status = if taken { "200 OK" } else { "404 Not Found" };
-            write!(
-                connection,
-                "HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
-            )
-            .unwrap();
+            // npm may cancel a request before sending headers or reading its response.
+            let _ = respond(&mut connection, always_taken);
         } else {
             thread::sleep(Duration::from_millis(5));
         }
     }
+}
+
+fn respond(connection: &mut TcpStream, always_taken: bool) -> io::Result<()> {
+    connection.set_read_timeout(Some(Duration::from_secs(2)))?;
+    let mut buffer = [0; 8192];
+    let length = connection.read(&mut buffer)?;
+    if length == 0 {
+        return Ok(());
+    }
+    let request = String::from_utf8_lossy(&buffer[..length]);
+    let taken = always_taken
+        || request
+            .lines()
+            .next()
+            .unwrap_or_default()
+            .contains("/0.0.2 ");
+    let status = if taken { "200 OK" } else { "404 Not Found" };
+    write!(connection, "HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
 }
 
 fn workspace(registry: &Registry) -> Helper {
@@ -116,4 +121,19 @@ fn explicitly_chosen_versions_do_not_query_the_registry() {
         "tag --skip-published-versions --ver 2.0.0 --message explicit",
     );
     assert_eq!(bitmap(&helper.scopes.local_path)["bar/foo"]["version"], "2.0.0");
+}
+
+#[test]
+fn registry_handles_a_disconnected_client_before_the_next_request() {
+    let registry = Registry::new(false);
+    let address = registry.url.strip_prefix("http://").unwrap();
+    drop(TcpStream::connect(address).unwrap());
+    let mut connection = TcpStream::connect(address).unwrap();
+    connection
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    connection.write_all(b"GET /package/0.0.3 HTTP/1.1\r\nHost: localhost\r\n\r\n").unwrap();
+    let mut response = String::new();
+    connection.read_to_string(&mut response).unwrap();
+    assert!(response.starts_with("HTTP/1.1 404 Not Found"), "{response}");
 }

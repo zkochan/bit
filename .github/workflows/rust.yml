@@ -226,7 +226,7 @@ jobs:
             diff_completion status_completion status_component_policy status_environments status_relative \
             status_component_selectors status_graph_remote status_autosync \
             commands::snap commands::tag snapshot_environments; do
-            if ! cargo test --locked -p bit-cli --features e2e --test e2e "$parity_filter"; then
+            if ! cargo test --locked -p bit-cli --features e2e --test e2e "$parity_filter" -- --nocapture; then
               parity_failed=1
             fi
           done
