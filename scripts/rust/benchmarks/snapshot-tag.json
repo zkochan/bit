@@ -1,16 +1,17 @@
 {
-  "measured_at_utc": "2026-10-16 16:56:51 UTC",
+  "measured_at_utc": "2026-10-16 17:35:06 UTC",
   "platform": "Linux 7.2.5-200.fc44.x86_64; AMD Ryzen 9 9950X3D2 16-Core Processor",
   "node_version": "22.22.0",
   "bit_reference_version": "2.2.94",
   "build": "RUSTFLAGS=-D warnings cargo build --locked --release --workspace",
   "native_source": {
     "algorithm": "sha256 of sorted git ls-files -co --exclude-standard -z native, unique regular files: path NUL bytes NUL",
-    "file_count": 1126,
-    "native_source_sha256": "ae8054ff3008853a497580398ecac699620344a409b2e6d66a404f8cf1a36fb5"
+    "file_count": 1128,
+    "native_source_sha256": "63f1e286593eecf66ec8c6ba42e7ddcb1f525388f88ea4f1e7b279ebee37448d",
+    "native_git_tree": "efc7e20475efa83e42fd323e4b914dc28cc28ed5"
   },
   "sha256": {
-    "release_bit": "289413b67b17898d5121122e909acbabe24b8052893cb11bf9e1fd765229206c",
+    "release_bit": "a5a4472d4f3ec4f595365d6cf44222707e79bfbca408c385b3d66a8c4ad05e52",
     "benchmark_helper": "4ea79082ea31c4e9829de770faf7fca3fe67a4e0b322a12fc6c8fc63f1aaf1e9",
     "node_wrapper": "d18f9f4aa2c224871e8872c5804c64d98941152e957919a1631fd46addf05d3d",
     "node_cli_entry": "71b324e03c4c9fb01cd3decb053ca4c3781c27ce06a8af53f7ad09d0ae42d033",
@@ -18,7 +19,7 @@
     "tty_helper": "e023c62e557dd4f711dff568aa77cca53054d19bfd86d78d0ec961f9ff8b4370"
   },
   "method": "Five alternating complete-command pairs on fresh copies per workload; trace rejects native fallback. All twenty stdout/stderr pairs match after removing Rust trace lines and normalizing only newly allocated @<40-hex> snap references.",
-  "tty": "snap, tag and callback tag: script -q -e, TERM=dumb, FORCE_COLOR=1, CI and NO_COLOR unset; exact colors/output/exit parity after CRLF and allocated refs normalization; raw logs /var/tmp/snapshot-tag-tty-ate79e4h",
+  "tty": "snap, tag and callback tag: script -q -e, TERM=dumb, FORCE_COLOR=1, CI and NO_COLOR unset; exact colors/output/exit parity after CRLF and allocated refs normalization; raw logs /var/tmp/snapshot-tag-tty-i01_scmt",
   "runs": {
     "plain-snap": {
       "command": [
@@ -33,25 +34,25 @@
       "rust": "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
       "runs_ms": {
         "node": [
-          848.511,
-          811.881,
-          832.972,
-          815.634,
-          869.547
+          942.553,
+          864.752,
+          840.895,
+          943.442,
+          834.328
         ],
         "rust": [
-          363.616,
-          248.392,
-          295.424,
-          297.168,
-          285.734
+          545.185,
+          277.429,
+          314.268,
+          305.198,
+          307.261
         ]
       },
       "median_ms": {
-        "node": 832.972,
-        "rust": 295.424
+        "node": 864.752,
+        "rust": 307.261
       },
-      "stage": "/var/tmp/bit-native-bench-gm3__kw1"
+      "stage": "/var/tmp/bit-native-bench-5hiqyyee"
     },
     "plain-tag": {
       "command": [
@@ -66,25 +67,25 @@
       "rust": "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
       "runs_ms": {
         "node": [
-          859.851,
-          863.354,
-          849.764,
-          879.877,
-          842.02
+          913.722,
+          857.512,
+          966.628,
+          854.108,
+          845.484
         ],
         "rust": [
-          284.236,
-          275.338,
-          293.574,
-          261.473,
-          300.136
+          337.182,
+          318.203,
+          299.625,
+          298.435,
+          337.426
         ]
       },
       "median_ms": {
-        "node": 859.851,
-        "rust": 284.236
+        "node": 857.512,
+        "rust": 318.203
       },
-      "stage": "/var/tmp/bit-native-bench-_i28xfjf"
+      "stage": "/var/tmp/bit-native-bench-wi_pq1c3"
     },
     "callback-snap": {
       "command": [
@@ -101,25 +102,25 @@
       "rust": "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
       "runs_ms": {
         "node": [
-          867.134,
-          867.644,
-          866.96,
-          866.302,
-          891.88
+          892.981,
+          869.255,
+          845.427,
+          847.001,
+          838.632
         ],
         "rust": [
-          804.353,
-          834.373,
-          778.099,
-          815.319,
-          786.857
+          804.101,
+          805.415,
+          818.829,
+          802.414,
+          798.154
         ]
       },
       "median_ms": {
-        "node": 867.134,
-        "rust": 804.353
+        "node": 847.001,
+        "rust": 804.101
       },
-      "stage": "/var/tmp/bit-native-bench-rgewqr49"
+      "stage": "/var/tmp/bit-native-bench-rug9djkr"
     },
     "callback-tag": {
       "command": [
@@ -136,26 +137,25 @@
       "rust": "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
       "runs_ms": {
         "node": [
-          888.142,
-          858.833,
-          874.717,
-          878.113,
-          871.28
+          856.366,
+          863.357,
+          888.577,
+          873.273,
+          871.213
         ],
         "rust": [
-          803.95,
-          808.903,
-          807.752,
-          809.539,
-          796.392
+          781.339,
+          779.235,
+          795.123,
+          819.629,
+          832.512
         ]
       },
       "median_ms": {
-        "node": 874.717,
-        "rust": 807.752
+        "node": 871.213,
+        "rust": 795.123
       },
-      "stage": "/var/tmp/bit-native-bench-2bzzv7r3"
+      "stage": "/var/tmp/bit-native-bench-cy5r763x"
     }
-  },
-  "measured_native_commit": "cbb644c6cc773ce5ac89451b16705d86c0baa431"
+  }
 }

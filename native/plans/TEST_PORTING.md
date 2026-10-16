@@ -101,6 +101,14 @@ These released-CLI parity cases supplement the TypeScript case inventory below:
   runs only on Windows and characterizes the pinned repository's pending-object enumeration
   limitation directly. It does not relax export acknowledgement checks.
 
+Windows status fixtures that require exported main or lane history run the pinned
+Node export's local lifecycle, then seed canonical existing repository objects and
+index into the remote. Bitmap scope promotion and the current lane's staged-config
+cleanup complete the fixture state omitted by the pinned server's empty ID list.
+`status_completion::pinned_windows_node_export_still_completes_its_local_lifecycle`
+characterizes that published behavior; the all-platform seeded lane-merge case
+checks actual status and diff against Node. Linux setup retains real native export.
+
 The nested-file diff fixture permits only the two sibling directory batches
 `a/deep.js` and `z/deep.js` to swap, including their matching Files summary order.
 The pinned fast-glob walker reads sibling directories concurrently and emits each

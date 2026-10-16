@@ -54,7 +54,7 @@ fn removed_components_do_not_block_unrelated_soft_tags() {
     helper.populate_components(2, true, "");
     helper.output_file("comp1/index.js", "module.exports = () => 'independent';");
     helper.tag_without_build("", "");
-    helper.run("export");
+    crate::helper::remote::publish(&helper);
     helper.run("delete comp2 --silent");
     helper.append_file("comp1/index.js", "\n// next");
     let node_workspace = helper.clone_workspace();

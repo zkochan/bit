@@ -90,3 +90,15 @@ fn short_callback_hash_versions_follow_the_published_version_parser() {
     let value = super::normalize(json!({"version":"ab"}), &original).unwrap();
     assert_eq!(value["version"], "ab");
 }
+
+#[test]
+fn windows_types_restore_preserves_absent_null_and_native_source_path() {
+    for original in [json!({}), json!({"types":null}), json!({"types":"_src/index.ts"})] {
+        let mut manifest = json!({"types":"callback.d.ts","custom":true});
+        super::platform_types(&mut manifest, &original, false);
+        assert_eq!(manifest["types"], "callback.d.ts");
+        super::platform_types(&mut manifest, &original, true);
+        assert_eq!(manifest.get("types"), original.get("types"));
+        assert_eq!(manifest["custom"], true);
+    }
+}

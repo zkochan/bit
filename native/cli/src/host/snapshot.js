@@ -178,7 +178,7 @@ async function snapshotBindMetadata(component,version,loaded) {
   const consumer=component.state._consumer;
   for(const field of ['dependencies','devDependencies','peerDependencies']) consumer[field]=new Dependencies((version[field]??[]).map((dependency)=>Dependency.deserialize(dependency)));
   for(const field of ['packageDependencies','devPackageDependencies','peerPackageDependencies','buildStatus','mainFile','bindingPrefix','overrides']) if(version[field]!==undefined) {
-    if(field==='overrides')consumer.overrides.componentOverridesData=version[field];
+    if(field==='overrides')consumer.overrides=bitRequire('@teambit/legacy.consumer-config').ComponentOverrides.loadFromScope(version[field]);
     else consumer[field]=version[field];
   }
   consumer.extensions=ExtensionDataList.fromModelObject(version.extensions.map((row)=>new ExtensionDataEntry(undefined,row.extensionId?ComponentID.fromObject(row.extensionId):undefined,row.name,row.config,row.data)));

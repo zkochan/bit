@@ -63,25 +63,31 @@ workspace VCS job runs status/diff and the snapshot/tag extension fixtures. Wind
 public diff headers, file-link behavior and package metadata.
 
 Bit 2.2.94's Windows file-remote acknowledgement problem is characterized separately
-from native publication. Remote diff fixtures seed canonical repository objects and
-indexes on Windows so they can test diff without depending on that broken setup
-operation. Product acknowledgement checks remain strict.
+from native publication. Remote status/diff fixtures use the published local export
+lifecycle and seed canonical repository objects and indexes on Windows. This
+provides real repository states without depending on the broken remote setup
+operation. Product acknowledgement checks remain strict. The Windows job runs
+every selected oracle group and reports failure if any group fails.
+
+The JavaScript host uses a Rust-owned private `.cjs` file rather than an inline
+command-line script, preserving Windows process-creation limits. Its session owns
+the file until the child exits; cleanup is tested on success and callback failure.
 
 ## Validation record
 
 All required local checks passed: pinned formatter, Clippy, Dylint, rustdoc,
-workspace tests (1,199 passed; one existing ignored case), the complete ported
-suite (375 passed), and the porting inventory check. The release workspace build
+workspace tests (1,201 passed; one existing ignored case), the complete ported
+suite (376 passed), and the porting inventory check. The release workspace build
 also passed with warnings denied.
 
 On Linux x64, five alternating fresh-copy pairs per command produced these medians:
 
 | Workload | Node 2.2.94 | Rust release | Node / Rust |
 | --- | ---: | ---: | ---: |
-| Ordinary snap | 832.972 ms | 295.424 ms | 2.82× |
-| Ordinary tag | 859.851 ms | 284.236 ms | 3.03× |
-| Callback snap | 867.134 ms | 804.353 ms | 1.08× |
-| Callback tag | 874.717 ms | 807.752 ms | 1.08× |
+| Ordinary snap | 864.752 ms | 307.261 ms | 2.81× |
+| Ordinary tag | 857.512 ms | 318.203 ms | 2.69× |
+| Callback snap | 847.001 ms | 804.101 ms | 1.05× |
+| Callback tag | 871.213 ms | 795.123 ms | 1.10× |
 
 All twenty complete stdout/stderr pairs match. Only newly allocated snap refs are
 normalized; Rust diagnostic trace lines are removed from stderr. Every Rust run

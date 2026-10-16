@@ -221,14 +221,13 @@ jobs:
         run: node ../scripts/rust/prepare-pnpm-engine.mjs
       - name: Compare native workspace VCS with the pinned Node.js CLI
         run: |
-          cargo test --locked -p bit-cli --features e2e --test e2e diff_completion
-          cargo test --locked -p bit-cli --features e2e --test e2e status_completion
-          cargo test --locked -p bit-cli --features e2e --test e2e status_component_policy
-          cargo test --locked -p bit-cli --features e2e --test e2e status_environments
-          cargo test --locked -p bit-cli --features e2e --test e2e status_relative
-          cargo test --locked -p bit-cli --features e2e --test e2e status_component_selectors
-          cargo test --locked -p bit-cli --features e2e --test e2e status_graph_remote
-          cargo test --locked -p bit-cli --features e2e --test e2e status_autosync
-          cargo test --locked -p bit-cli --features e2e --test e2e commands::snap
-          cargo test --locked -p bit-cli --features e2e --test e2e commands::tag
-          cargo test --locked -p bit-cli --features e2e --test e2e snapshot_environments
+          parity_failed=0
+          for parity_filter in \
+            diff_completion status_completion status_component_policy status_environments status_relative \
+            status_component_selectors status_graph_remote status_autosync \
+            commands::snap commands::tag snapshot_environments; do
+            if ! cargo test --locked -p bit-cli --features e2e --test e2e "$parity_filter"; then
+              parity_failed=1
+            fi
+          done
+          exit "$parity_failed"

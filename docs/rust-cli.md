@@ -109,9 +109,10 @@ They run the `bit` binary against the released Node.js CLI that
 Some behavior is still implemented by aspects in JavaScript, for example an
 env's `getDependencies()` or the compile step after `bit install`. Native
 commands reach it through `native/cli/src/host/host.js`. The script is embedded
-in the binary and runs with `node -e` on the Node.js CLI's own Node. It starts
-on the first call only, and it loads only modules that the published
-`@teambit/bit` package already ships.
+in the binary and runs from a private `.cjs` temporary file on the Node.js CLI's
+own Node, keeping the command line within Windows limits. The Rust session owns
+and removes that file after the child stops. The host starts on the first call
+only and loads modules that the published `@teambit/bit` package already ships.
 
 The protocol is one JSON request per line on the script's stdin,
 `{id, method, params}`, and one response per line on its stdout,

@@ -101,12 +101,25 @@ fn normalize(mut manifest: Value, original: &Value) -> io::Result<Value> {
         let version = format!("0.0.0-{hash}");
         manifest["version"] = value!(version);
     }
-    if cfg!(windows) {
-        manifest["types"] = original["types"].clone();
-    }
+    platform_types(&mut manifest, original, cfg!(windows));
     manifest["_bit_local"] = value!(true);
     manifest["source"] = original["source"].clone();
     Ok(manifest)
+}
+
+fn platform_types(manifest: &mut Value, original: &Value, windows: bool) {
+    if !windows {
+        return;
+    }
+    if let Some(types) = original.get("types") {
+        manifest["types"] = types.clone();
+    } else {
+        // An absent JavaScript property serializes as absent, never as null.
+        manifest
+            .as_object_mut()
+            .unwrap()
+            .shift_remove("types");
+    }
 }
 
 fn aspect_exports(manifest: &mut Value) -> io::Result<()> {

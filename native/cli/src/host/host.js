@@ -9,7 +9,7 @@ if (!process.env.BIT_NO_COMPILE_CACHE) {
 // using only modules the published `@teambit/bit` package ships. The Rust CLI passes it to the
 // Node.js CLI's own Node with `-e`. Changed in-memory sources are spooled only into Rust-owned temporary directories.
 //
-//   node -e <this script> <@teambit/bit dir> <Node.js CLI entry> <workspace root>
+//   node <private host.cjs> <@teambit/bit dir> <Node.js CLI entry> <workspace root>
 //
 // One JSON request per stdin line, `{id, method, params}`; one JSON response per stdout line,
 // `{id, result}` or `{id, error}`. Aspect output normally goes to stderr so stdout stays

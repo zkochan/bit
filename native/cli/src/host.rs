@@ -35,6 +35,7 @@ struct Session {
     next_id: u64,
     captured_stdout: String,
     stderr_finished: std::sync::mpsc::Receiver<()>,
+    _script: tempfile::TempPath,
 }
 
 #[derive(Deserialize)]
@@ -116,11 +117,11 @@ impl Host {
             .ok_or_else(|| {
                 io::Error::other("the Node.js CLI entry does not belong to an @teambit/bit package")
             })?;
+        let script = program()?;
         let mut command = Command::new(&self.cli.node);
         self.configure(&mut command)?;
         command
-            .arg("-e")
-            .arg(SCRIPT)
+            .arg(&script)
             .arg(bit_dir)
             .arg(&self.cli.entry)
             .arg(&self.root)
@@ -143,8 +144,18 @@ impl Host {
             next_id: 0,
             captured_stdout: String::new(),
             stderr_finished,
+            _script: script,
         })
     }
+}
+
+fn program() -> io::Result<tempfile::TempPath> {
+    let mut script = tempfile::Builder::new()
+        .prefix("bit-native-host-")
+        .suffix(".cjs")
+        .tempfile()?;
+    script.write_all(SCRIPT.as_bytes())?;
+    Ok(script.into_temp_path())
 }
 
 impl Session {
@@ -235,3 +246,6 @@ fn progress_mode() -> &'static str {
         && env::var_os("CI").is_none();
     if progress { "1" } else { "0" }
 }
+
+#[cfg(all(test, unix))]
+mod tests;
