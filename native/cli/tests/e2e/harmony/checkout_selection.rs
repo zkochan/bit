@@ -18,7 +18,7 @@ fn compare(helper: &Helper, command: &str) {
     compare_with(helper, command, true);
 }
 
-fn compare_with(helper: &Helper, command: &str, ci: bool) {
+fn compare_with(helper: &Helper, command: &str, ci: bool) -> crate::helper::Run {
     let oracle = helper.clone_workspace();
     let variables = if ci { vec![("CI", OsStr::new("1"))] } else { Vec::new() };
     let mut node_variables = variables.clone();
@@ -46,6 +46,7 @@ fn compare_with(helper: &Helper, command: &str, ci: bool) {
             fs::read(oracle.join(file)).unwrap(),
         );
     }
+    native
 }
 
 #[test]
@@ -96,8 +97,29 @@ fn checkout_and_revert_resolve_short_snapshot_references() {
         format!("revert comp1 {} -x", &reference[..7]),
     ] {
         helper.get_cloned_workspace(&baseline);
-        compare_with(&helper, &command, false);
+        #[cfg(windows)]
+        let before = short_ref_workspace_files(&helper);
+        let result = compare_with(&helper, &command, false);
+        #[cfg(not(windows))]
+        assert!(result.status.success());
+        #[cfg(windows)]
+        {
+            assert_eq!(result.status.code(), Some(1));
+            assert_eq!(
+                result.stderr,
+                format!("failed finding an object with the short hash {}", &reference[..7]),
+            );
+            assert_eq!(short_ref_workspace_files(&helper), before);
+        }
     }
+}
+
+#[cfg(windows)]
+fn short_ref_workspace_files(helper: &Helper) -> Vec<Vec<u8>> {
+    [".bitmap", "comp1/index.js", "comp2/index.js", "comp3/index.js"]
+        .iter()
+        .map(|file| fs::read(helper.scopes.local_path.join(file)).unwrap())
+        .collect()
 }
 
 #[test]
@@ -124,6 +146,14 @@ fn ambiguous_short_references_preserve_canonical_error_without_writes() {
     assert_eq!(native.status.code(), node.status.code());
     assert!(!native.status.success());
     assert_eq!(native.stderr, node.stderr);
-    assert!(native.stderr.contains("objects with the same short hash"));
+    let expected = if cfg!(windows) {
+        format!("failed finding an object with the short hash {}", &reference[..7])
+    } else {
+        format!(
+            "found 2 objects with the same short hash {}, please use longer hash",
+            &reference[..7],
+        )
+    };
+    assert_eq!(native.stderr, expected);
     assert_eq!(config::read_jsonc(&helper.scopes.local_path.join(".bitmap")), before);
 }

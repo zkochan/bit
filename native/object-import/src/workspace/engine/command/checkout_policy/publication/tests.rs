@@ -101,3 +101,30 @@ fn hardlinked_workspace_config_declines_during_validation() {
     assert_eq!(fs::read(&path).unwrap(), before);
     assert_eq!(fs::read(&copy).unwrap(), before);
 }
+
+#[test]
+fn policy_jsonc_writer_uses_platform_eols_independently_of_original_newlines() {
+    let original = "// retained\n{\"teambit.dependencies/dependency-resolver\":{\"policy\":{\"dependencies\":{\"pkg\":\"1.0.0\"}}}}\n";
+    let expected = concat!(
+        "// retained\n{\n",
+        "  \"teambit.dependencies/dependency-resolver\": {\n",
+        "    \"policy\": {\n",
+        "      \"dependencies\": {\n",
+        "        \"pkg\": \"2.0.0\"\n",
+        "      },\n",
+        "      \"peerDependencies\": {}\n",
+        "    },\n",
+        "    \"linkCoreAspects\": true\n",
+        "  }\n}\n",
+    );
+    let updates = json!({"pkg":["1.0.0","2.0.0"]});
+    for input in [original.to_owned(), original.replace('\n', "\r\n")] {
+        for windows in [false, true] {
+            let actual =
+                super::render_updates(&input, updates.as_object().unwrap(), windows).unwrap();
+            let expected =
+                if windows { expected.replace('\n', "\r\n") } else { expected.to_owned() };
+            assert_eq!(actual, expected);
+        }
+    }
+}

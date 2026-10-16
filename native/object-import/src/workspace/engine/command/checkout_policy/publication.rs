@@ -38,8 +38,11 @@ impl Prepared {
         let mapped = update_map(updates)?;
         let original = String::from_utf8(self.before.clone())
             .map_err(|_| invalid("command workspace config UTF-8"))?;
-        let mut text =
-            if mapped.is_empty() { original } else { render_updates(&original, &mapped)? };
+        let mut text = if mapped.is_empty() {
+            original
+        } else {
+            render_updates(&original, &mapped, cfg!(windows))?
+        };
         if !conflicts.is_empty() {
             text = crate::config_merge::render_workspace_conflict(&text, &plan["conflicts"])?;
         }
@@ -105,7 +108,11 @@ fn ordinary(path: &PathBuf) -> io::Result<()> {
     Ok(())
 }
 
-fn render_updates(original: &str, updates: &Map<String, Value>) -> io::Result<String> {
+fn render_updates(
+    original: &str,
+    updates: &Map<String, Value>,
+    windows: bool,
+) -> io::Result<String> {
     let mut document = crate::jsonc::Document::parse(original)?;
     if !document
         .get(&[RESOLVER])
@@ -127,7 +134,10 @@ fn render_updates(original: &str, updates: &Map<String, Value>) -> io::Result<St
             document.set(&path, &value);
         }
     }
-    let output = format!("{document}\n");
+    // WorkspaceConfig.toVinyl delegates the serialized JSONC to AbstractVinyl,
+    // whose write applies platform EOLs; comment-json itself always renders LF.
+    let bytes = crate::checkout::eol::normalize(format!("{document}\n").into_bytes(), windows);
+    let output = String::from_utf8(bytes).map_err(io::Error::other)?;
     if output.len() > MAX_BYTES {
         return Err(invalid("command workspace config output budget"));
     }

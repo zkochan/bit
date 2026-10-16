@@ -7,8 +7,22 @@ pub(super) fn matching(
     prefix: &str,
     overlay: impl Iterator<Item = String>,
 ) -> io::Result<Vec<String>> {
+    matching_for_separator(directory, prefix, overlay, std::path::MAIN_SEPARATOR)
+}
+
+fn matching_for_separator(
+    directory: &Path,
+    prefix: &str,
+    overlay: impl Iterator<Item = String>,
+    separator: char,
+) -> io::Result<Vec<String>> {
     if !(3..40).contains(&prefix.len()) || !prefix.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err(invalid("checkout short reference"));
+    }
+    // Bit 2.2.94 passes path.join's backslashes to glob as escape characters on
+    // Windows. Repository.listRefsStartWith therefore finds no object candidates.
+    if separator == '\\' {
+        return Ok(Vec::new());
     }
     let mut refs = overlay
         .filter(|hash| hash.starts_with(prefix))

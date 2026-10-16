@@ -151,13 +151,16 @@ fn lane_switch_with_compiled_callbacks_matches_node_and_retains_cache_prefix() {
     let helper = super::snapshot_environments::callback_workspace(false);
     helper.re_init_remote_scope();
     helper.add_remote_scope();
-    for command in ["tag bar/foo -m initial", "export", "lane create dev"] {
+    for command in ["tag bar/foo -m initial", "lane create dev"] {
         let setup = Helper::cmd_in_with(
             &helper.scopes.local_path,
             command,
             &[("BIT_NATIVE", OsStr::new("off"))],
         );
         assert!(setup.status.success(), "{} {}", setup.stdout, setup.stderr);
+        if command.starts_with("tag ") {
+            crate::helper::remote::publish(&helper);
+        }
     }
     helper.append_file("bar/foo.js", "\n// lane source\n");
     let setup = Helper::cmd_in_with(
