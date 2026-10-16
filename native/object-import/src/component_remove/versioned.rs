@@ -1,7 +1,7 @@
 //! Local removal of a staged tagged or imported Component.
 
 mod history;
-use history::{create as lane_history, ensure_absent as history_absent};
+use history::plan as lane_history;
 
 use super::{Plan, RowKind, invalid, validate_ancestors};
 use crate::workspace::engine::command::outbound;
@@ -17,12 +17,13 @@ pub struct VersionedPlan {
     staged: Option<Change>,
     objects: Vec<Change>,
     lane: Option<Change>,
-    history: Option<HistoryCreation>,
+    history: Option<HistoryState>,
 }
 
-struct HistoryCreation {
+struct HistoryState {
     path: PathBuf,
-    bytes: Vec<u8>,
+    before: Option<Vec<u8>>,
+    after: Option<Vec<u8>>,
 }
 
 struct Change {
@@ -78,7 +79,7 @@ impl VersionedPlan {
         }
         let (index, model_hash) = index_change(root, scope, component_name, kind)?;
         let (staged, staged_version) =
-            staged_selection(root, scope, component_name, version, kind, workspace.lane.as_ref())?;
+            staged_selection(root, scope, component_name, kind, workspace.lane.as_ref())?;
         let objects = object_changes(
             root,
             &ModelSelection {
@@ -130,15 +131,7 @@ impl VersionedPlan {
             }
         }
         if let Some(history) = &self.history {
-            validate_ancestors(
-                &self.workspace.root,
-                history.path
-                    .parent()
-                    .ok_or_else(|| invalid("history path"))?
-                    .strip_prefix(&self.workspace.root)
-                    .map_err(|_| invalid("history path"))?,
-            )?;
-            history_absent(&history.path)?;
+            history::validate(&self.workspace.root, history)?;
         }
         Ok(())
     }
@@ -171,8 +164,7 @@ impl VersionedPlan {
             fs::write(&lane.path, lane.after.as_ref().ok_or_else(|| invalid("lane object"))?)?;
         }
         if let Some(history) = &self.history {
-            fs::create_dir_all(history.path.parent().ok_or_else(|| invalid("history path"))?)?;
-            fs::write(&history.path, &history.bytes)?;
+            history::write(history)?;
         }
         Ok(())
     }
@@ -182,7 +174,6 @@ fn staged_selection(
     root: &Path,
     scope: &str,
     name: &str,
-    version: &str,
     kind: RowKind,
     lane: Option<&super::Lane>,
 ) -> io::Result<(Option<Change>, Option<String>)> {
@@ -191,9 +182,6 @@ fn staged_selection(
         return Ok((None, None));
     }
     let (change, staged_version) = staged_change(root, scope, name, lane)?;
-    if kind == RowKind::LaneSnap && staged_version != version {
-        return Err(invalid("lane staged version differs from workspace version"));
-    }
     Ok((Some(change), Some(staged_version)))
 }
 
@@ -342,10 +330,13 @@ fn lane_model_hashes(
     {
         return Err(invalid("unsupported lane Component model"));
     }
-    crate::merge_history::hash(selection.version)?;
-    let version = outbound::read_object(dir, selection.version, "Version")?;
-    if !version["parents"].as_array().is_some_and(Vec::is_empty) {
-        return Err(invalid("lane VersionHistory needs parent traversal"));
+    let ancestry = history::ancestry(dir, selection.version)?;
+    if selection.staged_version.is_none_or(|staged| {
+        !ancestry
+            .iter()
+            .any(|version| version["hash"] == staged)
+    }) {
+        return Err(invalid("lane staged version is outside snap ancestry"));
     }
     Ok(vec![selection.model_hash.to_owned()])
 }

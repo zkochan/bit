@@ -536,3 +536,82 @@ fn modified_lane_component_delegates_unless_forced() {
         }
     }
 }
+
+#[test]
+fn linear_lane_snap_removal_matches_node() {
+    let helper = Helper::new();
+    helper.re_init_workspace_with(false);
+    helper.run("lane create dev");
+    helper.create_component_bar_foo("module.exports = 'one';");
+    helper.add_component_bar_foo();
+    helper.run("snap --message one");
+    helper.output_file("bar/foo.js", "module.exports = 'two';");
+    helper.run("snap --message two");
+    let baseline = helper.clone_workspace();
+    for suffix in ["", " --force", " --keep-files"] {
+        helper.get_cloned_workspace(&baseline);
+        let node_root = helper.clone_workspace();
+        let command = format!("remove bar/foo --silent{suffix}");
+        let node = Helper::cmd_in_with(&node_root, &command, &[("BIT_NATIVE", OsStr::new("off"))]);
+        let native = helper.native_run(&command);
+        assert!(native.native, "{}", native.trace);
+        assert_eq!(native.status.code(), node.status.code());
+        assert_eq!(native.stdout, node.stdout);
+        assert_eq!(native.stderr, node.stderr);
+        let root = &helper.scopes.local_path;
+        for path in [".bitmap", ".bit/index.json", ".bit/staged-config/my-scope/dev.json"] {
+            assert_eq!(
+                fs::read(root.join(path)).unwrap(),
+                fs::read(node_root.join(path)).unwrap(),
+                "{path}",
+            );
+        }
+        let native_objects = scope_objects(root);
+        let node_objects = scope_objects(&node_root);
+        assert_eq!(
+            native_objects.keys().collect::<Vec<_>>(),
+            node_objects.keys().collect::<Vec<_>>(),
+            "{suffix}",
+        );
+        for (path, bytes) in native_objects {
+            assert!(bytes == node_objects[&path], "{path:?}");
+        }
+        assert_eq!(root.join("bar/foo.js").exists(), node_root.join("bar/foo.js").exists());
+    }
+}
+
+#[test]
+fn populated_lane_version_history_removal_matches_node() {
+    let helper = Helper::new();
+    helper.re_init_workspace_with(false);
+    helper.run("lane create dev");
+    helper.create_component_bar_foo("module.exports = 'one';");
+    helper.add_component_bar_foo();
+    helper.run("snap --message one");
+    helper.output_file("bar/foo.js", "module.exports = 'two';");
+    helper.run("snap --message two");
+    let root = &helper.scopes.local_path;
+    let status = Helper::cmd_in_with(root, "status --json", &[("BIT_NATIVE", OsStr::new("off"))]);
+    assert!(status.status.success());
+    let baseline = helper.clone_workspace();
+    let node_root = helper.clone_workspace();
+    let node = Helper::cmd_in_with(
+        &node_root,
+        "remove bar/foo --silent",
+        &[("BIT_NATIVE", OsStr::new("off"))],
+    );
+    let native = helper.native_run("remove bar/foo --silent");
+    assert!(native.native, "{}", native.trace);
+    assert_eq!(native.status.code(), node.status.code());
+    assert_eq!(native.stdout, node.stdout);
+    assert_eq!(native.stderr, node.stderr);
+    for path in [".bitmap", ".bit/index.json", ".bit/staged-config/my-scope/dev.json"] {
+        assert_eq!(
+            fs::read(root.join(path)).unwrap(),
+            fs::read(node_root.join(path)).unwrap(),
+            "{path}",
+        );
+    }
+    assert_eq!(scope_objects(root), scope_objects(&node_root));
+    assert!(baseline.join(".bit/objects/d7/fbb87919452525f35e171b15116996ab6448af").is_file());
+}
