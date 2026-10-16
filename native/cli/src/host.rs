@@ -17,7 +17,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-const SCRIPT: &str = include_str!("host/host.js");
+const SCRIPT: &str = concat!(include_str!("host/host.js"), "\n", include_str!("host/snapshot.js"));
 const EXIT_GRACE: Duration = Duration::from_secs(5);
 
 pub struct Host {
@@ -25,6 +25,7 @@ pub struct Host {
     root: PathBuf,
     color: bool,
     session: Mutex<Option<Session>>,
+    failed_stdout: Mutex<String>,
 }
 
 struct Session {
@@ -47,7 +48,13 @@ struct Response {
 impl Host {
     /// A host for the workspace at `root`. `color` makes the aspects' own output colored.
     pub fn new(cli: NodeCli, root: PathBuf, color: bool) -> Self {
-        Self { cli, root, color, session: Mutex::new(None) }
+        Self {
+            cli,
+            root,
+            color,
+            session: Mutex::new(None),
+            failed_stdout: Mutex::new(String::new()),
+        }
     }
 
     /// Call `method` with `params`; the first call starts Node.
@@ -61,6 +68,10 @@ impl Host {
         let result = session.call(method, params);
         trace::log(format!("host {method} took {} ms", started.elapsed().as_millis()));
         if result.is_err() {
+            self.failed_stdout
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push_str(&std::mem::take(&mut session.captured_stdout));
             guard.take();
         }
         result
@@ -68,12 +79,16 @@ impl Host {
 
     /// Output emitted while loading aspects and serving callback facts.
     pub fn take_stdout(&self) -> String {
-        self.session
+        let mut output =
+            std::mem::take(&mut *self.failed_stdout.lock().unwrap_or_else(PoisonError::into_inner));
+        if let Some(session) = self.session
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .as_mut()
-            .map(|session| std::mem::take(&mut session.captured_stdout))
-            .unwrap_or_default()
+        {
+            output.push_str(&std::mem::take(&mut session.captured_stdout));
+        }
+        output
     }
 
     fn configure(&self, command: &mut Command) -> io::Result<()> {
@@ -213,7 +228,9 @@ fn forward_stderr(child: &mut Child) -> io::Result<std::sync::mpsc::Receiver<()>
 }
 
 fn progress_mode() -> &'static str {
-    let progress = env::args().any(|arg| matches!(arg.as_str(), "status" | "s" | "diff" | "d"))
+    let progress = env::args()
+        .nth(1)
+        .is_some_and(|arg| matches!(arg.as_str(), "status" | "s" | "diff" | "d"))
         && !env::args().any(|arg| matches!(arg.as_str(), "--json" | "-j"))
         && env::var_os("CI").is_none();
     if progress { "1" } else { "0" }

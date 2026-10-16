@@ -171,7 +171,7 @@ jobs:
         run: cargo test --locked -p bit-cli --features e2e --test e2e
 
   status-diff-windows:
-    name: Status and diff parity (Windows)
+    name: Workspace VCS parity (Windows)
     runs-on: windows-latest
     timeout-minutes: 60
     defaults:
@@ -219,7 +219,7 @@ jobs:
           npx -y @teambit/bvm@3.1.4 install "$BIT_VERSION" --skip-update-path
       - name: Prepare pinned pnpm engine sources
         run: node ../scripts/rust/prepare-pnpm-engine.mjs
-      - name: Compare native status and diff with the pinned Node.js CLI
+      - name: Compare native workspace VCS with the pinned Node.js CLI
         run: |
           cargo test --locked -p bit-cli --features e2e --test e2e diff_completion
           cargo test --locked -p bit-cli --features e2e --test e2e status_completion
@@ -229,3 +229,6 @@ jobs:
           cargo test --locked -p bit-cli --features e2e --test e2e status_component_selectors
           cargo test --locked -p bit-cli --features e2e --test e2e status_graph_remote
           cargo test --locked -p bit-cli --features e2e --test e2e status_autosync
+          cargo test --locked -p bit-cli --features e2e --test e2e commands::snap
+          cargo test --locked -p bit-cli --features e2e --test e2e commands::tag
+          cargo test --locked -p bit-cli --features e2e --test e2e snapshot_environments
