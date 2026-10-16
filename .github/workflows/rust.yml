@@ -178,12 +178,12 @@ jobs:
       run:
         working-directory: native
         shell: bash
-    env:
-      BVM_GLOBALS_DIR: ${{ runner.temp }}/bit-bvm
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Set the BVM cache directory
+        run: echo "BVM_GLOBALS_DIR=$RUNNER_TEMP/bit-bvm" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v4
         with:
           node-version: 22.22.0
