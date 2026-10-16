@@ -1,0 +1,437 @@
+{
+  "measured_at_utc": "2026-10-16 20:51:07 UTC",
+  "platform": "Linux 7.2.5-200.fc44.x86_64; AMD Ryzen 9 9950X3D2 16-Core Processor",
+  "node_version": "22.22.0",
+  "bit_reference_version": "2.2.94",
+  "build": "RUSTFLAGS=-D warnings cargo build --locked --release --workspace",
+  "native_source": {
+    "algorithm": "sha256 of sorted git ls-files -co --exclude-standard -z native, unique regular files: path NUL bytes NUL",
+    "file_count": 1163,
+    "native_source_sha256": "bf4dcfbd98af55e6cfdcd7275b06061fb92f47de45c85339e304ec0e5a0f6ff9",
+    "native_git_tree": "8f68f15cbde570decc1781adec88c7449b4a70f7"
+  },
+  "sha256": {
+    "release_bit": "249b8f1985c6368a12a7462bb6817ecdfbe4e88ad43d983d3a9aeba475a16993",
+    "benchmark_helper": "4ea79082ea31c4e9829de770faf7fca3fe67a4e0b322a12fc6c8fc63f1aaf1e9",
+    "fixture_generator": "0851b15d386eefc0465cf63150aef417570798c4578671bbcb0df0951a50db89",
+    "stdout_stderr_filesystem_tty_verifier": "85ccb4f5be14859ee0c83db63ad635da9cece20d75c5047574c536ddbfa2223b",
+    "node_wrapper": "d18f9f4aa2c224871e8872c5804c64d98941152e957919a1631fd46addf05d3d",
+    "node_cli_entry": "71b324e03c4c9fb01cd3decb053ca4c3781c27ce06a8af53f7ad09d0ae42d033"
+  },
+  "fixtures": {
+    "ordinary": {
+      "source": "/var/tmp/status-diff-bench-fixture-2586579",
+      "source_sha256": "c58214e737af4a7d07d0521cb22449978cb184c5cdef706b9c7a6ce235829a8f",
+      "commands": [
+        [
+          "/var/tmp/status-diff-node-oracle",
+          "tag",
+          "comp2",
+          "--message",
+          "checkout benchmark second"
+        ]
+      ],
+      "fixture": "/var/tmp/checkout-qualified-benchmark-fixtures/ordinary",
+      "fixture_sha256": "8211ff87332cff495cb2af431a415947e84134f083b116ca34508e4daf08fb98"
+    },
+    "callbacks": {
+      "source": "/var/tmp/snapshot-callback-benchmark-fixture",
+      "source_sha256": "e19efeb327d2ff430c66ddd16d23821edb747ed1f9a4cee3f7d1eafd93c9c3f9",
+      "commands": [
+        [
+          "/var/tmp/status-diff-node-oracle",
+          "tag",
+          "bar/foo",
+          "--message",
+          "checkout benchmark initial"
+        ],
+        [
+          "/var/tmp/status-diff-node-oracle",
+          "tag",
+          "bar/foo",
+          "--message",
+          "checkout benchmark second"
+        ]
+      ],
+      "fixture": "/var/tmp/checkout-qualified-benchmark-fixtures/callbacks",
+      "fixture_sha256": "71865832002563c002335ce43307aa9d32258348b5a898c25da508445b430910"
+    }
+  },
+  "fixture_creation": [
+    "python3",
+    "scripts/rust/prepare-checkout-benchmark.py",
+    "--ordinary",
+    "/var/tmp/status-diff-bench-fixture-2586579",
+    "--callbacks",
+    "/var/tmp/snapshot-callback-benchmark-fixture",
+    "--node",
+    "/var/tmp/status-diff-node-oracle",
+    "--destination",
+    "/var/tmp/checkout-qualified-benchmark-fixtures"
+  ],
+  "method": {
+    "timed_pairs": 20,
+    "tty_pairs": 20,
+    "pairs_per_workload_per_mode": 5,
+    "order": "Alternating Node/Rust and Rust/Node on fresh workspace copies for each invocation.",
+    "timing": "Complete process elapsed; source copies excluded; serial execution with no other builds/tests.",
+    "parity": "All forty exit/stdout/stderr and bitmap/workspace-source-file/symlink pairs match, including callback component.json. .bit/.git/node_modules excluded from filesystem comparison.",
+    "normalization": [
+      "Rust BIT_NATIVE_TRACE lines only",
+      "elapsed duration only inside (completed in ...)"
+    ],
+    "outer_environment_unset": [
+      "BIT_NATIVE",
+      "CI",
+      "FORCE_COLOR",
+      "NO_COLOR",
+      "NODE_DISABLE_COLORS"
+    ],
+    "tty": {
+      "driver": "script -q -e",
+      "TERM": "dumb",
+      "FORCE_COLOR": "1",
+      "CI": "unset",
+      "ANSI": "preserved"
+    }
+  },
+  "qualification": {
+    "local_formal_gates": "all seven passed",
+    "workspace_tests_passed": 1212,
+    "workspace_existing_ignored": 1,
+    "e2e_passed": 406,
+    "exact_head_platform_ci": "pending"
+  },
+  "runs": {
+    "stored": {
+      "command": [
+        "checkout",
+        "0.0.1",
+        "comp2",
+        "--force-theirs",
+        "-x"
+      ],
+      "source": "/var/tmp/checkout-qualified-benchmark-fixtures/ordinary",
+      "source_sha256": "8211ff87332cff495cb2af431a415947e84134f083b116ca34508e4daf08fb98",
+      "node": "/var/tmp/status-diff-node-oracle",
+      "rust": "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
+      "runs_ms": {
+        "node": [
+          472.176,
+          467.37,
+          474.951,
+          482.322,
+          492.453
+        ],
+        "rust": [
+          23.789,
+          14.224,
+          23.2,
+          13.275,
+          23.221
+        ]
+      },
+      "median_ms": {
+        "node": 474.951,
+        "rust": 23.2
+      },
+      "stage": "/var/tmp/bit-native-bench-1cltd4wd",
+      "verification": {
+        "stage": "/var/tmp/bit-native-bench-1cltd4wd",
+        "pairs": [
+          {
+            "run": 0,
+            "workspace_files": 7
+          },
+          {
+            "run": 1,
+            "workspace_files": 7
+          },
+          {
+            "run": 2,
+            "workspace_files": 7
+          },
+          {
+            "run": 3,
+            "workspace_files": 7
+          },
+          {
+            "run": 4,
+            "workspace_files": 7
+          }
+        ],
+        "tty_stage": "/var/tmp/bit-native-tty-_bl80dbd",
+        "tty_pairs": [
+          {
+            "run": 0,
+            "workspace_files": 7
+          },
+          {
+            "run": 1,
+            "workspace_files": 7
+          },
+          {
+            "run": 2,
+            "workspace_files": 7
+          },
+          {
+            "run": 3,
+            "workspace_files": 7
+          },
+          {
+            "run": 4,
+            "workspace_files": 7
+          }
+        ]
+      },
+      "node_over_rust_ratio": 20.472
+    },
+    "reset": {
+      "command": [
+        "checkout",
+        "reset",
+        "comp2",
+        "-x"
+      ],
+      "source": "/var/tmp/checkout-qualified-benchmark-fixtures/ordinary",
+      "source_sha256": "8211ff87332cff495cb2af431a415947e84134f083b116ca34508e4daf08fb98",
+      "node": "/var/tmp/status-diff-node-oracle",
+      "rust": "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
+      "runs_ms": {
+        "node": [
+          471.321,
+          491.49,
+          473.372,
+          465.217,
+          462.002
+        ],
+        "rust": [
+          23.211,
+          13.746,
+          23.609,
+          12.934,
+          23.456
+        ]
+      },
+      "median_ms": {
+        "node": 471.321,
+        "rust": 23.211
+      },
+      "stage": "/var/tmp/bit-native-bench-s90opoir",
+      "verification": {
+        "stage": "/var/tmp/bit-native-bench-s90opoir",
+        "pairs": [
+          {
+            "run": 0,
+            "workspace_files": 7
+          },
+          {
+            "run": 1,
+            "workspace_files": 7
+          },
+          {
+            "run": 2,
+            "workspace_files": 7
+          },
+          {
+            "run": 3,
+            "workspace_files": 7
+          },
+          {
+            "run": 4,
+            "workspace_files": 7
+          }
+        ],
+        "tty_stage": "/var/tmp/bit-native-tty-tzivh4l4",
+        "tty_pairs": [
+          {
+            "run": 0,
+            "workspace_files": 7
+          },
+          {
+            "run": 1,
+            "workspace_files": 7
+          },
+          {
+            "run": 2,
+            "workspace_files": 7
+          },
+          {
+            "run": 3,
+            "workspace_files": 7
+          },
+          {
+            "run": 4,
+            "workspace_files": 7
+          }
+        ]
+      },
+      "node_over_rust_ratio": 20.306
+    },
+    "revert": {
+      "command": [
+        "revert",
+        "comp2",
+        "0.0.1",
+        "-x"
+      ],
+      "source": "/var/tmp/checkout-qualified-benchmark-fixtures/ordinary",
+      "source_sha256": "8211ff87332cff495cb2af431a415947e84134f083b116ca34508e4daf08fb98",
+      "node": "/var/tmp/status-diff-node-oracle",
+      "rust": "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
+      "runs_ms": {
+        "node": [
+          466.741,
+          471.116,
+          471.338,
+          471.734,
+          474.763
+        ],
+        "rust": [
+          9.298,
+          8.242,
+          9.144,
+          7.752,
+          9.492
+        ]
+      },
+      "median_ms": {
+        "node": 471.338,
+        "rust": 9.144
+      },
+      "stage": "/var/tmp/bit-native-bench-nsk1gnrw",
+      "verification": {
+        "stage": "/var/tmp/bit-native-bench-nsk1gnrw",
+        "pairs": [
+          {
+            "run": 0,
+            "workspace_files": 7
+          },
+          {
+            "run": 1,
+            "workspace_files": 7
+          },
+          {
+            "run": 2,
+            "workspace_files": 7
+          },
+          {
+            "run": 3,
+            "workspace_files": 7
+          },
+          {
+            "run": 4,
+            "workspace_files": 7
+          }
+        ],
+        "tty_stage": "/var/tmp/bit-native-tty-5a_ignhr",
+        "tty_pairs": [
+          {
+            "run": 0,
+            "workspace_files": 7
+          },
+          {
+            "run": 1,
+            "workspace_files": 7
+          },
+          {
+            "run": 2,
+            "workspace_files": 7
+          },
+          {
+            "run": 3,
+            "workspace_files": 7
+          },
+          {
+            "run": 4,
+            "workspace_files": 7
+          }
+        ]
+      },
+      "node_over_rust_ratio": 51.546
+    },
+    "callbacks": {
+      "command": [
+        "checkout",
+        "0.0.1",
+        "bar/foo",
+        "--force-theirs",
+        "-x"
+      ],
+      "source": "/var/tmp/checkout-qualified-benchmark-fixtures/callbacks",
+      "source_sha256": "71865832002563c002335ce43307aa9d32258348b5a898c25da508445b430910",
+      "node": "/var/tmp/status-diff-node-oracle",
+      "rust": "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
+      "runs_ms": {
+        "node": [
+          548.837,
+          553.692,
+          543.575,
+          549.615,
+          545.788
+        ],
+        "rust": [
+          618.269,
+          531.904,
+          507.815,
+          508.649,
+          498.137
+        ]
+      },
+      "median_ms": {
+        "node": 548.837,
+        "rust": 508.649
+      },
+      "stage": "/var/tmp/bit-native-bench-fomtkli0",
+      "verification": {
+        "stage": "/var/tmp/bit-native-bench-fomtkli0",
+        "pairs": [
+          {
+            "run": 0,
+            "workspace_files": 8
+          },
+          {
+            "run": 1,
+            "workspace_files": 8
+          },
+          {
+            "run": 2,
+            "workspace_files": 8
+          },
+          {
+            "run": 3,
+            "workspace_files": 8
+          },
+          {
+            "run": 4,
+            "workspace_files": 8
+          }
+        ],
+        "tty_stage": "/var/tmp/bit-native-tty-aoimxifh",
+        "tty_pairs": [
+          {
+            "run": 0,
+            "workspace_files": 8
+          },
+          {
+            "run": 1,
+            "workspace_files": 8
+          },
+          {
+            "run": 2,
+            "workspace_files": 8
+          },
+          {
+            "run": 3,
+            "workspace_files": 8
+          },
+          {
+            "run": 4,
+            "workspace_files": 8
+          }
+        ]
+      },
+      "node_over_rust_ratio": 1.079
+    }
+  }
+}

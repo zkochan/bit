@@ -225,7 +225,9 @@ jobs:
           for parity_filter in \
             diff_completion status_completion status_component_policy status_environments status_relative \
             status_component_selectors status_graph_remote status_autosync \
-            commands::snap commands::tag snapshot_environments; do
+            commands::snap commands::tag snapshot_environments \
+            checkout_platform checkout_local checkout_callbacks checkout_policy checkout_selection \
+            reset_selection harmony::revert; do
             if ! cargo test --locked -p bit-cli --features e2e --test e2e "$parity_filter" -- --nocapture; then
               parity_failed=1
             fi
