@@ -75,7 +75,7 @@ fn new_component_with_missing_main_file_matches_node() {
 }
 
 #[test]
-fn forced_tagged_removal_matches_node_with_and_without_files() {
+fn tagged_removal_matches_node_with_and_without_files() {
     let helper = Helper::new();
     helper.re_init_workspace_with(false);
     helper.create_component_bar_foo("module.exports = 'new';");
@@ -92,9 +92,12 @@ fn forced_tagged_removal_matches_node_with_and_without_files() {
     let model: serde_json::Value = serde_json::from_str(&model_wire).unwrap();
     let version_hash = model["versions"]["0.0.1"].as_str().unwrap();
     let baseline = helper.clone_workspace();
-    for command in
-        ["remove bar/foo --silent --force", "remove bar/foo --silent --force --keep-files"]
-    {
+    for command in [
+        "remove bar/foo --silent --force",
+        "remove bar/foo --silent --force --keep-files",
+        "remove bar/foo --silent",
+        "remove bar/foo --silent --keep-files",
+    ] {
         helper.get_cloned_workspace(&baseline);
         let node_root = helper.clone_workspace();
         let node = Helper::cmd_in_with(&node_root, command, &[("BIT_NATIVE", OsStr::new("off"))]);
@@ -124,7 +127,7 @@ fn forced_tagged_removal_matches_node_with_and_without_files() {
 }
 
 #[test]
-fn forced_removal_of_multiple_local_tags_matches_node() {
+fn removal_of_multiple_local_tags_matches_node() {
     let helper = Helper::new();
     helper.re_init_workspace_with(false);
     helper.create_component_bar_foo("module.exports = 'first';");
@@ -149,33 +152,36 @@ fn forced_removal_of_multiple_local_tags_matches_node() {
         .map(|value| value.as_str().unwrap().to_owned())
         .collect::<Vec<_>>();
     assert_eq!(version_hashes.len(), 2);
-    let node_root = helper.clone_workspace();
-    let command = "remove bar/foo --silent --force";
-    let node = Helper::cmd_in_with(&node_root, command, &[("BIT_NATIVE", OsStr::new("off"))]);
-    let native = helper.native_run(command);
-    assert!(native.native, "{}", native.trace);
-    assert_eq!(native.status.code(), node.status.code());
-    assert_eq!(native.stdout, node.stdout);
-    assert_eq!(native.stderr, node.stderr);
-    assert!(native.status.success());
-    for path in [".bitmap", ".bit/index.json", ".bit/staged-config/main.json"] {
-        assert_eq!(
-            fs::read(root.join(path)).unwrap(),
-            fs::read(node_root.join(path)).unwrap(),
-            "{path}",
-        );
+    let baseline = helper.clone_workspace();
+    for command in ["remove bar/foo --silent --force", "remove bar/foo --silent"] {
+        helper.get_cloned_workspace(&baseline);
+        let node_root = helper.clone_workspace();
+        let node = Helper::cmd_in_with(&node_root, command, &[("BIT_NATIVE", OsStr::new("off"))]);
+        let native = helper.native_run(command);
+        assert!(native.native, "{}", native.trace);
+        assert_eq!(native.status.code(), node.status.code());
+        assert_eq!(native.stdout, node.stdout);
+        assert_eq!(native.stderr, node.stderr);
+        assert!(native.status.success());
+        for path in [".bitmap", ".bit/index.json", ".bit/staged-config/main.json"] {
+            assert_eq!(
+                fs::read(root.join(path)).unwrap(),
+                fs::read(node_root.join(path)).unwrap(),
+                "{path}",
+            );
+        }
+        for hash in std::iter::once(model_hash).chain(version_hashes.iter().map(String::as_str)) {
+            let object = format!(".bit/objects/{}/{}", &hash[..2], &hash[2..]);
+            assert_eq!(root.join(&object).exists(), node_root.join(&object).exists());
+            let prefix = format!(".bit/objects/{}", &hash[..2]);
+            assert_eq!(root.join(&prefix).exists(), node_root.join(&prefix).exists());
+        }
+        assert_eq!(root.join("bar/foo.js").exists(), node_root.join("bar/foo.js").exists());
     }
-    for hash in std::iter::once(model_hash).chain(version_hashes.iter().map(String::as_str)) {
-        let object = format!(".bit/objects/{}/{}", &hash[..2], &hash[2..]);
-        assert_eq!(root.join(&object).exists(), node_root.join(&object).exists());
-        let prefix = format!(".bit/objects/{}", &hash[..2]);
-        assert_eq!(root.join(&prefix).exists(), node_root.join(&prefix).exists());
-    }
-    assert_eq!(root.join("bar/foo.js").exists(), node_root.join("bar/foo.js").exists());
 }
 
 #[test]
-fn forced_tagged_removal_preserves_another_staged_component() {
+fn tagged_removal_preserves_another_staged_component() {
     let helper = Helper::new();
     helper.re_init_workspace_with(false);
     helper.create_component_bar_foo("module.exports = 'foo';");
@@ -199,23 +205,26 @@ fn forced_tagged_removal_preserves_another_staged_component() {
         serde_json::from_slice(&fs::read(root.join(".bit/staged-config/main.json")).unwrap())
             .unwrap();
     assert_eq!(staged_before.as_array().unwrap().len(), 2);
-    let node_root = helper.clone_workspace();
-    let command = "remove bar/foo --silent --force";
-    let node = Helper::cmd_in_with(&node_root, command, &[("BIT_NATIVE", OsStr::new("off"))]);
-    let native = helper.native_run(command);
-    assert!(native.native, "{}", native.trace);
-    assert_eq!(native.status.code(), node.status.code());
-    assert_eq!(native.stdout, node.stdout);
-    assert_eq!(native.stderr, node.stderr);
-    assert!(native.status.success());
-    for path in [".bitmap", ".bit/index.json", ".bit/staged-config/main.json"] {
-        assert_eq!(
-            fs::read(root.join(path)).unwrap(),
-            fs::read(node_root.join(path)).unwrap(),
-            "{path}",
-        );
+    let baseline = helper.clone_workspace();
+    for command in ["remove bar/foo --silent --force", "remove bar/foo --silent"] {
+        helper.get_cloned_workspace(&baseline);
+        let node_root = helper.clone_workspace();
+        let node = Helper::cmd_in_with(&node_root, command, &[("BIT_NATIVE", OsStr::new("off"))]);
+        let native = helper.native_run(command);
+        assert!(native.native, "{}", native.trace);
+        assert_eq!(native.status.code(), node.status.code());
+        assert_eq!(native.stdout, node.stdout);
+        assert_eq!(native.stderr, node.stderr);
+        assert!(native.status.success());
+        for path in [".bitmap", ".bit/index.json", ".bit/staged-config/main.json"] {
+            assert_eq!(
+                fs::read(root.join(path)).unwrap(),
+                fs::read(node_root.join(path)).unwrap(),
+                "{path}",
+            );
+        }
+        assert!(root.join("baz/qux.js").exists());
     }
-    assert!(root.join("baz/qux.js").exists());
 }
 
 #[test]
@@ -238,6 +247,33 @@ fn tagged_missing_main_file_delegates_before_removal() {
     assert_eq!(delegated.stderr, node.stderr);
     assert!(delegated.status.success());
     for path in [".bitmap", ".bit/index.json", ".bit/staged-config/main.json"] {
+        assert_eq!(
+            fs::read(helper.scopes.local_path.join(path)).unwrap(),
+            fs::read(node_root.join(path)).unwrap(),
+            "{path}",
+        );
+    }
+}
+
+#[test]
+fn modified_tagged_component_delegates_without_force() {
+    let helper = Helper::new();
+    helper.re_init_workspace_with(false);
+    helper.create_component_bar_foo("module.exports = 'new';");
+    helper.add_component_bar_foo();
+    helper.run("link");
+    helper.run("tag --soft bar/foo --message probe");
+    helper.run("tag --persist=skip-build");
+    helper.output_file("bar/foo.js", "module.exports = 'modified';");
+    let node_root = helper.clone_workspace();
+    let command = "remove bar/foo --silent";
+    let node = Helper::cmd_in_with(&node_root, command, &[("BIT_NATIVE", OsStr::new("off"))]);
+    let delegated = helper.cmd(command);
+    assert!(!delegated.native, "{}", delegated.trace);
+    assert_eq!(delegated.status.code(), node.status.code());
+    assert_eq!(delegated.stdout, node.stdout);
+    assert_eq!(delegated.stderr, node.stderr);
+    for path in [".bitmap", ".bit/index.json", ".bit/staged-config/main.json", "bar/foo.js"] {
         assert_eq!(
             fs::read(helper.scopes.local_path.join(path)).unwrap(),
             fs::read(node_root.join(path)).unwrap(),

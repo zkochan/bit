@@ -2,6 +2,7 @@
 
 use super::{
     color::Chalk,
+    status,
     workspace_command::{self, format::Formatter, results::Report},
 };
 use crate::{commands::Command, native::Outcome, workspace};
@@ -20,11 +21,7 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
     let Some(root) = workspace::root(&env::current_dir()?) else {
         return Ok(Outcome::Declined("not inside a workspace".into()));
     };
-    let plan = match if force {
-        VersionedPlan::prepare(&root, name, keep_files).map(Removal::Versioned)
-    } else {
-        Plan::prepare(&root, name, keep_files).map(Removal::New)
-    } {
+    let plan = match prepare(&root, name, keep_files, force) {
         Ok(plan) => plan,
         Err(error) => return Ok(Outcome::Declined(format!("remove: {error}"))),
     };
@@ -48,6 +45,28 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
         }
         plan.commit(&file_id)
     })
+}
+
+fn prepare(
+    root: &std::path::Path,
+    name: &str,
+    keep_files: bool,
+    force: bool,
+) -> io::Result<Removal> {
+    if force {
+        return VersionedPlan::prepare(root, name, keep_files).map(Removal::Versioned);
+    }
+    if let Ok(plan) = Plan::prepare(root, name, keep_files) {
+        return Ok(Removal::New(plan));
+    }
+    let plan = VersionedPlan::prepare(root, name, keep_files)?;
+    if !status::clean_staged_component(root, plan.identity())? {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "tagged component is not clean and staged",
+        ));
+    }
+    Ok(Removal::Versioned(plan))
 }
 
 enum Removal {
