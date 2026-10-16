@@ -433,5 +433,14 @@
       },
       "node_over_rust_ratio": 1.079
     }
+  },
+  "post_measurement_qualification": {
+    "native_git_tree": "755e88822eefce1b1966893d6e1c5fc99d889afa",
+    "changed_native_files": [
+      "native/object-import/src/merge_state/config_tests.rs"
+    ],
+    "reason": "Update the Windows-only test for supported safe existing-file writes: retain hardlink rejection and verify successful regular-file publication, identity and token consumption. Production source is unchanged.",
+    "release_bit_sha256_unchanged": "249b8f1985c6368a12a7462bb6817ecdfbe4e88ad43d983d3a9aeba475a16993",
+    "checks": "All seven required local gates passed again; 1212 workspace tests (one existing ignored), 406 e2e tests, warnings-denied release build."
   }
 }
