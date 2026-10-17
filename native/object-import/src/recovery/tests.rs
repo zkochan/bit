@@ -180,14 +180,19 @@ fn reinitializing_identical_plan_invalidates_previous_token() {
     assert!(state.advance(&first, 1).is_err());
     assert_eq!(fs::read(path).unwrap(), b"body");
 }
-#[cfg(not(target_os = "linux"))]
 #[test]
-fn unqualified_copy_platform_declines_without_mutation() {
+fn copy_platform_qualification_preserves_supported_and_declined_results() {
     let fixture = Fixture::new();
     let source = fixture.file("source", b"fresh");
     let destination = fixture.file("destination", b"keep");
-    assert!(super::copy::file(&source, &destination).is_err());
-    assert_eq!(fs::read(destination).unwrap(), b"keep");
+    let result = super::copy::file(&source, &destination);
+    if cfg!(any(target_os = "linux", windows)) {
+        result.unwrap();
+        assert_eq!(fs::read(destination).unwrap(), b"fresh");
+    } else {
+        assert!(result.is_err());
+        assert_eq!(fs::read(destination).unwrap(), b"keep");
+    }
 }
 
 #[test]
