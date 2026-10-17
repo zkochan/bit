@@ -1,0 +1,819 @@
+{
+  "measured_at_utc": "2026-10-17T12:37:24.700827+00:00",
+  "platform": "Linux-7.2.5-200.fc44.x86_64-x86_64-with-glibc2.43",
+  "native_source": {
+    "sha256": "8248d648a892b29a353b979d14131b600b92d8488ddeb15e9702850d48120170",
+    "tracked_and_untracked_files": 1338
+  },
+  "git_head": "9fc735ef9c60aacea98fe6a1fc3ed71ad1332fa8",
+  "publishable": true,
+  "complete": true,
+  "verified_pairs": 120,
+  "failures": [],
+  "expected_pairs": 120,
+  "sha256": {
+    "rust": "f3a4b6f1a6419b944d369a97c421880410109f5ba0559d4c959ee339c1e5b205",
+    "node_wrapper": "d18f9f4aa2c224871e8872c5804c64d98941152e957919a1631fd46addf05d3d",
+    "benchmark_driver": "64d35ef3bd6a2af2b73f2f95beb67dedc04f82c666677af5f8e27b4ed41f1aed",
+    "node_package": "eb77450196c8582827be7df68b4feb542354c5ba00ca0a81325ea5dfe7c632b7",
+    "node_binary": "1bec56ef7cfa9a76f3e0b7c0a87f220eb73f23102b9c0b4c7529a3f7c3ce7c31",
+    "node_cli": "71b324e03c4c9fb01cd3decb053ca4c3781c27ce06a8af53f7ad09d0ae42d033"
+  },
+  "bit_version": "2.2.94",
+  "helper_sha256": {
+    "scripts/rust/bench-merge-history.py": "98d7461483d6f42f100af75c363ede19a310341998e3a9e332b87c56f23cdad7",
+    "scripts/rust/bench-native-command.py": "4ea79082ea31c4e9829de770faf7fca3fe67a4e0b322a12fc6c8fc63f1aaf1e9",
+    "scripts/rust/bench-native-export.py": "3c4f26081871651c29d9668f97abd5de36f8d66e90fef35d41fee0c9e599966a",
+    "scripts/rust/bench-native-import.py": "a2deb65522d0ce9c867e1e2b0271e16145101493c9c27f022589618d623442ca",
+    "scripts/rust/bench-provisioning.py": "64d35ef3bd6a2af2b73f2f95beb67dedc04f82c666677af5f8e27b4ed41f1aed",
+    "scripts/rust/bench-transfer-suite.py": "e20294658ad18614a8c1a6f25c19f415afec15667d71a563542d386d229d07f3",
+    "scripts/rust/bench-transfer.py": "7282a466f4587007f9dd36ebeed70bd658140519e0b4991d299bb32eea508c5e",
+    "scripts/rust/benchmark-no-fs-cache.py": "3be980cc581178393e281f5388f0b00ec836c017c588aed3bf07c36aa0e84b89",
+    "scripts/rust/checkout-head-parity.py": "fbcc3006071a84ed9520b192854614198e914ee15533a7210f1fdc3bfca749f4",
+    "scripts/rust/prepare-checkout-benchmark.py": "0851b15d386eefc0465cf63150aef417570798c4578671bbcb0df0951a50db89",
+    "scripts/rust/prepare-transfer-benchmark.py": "b23fb0470233d7bce510f0940fbf3869316a81aea9f5747b4175e3e088374ff6",
+    "scripts/rust/remote-log-parity.py": "bbc64f78b3c0d0ce911cc568680a166fe2ad2c887a6e62bf40327264cdabbe7b",
+    "scripts/rust/reset-parity.py": "1aa5327b5623d810e03f0f6fda8c3830076f9a8b45e3612bbd1967e375c5bbf2",
+    "scripts/rust/revert-parity.py": "b10b1f3fa0dbbc52fcdf68e4d537f3c45381937a664032316de8b2b689e5036f",
+    "scripts/rust/verify-native-command.py": "85ccb4f5be14859ee0c83db63ad635da9cece20d75c5047574c536ddbfa2223b"
+  },
+  "oracle_execution": "Pinned Node binary plus pinned JS entry; wrapper is provenance only",
+  "node_version": "v22.22.0",
+  "pinned_paths": {
+    "node_binary": "/var/home/zoltan/.bvm/nodejs/22.22.0/bin/node",
+    "node_cli": "/var/home/zoltan/.bvm/versions/2.2.94/bit-2.2.94/node_modules/@teambit/bit/bin/bit"
+  },
+  "stage": "/var/tmp/provisioning-bench-lcons9gs",
+  "runs": 5,
+  "fixture_state": {
+    ".": [
+      493,
+      "directory"
+    ],
+    ".bit": [
+      493,
+      "directory"
+    ],
+    ".bit/bitmap-history": [
+      493,
+      "directory"
+    ],
+    ".bit/components": [
+      493,
+      "directory"
+    ],
+    ".bit/objects": [
+      493,
+      "directory"
+    ],
+    ".bit/scope.json": [
+      420,
+      "file",
+      "3a1561d3f5fa909f10a6c6c5ea7385c71ba11274b4eae944119851f16f160846"
+    ],
+    ".bit/tmp": [
+      493,
+      "directory"
+    ],
+    ".bit/workspace-config-history": [
+      493,
+      "directory"
+    ],
+    ".bit/workspace-config-history/files": [
+      493,
+      "directory"
+    ],
+    ".bitmap": [
+      420,
+      "file",
+      "fd7771905198f39021efb9206b7e88b136dfdc4049b713c2df7bbc93e652ef12"
+    ],
+    ".mcp.json": [
+      420,
+      "file",
+      "eb9f229717e6c6358ffe890f649668680996bf0b62e174a28ce9228c6b15cece"
+    ],
+    "AGENTS.md": [
+      420,
+      "file",
+      "9692b14b7eca2e32b314ec51d1ae081f177c757602dc21fedd2a3f554d8b7790"
+    ],
+    "package.json": [
+      420,
+      "file",
+      "3ca9d4afd21425087cf31893b8f9f63c81b0b8408db5e343ca76e5f8aa26ab9a"
+    ],
+    "workspace.jsonc": [
+      420,
+      "file",
+      "a62df4de93d6fc9eda5c504935056ed77da974ac997cbc2b0aa5d9fe64d15c70"
+    ]
+  },
+  "initial_settings": {
+    "benchmark.value": "configured",
+    "analytics_reporting": "false",
+    "error_reporting": "false",
+    "log_level": "fatal"
+  },
+  "fixture_sha256": "bf21b94134023e3713debd91218adb958c8d6659bd1ab5c10f8abc9fcd7a3445",
+  "catalog": "Local CONNECT proxy returns deterministic HTTP 502; no external BVM request succeeds",
+  "environment": {
+    "BIT_NODE_CLI": "/var/home/zoltan/.bvm/versions/2.2.94/bit-2.2.94/node_modules/@teambit/bit/bin/bit",
+    "BIT_NODE_BINARY": "/var/home/zoltan/.bvm/nodejs/22.22.0/bin/node",
+    "PATH": "/var/home/zoltan/.bvm/nodejs/22.22.0/bin:/var/home/zoltan/.local/bin:/var/home/zoltan/.local/bin:/var/home/zoltan/.grok/bin:/var/home/zoltan/.local/bin:/var/home/zoltan/bin:/var/home/zoltan/.codex/packages/app-server-daemon/releases/0.163.0-x86_64-unknown-linux-musl/codex-path:/var/home/zoltan/.codex/tmp/arg0-linux/codex-arg0wWcnwf:/var/home/zoltan/.codex/tmp/arg0/codex-arg0pqwMgn:/var/home/zoltan/.codex/packages/app-server-daemon/releases/0.162.1-x86_64-unknown-linux-musl/codex-path:/var/home/zoltan/.codex/tmp/arg0/codex-arg07pBJUs:/var/home/zoltan/.local/share/pnpm/global/v11/5d5c-18dd8a9d84ab57db-0/node_modules/.pnpm/@openai+codex@0.162.1-linux-x64/node_modules/@openai/codex/vendor/x86_64-unknown-linux-musl/codex-path:/var/home/zoltan/.local/bin:/var/home/zoltan/.cargo/bin:/home/linuxbrew/.linuxbrew/opt/rustup/bin:/var/home/zoltan/.local/share/pnpm/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/var/home/zoltan/bin",
+    "TMPDIR": "/var/tmp"
+  },
+  "method": "Alternating complete commands on fresh identical absolute paths; strict stdout, stderr, exit, native ownership, every file, directory, symlink and mode checked after every pair; serial execution.",
+  "normalization": [
+    "Native trace lines",
+    "Fresh workspace-local eight-hex scope suffix",
+    "Command-history timestamps and PIDs (commands retained)"
+  ],
+  "workloads": {
+    "init": {
+      "command": [
+        "init",
+        "--standalone"
+      ],
+      "modes": {
+        "timed": {
+          "runs_ms": {
+            "node": [
+              208.995,
+              212.156,
+              211.753,
+              224.861,
+              207.872
+            ],
+            "rust": [
+              1.997,
+              2.211,
+              2.198,
+              2.018,
+              2.491
+            ]
+          },
+          "median_ms": {
+            "node": 211.753,
+            "rust": 2.198
+          },
+          "speedup": 96.339
+        },
+        "tty": {
+          "runs_ms": {
+            "node": [
+              243.729,
+              221.965,
+              221.149,
+              221.541,
+              220.353
+            ],
+            "rust": [
+              21.476,
+              21.418,
+              21.722,
+              20.901,
+              21.233
+            ]
+          },
+          "median_ms": {
+            "node": 221.541,
+            "rust": 21.418
+          },
+          "speedup": 10.344
+        },
+        "ci": {
+          "runs_ms": {
+            "node": [
+              210.416,
+              201.269,
+              208.735,
+              203.138,
+              201.123
+            ],
+            "rust": [
+              2.123,
+              1.972,
+              2.129,
+              2.591,
+              1.902
+            ]
+          },
+          "median_ms": {
+            "node": 203.138,
+            "rust": 2.123
+          },
+          "speedup": 95.684
+        }
+      }
+    },
+    "init-bare": {
+      "command": [
+        "init",
+        "--bare",
+        "benchmark"
+      ],
+      "modes": {
+        "timed": {
+          "runs_ms": {
+            "node": [
+              203.122,
+              193.151,
+              195.099,
+              200.586,
+              199.42
+            ],
+            "rust": [
+              2.063,
+              1.631,
+              1.579,
+              1.779,
+              1.599
+            ]
+          },
+          "median_ms": {
+            "node": 199.42,
+            "rust": 1.631
+          },
+          "speedup": 122.269
+        },
+        "tty": {
+          "runs_ms": {
+            "node": [
+              206.509,
+              217.111,
+              209.586,
+              207.728,
+              206.426
+            ],
+            "rust": [
+              21.14,
+              21.389,
+              21.245,
+              21.236,
+              21.17
+            ]
+          },
+          "median_ms": {
+            "node": 207.728,
+            "rust": 21.236
+          },
+          "speedup": 9.782
+        },
+        "ci": {
+          "runs_ms": {
+            "node": [
+              196.285,
+              208.478,
+              198.317,
+              199.855,
+              197.941
+            ],
+            "rust": [
+              1.937,
+              1.696,
+              1.733,
+              1.264,
+              1.385
+            ]
+          },
+          "median_ms": {
+            "node": 198.317,
+            "rust": 1.696
+          },
+          "speedup": 116.932
+        }
+      }
+    },
+    "config-get": {
+      "command": [
+        "config",
+        "get",
+        "benchmark.value"
+      ],
+      "modes": {
+        "timed": {
+          "runs_ms": {
+            "node": [
+              226.489,
+              224.593,
+              234.045,
+              226.253,
+              219.731
+            ],
+            "rust": [
+              2.043,
+              1.692,
+              2.223,
+              2.281,
+              1.95
+            ]
+          },
+          "median_ms": {
+            "node": 226.253,
+            "rust": 2.043
+          },
+          "speedup": 110.745
+        },
+        "tty": {
+          "runs_ms": {
+            "node": [
+              240.524,
+              241.974,
+              238.252,
+              234.392,
+              238.573
+            ],
+            "rust": [
+              21.334,
+              21.098,
+              21.318,
+              21.096,
+              21.47
+            ]
+          },
+          "median_ms": {
+            "node": 238.573,
+            "rust": 21.318
+          },
+          "speedup": 11.191
+        },
+        "ci": {
+          "runs_ms": {
+            "node": [
+              222.663,
+              225.492,
+              227.425,
+              225.723,
+              223.212
+            ],
+            "rust": [
+              2.16,
+              2.273,
+              4.648,
+              2.273,
+              1.603
+            ]
+          },
+          "median_ms": {
+            "node": 225.492,
+            "rust": 2.273
+          },
+          "speedup": 99.205
+        }
+      }
+    },
+    "config-set": {
+      "command": [
+        "config",
+        "set",
+        "benchmark.value",
+        "updated"
+      ],
+      "modes": {
+        "timed": {
+          "runs_ms": {
+            "node": [
+              218.776,
+              222.84,
+              217.437,
+              225.167,
+              220.2
+            ],
+            "rust": [
+              2.261,
+              1.954,
+              2.182,
+              1.8,
+              2.169
+            ]
+          },
+          "median_ms": {
+            "node": 220.2,
+            "rust": 2.169
+          },
+          "speedup": 101.521
+        },
+        "tty": {
+          "runs_ms": {
+            "node": [
+              229.786,
+              224.67,
+              225.512,
+              268.782,
+              374.694
+            ],
+            "rust": [
+              21.081,
+              21.117,
+              21.783,
+              21.668,
+              21.43
+            ]
+          },
+          "median_ms": {
+            "node": 229.786,
+            "rust": 21.43
+          },
+          "speedup": 10.723
+        },
+        "ci": {
+          "runs_ms": {
+            "node": [
+              239.6,
+              226.805,
+              236.719,
+              242.003,
+              230.935
+            ],
+            "rust": [
+              2.129,
+              2.332,
+              2.516,
+              1.796,
+              2.091
+            ]
+          },
+          "median_ms": {
+            "node": 236.719,
+            "rust": 2.129
+          },
+          "speedup": 111.188
+        }
+      }
+    },
+    "config-list": {
+      "command": [
+        "config",
+        "list",
+        "--json"
+      ],
+      "modes": {
+        "timed": {
+          "runs_ms": {
+            "node": [
+              230.397,
+              231.168,
+              257.172,
+              238.233,
+              225.45
+            ],
+            "rust": [
+              1.841,
+              2.525,
+              2.516,
+              2.27,
+              2.404
+            ]
+          },
+          "median_ms": {
+            "node": 231.168,
+            "rust": 2.404
+          },
+          "speedup": 96.16
+        },
+        "tty": {
+          "runs_ms": {
+            "node": [
+              235.286,
+              246.346,
+              237.387,
+              239.822,
+              232.013
+            ],
+            "rust": [
+              21.189,
+              21.02,
+              21.148,
+              21.08,
+              21.15
+            ]
+          },
+          "median_ms": {
+            "node": 237.387,
+            "rust": 21.148
+          },
+          "speedup": 11.225
+        },
+        "ci": {
+          "runs_ms": {
+            "node": [
+              218.485,
+              218.014,
+              215.655,
+              220.135,
+              226.005
+            ],
+            "rust": [
+              1.829,
+              2.09,
+              2.125,
+              1.952,
+              2.094
+            ]
+          },
+          "median_ms": {
+            "node": 218.485,
+            "rust": 2.09
+          },
+          "speedup": 104.538
+        }
+      }
+    },
+    "doctor-list": {
+      "command": [
+        "doctor",
+        "--list"
+      ],
+      "modes": {
+        "timed": {
+          "runs_ms": {
+            "node": [
+              237.977,
+              222.273,
+              228.652,
+              222.353,
+              223.453
+            ],
+            "rust": [
+              1.822,
+              1.975,
+              1.506,
+              1.351,
+              1.6
+            ]
+          },
+          "median_ms": {
+            "node": 223.453,
+            "rust": 1.6
+          },
+          "speedup": 139.658
+        },
+        "tty": {
+          "runs_ms": {
+            "node": [
+              226.243,
+              238.115,
+              226.758,
+              231.8,
+              229.292
+            ],
+            "rust": [
+              21.097,
+              21.618,
+              21.064,
+              21.267,
+              21.057
+            ]
+          },
+          "median_ms": {
+            "node": 229.292,
+            "rust": 21.097
+          },
+          "speedup": 10.868
+        },
+        "ci": {
+          "runs_ms": {
+            "node": [
+              242.165,
+              226.761,
+              219.862,
+              229.136,
+              234.528
+            ],
+            "rust": [
+              1.615,
+              1.271,
+              1.35,
+              1.43,
+              1.384
+            ]
+          },
+          "median_ms": {
+            "node": 229.136,
+            "rust": 1.384
+          },
+          "speedup": 165.561
+        }
+      }
+    },
+    "doctor-git": {
+      "command": [
+        "doctor",
+        "validate git exec",
+        "--json"
+      ],
+      "modes": {
+        "timed": {
+          "runs_ms": {
+            "node": [
+              401.285,
+              398.485,
+              397.687,
+              378.744,
+              390.088
+            ],
+            "rust": [
+              160.54,
+              164.367,
+              157.439,
+              163.605,
+              157.959
+            ]
+          },
+          "median_ms": {
+            "node": 397.687,
+            "rust": 160.54
+          },
+          "speedup": 2.477
+        },
+        "tty": {
+          "runs_ms": {
+            "node": [
+              412.395,
+              401.252,
+              399.207,
+              382.223,
+              399.407
+            ],
+            "rust": [
+              173.445,
+              164.715,
+              174.637,
+              166.964,
+              166.924
+            ]
+          },
+          "median_ms": {
+            "node": 399.407,
+            "rust": 166.964
+          },
+          "speedup": 2.392
+        },
+        "ci": {
+          "runs_ms": {
+            "node": [
+              382.624,
+              379.864,
+              390.866,
+              372.663,
+              382.344
+            ],
+            "rust": [
+              159.401,
+              160.32,
+              166.581,
+              163.395,
+              167.313
+            ]
+          },
+          "median_ms": {
+            "node": 382.344,
+            "rust": 163.395
+          },
+          "speedup": 2.34
+        }
+      }
+    },
+    "doctor-default": {
+      "command": [
+        "doctor",
+        "--json"
+      ],
+      "modes": {
+        "timed": {
+          "runs_ms": {
+            "node": [
+              512.744,
+              518.844,
+              507.146,
+              519.062,
+              500.996
+            ],
+            "rust": [
+              278.554,
+              280.474,
+              272.764,
+              288.377,
+              284.656
+            ]
+          },
+          "median_ms": {
+            "node": 512.744,
+            "rust": 280.474
+          },
+          "speedup": 1.828
+        },
+        "tty": {
+          "runs_ms": {
+            "node": [
+              523.523,
+              526.328,
+              536.693,
+              522.911,
+              528.791
+            ],
+            "rust": [
+              295.364,
+              292.342,
+              287.725,
+              296.994,
+              285.531
+            ]
+          },
+          "median_ms": {
+            "node": 526.328,
+            "rust": 292.342
+          },
+          "speedup": 1.8
+        },
+        "ci": {
+          "runs_ms": {
+            "node": [
+              494.261,
+              631.362,
+              554.001,
+              504.51,
+              621.697
+            ],
+            "rust": [
+              275.721,
+              437.856,
+              287.783,
+              278.59,
+              281.27
+            ]
+          },
+          "median_ms": {
+            "node": 554.001,
+            "rust": 281.27
+          },
+          "speedup": 1.97
+        }
+      }
+    }
+  },
+  "catalog_requests": 30,
+  "qualification": {
+    "workspace_tests_passed": 1285,
+    "existing_ignored": 1,
+    "e2e_passed": 531,
+    "focused_export_packages_passed": 17,
+    "focused_export_callbacks_passed": 5,
+    "gates": [
+      {
+        "gate": "fmt",
+        "code": 0,
+        "seconds": 1.034
+      },
+      {
+        "gate": "clippy",
+        "code": 0,
+        "seconds": 10.031
+      },
+      {
+        "gate": "dylint",
+        "code": 0,
+        "seconds": 8.098
+      },
+      {
+        "gate": "doc",
+        "code": 0,
+        "seconds": 4.039
+      },
+      {
+        "gate": "unit",
+        "code": 0,
+        "seconds": 11.592
+      },
+      {
+        "gate": "export-packages",
+        "code": 0,
+        "seconds": 6.548
+      },
+      {
+        "gate": "export-callbacks",
+        "code": 0,
+        "seconds": 7.044
+      },
+      {
+        "gate": "e2e",
+        "code": 0,
+        "seconds": 154.205
+      },
+      {
+        "gate": "port-plan",
+        "code": 0,
+        "seconds": 0.128
+      }
+    ],
+    "build": "RUSTFLAGS=-D warnings cargo build --locked --release --workspace",
+    "note": "Local Linux qualification; PR CI separately repeats Linux/macOS/Windows tests and Windows provisioning parity."
+  },
+  "scope": "Controlled Linux fixtures with analytics/error reporting disabled and log_level=fatal, pinned Node22.22.0/Bit2.2.94. Serial complete-process measurements, fresh workspace/global/HOME state per invocation; five local pairs do not establish a general or cross-platform speed guarantee.",
+  "qualified_native_source": {
+    "sha256": "7cb50da78b6314774dd54c9b1edc06520d03a021f5b28da1b1cc5e04bc142372",
+    "tracked_and_untracked_files": 1338
+  },
+  "final_source_qualification": "Final source encodes the captured query trailing spaces with concat! instead of trailing whitespace in the GraphQL file. The final warnings-denied release rebuild is byte-for-byte identical to the measured artifact; all timing samples therefore measure this exact executable. All seven mandatory gates were rerun on the final source."
+}
