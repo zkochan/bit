@@ -233,7 +233,11 @@ fn select_components(
             .iter()
             .find(|row| component.matches(row))
             .and_then(|row| row["head"].as_str());
-        if (!exhaustive || input.options.head_only) && previous_head == Some(component.head) {
+        if (!exhaustive || input.options.head_only)
+            && previous_head == Some(component.head)
+            && !(input.options.fork_lane_new_scope
+                && staged::missing_remote_head(&host, component.head)?)
+        {
             continue;
         }
         let row = component_rows
@@ -249,7 +253,7 @@ fn selection_rows(input: &Prepare, loaded: &Loaded) -> io::Result<(Vec<Value>, b
     let mut rows = lane_entries(&loaded.lane)?;
     let exhaustive =
         input.options.all || input.options.all_versions || input.options.head_only;
-    if exhaustive {
+    if exhaustive || input.options.fork_lane_new_scope {
         let extra = exhaustive::workspace_entries(input, loaded, &rows)?;
         rows.extend(extra);
     }

@@ -66,11 +66,33 @@ pub(super) fn selected_versions(
     exhaustive: bool,
 ) -> io::Result<Vec<String>> {
     let dir = &context.loaded.dir;
-    Ok(if context.input.options.head_only {
+    let mut versions = if context.input.options.head_only {
         vec![id.head.to_owned()]
     } else if exhaustive {
         exhaustive::all_lane_versions(dir, id.head, component["head"].as_str())?
     } else {
         lane_versions(dir, id.head, previous_head, context.scope, context.name)?
-    })
+    };
+    if context.input.options.fork_lane_new_scope
+        && !versions
+            .iter()
+            .any(|hash| hash == id.head)
+    {
+        versions.push(id.head.to_owned());
+    }
+    Ok(versions)
+}
+
+/// The released importer fetches raw refs to filter Versions already on a file remote.
+pub(super) fn missing_remote_head(host: &str, head: &str) -> io::Result<bool> {
+    let bit_client_transfer::remotes::Remote::File(root) =
+        bit_client_transfer::remotes::Remote::from_host(host)?
+    else {
+        return Ok(false);
+    };
+    match model::read_object(&root.join("objects"), head, "Version") {
+        Ok(_) => Ok(false),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(true),
+        Err(error) => Err(error),
+    }
 }

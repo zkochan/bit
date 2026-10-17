@@ -232,9 +232,9 @@ remote communication belongs to the native command and never delegates a second 
 
 Release qualification against Node 22.22.0 / Bit 2.2.94 verified 105 fresh-copy pairs across seven
 transfer workloads in non-TTY, real TTY and CI modes, including generated package bytes and links.
-The six workloads without configured callbacks measured 2.1–30× lower complete-command medians.
-Configured callbacks measured 700 ms versus Node's 731 ms off a terminal, 710 ms versus 731 ms in
-CI, and 694 ms versus 731 ms on a TTY. An earlier full run had effectively tied callback TTY medians. These are local fixture measurements;
+The six workloads without configured callbacks measured 2.1–27× lower complete-command medians.
+Configured callbacks measured 653 ms versus Node's 682 ms off a terminal, 653 ms versus 673 ms in
+CI, and 669 ms versus 677 ms on a TTY. An earlier full run had effectively tied callback TTY medians. These are local fixture measurements;
 the actual Harmony/extension bootstrap dominates the callback path. The
 [complete samples and fingerprints](../scripts/rust/benchmarks/transfer.json) include both slower
 intermediate implementations and the final artifact. Reproduce the fixtures with
