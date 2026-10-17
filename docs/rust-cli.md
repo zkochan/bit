@@ -316,20 +316,23 @@ controlled warm-metadata fixtures, non-TTY medians in milliseconds were:
 
 | Workload | Node | Rust |
 | --- | ---: | ---: |
-| Save modified | 439.323 | 18.400 |
-| Save including new | 457.247 | 19.635 |
-| List | 224.755 | 1.622 |
-| Load tracked | 420.494 | 8.123 |
-| Load with manual conflict | 438.636 | 8.711 |
-| Restore new components | 532.119 | 491.263 |
+| Save modified | 422.519 | 22.623 |
+| Save including new | 443.106 | 23.830 |
+| List | 216.531 | 1.544 |
+| Load tracked | 422.973 | 7.670 |
+| Load with manual conflict | 427.957 | 8.541 |
+| Restore new components | 517.330 | 477.524 |
 
 New-component restoration still invokes the published add/compile callbacks; its
-measured gain was only 1.06–1.08× across modes. These results do not establish
+measured gain was only 1.01–1.08× across modes, which is near parity. These results do not establish
 first-use, cross-platform or large-workspace performance. The record includes
 source, binary, helper and fixture fingerprints, exact normalizations and
 validated builtin-metadata prewarming shared by both implementations. A further
 45 pairs in [`stash-regressions.json`](../scripts/rust/benchmarks/stash-regressions.json)
-qualify status, checkout and export using the same release binary.
+qualify status, checkout and export using the same release binary. Host load was sampled
+every 0.5 seconds; peak aggregate CPU use was 17.3%. A separate contended trial
+is retained with `performance_valid: false` and is excluded from speedup evidence.
+Linux CI also repeats three lane-import regressions with a 1 MiB main-stack limit.
 
 ### Write commands
 

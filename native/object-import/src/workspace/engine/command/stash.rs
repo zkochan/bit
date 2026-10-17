@@ -110,7 +110,7 @@ pub(in crate::workspace::engine) fn prepare(
     let imported =
         crate::command_import::prepare_lane(&request.root, &request.global_remotes_file)?;
     let result = json!({"token":token,"context":context});
-    state.stash = Some(Retained {
+    state.stash = Some(Box::new(Retained {
         root: request.root.clone(),
         token,
         context,
@@ -119,7 +119,7 @@ pub(in crate::workspace::engine) fn prepare(
         components: Vec::new(),
         prepared: None,
         graph: GraphPhase::default(),
-    });
+    }));
     Ok((0, result))
 }
 

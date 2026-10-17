@@ -14,10 +14,11 @@ fn aliases_messages_explicit_ids_and_empty_operations_match_node() {
     compare_stashes(&helper.scopes.local_path, &oracle);
     command(&helper, &oracle, "stash list");
     command(&helper, &oracle, "stash pop stash-1 --force-theirs");
-    assert_eq!(
-        fs::read_to_string(helper.scopes.local_path.join("comp1/index.js")).unwrap(),
-        "console.log('first');\n",
-    );
+    let restored = fs::read(helper.scopes.local_path.join("comp1/index.js")).unwrap();
+    assert_eq!(restored, fs::read(oracle.join("comp1/index.js")).unwrap());
+    let expected =
+        if cfg!(windows) { "console.log('first');\r\n" } else { "console.log('first');\n" };
+    assert_eq!(restored, expected.as_bytes());
     assert!(helper.scopes.local_path.join(".bit/stash/stash-2.json").exists());
 }
 #[test]
@@ -64,10 +65,11 @@ fn double_digit_stash_names_keep_the_published_lexical_latest_selection() {
     compare_stashes(&helper.scopes.local_path, &oracle);
     command(&helper, &oracle, "stash list");
     command(&helper, &oracle, "stash load");
-    assert_eq!(
-        fs::read_to_string(helper.scopes.local_path.join("comp1/index.js")).unwrap(),
-        "console.log('stash 9');\n",
-    );
+    let restored = fs::read(helper.scopes.local_path.join("comp1/index.js")).unwrap();
+    assert_eq!(restored, fs::read(oracle.join("comp1/index.js")).unwrap());
+    let expected =
+        if cfg!(windows) { "console.log('stash 9');\r\n" } else { "console.log('stash 9');\n" };
+    assert_eq!(restored, expected.as_bytes());
     assert!(helper.scopes.local_path.join(".bit/stash/stash-10.json").exists());
 }
 #[test]

@@ -52,7 +52,7 @@ pub(crate) struct State {
     resolve: Option<resolve::Retained>,
     inbound: Option<inbound::Retained>,
     outbound: Option<outbound::Retained>,
-    stash: Option<stash::Retained>,
+    stash: Option<Box<stash::Retained>>,
 }
 struct Record {
     request: Prepare,

@@ -18,10 +18,11 @@ fn basic_save_and_load_restore_sources_without_advancing_heads() {
     command(&helper, &oracle, "stash save");
     compare_stashes(&helper.scopes.local_path, &oracle);
     assert!(helper.scopes.local_path.join(".bit/stash/stash-1.json").is_file());
-    assert_eq!(
-        fs::read_to_string(helper.scopes.local_path.join("comp1/index.js")).unwrap(),
-        "console.log('base');\n\n",
-    );
+    let restored = fs::read(helper.scopes.local_path.join("comp1/index.js")).unwrap();
+    assert_eq!(restored, fs::read(oracle.join("comp1/index.js")).unwrap());
+    let expected =
+        if cfg!(windows) { "console.log('base');\r\n\r\n" } else { "console.log('base');\n\n" };
+    assert_eq!(restored, expected.as_bytes());
     assert_eq!(controls(&helper.scopes.local_path), before);
     compare_status(&helper, &oracle, 0);
     command(&helper, &oracle, "stash load");

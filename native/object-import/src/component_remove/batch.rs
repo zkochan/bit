@@ -112,17 +112,27 @@ fn remove_sources(selected: &[Selected]) -> io::Result<()> {
     }
     parents.sort_unstable_by(|left, right| right.cmp(left));
     for parent in parents {
-        match fs::remove_dir(parent) {
-            Ok(()) => {}
-            Err(error)
-                if matches!(
-                    error.kind(),
-                    io::ErrorKind::NotFound | io::ErrorKind::DirectoryNotEmpty,
-                ) => {}
-            Err(error) => return Err(error),
-        }
+        remove_empty_parent(parent)?;
     }
     Ok(())
+}
+
+fn remove_empty_parent(parent: &Path) -> io::Result<()> {
+    let entries = match fs::read_dir(parent) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error),
+    };
+    for entry in entries {
+        if entry?.file_name() != ".DS_Store" {
+            return Ok(());
+        }
+    }
+    match fs::remove_dir_all(parent) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
 }
 
 fn select_all(root: &Path, bitmap: &Value, identities: &[String]) -> io::Result<Vec<Selected>> {
