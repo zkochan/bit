@@ -1,5 +1,10 @@
 //! `e2e/commands/import.e2e.ts`.
 
+mod fetch_deps;
+mod history;
+mod lanes;
+mod policy;
+
 use crate::{
     helper::{FOO_FIXTURE, Helper, Run, config, parse, setup},
     known_failure::{KnownResult, Native},

@@ -1,6 +1,6 @@
 //! Materialize a remote Version over an imported workspace component.
 use super::{
-    super::details, Replacement, Target, WorkspaceFiles, invalid, policy, safe_destination, version,
+    super::details, Replacement, Target, WorkspaceFiles, invalid, safe_destination, version,
 };
 use crate::{checkout, command_import::PreparedImport};
 use serde_json::{Map, Value};
@@ -12,7 +12,6 @@ pub(super) struct Input<'a> {
     pub(super) target: &'a Target,
     pub(super) imported: &'a PreparedImport,
     pub(super) row: &'a Value,
-    pub(super) policy: &'a HashMap<String, String>,
     pub(super) resolution: Resolution<'a>,
 }
 
@@ -39,7 +38,7 @@ pub(super) fn prepare(
             .ok_or_else(|| invalid("inbound existing Version"))?;
         &local
     };
-    let main = validate_new(input, new)?;
+    let main = validate_new(new)?;
     plan_files(input, &old, new, &name, changes)?;
     let bitmap =
         rows.get_mut(&input.target.name).ok_or_else(|| invalid("inbound existing bitmap"))?;
@@ -104,9 +103,8 @@ fn versions(input: &Input<'_>, model: &Value) -> io::Result<(Value, String, Stri
     Ok((old, new_hash, new_name))
 }
 
-fn validate_new<'a>(input: &Input<'_>, new: &'a Value) -> io::Result<&'a str> {
+fn validate_new(new: &Value) -> io::Result<&str> {
     crate::history_query::validate_version(new)?;
-    policy::reject_update(new, input.policy)?;
     let main = new["mainFile"].as_str().ok_or_else(|| invalid("inbound existing main file"))?;
     checkout::plan::relative_path(main)?;
     Ok(main)

@@ -1,5 +1,6 @@
 //! Select only lane-origin Versions newer than the remote lane head.
-use super::{MAX_OBJECTS, invalid, model};
+use super::{ComponentContext, ComponentId, MAX_OBJECTS, exhaustive, invalid, model};
+use serde_json::Value;
 use std::{collections::HashSet, io, path::Path};
 
 /// Keep the lane head and any preceding snaps made on this lane. A main-lane
@@ -55,4 +56,21 @@ fn selected_parents(
         })
         .collect::<io::Result<Vec<_>>>()
         .map(Some)
+}
+
+pub(super) fn selected_versions(
+    context: &ComponentContext<'_>,
+    id: &ComponentId<'_>,
+    component: &Value,
+    previous_head: Option<&str>,
+    exhaustive: bool,
+) -> io::Result<Vec<String>> {
+    let dir = &context.loaded.dir;
+    Ok(if context.input.options.head_only {
+        vec![id.head.to_owned()]
+    } else if exhaustive {
+        exhaustive::all_lane_versions(dir, id.head, component["head"].as_str())?
+    } else {
+        lane_versions(dir, id.head, previous_head, context.scope, context.name)?
+    })
 }
