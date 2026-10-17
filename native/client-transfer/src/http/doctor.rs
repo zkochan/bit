@@ -15,6 +15,7 @@ impl Network {
         if let Some(name) = name {
             variables["diagnosisName"] = json!(name);
         }
+        let query = QUERY.replace("\r\n", "\n");
         let request = self.client
             .post(format!("{url}/graphql"))
             .header("x-verb", "read");
@@ -23,7 +24,7 @@ impl Network {
             None => request,
         };
         let request =
-            request.json(&json!({"query":QUERY,"variables":variables,"operationName":"doctor"}));
+            request.json(&json!({"query":query,"variables":variables,"operationName":"doctor"}));
         let response = self.send(request).await?;
         let value = self.doctor_response(response).await?;
         projection(&value, scope)

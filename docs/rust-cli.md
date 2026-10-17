@@ -275,13 +275,13 @@ fixtures use Node 22.22.0 / Bit 2.2.94, disabled analytics and `log_level=fatal`
 
 | Complete command | Node median, non-TTY | Rust release median, non-TTY |
 | --- | ---: | ---: |
-| `init --standalone` | 212 ms | 2.2 ms |
-| `config get benchmark.value` | 226 ms | 2.0 ms |
-| `doctor --list` | 223 ms | 1.6 ms |
-| `doctor "validate git exec" --json` | 398 ms | 161 ms |
-| `doctor --json` | 513 ms | 280 ms |
+| `init --standalone` | 208 ms | 1.8 ms |
+| `config get benchmark.value` | 340 ms | 3.1 ms |
+| `doctor --list` | 228 ms | 1.5 ms |
+| `doctor "validate git exec" --json` | 397 ms | 157 ms |
+| `doctor --json` | 507 ms | 275 ms |
 
-The full doctor command measured 1.8–2.0× lower medians across the three modes; the published
+The full doctor command measured 1.8× lower medians across the three modes; the published
 BVM lookup and external npm/yarn metadata remain part of the command. These are local fixture
 measurements, without a general or cross-platform speed guarantee. The
 [samples, fingerprints and settings](../scripts/rust/benchmarks/consolidation.json) are reproduced

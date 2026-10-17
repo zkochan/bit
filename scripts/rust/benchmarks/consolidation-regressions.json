@@ -1,5 +1,5 @@
 {
-  "measured_at_utc": "2026-10-17T12:38:56.541536+00:00",
+  "measured_at_utc": "2026-10-17T13:06:14.432497+00:00",
   "method": "Existing complete transfer verifier, five alternating pairs per mode, exact supported output/workspace/object/control/package state; source immutable and disposable file remote restored after each command.",
   "driver_sha256": "7282a466f4587007f9dd36ebeed70bd658140519e0b4991d299bb32eea508c5e",
   "helpers_sha256": {
@@ -8,13 +8,13 @@
   },
   "runs": {
     "status": {
-      "stage": "/var/tmp/transfer-bench-g3t39gax",
+      "stage": "/var/tmp/transfer-bench-xqjnyi9r",
       "source": "/var/tmp/status-diff-bench-fixture-2586579",
       "source_sha256": "c58214e737af4a7d07d0521cb22449978cb184c5cdef706b9c7a6ce235829a8f",
       "remote_sha256": {
         "/var/tmp/transfer-final-fixtures/transfer-remote": "a170b5b4c8419a66a51af9a0859ecca255be5bc1e763f185fab80234d687caf1"
       },
-      "rust_sha256": "f3a4b6f1a6419b944d369a97c421880410109f5ba0559d4c959ee339c1e5b205",
+      "rust_sha256": "dbdda839dff481a237be1632fe12baa6f176fb49fea3f5ada792c700cb6d9f03",
       "command": [
         "status",
         "--json"
@@ -22,50 +22,50 @@
       "runs_ms": {
         "timed": {
           "node": [
-            510.941,
-            503.513,
-            500.965,
-            490.268,
-            494.704
+            683.883,
+            485.645,
+            492.921,
+            482.219,
+            498.486
           ],
           "rust": [
-            21.055,
-            7.911,
-            8.612,
-            8.333,
-            8.875
+            8.95,
+            7.791,
+            8.863,
+            7.763,
+            7.996
           ]
         },
         "tty": {
           "node": [
-            507.667,
-            511.965,
-            496.443,
-            501.346,
-            505.904
+            499.733,
+            500.977,
+            492.658,
+            499.614,
+            505.137
           ],
           "rust": [
-            21.485,
-            20.902,
-            21.318,
-            21.214,
-            21.257
+            21.316,
+            21.057,
+            21.077,
+            20.963,
+            21.201
           ]
         },
         "ci": {
           "node": [
-            493.73,
-            493.874,
-            504.229,
-            490.82,
-            499.414
+            486.212,
+            483.678,
+            473.769,
+            503.868,
+            525.873
           ],
           "rust": [
-            9.094,
-            7.9,
-            8.301,
-            9.48,
-            8.557
+            8.758,
+            7.975,
+            7.934,
+            8.506,
+            8.392
           ]
         }
       },
@@ -133,16 +133,16 @@
       ],
       "median_ms": {
         "timed": {
-          "node": 500.965,
-          "rust": 8.612
+          "node": 492.921,
+          "rust": 7.996
         },
         "tty": {
-          "node": 505.904,
-          "rust": 21.257
+          "node": 499.733,
+          "rust": 21.077
         },
         "ci": {
-          "node": 493.874,
-          "rust": 8.557
+          "node": 486.212,
+          "rust": 8.392
         }
       },
       "reproduce_argv": [
@@ -164,13 +164,13 @@
       ]
     },
     "checkout": {
-      "stage": "/var/tmp/transfer-bench-aarsuds5",
+      "stage": "/var/tmp/transfer-bench-kzif6fy0",
       "source": "/var/tmp/checkout-qualified-benchmark-fixtures/ordinary",
       "source_sha256": "8211ff87332cff495cb2af431a415947e84134f083b116ca34508e4daf08fb98",
       "remote_sha256": {
         "/var/tmp/transfer-final-fixtures/transfer-remote": "a170b5b4c8419a66a51af9a0859ecca255be5bc1e763f185fab80234d687caf1"
       },
-      "rust_sha256": "f3a4b6f1a6419b944d369a97c421880410109f5ba0559d4c959ee339c1e5b205",
+      "rust_sha256": "dbdda839dff481a237be1632fe12baa6f176fb49fea3f5ada792c700cb6d9f03",
       "command": [
         "checkout",
         "0.0.1",
@@ -181,50 +181,50 @@
       "runs_ms": {
         "timed": {
           "node": [
-            428.262,
-            424.518,
-            426.248,
-            443.084,
-            437.888
+            449.734,
+            435.166,
+            432.185,
+            425.009,
+            437.552
           ],
           "rust": [
-            20.311,
-            22.755,
-            23.324,
-            23.853,
-            16.096
+            23.301,
+            22.784,
+            24.421,
+            22.603,
+            14.712
           ]
         },
         "tty": {
           "node": [
-            454.107,
-            442.35,
-            442.97,
-            447.979,
-            436.576
+            438.859,
+            451.495,
+            434.546,
+            435.464,
+            440.034
           ],
           "rust": [
-            25.652,
-            25.008,
-            25.158,
-            24.542,
-            25.311
+            26.205,
+            31.182,
+            34.695,
+            25.245,
+            35.202
           ]
         },
         "ci": {
           "node": [
-            510.028,
-            595.32,
-            442.37,
-            436.483,
-            446.039
+            433.801,
+            434.475,
+            439.123,
+            417.935,
+            435.471
           ],
           "rust": [
-            14.211,
-            13.889,
-            16.419,
-            14.9,
-            15.284
+            13.092,
+            14.476,
+            23.199,
+            13.922,
+            23.579
           ]
         }
       },
@@ -292,16 +292,16 @@
       ],
       "median_ms": {
         "timed": {
-          "node": 428.262,
-          "rust": 22.755
+          "node": 435.166,
+          "rust": 22.784
         },
         "tty": {
-          "node": 442.97,
-          "rust": 25.158
+          "node": 438.859,
+          "rust": 31.182
         },
         "ci": {
-          "node": 446.039,
-          "rust": 14.9
+          "node": 434.475,
+          "rust": 14.476
         }
       },
       "reproduce_argv": [
@@ -326,63 +326,63 @@
       ]
     },
     "export": {
-      "stage": "/var/tmp/transfer-bench-9vi6gw_m",
+      "stage": "/var/tmp/transfer-bench-sg0mqd8_",
       "source": "/var/tmp/transfer-final-fixtures/export-main",
       "source_sha256": "9657e3602a120bc61ab716eaa2011aacd80bcb87f53da5de465ba975b183051f",
       "remote_sha256": {
         "/var/tmp/transfer-final-fixtures/transfer-remote": "a170b5b4c8419a66a51af9a0859ecca255be5bc1e763f185fab80234d687caf1"
       },
-      "rust_sha256": "f3a4b6f1a6419b944d369a97c421880410109f5ba0559d4c959ee339c1e5b205",
+      "rust_sha256": "dbdda839dff481a237be1632fe12baa6f176fb49fea3f5ada792c700cb6d9f03",
       "command": [
         "export"
       ],
       "runs_ms": {
         "timed": {
           "node": [
-            274.971,
-            282.462,
-            279.899,
-            273.142,
-            281.016
+            287.984,
+            266.995,
+            273.651,
+            263.027,
+            262.913
           ],
           "rust": [
-            106.392,
-            118.745,
-            112.448,
-            110.898,
-            118.406
+            106.184,
+            105.682,
+            118.74,
+            105.716,
+            115.996
           ]
         },
         "tty": {
           "node": [
-            291.658,
-            284.591,
-            269.76,
-            276.963,
-            281.788
+            270.421,
+            281.747,
+            275.979,
+            279.103,
+            276.003
           ],
           "rust": [
-            132.49,
-            121.178,
-            124.92,
-            126.884,
-            128.316
+            125.347,
+            127.125,
+            129.148,
+            125.896,
+            118.631
           ]
         },
         "ci": {
           "node": [
-            275.512,
-            284.608,
-            270.094,
-            277.272,
-            270.775
+            262.927,
+            267.321,
+            266.48,
+            266.583,
+            276.557
           ],
           "rust": [
-            118.863,
-            116.992,
-            112.765,
-            123.011,
-            108.242
+            117.275,
+            115.139,
+            107.435,
+            115.08,
+            119.205
           ]
         }
       },
@@ -450,16 +450,16 @@
       ],
       "median_ms": {
         "timed": {
-          "node": 279.899,
-          "rust": 112.448
+          "node": 266.995,
+          "rust": 106.184
         },
         "tty": {
-          "node": 281.788,
-          "rust": 126.884
+          "node": 276.003,
+          "rust": 125.896
         },
         "ci": {
-          "node": 275.512,
-          "rust": 116.992
+          "node": 266.583,
+          "rust": 115.139
         }
       },
       "reproduce_argv": [
@@ -481,21 +481,21 @@
     }
   },
   "native_source": {
-    "sha256": "8248d648a892b29a353b979d14131b600b92d8488ddeb15e9702850d48120170",
+    "sha256": "5060fd103c4861f4e5b34699bd673333ee5c0f1d82a69a20898562ebdbd20a84",
     "tracked_and_untracked_files": 1338
   },
   "platform": "Linux-7.2.5-200.fc44.x86_64-x86_64-with-glibc2.43",
   "node_version": "v22.22.0",
-  "bit_reference_version": "2.2.94",
-  "build": "RUSTFLAGS=-D warnings cargo build --locked --release --workspace",
   "sha256": {
-    "rust": "f3a4b6f1a6419b944d369a97c421880410109f5ba0559d4c959ee339c1e5b205",
+    "rust": "dbdda839dff481a237be1632fe12baa6f176fb49fea3f5ada792c700cb6d9f03",
     "node_wrapper": "d18f9f4aa2c224871e8872c5804c64d98941152e957919a1631fd46addf05d3d",
     "benchmark_driver": "64d35ef3bd6a2af2b73f2f95beb67dedc04f82c666677af5f8e27b4ed41f1aed",
     "node_package": "eb77450196c8582827be7df68b4feb542354c5ba00ca0a81325ea5dfe7c632b7",
     "node_binary": "1bec56ef7cfa9a76f3e0b7c0a87f220eb73f23102b9c0b4c7529a3f7c3ce7c31",
     "node_cli": "71b324e03c4c9fb01cd3decb053ca4c3781c27ce06a8af53f7ad09d0ae42d033"
   },
+  "bit_reference_version": "2.2.94",
+  "build": "RUSTFLAGS=-D warnings cargo build --locked --release --workspace",
   "environment": {
     "HOME": "/var/tmp/transfer-final-fixtures/home",
     "BIT_GLOBALS_DIR": "/var/tmp/transfer-final-fixtures/globals",
@@ -504,10 +504,5 @@
     "PATH": "/var/home/zoltan/.bvm/nodejs/22.22.0/bin:/var/home/zoltan/.local/bin:/var/home/zoltan/.local/bin:/var/home/zoltan/.grok/bin:/var/home/zoltan/.local/bin:/var/home/zoltan/bin:/var/home/zoltan/.codex/packages/app-server-daemon/releases/0.163.0-x86_64-unknown-linux-musl/codex-path:/var/home/zoltan/.codex/tmp/arg0-linux/codex-arg0wWcnwf:/var/home/zoltan/.codex/tmp/arg0/codex-arg0pqwMgn:/var/home/zoltan/.codex/packages/app-server-daemon/releases/0.162.1-x86_64-unknown-linux-musl/codex-path:/var/home/zoltan/.codex/tmp/arg0/codex-arg07pBJUs:/var/home/zoltan/.local/share/pnpm/global/v11/5d5c-18dd8a9d84ab57db-0/node_modules/.pnpm/@openai+codex@0.162.1-linux-x64/node_modules/@openai/codex/vendor/x86_64-unknown-linux-musl/codex-path:/var/home/zoltan/.local/bin:/var/home/zoltan/.cargo/bin:/home/linuxbrew/.linuxbrew/opt/rustup/bin:/var/home/zoltan/.local/share/pnpm/bin:/usr/local/sbin:/usr/local/bin:/usr/bin:/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/var/home/zoltan/bin",
     "TMPDIR": "/var/tmp"
   },
-  "normalization": "Existing transfer verifier masks native trace, explicit elapsed durations, fixture paths and characterized component allocation/export dates; Source bytes, workspace bytes, controls and package files/links remain checked. Remote VersionHistory/index row order uses the proofs recorded by transfer qualification.",
-  "qualified_native_source": {
-    "sha256": "7cb50da78b6314774dd54c9b1edc06520d03a021f5b28da1b1cc5e04bc142372",
-    "tracked_and_untracked_files": 1338
-  },
-  "final_source_qualification": "Final source encodes the captured query trailing spaces with concat! instead of trailing whitespace in the GraphQL file. The final warnings-denied release rebuild is byte-for-byte identical to the measured artifact; all timing samples therefore measure this exact executable. All seven mandatory gates were rerun on the final source."
+  "normalization": "Existing transfer verifier masks native trace, explicit elapsed durations, fixture paths and characterized component allocation/export dates; Source bytes, workspace bytes, controls and package files/links remain checked. Remote VersionHistory/index row order uses the proofs recorded by transfer qualification."
 }
