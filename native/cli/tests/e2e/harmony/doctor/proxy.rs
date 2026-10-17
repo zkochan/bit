@@ -71,12 +71,15 @@ fn serve(
         }
         // The published proxy agent replays non-200 responses to node-fetch,
         // and BVM parses their JSON without checking the HTTP status.
-        write!(
-            socket,
+        let header = format!(
             "HTTP/1.1 502 Fixture\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
             body.len(),
-        )?;
-        socket.write_all(body)?;
+        );
+        // The published proxy agent replays only the bytes buffered when
+        // the headers arrive. Deliver the small catalog in the same write.
+        let mut response = header.into_bytes();
+        response.extend_from_slice(body);
+        socket.write_all(&response)?;
         count.fetch_add(1, Ordering::Release);
     }
 }

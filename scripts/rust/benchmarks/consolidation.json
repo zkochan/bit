@@ -764,52 +764,57 @@
       {
         "gate": "fmt",
         "code": 0,
-        "seconds": 1.113
+        "seconds": 1.038
       },
       {
         "gate": "clippy",
         "code": 0,
-        "seconds": 10.086
+        "seconds": 9.43
       },
       {
         "gate": "dylint",
         "code": 0,
-        "seconds": 9.521
+        "seconds": 9.502
       },
       {
         "gate": "doc",
         "code": 0,
-        "seconds": 6.276
+        "seconds": 14.094
       },
       {
         "gate": "unit",
         "code": 0,
-        "seconds": 12.281
+        "seconds": 22.183
       },
       {
         "gate": "export-packages",
         "code": 0,
-        "seconds": 7.012
+        "seconds": 10.655
       },
       {
         "gate": "export-callbacks",
         "code": 0,
-        "seconds": 7.008
+        "seconds": 6.82
       },
       {
         "gate": "e2e",
         "code": 0,
-        "seconds": 153.756
+        "seconds": 155.269
       },
       {
         "gate": "port-plan",
         "code": 0,
-        "seconds": 0.122
+        "seconds": 0.128
       }
     ],
     "build": "RUSTFLAGS=-D warnings cargo build --locked --release --workspace",
     "note": "Local Linux qualification; PR CI separately repeats Linux/macOS/Windows tests and Windows provisioning parity.",
     "embedded_query_crlf_e2e_passed": 3
   },
-  "scope": "Controlled Linux fixtures with analytics/error reporting disabled and log_level=fatal, pinned Node22.22.0/Bit2.2.94. Serial complete-process measurements, fresh workspace/global/HOME state per invocation; five local pairs do not establish a general or cross-platform speed guarantee."
+  "scope": "Controlled Linux fixtures with analytics/error reporting disabled and log_level=fatal, pinned Node22.22.0/Bit2.2.94. Serial complete-process measurements, fresh workspace/global/HOME state per invocation; five local pairs do not establish a general or cross-platform speed guarantee.",
+  "qualified_native_source": {
+    "sha256": "3bc014d18d1b0c21d7b04515be7847cf94c133130cdcc19909ebb6310f36573f",
+    "tracked_and_untracked_files": 1338
+  },
+  "final_source_qualification": "The only change after measurement is the doctor e2e catalog-proxy fixture and its failure diagnostic: the small headers/body response is sent in one write because the published proxy agent only replays bytes buffered when headers arrive. A forced split probe against actual Bit 2.2.94 produced no BVM result; the combined response returned version 99.0.0. The final warnings-denied release workspace rebuild is byte-for-byte identical to the measured executable. All mandatory gates were rerun on this final test source."
 }
