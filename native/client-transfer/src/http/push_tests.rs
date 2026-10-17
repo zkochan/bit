@@ -44,6 +44,7 @@ fn disconnecting_server(
         loop {
             match listener.accept() {
                 Ok((mut socket, _)) => {
+                    socket.set_nonblocking(false).unwrap();
                     socket
                         .set_read_timeout(Some(Duration::from_secs(5)))
                         .unwrap();

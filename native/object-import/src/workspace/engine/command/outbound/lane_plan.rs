@@ -7,8 +7,7 @@ use std::io;
 
 pub(super) fn prepare(input: &Prepare, lane: LaneSelected) -> io::Result<Plan> {
     let host = remote::host(input, &lane.scope)?;
-    let fork_history = host
-        .starts_with("file://")
+    let fork_history = (host.starts_with("file://") && !cfg!(windows))
         .then(|| lane.fork_history.clone())
         .flatten();
     let prepared = lane_publication::prepare(input, &lane)?;

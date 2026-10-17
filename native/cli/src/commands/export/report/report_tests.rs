@@ -69,3 +69,14 @@ fn reports_an_exported_lane_with_and_without_new_versions() {
     empty["exportedLanes"] = json!(["s/study"]);
     assert_eq!(format_with(&empty, chalk, false), "exported lane (1)\n   \u{203A} s/study");
 }
+
+#[test]
+fn empty_server_acknowledgement_keeps_lane_removal_report() {
+    let mut value = receipt(&[], &[]);
+    value["exportedLanes"] = json!(["s/study"]);
+    value["removedIds"] = json!(["s/a"]);
+    assert_eq!(
+        format_with(&value, Chalk::new(false), false),
+        "exported lane (1)\n   › s/study\n\ncomponents removed on the remote lane (1)\n   ⚠ s/a",
+    );
+}

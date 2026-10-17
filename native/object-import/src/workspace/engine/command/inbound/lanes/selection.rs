@@ -30,6 +30,15 @@ pub(super) fn ids(input: &Prepare) -> io::Result<Vec<String>> {
 }
 
 fn tracked(root: &Path) -> io::Result<Vec<String>> {
+    tracked_for_separator(root, std::path::MAIN_SEPARATOR)
+}
+
+fn tracked_for_separator(root: &Path, separator: char) -> io::Result<Vec<String>> {
+    // RemoteLanes.listLaneFiles passes path.join('*', '*') to glob 13. On
+    // Windows, its backslash escapes the second star and no legal lane matches.
+    if separator == '\\' {
+        return Ok(Vec::new());
+    }
     let base = crate::scope_path(root).join("refs/remotes");
     if !base.try_exists()? {
         return Ok(Vec::new());
@@ -70,3 +79,6 @@ fn scope_lanes(directory: &Path, scope: &str) -> io::Result<Vec<String>> {
     }
     Ok(ids)
 }
+
+#[cfg(test)]
+mod tests;

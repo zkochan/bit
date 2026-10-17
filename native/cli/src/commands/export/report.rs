@@ -209,15 +209,12 @@ pub(super) fn format_with(receipt: &Value, chalk: Chalk, verbose: bool) -> Strin
     let components = ids("componentsIds");
     let removed = ids("removedIds");
     let lane = ids("exportedLanes").first().copied();
-    if components.is_empty() && ids("nonExistOnBitMap").is_empty() && ids("missingScope").is_empty()
+    if components.is_empty()
+        && ids("nonExistOnBitMap").is_empty()
+        && ids("missingScope").is_empty()
+        && lane.is_none()
     {
-        return lane.map_or_else(
-            || chalk.yellow("nothing to export"),
-            |lane| {
-                Formatter::new(chalk)
-                    .section("exported lane", "", &[Formatter::new(chalk).item(&chalk.bold(lane))])
-            },
-        );
+        return chalk.yellow("nothing to export");
     }
     let format = Formatter::new(chalk);
     let export_sections = export_sections(receipt, &components, lane, &format, chalk, verbose);
@@ -252,12 +249,12 @@ fn export_sections(
     chalk: Chalk,
     verbose: bool,
 ) -> String {
-    let update_ids: HashSet<_> = receipt["laneUpdateIds"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(Value::as_str)
-        .collect();
+    if components.is_empty() {
+        return lane.map_or_else(String::new, |lane| {
+            format.section("exported lane", "", &[format.item(&chalk.bold(lane))])
+        });
+    }
+    let update_ids = lane_update_ids(receipt);
     let items: Vec<String> = components
         .iter()
         .filter(|id| !update_ids.contains(*id))
@@ -283,6 +280,15 @@ fn export_sections(
         .filter(|section| !section.is_empty())
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+fn lane_update_ids(receipt: &Value) -> HashSet<&str> {
+    receipt["laneUpdateIds"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .collect()
 }
 
 fn render_item(

@@ -149,11 +149,12 @@ pub(in crate::workspace::engine) fn stage(
 
 fn publication_receipt(retained: &Retained, exported_ids: &[String], applied: bool) -> Value {
     let lane = retained.publication.as_ref().and_then(Publication::lane_name);
-    let (updates, removed) = retained.publication
+    let (mut updates, removed) = retained.publication
         .as_ref()
         .map(Publication::receipt_ids)
         .unwrap_or_default();
     let components = super::publication_state::components(retained, exported_ids);
+    updates.retain(|id| components.contains(id));
     json!({"token":retained.token,"owner":"rust","applied":applied,
         "componentsIds":components,"newIdsOnRemote":exported_ids,"nonExistOnBitMap":retained.publication.as_ref().map(Publication::non_existing_ids).unwrap_or_default(),
         "removedIds":removed,"missingScope":[],"exportedLanes":lane.into_iter().collect::<Vec<_>>(),
