@@ -1,3 +1,5 @@
+mod eol;
+
 use super::{Plan, invalid, refactor, unsupported};
 use serde_json::Value;
 use std::{
@@ -12,6 +14,7 @@ pub(super) struct Change {
     pub(super) bytes: Vec<u8>,
     permissions: fs::Permissions,
     before: Vec<u8>,
+    writer: eol::Writer,
 }
 pub(super) fn prepare(plan: &mut Plan, facts: &Value) -> io::Result<()> {
     let component = facts["components"]
@@ -39,10 +42,21 @@ pub(super) fn prepare(plan: &mut Plan, facts: &Value) -> io::Result<()> {
         }
         plan.files.push(change);
     }
-    if plan.options.refactor {
-        dependencies(plan, facts)?;
+    prepare_dependencies(plan, facts)
+}
+fn prepare_dependencies(plan: &mut Plan, facts: &Value) -> io::Result<()> {
+    if !plan.options.refactor {
+        return Ok(());
     }
-    Ok(())
+    if plan.identity.exported {
+        // Validate now; package replacements follow onAdd and original removal.
+        let target = std::mem::take(&mut plan.files);
+        dependencies(plan, facts)?;
+        plan.files = target;
+        Ok(())
+    } else {
+        dependencies(plan, facts)
+    }
 }
 fn change(plan: &mut Plan, relative: &str, component: &Value) -> io::Result<Change> {
     let source = plan.root.join(&plan.identity.source_directory).join(relative);
@@ -75,6 +89,7 @@ fn change(plan: &mut Plan, relative: &str, component: &Value) -> io::Result<Chan
     let destination = plan.root.join(&plan.identity.target_directory).join(name);
     safe_parent(&plan.root, &destination)?;
     Ok(Change {
+        writer: eol::Writer::target(plan.identity.exported, plan.options.preserve),
         before,
         permissions: fs::metadata(&source)?.permissions(),
         source,
@@ -137,6 +152,7 @@ fn dependent_file(
     let changed = bytes != loaded;
     Ok((
         Change {
+            writer: eol::Writer::Workspace,
             before,
             permissions: fs::metadata(&path)?.permissions(),
             source: path.clone(),
@@ -152,7 +168,7 @@ pub(super) fn apply(plan: &Plan) -> io::Result<()> {
         if let Some(parent) = change.destination.parent() {
             fs::create_dir_all(parent)?;
         }
-        let bytes = crate::checkout::eol::normalize(change.bytes.clone(), cfg!(windows));
+        let bytes = change.writer.contents(change.bytes.clone(), cfg!(windows));
         fs::write(&change.destination, bytes)?;
         fs::set_permissions(&change.destination, change.permissions.clone())?;
     }
@@ -294,30 +310,35 @@ pub(super) fn refactor_loaded(
     packages: (&str, &str),
 ) -> io::Result<()> {
     let source_root = plan.root.join(&plan.identity.source_directory);
-    plan.files.retain(|file| file.source.starts_with(&source_root));
+    if plan.identity.exported {
+        plan.files.clear();
+    } else {
+        plan.files.retain(|file| file.source.starts_with(&source_root));
+    }
     for row in rows {
-        if row["identity"] == plan.identity.source
-            || row["identity"] == plan.identity.target
+        if row["identity"] == plan.identity.source && !plan.options.deprecate
+            || row["identity"] == plan.identity.target && !plan.identity.exported
         {
             continue;
         }
-        let mut component = row.clone();
-        component["rootDir"] = row["directory"].clone();
-        component["files"] = Value::Array(
-            row["files"]
-                .as_array()
-                .ok_or_else(|| unsupported("rename loaded dependency files"))?
-                .iter()
-                .map(
-                    |file| {
-                        if file.is_string() { file.clone() } else { file["relativePath"].clone() }
-                    },
-                )
-                .collect(),
-        );
+        let component = loaded_dependency(row)?;
         dependent(plan, &component, packages.0, packages.1)?;
     }
     Ok(())
+}
+
+fn loaded_dependency(row: &Value) -> io::Result<Value> {
+    let mut component = row.clone();
+    component["rootDir"] = row["directory"].clone();
+    component["files"] = Value::Array(
+        row["files"]
+            .as_array()
+            .ok_or_else(|| unsupported("rename loaded dependency files"))?
+            .iter()
+            .map(|file| if file.is_string() { file.clone() } else { file["relativePath"].clone() })
+            .collect(),
+    );
+    Ok(component)
 }
 
 fn target_bytes(

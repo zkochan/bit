@@ -18,7 +18,13 @@ fn workspace(exported: bool) -> Helper {
     super::lanes::delay_new(&helper, &format!("{}/foo", helper.scopes.remote));
     if exported {
         support::tag(&helper);
-        remote::publish(&helper);
+        remote::publish_selected(
+            &helper,
+            &[
+                format!("{}/my-aspect", helper.scopes.remote),
+                format!("{}/env/lane-delay", helper.scopes.remote),
+            ],
+        );
     }
     helper
 }

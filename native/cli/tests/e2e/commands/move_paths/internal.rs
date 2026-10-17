@@ -1,5 +1,5 @@
 //! Internal path relocation uses the component's complete retained ignore policy.
-use super::support::{bitmap, setup, successful, workspace};
+use super::support::{bitmap, compare, setup, workspace};
 use std::fs;
 
 #[test]
@@ -11,7 +11,15 @@ fn nested_directory_moves_ignored_bytes_but_reports_only_tracked_files() {
     helper.output_file("comp1/nested/ignored.txt", "ignored bytes\n");
     helper.output_file("comp1/.bitignore", "**/ignored.txt\n");
     setup(&helper, "add comp1 -i comp1 -m comp1/nested/main.js");
-    let output = successful(&helper, "move comp1/nested comp1/other");
+    let output = compare(&helper, "move comp1/nested comp1/other");
+    if cfg!(windows) {
+        assert!(!output.status.success());
+        assert!(output.stderr.contains("is not a tracked component"));
+        assert!(helper.scopes.local_path.join("comp1/nested/ignored.txt").is_file());
+        assert!(!helper.scopes.local_path.join("comp1/other").exists());
+        return;
+    }
+    assert!(output.status.success(), "{}", output.stderr);
     assert!(!output.stdout.contains("ignored.txt"));
     assert!(output.stdout.contains("nested/main.js"));
     assert_eq!(bitmap(&helper)["comp1"]["mainFile"], "other/main.js");

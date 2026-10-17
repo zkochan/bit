@@ -9,6 +9,7 @@ WORKLOADS = {
     'deprecate-batch': ['deprecate', '**'],
     'rename-new': ['rename', 'comp1', 'renamed-component'],
     'rename-exported': ['rename', 'comp1', 'renamed-component', '--deprecate'],
+    'rename-exported-refactor': ['rename', 'comp1', 'renamed-component', '--refactor'],
 }
 
 
@@ -63,9 +64,14 @@ def seed(args, stage, environment):
             for index in range(10):
                 (component / f'file-{index}.js').write_text(f'module.exports = {index};\n')
             run('add', 'comp1', '--id', 'comp1')
-        if name in {'deprecate-batch', 'rename-exported'}:
+        if name == 'rename-exported-refactor':
+            dependent = workspace / 'comp2'
+            dependent.mkdir()
+            (dependent / 'index.js').write_text("module.exports = require('@identity-benchmark/comp1');\n")
+            run('add', 'comp2', '--id', 'comp2')
+        if name == 'deprecate-batch' or name.startswith('rename-exported'):
             run('tag', '--ignore-issues', '*', '--message', 'identity benchmark fixture')
-        if name == 'rename-exported':
+        if name.startswith('rename-exported'):
             run('export')
             raw_bitmap = (workspace / '.bitmap').read_text()
             bitmap = json.loads(raw_bitmap[raw_bitmap.index('{'):])

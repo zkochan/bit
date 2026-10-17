@@ -6,8 +6,8 @@ use crate::commands::{
     workspace_command::{self, results::Report},
 };
 use bit_object_import::component_rename::{Options, Plan};
-use serde_json::json;
-use std::{io, path::Path};
+use serde_json::{Value, json};
+use std::{borrow::Cow, io, path::Path};
 
 pub(super) fn run(
     root: &Path,
@@ -31,22 +31,17 @@ pub(super) fn run(
         super::ast::transform(root, &mut prepared.plan, linker)?;
     }
 
-    if options.refactor {
+    if options.refactor && !prepared.plan.identity.exported {
         refactor_load(root, &mut prepared, linker, output)?;
     }
     prepared.plan.apply_files()?;
     materialized(root, &prepared, linker)?;
     finish_exported(root, &mut prepared, options, linker, chalk, output, &source_package)?;
-    prepared.plan.commit(&workspace_command::file_id())?;
-    let targets = vec![prepared.plan.identity.target.clone()];
-    if prepared.plan.identity.exported {
-        linker.link(root, prepared.plan.bitmap(), &targets, false, chalk)?;
-    } else {
-        linker.link_retained(root, prepared.plan.bitmap(), &targets, false, chalk)?;
+    if options.refactor && prepared.plan.identity.exported {
+        exported_refactor(root, &mut prepared, linker, output)?;
     }
-    print!("{}", linker.take_stdout());
-    linker.call(root, "renameTooling", &json!({"action":"compile","ids":targets}))?;
-    print!("{}", linker.take_stdout());
+    prepared.plan.commit(&workspace_command::file_id())?;
+    finish_link(root, &prepared, options, linker, chalk)?;
     output.stop();
     Ok(report(&prepared, chalk))
 }
@@ -82,11 +77,8 @@ fn refactor_load(
 ) -> io::Result<()> {
     let identities = refactor_identities(prepared)?;
     output.status(&format!("loading {} component(s)", identities.len()));
-    let loaded = if prepared.plan.identity.exported {
-        linker.capture(root, prepared.plan.added_bitmap(), &identities)?
-    } else {
-        linker.capture_cached(root, prepared.plan.added_bitmap(), &identities)?
-    };
+    let bitmap = refactor_bitmap(&prepared.plan)?;
+    let loaded = linker.capture_cached(root, &bitmap, &identities)?;
     print!("{}", linker.take_stdout());
     let source = prepared.facts["sourcePackage"]
         .as_str()
@@ -215,20 +207,73 @@ fn materialized(root: &Path, prepared: &Prepared, linker: &mut ProjectedLinker) 
 }
 
 fn refactor_identities(prepared: &Prepared) -> io::Result<Vec<String>> {
-    let identities = prepared.plan
-        .added_bitmap()
+    let bitmap = refactor_bitmap(&prepared.plan)?;
+    let identities = bitmap
         .as_object()
         .ok_or_else(|| io::Error::other("rename projected bitmap"))?
         .iter()
-        .filter_map(|(key, row)| {
-            let name = row["name"].as_str().unwrap_or(key);
-            let scope = row["scope"]
-                .as_str()
-                .filter(|scope| !scope.is_empty())
-                .or_else(|| row["defaultScope"].as_str())?;
-            row["rootDir"].as_str()?;
-            Some(format!("{scope}/{name}"))
-        })
+        .filter_map(|(key, row)| listed_identity(key, row))
         .collect::<Vec<_>>();
     Ok(identities)
+}
+
+fn exported_refactor(
+    root: &Path,
+    prepared: &mut Prepared,
+    linker: &mut ProjectedLinker,
+    output: &bit_install::output::Output,
+) -> io::Result<()> {
+    // RenamingMain reloads after adding/removing identities, before target get/list.
+    prepared.plan.publish_configuration(&workspace_command::file_id())?;
+    let target = vec![prepared.plan.identity.target.clone()];
+    linker.forget_loaded();
+    // Workspace.get(target) is singular; only getMany/list starts a loading summary.
+    linker.capture(root, &prepared.plan.published_bitmap()?, &target)?;
+    print!("{}", linker.take_stdout());
+    refactor_load(root, prepared, linker, output)?;
+    prepared.plan.apply_files()?;
+    linker.call(root, "identityMaterialized", &prepared.plan.materialized())?;
+    print!("{}", linker.take_stdout());
+    Ok(())
+}
+
+fn finish_link(
+    root: &Path,
+    prepared: &Prepared,
+    options: &Options,
+    linker: &mut ProjectedLinker,
+    chalk: Chalk,
+) -> io::Result<()> {
+    let targets = vec![prepared.plan.identity.target.clone()];
+    if prepared.plan.identity.exported && !options.refactor {
+        linker.link(root, prepared.plan.bitmap(), &targets, false, chalk)?;
+    } else {
+        linker.link_retained(root, prepared.plan.bitmap(), &targets, false, chalk)?;
+    }
+    print!("{}", linker.take_stdout());
+    linker.call(root, "renameTooling", &json!({"action":"compile","ids":targets}))?;
+    print!("{}", linker.take_stdout());
+    Ok(())
+}
+
+fn refactor_bitmap(plan: &Plan) -> io::Result<Cow<'_, Value>> {
+    if plan.identity.exported {
+        plan.published_bitmap().map(Cow::Owned)
+    } else {
+        Ok(Cow::Borrowed(plan.added_bitmap()))
+    }
+}
+fn listed_identity(key: &str, row: &Value) -> Option<String> {
+    if row["config"]["teambit.component/remove"]["removed"] == true
+        || row["isAvailableOnCurrentLane"] == false
+    {
+        return None;
+    }
+    let name = row["name"].as_str().unwrap_or(key);
+    let scope = row["scope"]
+        .as_str()
+        .filter(|scope| !scope.is_empty())
+        .or_else(|| row["defaultScope"].as_str())?;
+    row["rootDir"].as_str()?;
+    Some(format!("{scope}/{name}"))
 }

@@ -20,6 +20,16 @@ pub(crate) fn seed_after_node_export(helper: &Helper) {
     seed_after_export_at(helper, &helper.scopes.local_path);
 }
 
+/// Limit the fixture server to the components actually requested by this export.
+pub(crate) fn publish_selected(helper: &Helper, identities: &[String]) {
+    if cfg!(windows) {
+        node_export(helper);
+        seed_selected_at(helper, &helper.scopes.local_path, identities);
+    } else {
+        helper.run("export");
+    }
+}
+
 /// Publish a cloned fixture author without changing the importing workspace.
 pub(crate) fn publish_at(helper: &Helper, workspace: &Path) {
     node_export_at(workspace);
@@ -30,6 +40,9 @@ pub(crate) fn publish_at(helper: &Helper, workspace: &Path) {
 
 /// Complete fixture publication after its caller has already executed the export lifecycle.
 pub(crate) fn seed_after_export_at(helper: &Helper, workspace: &Path) {
+    seed_selected_at(helper, workspace, &[]);
+}
+fn seed_selected_at(helper: &Helper, workspace: &Path, identities: &[String]) {
     let scope = bit_object_import::scope_path(workspace);
     promote_workspace(helper, &scope, workspace);
     let shared = setup::shared();
@@ -39,6 +52,7 @@ pub(crate) fn seed_after_export_at(helper: &Helper, workspace: &Path) {
         .arg(&scope)
         .arg(&helper.scopes.remote_path)
         .arg(config::read_jsonc(&workspace.join(".bitmap"))["_bit_lane"]["id"].to_string())
+        .arg(serde_json::to_string(identities).unwrap())
         .env("HOME", shared.root.join("home"))
         .env("USERPROFILE", shared.root.join("home"))
         .env("BIT_GLOBALS_DIR", shared.root.join("globals"))

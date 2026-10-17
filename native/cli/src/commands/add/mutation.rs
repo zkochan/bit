@@ -34,6 +34,11 @@ impl ProjectedLinker {
         std::mem::take(&mut self.stdout)
     }
 
+    /// Match a consumer reload while retaining callback spool ownership.
+    pub(in crate::commands) fn forget_loaded(&mut self) {
+        self.retained.forget_loaded();
+    }
+
     /// Read native source and dependency metadata on the same hydrated provider session.
     pub(in crate::commands) fn capture(
         &mut self,

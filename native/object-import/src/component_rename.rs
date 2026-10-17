@@ -117,6 +117,10 @@ impl Plan {
     pub fn added_bitmap(&self) -> &Value {
         &self.controls.initial
     }
+    /// Exact published intermediate bitmap used by the post-removal target/list reload.
+    pub fn published_bitmap(&self) -> io::Result<Value> {
+        crate::parse_jsonc(&self.controls.expected)
+    }
     /// Persist a copied exported component after its first successful linking phase.
     pub fn publish_added(&mut self, file_id: &str) -> io::Result<()> {
         let reason = format!("adding {}", self.identity.target);

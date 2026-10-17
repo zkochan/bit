@@ -126,7 +126,9 @@ pub(super) fn capture(
     environment: &mut Option<Environments>,
     stdout: &mut String,
 ) -> io::Result<capture::Capture> {
-    capture_with(root, bitmap, identities, environment, stdout, true, false)
+    // Retained rows may later hydrate a class even without a custom onLoad slot.
+    // Preserve scoped/defaultScope identity metadata for that actual producer.
+    capture_with(root, bitmap, identities, environment, stdout, true, true)
 }
 pub(super) fn capture_cached(
     root: &Path,

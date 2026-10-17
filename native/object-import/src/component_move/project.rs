@@ -58,7 +58,7 @@ fn internal(
     let mut changes = vec![];
     for old in files
         .into_iter()
-        .filter(|file| file.starts_with(from))
+        .filter(|file| matches_from(file, from, cfg!(windows)))
     {
         let next = old.replacen(from, to, 1);
         let prefix = format!("{directory}/");
@@ -85,3 +85,12 @@ fn id(identity: &str, row: &Value) -> String {
         .filter(|value| !value.is_empty())
         .map_or_else(|| identity.into(), |version| format!("{identity}@{version}"))
 }
+
+// ComponentMap.updateDirLocation compares native path.join output with a Linux
+// normalized dirFrom. Its Windows nested-directory mismatch is observable.
+fn matches_from(file: &str, from: &str, windows: bool) -> bool {
+    if windows { file.replace('/', r"\").starts_with(from) } else { file.starts_with(from) }
+}
+
+#[cfg(test)]
+mod tests;

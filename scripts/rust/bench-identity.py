@@ -223,7 +223,7 @@ def main():
               'native_pairs': sum(row['native_ownership'] for row in verified),
               'warmup_note': 'Only explicitly recorded pinned builtin metadata is prewarmed; no first-use claim.',
               'clock_phase_control': {
-                  'workloads': ['rename-new', 'rename-exported'],
+                  'workloads': [name for name in PREPARE.WORKLOADS if name.startswith('rename-')],
                   'start_phase_ms': [50, 100],
                   'outside_command_timing': True,
                   'method': 'Wait before launch for the same wall-clock phase on both implementations; clocks and commands are unchanged.',

@@ -12,6 +12,12 @@ pub(super) struct Retained {
 }
 
 impl Retained {
+    pub(super) fn forget_loaded(&mut self) {
+        // Keep source spools alive and keep their aggregate byte budget, while
+        // matching Workspace._reloadConsumer's loaded-class invalidation.
+        self.rows.clear();
+        self.started = false;
+    }
     pub(super) fn start(&mut self) -> bool {
         let first = !self.started;
         self.started = true;
