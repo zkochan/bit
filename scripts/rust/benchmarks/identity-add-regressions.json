@@ -2,10 +2,10 @@
   "stage": "/var/tmp/add-file-remote-benchmark",
   "platform": "Linux-7.2.5-200.fc44.x86_64-x86_64-with-glibc2.43",
   "native_source": {
-    "sha256": "e408e29e698bb1043306ab89b1605808ecb09f7f05f953e3f270c41b791d115b",
-    "file_count": 1490
+    "sha256": "1a72fe6e460c9df3a3e491bc584320487ceafcf65ad958eea5ae7d83ffa3ed55",
+    "file_count": 1494
   },
-  "rust_sha256": "85e65e2434207c6835d4864462b1ea8c03c83e20ac8621473b39653e7f228f51",
+  "rust_sha256": "1d2df596049653380716e3765dd67583ab40318b41ac6c6b1ae87ab73fc96f08",
   "node_binary_sha256": "1bec56ef7cfa9a76f3e0b7c0a87f220eb73f23102b9c0b4c7529a3f7c3ce7c31",
   "node_cli_sha256": "71b324e03c4c9fb01cd3decb053ca4c3781c27ce06a8af53f7ad09d0ae42d033",
   "node_version": "v22.22.0",
@@ -75,7 +75,7 @@
   ],
   "ownership_note": "CI ignored and link-failure delegate before effects; no native speed claim for these rows.",
   "native_pairs": 80,
-  "delegated_pairs": 0,
+  "delegated_pairs": 10,
   "verified_pairs": 90,
   "verified": [
     {
@@ -626,23 +626,23 @@
         "speed_claim_eligible": true,
         "runs_ms": {
           "rust": [
-            273.101,
-            264.332,
-            273.819,
-            275.721,
-            263.524
+            292.302,
+            277.191,
+            280.661,
+            282.62,
+            280.24
           ],
           "node": [
-            437.553,
-            437.71,
-            432.444,
-            439.085,
-            444.778
+            457.798,
+            424.21,
+            433.394,
+            437.78,
+            451.263
           ]
         },
         "median_ms": {
-          "rust": 273.101,
-          "node": 437.71
+          "rust": 280.661,
+          "node": 437.78
         }
       },
       "ci": {
@@ -650,23 +650,23 @@
         "speed_claim_eligible": true,
         "runs_ms": {
           "rust": [
-            266.506,
-            268.311,
-            270.998,
-            279.219,
-            267.957
+            298.079,
+            306.099,
+            327.562,
+            280.17,
+            292.019
           ],
           "node": [
-            436.851,
-            429.228,
-            434.623,
-            443.421,
-            432.685
+            469.386,
+            446.251,
+            513.504,
+            485.556,
+            446.006
           ]
         },
         "median_ms": {
-          "rust": 268.311,
-          "node": 434.623
+          "rust": 298.079,
+          "node": 469.386
         }
       },
       "tty": {
@@ -674,23 +674,23 @@
         "speed_claim_eligible": true,
         "runs_ms": {
           "rust": [
-            288.049,
-            281.627,
-            289.463,
-            277.486,
-            284.722
+            297.278,
+            279.917,
+            288.192,
+            282.213,
+            284.916
           ],
           "node": [
-            451.391,
-            441.237,
-            451.762,
-            443.051,
-            457.183
+            469.662,
+            431.761,
+            452.296,
+            464.272,
+            449.396
           ]
         },
         "median_ms": {
-          "rust": 284.722,
-          "node": 451.391
+          "rust": 284.916,
+          "node": 452.296
         }
       }
     },
@@ -700,23 +700,23 @@
         "speed_claim_eligible": true,
         "runs_ms": {
           "rust": [
-            1228.108,
-            1207.052,
-            1203.004,
-            1198.759,
-            1223.699
+            1358.779,
+            1216.214,
+            1250.25,
+            1252.434,
+            1248.119
           ],
           "node": [
-            1641.151,
-            1676.076,
-            1573.202,
-            1569.514,
-            1608.938
+            2140.182,
+            1666.979,
+            1715.159,
+            1638.773,
+            1671.234
           ]
         },
         "median_ms": {
-          "rust": 1207.052,
-          "node": 1608.938
+          "rust": 1250.25,
+          "node": 1671.234
         }
       },
       "ci": {
@@ -724,23 +724,23 @@
         "speed_claim_eligible": true,
         "runs_ms": {
           "rust": [
-            1195.267,
-            1207.205,
-            1222.345,
-            1222.317,
-            1250.601
+            1260.65,
+            1254.413,
+            1222.844,
+            1237.205,
+            1235.837
           ],
           "node": [
-            1622.529,
-            1643.554,
-            1606.258,
-            1609.263,
-            1623.633
+            1663.475,
+            1607.766,
+            1637.832,
+            1718.643,
+            1674.267
           ]
         },
         "median_ms": {
-          "rust": 1222.317,
-          "node": 1622.529
+          "rust": 1237.205,
+          "node": 1663.475
         }
       },
       "tty": {
@@ -748,23 +748,23 @@
         "speed_claim_eligible": true,
         "runs_ms": {
           "rust": [
-            1217.667,
-            1216.145,
-            1249.996,
-            1260.572,
-            1216.381
+            1304.422,
+            1345.197,
+            1291.911,
+            1277.444,
+            1273.429
           ],
           "node": [
-            1627.943,
-            1555.872,
-            1575.529,
-            1653.537,
-            1639.282
+            1747.894,
+            1677.391,
+            1679.993,
+            1680.187,
+            1666.828
           ]
         },
         "median_ms": {
-          "rust": 1217.667,
-          "node": 1627.943
+          "rust": 1291.911,
+          "node": 1679.993
         }
       }
     },
@@ -774,23 +774,23 @@
         "speed_claim_eligible": true,
         "runs_ms": {
           "rust": [
-            291.825,
-            282.853,
-            282.483,
-            300.694,
-            284.609
+            290.97,
+            292.034,
+            289.831,
+            299.927,
+            300.167
           ],
           "node": [
-            356.073,
-            345.795,
-            352.541,
-            355.852,
-            343.552
+            368.975,
+            344.091,
+            381.286,
+            362.568,
+            369.346
           ]
         },
         "median_ms": {
-          "rust": 284.609,
-          "node": 352.541
+          "rust": 292.034,
+          "node": 368.975
         }
       },
       "ci": {
@@ -798,23 +798,23 @@
         "speed_claim_eligible": true,
         "runs_ms": {
           "rust": [
-            288.95,
-            295.605,
-            304.399,
-            298.541,
-            291.595
+            300.488,
+            292.722,
+            301.693,
+            292.195,
+            294.961
           ],
           "node": [
-            357.471,
-            353.282,
-            348.277,
-            341.277,
-            345.071
+            351.733,
+            355.843,
+            345.954,
+            359.831,
+            360.438
           ]
         },
         "median_ms": {
-          "rust": 295.605,
-          "node": 348.277
+          "rust": 294.961,
+          "node": 355.843
         }
       },
       "tty": {
@@ -822,23 +822,23 @@
         "speed_claim_eligible": true,
         "runs_ms": {
           "rust": [
-            305.166,
-            305.008,
-            313.622,
-            308.864,
-            310.265
+            308.781,
+            301.916,
+            318.428,
+            328.658,
+            304.297
           ],
           "node": [
-            351.985,
-            369.857,
-            373.978,
-            357.962,
-            359.639
+            362.057,
+            354.57,
+            367.376,
+            359.333,
+            362.003
           ]
         },
         "median_ms": {
-          "rust": 308.864,
-          "node": 359.639
+          "rust": 308.781,
+          "node": 362.003
         }
       }
     },
@@ -848,23 +848,23 @@
         "speed_claim_eligible": true,
         "runs_ms": {
           "rust": [
-            280.392,
-            282.328,
-            283.451,
-            278.086,
-            286.826
+            284.941,
+            292.947,
+            296.333,
+            296.586,
+            287.623
           ],
           "node": [
-            432.007,
-            435.343,
-            432.796,
-            428.9,
-            441.196
+            444.119,
+            433.361,
+            439.418,
+            451.763,
+            453.933
           ]
         },
         "median_ms": {
-          "rust": 282.328,
-          "node": 432.796
+          "rust": 292.947,
+          "node": 444.119
         }
       },
       "ci": {
@@ -872,23 +872,23 @@
         "speed_claim_eligible": true,
         "runs_ms": {
           "rust": [
-            284.412,
-            283.857,
-            277.927,
-            286.251,
-            277.692
+            288.394,
+            285.164,
+            294.008,
+            294.273,
+            293.355
           ],
           "node": [
-            443.354,
-            451.007,
-            442.374,
-            433.369,
-            424.363
+            446.498,
+            438.932,
+            437.888,
+            455.344,
+            426.152
           ]
         },
         "median_ms": {
-          "rust": 283.857,
-          "node": 442.374
+          "rust": 293.355,
+          "node": 438.932
         }
       },
       "tty": {
@@ -896,23 +896,23 @@
         "speed_claim_eligible": true,
         "runs_ms": {
           "rust": [
-            296.345,
-            291.481,
-            296.122,
-            302.4,
-            288.032
+            316.642,
+            304.545,
+            306.637,
+            304.72,
+            306.954
           ],
           "node": [
-            447.889,
-            461.988,
-            452.622,
-            453.247,
-            456.637
+            443.536,
+            472.46,
+            451.168,
+            495.095,
+            454.494
           ]
         },
         "median_ms": {
-          "rust": 296.122,
-          "node": 453.247
+          "rust": 306.637,
+          "node": 454.494
         }
       }
     },
@@ -922,23 +922,23 @@
         "speed_claim_eligible": true,
         "runs_ms": {
           "rust": [
-            2.382,
-            2.404,
-            2.504,
-            2.32,
-            2.707
+            2.933,
+            2.627,
+            2.228,
+            2.498,
+            2.322
           ],
           "node": [
-            217.983,
-            227.973,
-            229.075,
-            230.452,
-            222.218
+            244.966,
+            228.799,
+            223.864,
+            224.447,
+            232.017
           ]
         },
         "median_ms": {
-          "rust": 2.404,
-          "node": 227.973
+          "rust": 2.498,
+          "node": 228.799
         }
       },
       "ci": {
@@ -946,23 +946,23 @@
         "speed_claim_eligible": false,
         "runs_ms": {
           "rust": [
-            230.075,
-            234.116,
-            236.366,
-            219.324,
-            235.048
+            236.851,
+            232.826,
+            229.149,
+            228.815,
+            222.761
           ],
           "node": [
-            228.075,
-            219.951,
-            224.606,
-            231.422,
-            222.837
+            227.118,
+            229.381,
+            226.467,
+            230.821,
+            225.176
           ]
         },
         "median_ms": {
-          "rust": 234.116,
-          "node": 224.606
+          "rust": 229.149,
+          "node": 227.118
         }
       },
       "tty": {
@@ -970,23 +970,23 @@
         "speed_claim_eligible": true,
         "runs_ms": {
           "rust": [
-            22.472,
-            21.083,
-            21.068,
-            21.257,
-            21.567
+            21.011,
+            21.114,
+            21.162,
+            21.465,
+            21.19
           ],
           "node": [
-            254.48,
-            235.439,
-            238.248,
-            242.232,
-            234.126
+            238.92,
+            239.073,
+            246.235,
+            240.569,
+            245.266
           ]
         },
         "median_ms": {
-          "rust": 21.257,
-          "node": 238.248
+          "rust": 21.162,
+          "node": 240.569
         }
       }
     },
@@ -996,23 +996,23 @@
         "speed_claim_eligible": true,
         "runs_ms": {
           "rust": [
-            277.238,
-            286.736,
-            271.179,
-            269.608,
-            272.619
+            277.064,
+            274.534,
+            267.928,
+            271.589,
+            284.939
           ],
           "node": [
-            419.167,
-            416.547,
-            407.025,
-            424.631,
-            399.403
+            416.102,
+            426.682,
+            405.886,
+            404.173,
+            404.588
           ]
         },
         "median_ms": {
-          "rust": 272.619,
-          "node": 416.547
+          "rust": 274.534,
+          "node": 405.886
         }
       },
       "ci": {
@@ -1020,23 +1020,23 @@
         "speed_claim_eligible": false,
         "runs_ms": {
           "rust": [
-            422.094,
-            420.708,
-            397.097,
-            414.668,
-            400.161
+            413.166,
+            421.723,
+            418.424,
+            421.009,
+            434.233
           ],
           "node": [
-            399.562,
-            395.755,
-            409.609,
-            423.757,
-            420.925
+            422.491,
+            417.448,
+            427.452,
+            414.459,
+            421.762
           ]
         },
         "median_ms": {
-          "rust": 414.668,
-          "node": 409.609
+          "rust": 421.009,
+          "node": 421.762
         }
       },
       "tty": {
@@ -1044,42 +1044,42 @@
         "speed_claim_eligible": true,
         "runs_ms": {
           "rust": [
-            279.831,
-            285.833,
-            289.597,
-            282.15,
-            285.447
+            303.289,
+            301.802,
+            289.301,
+            295.874,
+            281.12
           ],
           "node": [
-            414.689,
-            423.149,
-            408.046,
-            421.742,
-            425.69
+            434.482,
+            421.204,
+            437.343,
+            429.411,
+            444.522
           ]
         },
         "median_ms": {
-          "rust": 285.447,
-          "node": 421.742
+          "rust": 295.874,
+          "node": 434.482
         }
       }
     }
   },
-  "measured_at_utc": "2026-10-17T22:09:49.804596+00:00",
+  "measured_at_utc": "2026-10-17T23:50:49.488467+00:00",
   "correctness_valid": true,
   "performance_valid": true,
   "performance_qualification": {
     "status": "independently closed complete workload runs; no row/sample discarded; retry only after host invalidation",
-    "driver_sha256": "7d6a98cf4723318a325db9b7ec1f77261c46f087a8edfbfd5b8516f68d529e2b",
+    "driver_sha256": "44b2980906443683aecb5711b50331d3dfbfc2b8505d2c893353b255bcb70e92",
     "samples_per_implementation_per_mode": 5,
     "attempts": [
       {
         "family": "identity",
         "workload": "move",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/identity-move-1.monitor.json",
-        "sha256": "97eb142be95e58a137807f624b2e59d65dfc23937c18d5772835217fa80df741",
-        "host_busy_peak_percent": 11.429,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-move-1.monitor.json",
+        "sha256": "f540336cfc8141b879cd07aeaa41fbc0b1a9d9e41da5c5709d95357269225ebf",
+        "host_busy_peak_percent": 75.561,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -1093,20 +1093,20 @@
           "--runs",
           "5",
           "--stage",
-          "/var/tmp/identity-file-remote-benchmark",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark",
           "--workload",
           "move",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/identity-move-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-move-1.result.json"
         ]
       },
       {
         "family": "identity",
         "workload": "deprecate-batch",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/identity-deprecate-batch-1.monitor.json",
-        "sha256": "3372ab3eb1c06ca07a3b0cb7200661c2411bec261785507ce55d3a889146e05c",
-        "host_busy_peak_percent": 11.042,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-deprecate-batch-1.monitor.json",
+        "sha256": "5d575c287ab9d52a501b08c4bb474b9f95d33d1884c5fe7b1c45e30c9a69e5c8",
+        "host_busy_peak_percent": 8.571,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -1120,20 +1120,47 @@
           "--runs",
           "5",
           "--stage",
-          "/var/tmp/identity-file-remote-benchmark",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark",
           "--workload",
           "deprecate-batch",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/identity-deprecate-batch-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-deprecate-batch-1.result.json"
         ]
       },
       {
         "family": "identity",
         "workload": "rename-new",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/identity-rename-new-1.monitor.json",
-        "sha256": "4ef59d0cc088fe38de63d969bea6e4761d97b2dd183512d8ee05b1344b64ba13",
-        "host_busy_peak_percent": 9.204,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-rename-new-1.monitor.json",
+        "sha256": "37a34534b9ab1a9403379d604dbe7a2cf0cf26d6e2c46d0c9fa896bcaf0ddbe2",
+        "host_busy_peak_percent": 86.683,
+        "performance_valid": false,
+        "reproduce_argv": [
+          "python3",
+          "scripts/rust/bench-identity.py",
+          "--rust",
+          "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
+          "--node-binary",
+          "/var/home/zoltan/.bvm/nodejs/22.22.0/bin/node",
+          "--node-cli",
+          "/var/home/zoltan/.bvm/versions/2.2.94/bit-2.2.94/node_modules/@teambit/bit/bin/bit",
+          "--runs",
+          "5",
+          "--stage",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark",
+          "--workload",
+          "rename-new",
+          "--output",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-rename-new-1.result.json"
+        ]
+      },
+      {
+        "family": "identity",
+        "workload": "rename-new",
+        "attempt": 2,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-rename-new-2.monitor.json",
+        "sha256": "7f1854084dca4f1171a96fc41bf5ef3b697b17e5cf20c1831d8b50e83ff677f7",
+        "host_busy_peak_percent": 27.144,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -1147,20 +1174,20 @@
           "--runs",
           "5",
           "--stage",
-          "/var/tmp/identity-file-remote-benchmark",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark",
           "--workload",
           "rename-new",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/identity-rename-new-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-rename-new-2.result.json"
         ]
       },
       {
         "family": "identity",
         "workload": "rename-exported",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/identity-rename-exported-1.monitor.json",
-        "sha256": "39285b55950f650877dbbcaf00d6fb57aca5143f5d0ffebada30a5b3073cd36a",
-        "host_busy_peak_percent": 8.38,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-rename-exported-1.monitor.json",
+        "sha256": "cc3a0e04eced98b0bbaea47111243cfdaa03e0b0a5103836bf77af1a2f929f2f",
+        "host_busy_peak_percent": 78.367,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -1174,20 +1201,74 @@
           "--runs",
           "5",
           "--stage",
-          "/var/tmp/identity-file-remote-benchmark",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark",
           "--workload",
           "rename-exported",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/identity-rename-exported-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-rename-exported-1.result.json"
+        ]
+      },
+      {
+        "family": "identity",
+        "workload": "rename-exported-refactor",
+        "attempt": 1,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-rename-exported-refactor-1.monitor.json",
+        "sha256": "abc073dffa963e1257f2ebea60d9cc7b95f9fefceb843a30862ee90d53aec1e3",
+        "host_busy_peak_percent": 93.583,
+        "performance_valid": false,
+        "reproduce_argv": [
+          "python3",
+          "scripts/rust/bench-identity.py",
+          "--rust",
+          "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
+          "--node-binary",
+          "/var/home/zoltan/.bvm/nodejs/22.22.0/bin/node",
+          "--node-cli",
+          "/var/home/zoltan/.bvm/versions/2.2.94/bit-2.2.94/node_modules/@teambit/bit/bin/bit",
+          "--runs",
+          "5",
+          "--stage",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark",
+          "--workload",
+          "rename-exported-refactor",
+          "--output",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-rename-exported-refactor-1.result.json"
+        ]
+      },
+      {
+        "family": "identity",
+        "workload": "rename-exported-refactor",
+        "attempt": 2,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/identity-rename-exported-refactor-2.monitor.json",
+        "sha256": "f33b8f637b5b3ba8de3c14ab3ba9bc108753d7aa63a9206d8debbd74f17de997",
+        "host_busy_peak_percent": 56.087,
+        "performance_valid": true,
+        "reproduce_argv": [
+          "python3",
+          "scripts/rust/bench-identity.py",
+          "--rust",
+          "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
+          "--node-binary",
+          "/var/home/zoltan/.bvm/nodejs/22.22.0/bin/node",
+          "--node-cli",
+          "/var/home/zoltan/.bvm/versions/2.2.94/bit-2.2.94/node_modules/@teambit/bit/bin/bit",
+          "--runs",
+          "5",
+          "--stage",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark",
+          "--workload",
+          "rename-exported-refactor",
+          "--output",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/identity-rename-exported-refactor-2.result.json"
         ]
       },
       {
         "family": "add",
         "workload": "single",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-single-1.monitor.json",
-        "sha256": "dabba8b8caa896d9afb7bee0429779eb4b1558c2bea2e68e1a07dace37187206",
-        "host_busy_peak_percent": 11.063,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-single-1.monitor.json",
+        "sha256": "5137bb3721472326ea13c851e39b81e288d3af1527659f86f319665e94f211f0",
+        "host_busy_peak_percent": 65.217,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -1205,16 +1286,16 @@
           "--workload",
           "single",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-single-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-single-1.result.json"
         ]
       },
       {
         "family": "add",
         "workload": "batch",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-batch-1.monitor.json",
-        "sha256": "b67a766d85714ca700e3896c1bcfeea5af2638cea66b3c2e06530348b4cc2924",
-        "host_busy_peak_percent": 10.193,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-batch-1.monitor.json",
+        "sha256": "2ede28bf25ce26cfd8950fe76c9cc22533dd8f4f09d3ec8af6eb3799713c2d27",
+        "host_busy_peak_percent": 70.044,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -1232,16 +1313,16 @@
           "--workload",
           "batch",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-batch-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-batch-1.result.json"
         ]
       },
       {
         "family": "add",
         "workload": "root",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-root-1.monitor.json",
-        "sha256": "dab217e15054812f39a18eac2aa9ee9c2db7b7db9383c930a55b1d8df0661a4f",
-        "host_busy_peak_percent": 6.153,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-root-1.monitor.json",
+        "sha256": "215ff92a1553bcfb5b16b34a8ce9aca6d707176ec6da0981b3726f2150d5b005",
+        "host_busy_peak_percent": 24.365,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -1259,16 +1340,16 @@
           "--workload",
           "root",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-root-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-root-1.result.json"
         ]
       },
       {
         "family": "add",
         "workload": "readd",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-readd-1.monitor.json",
-        "sha256": "5e9216c7e74b484dc86d6ff7540d47f6adbe828965c74de885dd7c72a180b4f9",
-        "host_busy_peak_percent": 8.972,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-readd-1.monitor.json",
+        "sha256": "56a1389cc4fac9dd5316e29b76b809a1e2578eed3b0c3259c9887074f8e1e468",
+        "host_busy_peak_percent": 34.68,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -1286,16 +1367,16 @@
           "--workload",
           "readd",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-readd-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-readd-1.result.json"
         ]
       },
       {
         "family": "add",
         "workload": "ignored",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-ignored-1.monitor.json",
-        "sha256": "794d8174153af571894081721030bfa46ddd281f4778957575a2813c4528d0d2",
-        "host_busy_peak_percent": 12.36,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-ignored-1.monitor.json",
+        "sha256": "b24edffe066eed2f768c7531ae7ac0015d15573a649da7914ec9192cea609ed1",
+        "host_busy_peak_percent": 12.097,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -1313,43 +1394,16 @@
           "--workload",
           "ignored",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-ignored-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-ignored-1.result.json"
         ]
       },
       {
         "family": "add",
         "workload": "link-failure",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-link-failure-1.monitor.json",
-        "sha256": "fbb99da926a9966a9ef62f0fa6796d511eb19ed4e4e0bfc4ef232d581fba8ce0",
-        "host_busy_peak_percent": 85.268,
-        "performance_valid": false,
-        "reproduce_argv": [
-          "python3",
-          "scripts/rust/bench-add.py",
-          "--rust",
-          "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
-          "--node-binary",
-          "/var/home/zoltan/.bvm/nodejs/22.22.0/bin/node",
-          "--node-cli",
-          "/var/home/zoltan/.bvm/versions/2.2.94/bit-2.2.94/node_modules/@teambit/bit/bin/bit",
-          "--runs",
-          "5",
-          "--stage",
-          "/var/tmp/add-file-remote-benchmark",
-          "--workload",
-          "link-failure",
-          "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-link-failure-1.result.json"
-        ]
-      },
-      {
-        "family": "add",
-        "workload": "link-failure",
-        "attempt": 2,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-link-failure-2.monitor.json",
-        "sha256": "9bfea71798f3b75ba2ca7f0556ed30b59ce483594dfa886d43e1b1da3cb82eee",
-        "host_busy_peak_percent": 11.871,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-link-failure-1.monitor.json",
+        "sha256": "d4b85c920c4650fc08ac09dc5d577468d9a41cb6432632f1740a1db945940722",
+        "host_busy_peak_percent": 13.701,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -1367,42 +1421,16 @@
           "--workload",
           "link-failure",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-link-failure-2.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-link-failure-1.result.json"
         ]
       },
       {
         "family": "regressions",
         "workload": "status",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/regressions-status-1.monitor.json",
-        "sha256": "441373049b80bf4741080a66e3b02942a0852bb62d897a1de0b648497c1aaa1c",
-        "host_busy_peak_percent": 91.838,
-        "performance_valid": false,
-        "reproduce_argv": [
-          "python3",
-          "scripts/rust/bench-transfer.py",
-          "--source",
-          "/var/tmp/status-diff-bench-fixture-2586579",
-          "--node",
-          "/var/tmp/status-diff-node-oracle",
-          "--rust",
-          "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
-          "--remote",
-          "/var/tmp/transfer-final-fixtures/transfer-remote",
-          "--runs",
-          "5",
-          "--",
-          "status",
-          "--json"
-        ]
-      },
-      {
-        "family": "regressions",
-        "workload": "status",
-        "attempt": 2,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/regressions-status-2.monitor.json",
-        "sha256": "764a7f620eac91843c3883842bf7ca459ff25fefff8e512eb59e410bb3905f28",
-        "host_busy_peak_percent": 75.499,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/regressions-status-1.monitor.json",
+        "sha256": "c9cda2bb30d2197a2b8a8ae651a705d50ab139b4b50b1af74e2c4972864ed458",
+        "host_busy_peak_percent": 75.623,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -1426,38 +1454,9 @@
         "family": "regressions",
         "workload": "checkout",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/regressions-checkout-1.monitor.json",
-        "sha256": "ab7955437e96b78531c66c580541f41bea2f79c60cc5d3735cf21ff488d71ffb",
-        "host_busy_peak_percent": 82.051,
-        "performance_valid": false,
-        "reproduce_argv": [
-          "python3",
-          "scripts/rust/bench-transfer.py",
-          "--source",
-          "/var/tmp/checkout-qualified-benchmark-fixtures/ordinary",
-          "--node",
-          "/var/tmp/status-diff-node-oracle",
-          "--rust",
-          "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
-          "--remote",
-          "/var/tmp/transfer-final-fixtures/transfer-remote",
-          "--runs",
-          "5",
-          "--",
-          "checkout",
-          "0.0.1",
-          "comp2",
-          "--force-theirs",
-          "-x"
-        ]
-      },
-      {
-        "family": "regressions",
-        "workload": "checkout",
-        "attempt": 2,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/regressions-checkout-2.monitor.json",
-        "sha256": "bfa132aa8326ba00ffaf3180f2c8ff5f828af9bcb11d0d8113a120bd7c0298b3",
-        "host_busy_peak_percent": 53.578,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/regressions-checkout-1.monitor.json",
+        "sha256": "5f7311efd5871014a1a4cd1a8073ad26ec9db3a6a19d2981d9bfc78e6269f5ce",
+        "host_busy_peak_percent": 52.97,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -1484,9 +1483,34 @@
         "family": "regressions",
         "workload": "export",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/regressions-export-1.monitor.json",
-        "sha256": "ef39158c6aa857a356f06348e774ba363ff28ec08bd1b6003bd116abe055c834",
-        "host_busy_peak_percent": 11.008,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-4/regressions-export-1.monitor.json",
+        "sha256": "59e80bcad781e2e0d18e714990df2ab24f45883fae6f1131c85d269bc4046dae",
+        "host_busy_peak_percent": 82.866,
+        "performance_valid": false,
+        "reproduce_argv": [
+          "python3",
+          "scripts/rust/bench-transfer.py",
+          "--source",
+          "/var/tmp/transfer-final-fixtures/export-main",
+          "--node",
+          "/var/tmp/status-diff-node-oracle",
+          "--rust",
+          "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
+          "--remote",
+          "/var/tmp/transfer-final-fixtures/transfer-remote",
+          "--runs",
+          "5",
+          "--",
+          "export"
+        ]
+      },
+      {
+        "family": "regressions",
+        "workload": "export",
+        "attempt": 2,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-4/regressions-export-2.monitor.json",
+        "sha256": "4f28a0532102169d0392c1ba16ae3afb06307aa6af164aebecda09b374d440c2",
+        "host_busy_peak_percent": 77.889,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -1510,9 +1534,9 @@
   },
   "host_monitor": {
     "single": {
-      "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-single-1.monitor.json",
-      "sha256": "dabba8b8caa896d9afb7bee0429779eb4b1558c2bea2e68e1a07dace37187206",
-      "host_busy_peak_percent": 11.063,
+      "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-single-1.monitor.json",
+      "sha256": "5137bb3721472326ea13c851e39b81e288d3af1527659f86f319665e94f211f0",
+      "host_busy_peak_percent": 65.217,
       "performance_valid": true,
       "reproduce_argv": [
         "python3",
@@ -1530,13 +1554,13 @@
         "--workload",
         "single",
         "--output",
-        "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-single-1.result.json"
+        "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-single-1.result.json"
       ]
     },
     "batch": {
-      "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-batch-1.monitor.json",
-      "sha256": "b67a766d85714ca700e3896c1bcfeea5af2638cea66b3c2e06530348b4cc2924",
-      "host_busy_peak_percent": 10.193,
+      "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-batch-1.monitor.json",
+      "sha256": "2ede28bf25ce26cfd8950fe76c9cc22533dd8f4f09d3ec8af6eb3799713c2d27",
+      "host_busy_peak_percent": 70.044,
       "performance_valid": true,
       "reproduce_argv": [
         "python3",
@@ -1554,13 +1578,13 @@
         "--workload",
         "batch",
         "--output",
-        "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-batch-1.result.json"
+        "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-batch-1.result.json"
       ]
     },
     "root": {
-      "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-root-1.monitor.json",
-      "sha256": "dab217e15054812f39a18eac2aa9ee9c2db7b7db9383c930a55b1d8df0661a4f",
-      "host_busy_peak_percent": 6.153,
+      "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-root-1.monitor.json",
+      "sha256": "215ff92a1553bcfb5b16b34a8ce9aca6d707176ec6da0981b3726f2150d5b005",
+      "host_busy_peak_percent": 24.365,
       "performance_valid": true,
       "reproduce_argv": [
         "python3",
@@ -1578,13 +1602,13 @@
         "--workload",
         "root",
         "--output",
-        "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-root-1.result.json"
+        "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-root-1.result.json"
       ]
     },
     "readd": {
-      "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-readd-1.monitor.json",
-      "sha256": "5e9216c7e74b484dc86d6ff7540d47f6adbe828965c74de885dd7c72a180b4f9",
-      "host_busy_peak_percent": 8.972,
+      "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-readd-1.monitor.json",
+      "sha256": "56a1389cc4fac9dd5316e29b76b809a1e2578eed3b0c3259c9887074f8e1e468",
+      "host_busy_peak_percent": 34.68,
       "performance_valid": true,
       "reproduce_argv": [
         "python3",
@@ -1602,13 +1626,13 @@
         "--workload",
         "readd",
         "--output",
-        "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-readd-1.result.json"
+        "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-readd-1.result.json"
       ]
     },
     "ignored": {
-      "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-ignored-1.monitor.json",
-      "sha256": "794d8174153af571894081721030bfa46ddd281f4778957575a2813c4528d0d2",
-      "host_busy_peak_percent": 12.36,
+      "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-ignored-1.monitor.json",
+      "sha256": "b24edffe066eed2f768c7531ae7ac0015d15573a649da7914ec9192cea609ed1",
+      "host_busy_peak_percent": 12.097,
       "performance_valid": true,
       "reproduce_argv": [
         "python3",
@@ -1626,13 +1650,13 @@
         "--workload",
         "ignored",
         "--output",
-        "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-ignored-1.result.json"
+        "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-ignored-1.result.json"
       ]
     },
     "link-failure": {
-      "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-link-failure-2.monitor.json",
-      "sha256": "9bfea71798f3b75ba2ca7f0556ed30b59ce483594dfa886d43e1b1da3cb82eee",
-      "host_busy_peak_percent": 11.871,
+      "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-link-failure-1.monitor.json",
+      "sha256": "d4b85c920c4650fc08ac09dc5d577468d9a41cb6432632f1740a1db945940722",
+      "host_busy_peak_percent": 13.701,
       "performance_valid": true,
       "reproduce_argv": [
         "python3",
@@ -1650,7 +1674,7 @@
         "--workload",
         "link-failure",
         "--output",
-        "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-link-failure-2.result.json"
+        "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-link-failure-1.result.json"
       ]
     }
   },
@@ -1659,10 +1683,10 @@
       "stage": "/var/tmp/add-file-remote-benchmark",
       "platform": "Linux-7.2.5-200.fc44.x86_64-x86_64-with-glibc2.43",
       "native_source": {
-        "sha256": "e408e29e698bb1043306ab89b1605808ecb09f7f05f953e3f270c41b791d115b",
-        "file_count": 1490
+        "sha256": "1a72fe6e460c9df3a3e491bc584320487ceafcf65ad958eea5ae7d83ffa3ed55",
+        "file_count": 1494
       },
-      "rust_sha256": "85e65e2434207c6835d4864462b1ea8c03c83e20ac8621473b39653e7f228f51",
+      "rust_sha256": "1d2df596049653380716e3765dd67583ab40318b41ac6c6b1ae87ab73fc96f08",
       "node_binary_sha256": "1bec56ef7cfa9a76f3e0b7c0a87f220eb73f23102b9c0b4c7529a3f7c3ce7c31",
       "node_cli_sha256": "71b324e03c4c9fb01cd3decb053ca4c3781c27ce06a8af53f7ad09d0ae42d033",
       "node_version": "v22.22.0",
@@ -1833,23 +1857,23 @@
             "speed_claim_eligible": true,
             "runs_ms": {
               "rust": [
-                273.101,
-                264.332,
-                273.819,
-                275.721,
-                263.524
+                292.302,
+                277.191,
+                280.661,
+                282.62,
+                280.24
               ],
               "node": [
-                437.553,
-                437.71,
-                432.444,
-                439.085,
-                444.778
+                457.798,
+                424.21,
+                433.394,
+                437.78,
+                451.263
               ]
             },
             "median_ms": {
-              "rust": 273.101,
-              "node": 437.71
+              "rust": 280.661,
+              "node": 437.78
             }
           },
           "ci": {
@@ -1857,23 +1881,23 @@
             "speed_claim_eligible": true,
             "runs_ms": {
               "rust": [
-                266.506,
-                268.311,
-                270.998,
-                279.219,
-                267.957
+                298.079,
+                306.099,
+                327.562,
+                280.17,
+                292.019
               ],
               "node": [
-                436.851,
-                429.228,
-                434.623,
-                443.421,
-                432.685
+                469.386,
+                446.251,
+                513.504,
+                485.556,
+                446.006
               ]
             },
             "median_ms": {
-              "rust": 268.311,
-              "node": 434.623
+              "rust": 298.079,
+              "node": 469.386
             }
           },
           "tty": {
@@ -1881,23 +1905,23 @@
             "speed_claim_eligible": true,
             "runs_ms": {
               "rust": [
-                288.049,
-                281.627,
-                289.463,
-                277.486,
-                284.722
+                297.278,
+                279.917,
+                288.192,
+                282.213,
+                284.916
               ],
               "node": [
-                451.391,
-                441.237,
-                451.762,
-                443.051,
-                457.183
+                469.662,
+                431.761,
+                452.296,
+                464.272,
+                449.396
               ]
             },
             "median_ms": {
-              "rust": 284.722,
-              "node": 451.391
+              "rust": 284.916,
+              "node": 452.296
             }
           }
         }
@@ -1907,10 +1931,10 @@
       "stage": "/var/tmp/add-file-remote-benchmark",
       "platform": "Linux-7.2.5-200.fc44.x86_64-x86_64-with-glibc2.43",
       "native_source": {
-        "sha256": "e408e29e698bb1043306ab89b1605808ecb09f7f05f953e3f270c41b791d115b",
-        "file_count": 1490
+        "sha256": "1a72fe6e460c9df3a3e491bc584320487ceafcf65ad958eea5ae7d83ffa3ed55",
+        "file_count": 1494
       },
-      "rust_sha256": "85e65e2434207c6835d4864462b1ea8c03c83e20ac8621473b39653e7f228f51",
+      "rust_sha256": "1d2df596049653380716e3765dd67583ab40318b41ac6c6b1ae87ab73fc96f08",
       "node_binary_sha256": "1bec56ef7cfa9a76f3e0b7c0a87f220eb73f23102b9c0b4c7529a3f7c3ce7c31",
       "node_cli_sha256": "71b324e03c4c9fb01cd3decb053ca4c3781c27ce06a8af53f7ad09d0ae42d033",
       "node_version": "v22.22.0",
@@ -2081,23 +2105,23 @@
             "speed_claim_eligible": true,
             "runs_ms": {
               "rust": [
-                1228.108,
-                1207.052,
-                1203.004,
-                1198.759,
-                1223.699
+                1358.779,
+                1216.214,
+                1250.25,
+                1252.434,
+                1248.119
               ],
               "node": [
-                1641.151,
-                1676.076,
-                1573.202,
-                1569.514,
-                1608.938
+                2140.182,
+                1666.979,
+                1715.159,
+                1638.773,
+                1671.234
               ]
             },
             "median_ms": {
-              "rust": 1207.052,
-              "node": 1608.938
+              "rust": 1250.25,
+              "node": 1671.234
             }
           },
           "ci": {
@@ -2105,23 +2129,23 @@
             "speed_claim_eligible": true,
             "runs_ms": {
               "rust": [
-                1195.267,
-                1207.205,
-                1222.345,
-                1222.317,
-                1250.601
+                1260.65,
+                1254.413,
+                1222.844,
+                1237.205,
+                1235.837
               ],
               "node": [
-                1622.529,
-                1643.554,
-                1606.258,
-                1609.263,
-                1623.633
+                1663.475,
+                1607.766,
+                1637.832,
+                1718.643,
+                1674.267
               ]
             },
             "median_ms": {
-              "rust": 1222.317,
-              "node": 1622.529
+              "rust": 1237.205,
+              "node": 1663.475
             }
           },
           "tty": {
@@ -2129,23 +2153,23 @@
             "speed_claim_eligible": true,
             "runs_ms": {
               "rust": [
-                1217.667,
-                1216.145,
-                1249.996,
-                1260.572,
-                1216.381
+                1304.422,
+                1345.197,
+                1291.911,
+                1277.444,
+                1273.429
               ],
               "node": [
-                1627.943,
-                1555.872,
-                1575.529,
-                1653.537,
-                1639.282
+                1747.894,
+                1677.391,
+                1679.993,
+                1680.187,
+                1666.828
               ]
             },
             "median_ms": {
-              "rust": 1217.667,
-              "node": 1627.943
+              "rust": 1291.911,
+              "node": 1679.993
             }
           }
         }
@@ -2155,10 +2179,10 @@
       "stage": "/var/tmp/add-file-remote-benchmark",
       "platform": "Linux-7.2.5-200.fc44.x86_64-x86_64-with-glibc2.43",
       "native_source": {
-        "sha256": "e408e29e698bb1043306ab89b1605808ecb09f7f05f953e3f270c41b791d115b",
-        "file_count": 1490
+        "sha256": "1a72fe6e460c9df3a3e491bc584320487ceafcf65ad958eea5ae7d83ffa3ed55",
+        "file_count": 1494
       },
-      "rust_sha256": "85e65e2434207c6835d4864462b1ea8c03c83e20ac8621473b39653e7f228f51",
+      "rust_sha256": "1d2df596049653380716e3765dd67583ab40318b41ac6c6b1ae87ab73fc96f08",
       "node_binary_sha256": "1bec56ef7cfa9a76f3e0b7c0a87f220eb73f23102b9c0b4c7529a3f7c3ce7c31",
       "node_cli_sha256": "71b324e03c4c9fb01cd3decb053ca4c3781c27ce06a8af53f7ad09d0ae42d033",
       "node_version": "v22.22.0",
@@ -2329,23 +2353,23 @@
             "speed_claim_eligible": true,
             "runs_ms": {
               "rust": [
-                291.825,
-                282.853,
-                282.483,
-                300.694,
-                284.609
+                290.97,
+                292.034,
+                289.831,
+                299.927,
+                300.167
               ],
               "node": [
-                356.073,
-                345.795,
-                352.541,
-                355.852,
-                343.552
+                368.975,
+                344.091,
+                381.286,
+                362.568,
+                369.346
               ]
             },
             "median_ms": {
-              "rust": 284.609,
-              "node": 352.541
+              "rust": 292.034,
+              "node": 368.975
             }
           },
           "ci": {
@@ -2353,23 +2377,23 @@
             "speed_claim_eligible": true,
             "runs_ms": {
               "rust": [
-                288.95,
-                295.605,
-                304.399,
-                298.541,
-                291.595
+                300.488,
+                292.722,
+                301.693,
+                292.195,
+                294.961
               ],
               "node": [
-                357.471,
-                353.282,
-                348.277,
-                341.277,
-                345.071
+                351.733,
+                355.843,
+                345.954,
+                359.831,
+                360.438
               ]
             },
             "median_ms": {
-              "rust": 295.605,
-              "node": 348.277
+              "rust": 294.961,
+              "node": 355.843
             }
           },
           "tty": {
@@ -2377,23 +2401,23 @@
             "speed_claim_eligible": true,
             "runs_ms": {
               "rust": [
-                305.166,
-                305.008,
-                313.622,
-                308.864,
-                310.265
+                308.781,
+                301.916,
+                318.428,
+                328.658,
+                304.297
               ],
               "node": [
-                351.985,
-                369.857,
-                373.978,
-                357.962,
-                359.639
+                362.057,
+                354.57,
+                367.376,
+                359.333,
+                362.003
               ]
             },
             "median_ms": {
-              "rust": 308.864,
-              "node": 359.639
+              "rust": 308.781,
+              "node": 362.003
             }
           }
         }
@@ -2403,10 +2427,10 @@
       "stage": "/var/tmp/add-file-remote-benchmark",
       "platform": "Linux-7.2.5-200.fc44.x86_64-x86_64-with-glibc2.43",
       "native_source": {
-        "sha256": "e408e29e698bb1043306ab89b1605808ecb09f7f05f953e3f270c41b791d115b",
-        "file_count": 1490
+        "sha256": "1a72fe6e460c9df3a3e491bc584320487ceafcf65ad958eea5ae7d83ffa3ed55",
+        "file_count": 1494
       },
-      "rust_sha256": "85e65e2434207c6835d4864462b1ea8c03c83e20ac8621473b39653e7f228f51",
+      "rust_sha256": "1d2df596049653380716e3765dd67583ab40318b41ac6c6b1ae87ab73fc96f08",
       "node_binary_sha256": "1bec56ef7cfa9a76f3e0b7c0a87f220eb73f23102b9c0b4c7529a3f7c3ce7c31",
       "node_cli_sha256": "71b324e03c4c9fb01cd3decb053ca4c3781c27ce06a8af53f7ad09d0ae42d033",
       "node_version": "v22.22.0",
@@ -2577,23 +2601,23 @@
             "speed_claim_eligible": true,
             "runs_ms": {
               "rust": [
-                280.392,
-                282.328,
-                283.451,
-                278.086,
-                286.826
+                284.941,
+                292.947,
+                296.333,
+                296.586,
+                287.623
               ],
               "node": [
-                432.007,
-                435.343,
-                432.796,
-                428.9,
-                441.196
+                444.119,
+                433.361,
+                439.418,
+                451.763,
+                453.933
               ]
             },
             "median_ms": {
-              "rust": 282.328,
-              "node": 432.796
+              "rust": 292.947,
+              "node": 444.119
             }
           },
           "ci": {
@@ -2601,23 +2625,23 @@
             "speed_claim_eligible": true,
             "runs_ms": {
               "rust": [
-                284.412,
-                283.857,
-                277.927,
-                286.251,
-                277.692
+                288.394,
+                285.164,
+                294.008,
+                294.273,
+                293.355
               ],
               "node": [
-                443.354,
-                451.007,
-                442.374,
-                433.369,
-                424.363
+                446.498,
+                438.932,
+                437.888,
+                455.344,
+                426.152
               ]
             },
             "median_ms": {
-              "rust": 283.857,
-              "node": 442.374
+              "rust": 293.355,
+              "node": 438.932
             }
           },
           "tty": {
@@ -2625,23 +2649,23 @@
             "speed_claim_eligible": true,
             "runs_ms": {
               "rust": [
-                296.345,
-                291.481,
-                296.122,
-                302.4,
-                288.032
+                316.642,
+                304.545,
+                306.637,
+                304.72,
+                306.954
               ],
               "node": [
-                447.889,
-                461.988,
-                452.622,
-                453.247,
-                456.637
+                443.536,
+                472.46,
+                451.168,
+                495.095,
+                454.494
               ]
             },
             "median_ms": {
-              "rust": 296.122,
-              "node": 453.247
+              "rust": 306.637,
+              "node": 454.494
             }
           }
         }
@@ -2651,10 +2675,10 @@
       "stage": "/var/tmp/add-file-remote-benchmark",
       "platform": "Linux-7.2.5-200.fc44.x86_64-x86_64-with-glibc2.43",
       "native_source": {
-        "sha256": "e408e29e698bb1043306ab89b1605808ecb09f7f05f953e3f270c41b791d115b",
-        "file_count": 1490
+        "sha256": "1a72fe6e460c9df3a3e491bc584320487ceafcf65ad958eea5ae7d83ffa3ed55",
+        "file_count": 1494
       },
-      "rust_sha256": "85e65e2434207c6835d4864462b1ea8c03c83e20ac8621473b39653e7f228f51",
+      "rust_sha256": "1d2df596049653380716e3765dd67583ab40318b41ac6c6b1ae87ab73fc96f08",
       "node_binary_sha256": "1bec56ef7cfa9a76f3e0b7c0a87f220eb73f23102b9c0b4c7529a3f7c3ce7c31",
       "node_cli_sha256": "71b324e03c4c9fb01cd3decb053ca4c3781c27ce06a8af53f7ad09d0ae42d033",
       "node_version": "v22.22.0",
@@ -2825,23 +2849,23 @@
             "speed_claim_eligible": true,
             "runs_ms": {
               "rust": [
-                2.382,
-                2.404,
-                2.504,
-                2.32,
-                2.707
+                2.933,
+                2.627,
+                2.228,
+                2.498,
+                2.322
               ],
               "node": [
-                217.983,
-                227.973,
-                229.075,
-                230.452,
-                222.218
+                244.966,
+                228.799,
+                223.864,
+                224.447,
+                232.017
               ]
             },
             "median_ms": {
-              "rust": 2.404,
-              "node": 227.973
+              "rust": 2.498,
+              "node": 228.799
             }
           },
           "ci": {
@@ -2849,23 +2873,23 @@
             "speed_claim_eligible": false,
             "runs_ms": {
               "rust": [
-                230.075,
-                234.116,
-                236.366,
-                219.324,
-                235.048
+                236.851,
+                232.826,
+                229.149,
+                228.815,
+                222.761
               ],
               "node": [
-                228.075,
-                219.951,
-                224.606,
-                231.422,
-                222.837
+                227.118,
+                229.381,
+                226.467,
+                230.821,
+                225.176
               ]
             },
             "median_ms": {
-              "rust": 234.116,
-              "node": 224.606
+              "rust": 229.149,
+              "node": 227.118
             }
           },
           "tty": {
@@ -2873,23 +2897,23 @@
             "speed_claim_eligible": true,
             "runs_ms": {
               "rust": [
-                22.472,
-                21.083,
-                21.068,
-                21.257,
-                21.567
+                21.011,
+                21.114,
+                21.162,
+                21.465,
+                21.19
               ],
               "node": [
-                254.48,
-                235.439,
-                238.248,
-                242.232,
-                234.126
+                238.92,
+                239.073,
+                246.235,
+                240.569,
+                245.266
               ]
             },
             "median_ms": {
-              "rust": 21.257,
-              "node": 238.248
+              "rust": 21.162,
+              "node": 240.569
             }
           }
         }
@@ -2899,10 +2923,10 @@
       "stage": "/var/tmp/add-file-remote-benchmark",
       "platform": "Linux-7.2.5-200.fc44.x86_64-x86_64-with-glibc2.43",
       "native_source": {
-        "sha256": "e408e29e698bb1043306ab89b1605808ecb09f7f05f953e3f270c41b791d115b",
-        "file_count": 1490
+        "sha256": "1a72fe6e460c9df3a3e491bc584320487ceafcf65ad958eea5ae7d83ffa3ed55",
+        "file_count": 1494
       },
-      "rust_sha256": "85e65e2434207c6835d4864462b1ea8c03c83e20ac8621473b39653e7f228f51",
+      "rust_sha256": "1d2df596049653380716e3765dd67583ab40318b41ac6c6b1ae87ab73fc96f08",
       "node_binary_sha256": "1bec56ef7cfa9a76f3e0b7c0a87f220eb73f23102b9c0b4c7529a3f7c3ce7c31",
       "node_cli_sha256": "71b324e03c4c9fb01cd3decb053ca4c3781c27ce06a8af53f7ad09d0ae42d033",
       "node_version": "v22.22.0",
@@ -3073,23 +3097,23 @@
             "speed_claim_eligible": true,
             "runs_ms": {
               "rust": [
-                277.238,
-                286.736,
-                271.179,
-                269.608,
-                272.619
+                277.064,
+                274.534,
+                267.928,
+                271.589,
+                284.939
               ],
               "node": [
-                419.167,
-                416.547,
-                407.025,
-                424.631,
-                399.403
+                416.102,
+                426.682,
+                405.886,
+                404.173,
+                404.588
               ]
             },
             "median_ms": {
-              "rust": 272.619,
-              "node": 416.547
+              "rust": 274.534,
+              "node": 405.886
             }
           },
           "ci": {
@@ -3097,23 +3121,23 @@
             "speed_claim_eligible": false,
             "runs_ms": {
               "rust": [
-                422.094,
-                420.708,
-                397.097,
-                414.668,
-                400.161
+                413.166,
+                421.723,
+                418.424,
+                421.009,
+                434.233
               ],
               "node": [
-                399.562,
-                395.755,
-                409.609,
-                423.757,
-                420.925
+                422.491,
+                417.448,
+                427.452,
+                414.459,
+                421.762
               ]
             },
             "median_ms": {
-              "rust": 414.668,
-              "node": 409.609
+              "rust": 421.009,
+              "node": 421.762
             }
           },
           "tty": {
@@ -3121,23 +3145,23 @@
             "speed_claim_eligible": true,
             "runs_ms": {
               "rust": [
-                279.831,
-                285.833,
-                289.597,
-                282.15,
-                285.447
+                303.289,
+                301.802,
+                289.301,
+                295.874,
+                281.12
               ],
               "node": [
-                414.689,
-                423.149,
-                408.046,
-                421.742,
-                425.69
+                434.482,
+                421.204,
+                437.343,
+                429.411,
+                444.522
               ]
             },
             "median_ms": {
-              "rust": 285.447,
-              "node": 421.742
+              "rust": 295.874,
+              "node": 434.482
             }
           }
         }
@@ -3145,7 +3169,7 @@
     }
   },
   "qualification_evidence": {
-    "path": "scripts/rust/benchmarks/identity-qualification.json",
-    "sha256": "560b0f202bf6c204a2fcbba70358b75c7aeefaec4736dda4d34d9c97c94563c2"
+    "path": "scripts/rust/benchmarks/identity-ci-fix-qualification.json",
+    "sha256": "90e57d273488daca4802c0c8242a08db9fd226a5db2e72e2baf898428ab284dd"
   }
 }

@@ -197,25 +197,26 @@ Unknown grammar and unsupported inputs delegate only before provider startup or 
 
 The Linux release measurements in [`identity.json`](../scripts/rust/benchmarks/identity.json)
 compare complete commands against Node 22.22.0 / Bit 2.2.94. Five alternating pairs
-per non-TTY, CI and TTY mode passed all 60 output, filesystem, cache, history and
+per non-TTY, CI and TTY mode passed all 75 output, filesystem, cache, history and
 file-remote comparisons. Non-TTY medians in milliseconds were:
 
 | Workload | Node | Rust |
 | --- | ---: | ---: |
-| Move 11 source files | 429.862 | 286.280 |
-| Deprecate 100 tagged components | 295.339 | 261.537 |
-| Rename a new component with 11 files | 545.324 | 507.730 |
-| Rename an exported component with deprecation | 586.782 | 534.904 |
+| Move 11 source files | 447.463 | 301.373 |
+| Deprecate 100 tagged components | 299.932 | 262.639 |
+| Rename a new component with 11 files | 549.241 | 521.201 |
+| Rename an exported component with deprecation | 597.438 | 562.636 |
+| Rename an exported component with dependent refactoring | 614.769 | 543.997 |
 
-All twelve native medians were faster. Another 90 add pairs in
+All fifteen native identity medians were faster. Another 90 add pairs in
 [`identity-add-regressions.json`](../scripts/rust/benchmarks/identity-add-regressions.json)
 and 45 status/checkout/export pairs in
 [`identity-regressions.json`](../scripts/rust/benchmarks/identity-regressions.json)
-passed on the same source and binary; all 37 native workload/mode medians were
+passed on the same source and binary; all 40 native workload/mode medians were
 faster. Ten intentionally delegated CI error pairs are excluded from native speed
 claims. Each complete workload was independently monitored after 20 consecutive
 seconds below 30% host CPU use, with a closed 0.5-second monitor staying below 80%.
-The [qualification evidence](../scripts/rust/benchmarks/identity-qualification.json)
+The [qualification evidence](../scripts/rust/benchmarks/identity-ci-fix-qualification.json)
 retains raw counters, the qualification driver and invalid attempts. Earlier
 full-suite trials, including [`identity-contended.json`](../scripts/rust/benchmarks/identity-contended.json),
 remain explicitly invalid for performance. These are controlled warm-metadata,

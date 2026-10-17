@@ -1,22 +1,22 @@
 {
   "correctness_valid": true,
   "performance_valid": true,
-  "measured_at_utc": "2026-10-17T22:09:49.823216+00:00",
+  "measured_at_utc": "2026-10-17T23:50:49.507981+00:00",
   "method": "Existing complete transfer verifier, five alternating pairs per mode, exact supported output/workspace/object/control/package state; source immutable and disposable file remote restored after each command.",
-  "driver_sha256": "7282a466f4587007f9dd36ebeed70bd658140519e0b4991d299bb32eea508c5e",
+  "driver_sha256": "44b2980906443683aecb5711b50331d3dfbfc2b8505d2c893353b255bcb70e92",
   "helpers_sha256": {
     "bench-native-command.py": "4ea79082ea31c4e9829de770faf7fca3fe67a4e0b322a12fc6c8fc63f1aaf1e9",
     "verify-native-command.py": "85ccb4f5be14859ee0c83db63ad635da9cece20d75c5047574c536ddbfa2223b"
   },
   "runs": {
     "status": {
-      "stage": "/var/tmp/transfer-bench-vizidw6q",
+      "stage": "/var/tmp/transfer-bench-9_kbsob0",
       "source": "/var/tmp/status-diff-bench-fixture-2586579",
       "source_sha256": "c58214e737af4a7d07d0521cb22449978cb184c5cdef706b9c7a6ce235829a8f",
       "remote_sha256": {
         "/var/tmp/transfer-final-fixtures/transfer-remote": "a170b5b4c8419a66a51af9a0859ecca255be5bc1e763f185fab80234d687caf1"
       },
-      "rust_sha256": "85e65e2434207c6835d4864462b1ea8c03c83e20ac8621473b39653e7f228f51",
+      "rust_sha256": "1d2df596049653380716e3765dd67583ab40318b41ac6c6b1ae87ab73fc96f08",
       "command": [
         "status",
         "--json"
@@ -24,50 +24,50 @@
       "runs_ms": {
         "timed": {
           "node": [
-            525.813,
-            504.793,
-            499.387,
-            648.776,
-            519.669
+            630.531,
+            673.91,
+            563.956,
+            496.47,
+            510.966
           ],
           "rust": [
-            8.661,
-            9.357,
-            8.286,
-            9.777,
-            9.052
+            9.494,
+            8.653,
+            8.149,
+            8.147,
+            8.568
           ]
         },
         "tty": {
           "node": [
-            528.468,
-            512.642,
-            516.296,
-            500.566,
-            502.245
+            674.45,
+            553.789,
+            512.143,
+            538.322,
+            521.247
           ],
           "rust": [
-            21.178,
-            21.184,
-            21.553,
-            21.458,
-            21.461
+            21.163,
+            20.909,
+            21.353,
+            21.212,
+            20.982
           ]
         },
         "ci": {
           "node": [
-            503.118,
-            522.859,
-            484.92,
-            497.174,
-            489.688
+            495.291,
+            476.025,
+            501.284,
+            505.478,
+            572.895
           ],
           "rust": [
-            9.387,
-            9.0,
-            8.699,
-            8.28,
-            9.822
+            8.29,
+            8.204,
+            8.378,
+            9.371,
+            8.049
           ]
         }
       },
@@ -135,27 +135,27 @@
       ],
       "median_ms": {
         "timed": {
-          "node": 519.669,
-          "rust": 9.052
+          "node": 563.956,
+          "rust": 8.568
         },
         "tty": {
-          "node": 512.642,
-          "rust": 21.458
+          "node": 538.322,
+          "rust": 21.163
         },
         "ci": {
-          "node": 497.174,
-          "rust": 9.0
+          "node": 501.284,
+          "rust": 8.29
         }
       }
     },
     "checkout": {
-      "stage": "/var/tmp/transfer-bench-ana9w4o0",
+      "stage": "/var/tmp/transfer-bench-xtpibcxs",
       "source": "/var/tmp/checkout-qualified-benchmark-fixtures/ordinary",
       "source_sha256": "8211ff87332cff495cb2af431a415947e84134f083b116ca34508e4daf08fb98",
       "remote_sha256": {
         "/var/tmp/transfer-final-fixtures/transfer-remote": "a170b5b4c8419a66a51af9a0859ecca255be5bc1e763f185fab80234d687caf1"
       },
-      "rust_sha256": "85e65e2434207c6835d4864462b1ea8c03c83e20ac8621473b39653e7f228f51",
+      "rust_sha256": "1d2df596049653380716e3765dd67583ab40318b41ac6c6b1ae87ab73fc96f08",
       "command": [
         "checkout",
         "0.0.1",
@@ -166,50 +166,50 @@
       "runs_ms": {
         "timed": {
           "node": [
-            428.199,
-            437.48,
-            433.113,
-            431.698,
-            434.172
+            462.132,
+            444.134,
+            439.76,
+            439.195,
+            433.1
           ],
           "rust": [
-            23.478,
-            23.469,
-            23.186,
-            22.913,
-            16.278
+            24.062,
+            23.67,
+            18.093,
+            17.106,
+            24.023
           ]
         },
         "tty": {
           "node": [
-            500.386,
-            528.111,
-            446.954,
-            452.089,
-            461.367
+            471.542,
+            444.961,
+            479.329,
+            434.701,
+            445.783
           ],
           "rust": [
-            24.278,
-            26.813,
-            26.787,
-            25.951,
-            26.179
+            29.05,
+            25.114,
+            26.195,
+            34.024,
+            36.223
           ]
         },
         "ci": {
           "node": [
-            440.28,
-            438.56,
-            417.397,
-            503.637,
-            437.326
+            434.229,
+            416.331,
+            423.371,
+            422.961,
+            425.845
           ],
           "rust": [
-            23.868,
-            25.313,
-            24.184,
-            23.534,
-            14.226
+            23.24,
+            14.45,
+            22.957,
+            13.957,
+            14.206
           ]
         }
       },
@@ -277,77 +277,77 @@
       ],
       "median_ms": {
         "timed": {
-          "node": 433.113,
-          "rust": 23.186
+          "node": 439.76,
+          "rust": 23.67
         },
         "tty": {
-          "node": 461.367,
-          "rust": 26.179
+          "node": 445.783,
+          "rust": 29.05
         },
         "ci": {
-          "node": 438.56,
-          "rust": 23.868
+          "node": 423.371,
+          "rust": 14.45
         }
       }
     },
     "export": {
-      "stage": "/var/tmp/transfer-bench-nchuzeo1",
+      "stage": "/var/tmp/transfer-bench-lgczfpdw",
       "source": "/var/tmp/transfer-final-fixtures/export-main",
       "source_sha256": "9657e3602a120bc61ab716eaa2011aacd80bcb87f53da5de465ba975b183051f",
       "remote_sha256": {
         "/var/tmp/transfer-final-fixtures/transfer-remote": "a170b5b4c8419a66a51af9a0859ecca255be5bc1e763f185fab80234d687caf1"
       },
-      "rust_sha256": "85e65e2434207c6835d4864462b1ea8c03c83e20ac8621473b39653e7f228f51",
+      "rust_sha256": "1d2df596049653380716e3765dd67583ab40318b41ac6c6b1ae87ab73fc96f08",
       "command": [
         "export"
       ],
       "runs_ms": {
         "timed": {
           "node": [
-            290.661,
-            269.317,
-            271.842,
-            270.369,
-            265.457
+            269.199,
+            268.531,
+            262.629,
+            269.733,
+            272.892
           ],
           "rust": [
-            107.651,
-            107.715,
-            118.642,
-            111.312,
-            112.326
+            114.556,
+            104.049,
+            108.516,
+            107.808,
+            107.72
           ]
         },
         "tty": {
           "node": [
-            282.118,
-            279.189,
-            285.703,
-            282.344,
-            279.585
+            288.077,
+            283.126,
+            283.915,
+            278.68,
+            278.051
           ],
           "rust": [
-            122.716,
-            119.51,
-            119.071,
-            122.535,
-            119.941
+            128.057,
+            118.718,
+            128.053,
+            119.612,
+            159.472
           ]
         },
         "ci": {
           "node": [
-            267.023,
-            277.715,
-            278.441,
-            270.945,
-            268.998
+            433.059,
+            320.209,
+            294.194,
+            292.241,
+            276.106
           ],
           "rust": [
-            106.551,
-            108.575,
-            109.826,
-            109.203,
-            109.532
+            190.74,
+            120.592,
+            107.514,
+            109.101,
+            110.157
           ]
         }
       },
@@ -415,25 +415,25 @@
       ],
       "median_ms": {
         "timed": {
-          "node": 270.369,
-          "rust": 111.312
+          "node": 269.199,
+          "rust": 107.808
         },
         "tty": {
-          "node": 282.118,
-          "rust": 119.941
+          "node": 283.126,
+          "rust": 128.053
         },
         "ci": {
-          "node": 270.945,
-          "rust": 109.203
+          "node": 294.194,
+          "rust": 110.157
         }
       }
     }
   },
   "host_monitor": {
     "status": {
-      "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/regressions-status-2.monitor.json",
-      "sha256": "764a7f620eac91843c3883842bf7ca459ff25fefff8e512eb59e410bb3905f28",
-      "host_busy_peak_percent": 75.499,
+      "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/regressions-status-1.monitor.json",
+      "sha256": "c9cda2bb30d2197a2b8a8ae651a705d50ab139b4b50b1af74e2c4972864ed458",
+      "host_busy_peak_percent": 75.623,
       "performance_valid": true,
       "reproduce_argv": [
         "python3",
@@ -454,9 +454,9 @@
       ]
     },
     "checkout": {
-      "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/regressions-checkout-2.monitor.json",
-      "sha256": "bfa132aa8326ba00ffaf3180f2c8ff5f828af9bcb11d0d8113a120bd7c0298b3",
-      "host_busy_peak_percent": 53.578,
+      "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/regressions-checkout-1.monitor.json",
+      "sha256": "5f7311efd5871014a1a4cd1a8073ad26ec9db3a6a19d2981d9bfc78e6269f5ce",
+      "host_busy_peak_percent": 52.97,
       "performance_valid": true,
       "reproduce_argv": [
         "python3",
@@ -480,9 +480,9 @@
       ]
     },
     "export": {
-      "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/regressions-export-1.monitor.json",
-      "sha256": "ef39158c6aa857a356f06348e774ba363ff28ec08bd1b6003bd116abe055c834",
-      "host_busy_peak_percent": 11.008,
+      "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-4/regressions-export-2.monitor.json",
+      "sha256": "4f28a0532102169d0392c1ba16ae3afb06307aa6af164aebecda09b374d440c2",
+      "host_busy_peak_percent": 77.889,
       "performance_valid": true,
       "reproduce_argv": [
         "python3",
@@ -504,16 +504,16 @@
   },
   "performance_qualification": {
     "status": "independently closed complete workload runs; no row/sample discarded; retry only after host invalidation",
-    "driver_sha256": "7d6a98cf4723318a325db9b7ec1f77261c46f087a8edfbfd5b8516f68d529e2b",
+    "driver_sha256": "44b2980906443683aecb5711b50331d3dfbfc2b8505d2c893353b255bcb70e92",
     "samples_per_implementation_per_mode": 5,
     "attempts": [
       {
         "family": "identity",
         "workload": "move",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/identity-move-1.monitor.json",
-        "sha256": "97eb142be95e58a137807f624b2e59d65dfc23937c18d5772835217fa80df741",
-        "host_busy_peak_percent": 11.429,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-move-1.monitor.json",
+        "sha256": "f540336cfc8141b879cd07aeaa41fbc0b1a9d9e41da5c5709d95357269225ebf",
+        "host_busy_peak_percent": 75.561,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -527,20 +527,20 @@
           "--runs",
           "5",
           "--stage",
-          "/var/tmp/identity-file-remote-benchmark",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark",
           "--workload",
           "move",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/identity-move-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-move-1.result.json"
         ]
       },
       {
         "family": "identity",
         "workload": "deprecate-batch",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/identity-deprecate-batch-1.monitor.json",
-        "sha256": "3372ab3eb1c06ca07a3b0cb7200661c2411bec261785507ce55d3a889146e05c",
-        "host_busy_peak_percent": 11.042,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-deprecate-batch-1.monitor.json",
+        "sha256": "5d575c287ab9d52a501b08c4bb474b9f95d33d1884c5fe7b1c45e30c9a69e5c8",
+        "host_busy_peak_percent": 8.571,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -554,20 +554,47 @@
           "--runs",
           "5",
           "--stage",
-          "/var/tmp/identity-file-remote-benchmark",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark",
           "--workload",
           "deprecate-batch",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/identity-deprecate-batch-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-deprecate-batch-1.result.json"
         ]
       },
       {
         "family": "identity",
         "workload": "rename-new",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/identity-rename-new-1.monitor.json",
-        "sha256": "4ef59d0cc088fe38de63d969bea6e4761d97b2dd183512d8ee05b1344b64ba13",
-        "host_busy_peak_percent": 9.204,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-rename-new-1.monitor.json",
+        "sha256": "37a34534b9ab1a9403379d604dbe7a2cf0cf26d6e2c46d0c9fa896bcaf0ddbe2",
+        "host_busy_peak_percent": 86.683,
+        "performance_valid": false,
+        "reproduce_argv": [
+          "python3",
+          "scripts/rust/bench-identity.py",
+          "--rust",
+          "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
+          "--node-binary",
+          "/var/home/zoltan/.bvm/nodejs/22.22.0/bin/node",
+          "--node-cli",
+          "/var/home/zoltan/.bvm/versions/2.2.94/bit-2.2.94/node_modules/@teambit/bit/bin/bit",
+          "--runs",
+          "5",
+          "--stage",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark",
+          "--workload",
+          "rename-new",
+          "--output",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-rename-new-1.result.json"
+        ]
+      },
+      {
+        "family": "identity",
+        "workload": "rename-new",
+        "attempt": 2,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-rename-new-2.monitor.json",
+        "sha256": "7f1854084dca4f1171a96fc41bf5ef3b697b17e5cf20c1831d8b50e83ff677f7",
+        "host_busy_peak_percent": 27.144,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -581,20 +608,20 @@
           "--runs",
           "5",
           "--stage",
-          "/var/tmp/identity-file-remote-benchmark",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark",
           "--workload",
           "rename-new",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/identity-rename-new-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-rename-new-2.result.json"
         ]
       },
       {
         "family": "identity",
         "workload": "rename-exported",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/identity-rename-exported-1.monitor.json",
-        "sha256": "39285b55950f650877dbbcaf00d6fb57aca5143f5d0ffebada30a5b3073cd36a",
-        "host_busy_peak_percent": 8.38,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-rename-exported-1.monitor.json",
+        "sha256": "cc3a0e04eced98b0bbaea47111243cfdaa03e0b0a5103836bf77af1a2f929f2f",
+        "host_busy_peak_percent": 78.367,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -608,20 +635,74 @@
           "--runs",
           "5",
           "--stage",
-          "/var/tmp/identity-file-remote-benchmark",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark",
           "--workload",
           "rename-exported",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/identity-rename-exported-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-rename-exported-1.result.json"
+        ]
+      },
+      {
+        "family": "identity",
+        "workload": "rename-exported-refactor",
+        "attempt": 1,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-rename-exported-refactor-1.monitor.json",
+        "sha256": "abc073dffa963e1257f2ebea60d9cc7b95f9fefceb843a30862ee90d53aec1e3",
+        "host_busy_peak_percent": 93.583,
+        "performance_valid": false,
+        "reproduce_argv": [
+          "python3",
+          "scripts/rust/bench-identity.py",
+          "--rust",
+          "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
+          "--node-binary",
+          "/var/home/zoltan/.bvm/nodejs/22.22.0/bin/node",
+          "--node-cli",
+          "/var/home/zoltan/.bvm/versions/2.2.94/bit-2.2.94/node_modules/@teambit/bit/bin/bit",
+          "--runs",
+          "5",
+          "--stage",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark",
+          "--workload",
+          "rename-exported-refactor",
+          "--output",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-2/identity-rename-exported-refactor-1.result.json"
+        ]
+      },
+      {
+        "family": "identity",
+        "workload": "rename-exported-refactor",
+        "attempt": 2,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/identity-rename-exported-refactor-2.monitor.json",
+        "sha256": "f33b8f637b5b3ba8de3c14ab3ba9bc108753d7aa63a9206d8debbd74f17de997",
+        "host_busy_peak_percent": 56.087,
+        "performance_valid": true,
+        "reproduce_argv": [
+          "python3",
+          "scripts/rust/bench-identity.py",
+          "--rust",
+          "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
+          "--node-binary",
+          "/var/home/zoltan/.bvm/nodejs/22.22.0/bin/node",
+          "--node-cli",
+          "/var/home/zoltan/.bvm/versions/2.2.94/bit-2.2.94/node_modules/@teambit/bit/bin/bit",
+          "--runs",
+          "5",
+          "--stage",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark",
+          "--workload",
+          "rename-exported-refactor",
+          "--output",
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/identity-rename-exported-refactor-2.result.json"
         ]
       },
       {
         "family": "add",
         "workload": "single",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-single-1.monitor.json",
-        "sha256": "dabba8b8caa896d9afb7bee0429779eb4b1558c2bea2e68e1a07dace37187206",
-        "host_busy_peak_percent": 11.063,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-single-1.monitor.json",
+        "sha256": "5137bb3721472326ea13c851e39b81e288d3af1527659f86f319665e94f211f0",
+        "host_busy_peak_percent": 65.217,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -639,16 +720,16 @@
           "--workload",
           "single",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-single-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-single-1.result.json"
         ]
       },
       {
         "family": "add",
         "workload": "batch",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-batch-1.monitor.json",
-        "sha256": "b67a766d85714ca700e3896c1bcfeea5af2638cea66b3c2e06530348b4cc2924",
-        "host_busy_peak_percent": 10.193,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-batch-1.monitor.json",
+        "sha256": "2ede28bf25ce26cfd8950fe76c9cc22533dd8f4f09d3ec8af6eb3799713c2d27",
+        "host_busy_peak_percent": 70.044,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -666,16 +747,16 @@
           "--workload",
           "batch",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-batch-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-batch-1.result.json"
         ]
       },
       {
         "family": "add",
         "workload": "root",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-root-1.monitor.json",
-        "sha256": "dab217e15054812f39a18eac2aa9ee9c2db7b7db9383c930a55b1d8df0661a4f",
-        "host_busy_peak_percent": 6.153,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-root-1.monitor.json",
+        "sha256": "215ff92a1553bcfb5b16b34a8ce9aca6d707176ec6da0981b3726f2150d5b005",
+        "host_busy_peak_percent": 24.365,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -693,16 +774,16 @@
           "--workload",
           "root",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-root-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-root-1.result.json"
         ]
       },
       {
         "family": "add",
         "workload": "readd",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-readd-1.monitor.json",
-        "sha256": "5e9216c7e74b484dc86d6ff7540d47f6adbe828965c74de885dd7c72a180b4f9",
-        "host_busy_peak_percent": 8.972,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-readd-1.monitor.json",
+        "sha256": "56a1389cc4fac9dd5316e29b76b809a1e2578eed3b0c3259c9887074f8e1e468",
+        "host_busy_peak_percent": 34.68,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -720,16 +801,16 @@
           "--workload",
           "readd",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-readd-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-readd-1.result.json"
         ]
       },
       {
         "family": "add",
         "workload": "ignored",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-ignored-1.monitor.json",
-        "sha256": "794d8174153af571894081721030bfa46ddd281f4778957575a2813c4528d0d2",
-        "host_busy_peak_percent": 12.36,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-ignored-1.monitor.json",
+        "sha256": "b24edffe066eed2f768c7531ae7ac0015d15573a649da7914ec9192cea609ed1",
+        "host_busy_peak_percent": 12.097,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -747,43 +828,16 @@
           "--workload",
           "ignored",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-ignored-1.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-ignored-1.result.json"
         ]
       },
       {
         "family": "add",
         "workload": "link-failure",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-link-failure-1.monitor.json",
-        "sha256": "fbb99da926a9966a9ef62f0fa6796d511eb19ed4e4e0bfc4ef232d581fba8ce0",
-        "host_busy_peak_percent": 85.268,
-        "performance_valid": false,
-        "reproduce_argv": [
-          "python3",
-          "scripts/rust/bench-add.py",
-          "--rust",
-          "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
-          "--node-binary",
-          "/var/home/zoltan/.bvm/nodejs/22.22.0/bin/node",
-          "--node-cli",
-          "/var/home/zoltan/.bvm/versions/2.2.94/bit-2.2.94/node_modules/@teambit/bit/bin/bit",
-          "--runs",
-          "5",
-          "--stage",
-          "/var/tmp/add-file-remote-benchmark",
-          "--workload",
-          "link-failure",
-          "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-link-failure-1.result.json"
-        ]
-      },
-      {
-        "family": "add",
-        "workload": "link-failure",
-        "attempt": 2,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-link-failure-2.monitor.json",
-        "sha256": "9bfea71798f3b75ba2ca7f0556ed30b59ce483594dfa886d43e1b1da3cb82eee",
-        "host_busy_peak_percent": 11.871,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-link-failure-1.monitor.json",
+        "sha256": "d4b85c920c4650fc08ac09dc5d577468d9a41cb6432632f1740a1db945940722",
+        "host_busy_peak_percent": 13.701,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -801,42 +855,16 @@
           "--workload",
           "link-failure",
           "--output",
-          "/var/tmp/identity-file-remote-benchmark/independent-workloads/add-link-failure-2.result.json"
+          "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/add-link-failure-1.result.json"
         ]
       },
       {
         "family": "regressions",
         "workload": "status",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/regressions-status-1.monitor.json",
-        "sha256": "441373049b80bf4741080a66e3b02942a0852bb62d897a1de0b648497c1aaa1c",
-        "host_busy_peak_percent": 91.838,
-        "performance_valid": false,
-        "reproduce_argv": [
-          "python3",
-          "scripts/rust/bench-transfer.py",
-          "--source",
-          "/var/tmp/status-diff-bench-fixture-2586579",
-          "--node",
-          "/var/tmp/status-diff-node-oracle",
-          "--rust",
-          "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
-          "--remote",
-          "/var/tmp/transfer-final-fixtures/transfer-remote",
-          "--runs",
-          "5",
-          "--",
-          "status",
-          "--json"
-        ]
-      },
-      {
-        "family": "regressions",
-        "workload": "status",
-        "attempt": 2,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/regressions-status-2.monitor.json",
-        "sha256": "764a7f620eac91843c3883842bf7ca459ff25fefff8e512eb59e410bb3905f28",
-        "host_busy_peak_percent": 75.499,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/regressions-status-1.monitor.json",
+        "sha256": "c9cda2bb30d2197a2b8a8ae651a705d50ab139b4b50b1af74e2c4972864ed458",
+        "host_busy_peak_percent": 75.623,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -860,38 +888,9 @@
         "family": "regressions",
         "workload": "checkout",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/regressions-checkout-1.monitor.json",
-        "sha256": "ab7955437e96b78531c66c580541f41bea2f79c60cc5d3735cf21ff488d71ffb",
-        "host_busy_peak_percent": 82.051,
-        "performance_valid": false,
-        "reproduce_argv": [
-          "python3",
-          "scripts/rust/bench-transfer.py",
-          "--source",
-          "/var/tmp/checkout-qualified-benchmark-fixtures/ordinary",
-          "--node",
-          "/var/tmp/status-diff-node-oracle",
-          "--rust",
-          "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
-          "--remote",
-          "/var/tmp/transfer-final-fixtures/transfer-remote",
-          "--runs",
-          "5",
-          "--",
-          "checkout",
-          "0.0.1",
-          "comp2",
-          "--force-theirs",
-          "-x"
-        ]
-      },
-      {
-        "family": "regressions",
-        "workload": "checkout",
-        "attempt": 2,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/regressions-checkout-2.monitor.json",
-        "sha256": "bfa132aa8326ba00ffaf3180f2c8ff5f828af9bcb11d0d8113a120bd7c0298b3",
-        "host_busy_peak_percent": 53.578,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-3/regressions-checkout-1.monitor.json",
+        "sha256": "5f7311efd5871014a1a4cd1a8073ad26ec9db3a6a19d2981d9bfc78e6269f5ce",
+        "host_busy_peak_percent": 52.97,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -918,9 +917,34 @@
         "family": "regressions",
         "workload": "export",
         "attempt": 1,
-        "path": "/var/tmp/identity-file-remote-benchmark/independent-workloads/regressions-export-1.monitor.json",
-        "sha256": "ef39158c6aa857a356f06348e774ba363ff28ec08bd1b6003bd116abe055c834",
-        "host_busy_peak_percent": 11.008,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-4/regressions-export-1.monitor.json",
+        "sha256": "59e80bcad781e2e0d18e714990df2ab24f45883fae6f1131c85d269bc4046dae",
+        "host_busy_peak_percent": 82.866,
+        "performance_valid": false,
+        "reproduce_argv": [
+          "python3",
+          "scripts/rust/bench-transfer.py",
+          "--source",
+          "/var/tmp/transfer-final-fixtures/export-main",
+          "--node",
+          "/var/tmp/status-diff-node-oracle",
+          "--rust",
+          "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
+          "--remote",
+          "/var/tmp/transfer-final-fixtures/transfer-remote",
+          "--runs",
+          "5",
+          "--",
+          "export"
+        ]
+      },
+      {
+        "family": "regressions",
+        "workload": "export",
+        "attempt": 2,
+        "path": "/var/tmp/identity-ci-fix-file-remote-benchmark/independent-workloads-ci-fix-4/regressions-export-2.monitor.json",
+        "sha256": "4f28a0532102169d0392c1ba16ae3afb06307aa6af164aebecda09b374d440c2",
+        "host_busy_peak_percent": 77.889,
         "performance_valid": true,
         "reproduce_argv": [
           "python3",
@@ -943,11 +967,11 @@
     "native_source_unchanged": true
   },
   "native_source": {
-    "sha256": "e408e29e698bb1043306ab89b1605808ecb09f7f05f953e3f270c41b791d115b",
-    "file_count": 1490
+    "sha256": "1a72fe6e460c9df3a3e491bc584320487ceafcf65ad958eea5ae7d83ffa3ed55",
+    "file_count": 1494
   },
   "qualification_evidence": {
-    "path": "scripts/rust/benchmarks/identity-qualification.json",
-    "sha256": "560b0f202bf6c204a2fcbba70358b75c7aeefaec4736dda4d34d9c97c94563c2"
+    "path": "scripts/rust/benchmarks/identity-ci-fix-qualification.json",
+    "sha256": "90e57d273488daca4802c0c8242a08db9fd226a5db2e72e2baf898428ab284dd"
   }
 }
