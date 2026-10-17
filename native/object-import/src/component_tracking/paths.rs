@@ -156,7 +156,7 @@ fn outside_path(root: &Path, path: &Path) -> String {
         .take_while(|(left, right)| left == right)
         .count();
     if common == 0 {
-        return path.to_string_lossy().replace('\\', "/");
+        return path.to_string_lossy().into_owned();
     }
     let mut relative = PathBuf::new();
     for _ in common..root.len() {
@@ -165,7 +165,7 @@ fn outside_path(root: &Path, path: &Path) -> String {
     for part in target.into_iter().skip(common) {
         relative.push(part.as_os_str());
     }
-    relative.to_string_lossy().replace('\\', "/")
+    relative.to_string_lossy().into_owned()
 }
 
 #[cfg(test)]

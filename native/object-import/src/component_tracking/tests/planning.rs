@@ -149,7 +149,15 @@ fn ignored_file_errors_keep_the_published_reverse_glob_order() {
     source(&root, "foo/z.js");
     std::fs::write(root.join("foo/.bitignore"), "*\n").unwrap();
     let error = Plan::prepare(&root, &root, &options(&["foo"]), &facts()).err().unwrap();
-    assert!(error.to_string().contains("foo/z.js, foo/a.js, foo/.bitignore"));
+    let paths = if cfg!(windows) {
+        r"foo\z.js, foo\a.js, foo\.bitignore"
+    } else {
+        "foo/z.js, foo/a.js, foo/.bitignore"
+    };
+    assert_eq!(
+        error.to_string(),
+        format!("warning: no files to add, the following files were ignored: {paths}"),
+    );
     std::fs::remove_dir_all(root).unwrap();
 }
 

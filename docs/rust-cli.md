@@ -330,7 +330,12 @@ Non-TTY medians in milliseconds were:
 | Blocked package link (native error) | 414.086 | 262.987 |
 
 Every native median was faster across the three modes; delegated CI error rows
-are excluded from speed claims. These are controlled file-remote, warm builtin
+are excluded from speed claims. These timing records identify measured commit
+`e3ae55f49`. The subsequent outside-workspace diagnostic and platform-specific test
+expectation changes passed another 135 parity pairs; their
+[`add-final-contended.json`](../scripts/rust/benchmarks/add-final-contended.json) and
+[`add-regressions-final-contended.json`](../scripts/rust/benchmarks/add-regressions-final-contended.json)
+records are excluded from timing claims because peak host load exceeded 80%. These are controlled file-remote, warm builtin
 metadata fixtures, not first-use, network-remote or cross-platform performance
 claims. Records include source, binary, helper and fixture fingerprints and exact
 normalizations. A further 45 pairs in

@@ -1843,5 +1843,7 @@
         "host_busy_percent": 5.473
       }
     ]
-  }
+  },
+  "measured_commit": "e3ae55f492ef751246e1f49d337034c1418e324f",
+  "followup_correctness_record": "add-regressions-final-contended.json"
 }
