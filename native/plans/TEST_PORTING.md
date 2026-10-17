@@ -163,6 +163,8 @@ compare divergent lane histories, staged and stored range metadata, colored log
 views and historical checkout after squashed/unrelated publication. Embedded
 `.git/bit` fixtures exercise both lane history and component logs.
 
+The merge history fixture `canonical_remote_seed_preserves_independent_lanes_and_native_historical_checkout` forces the published remote object writer on every platform, preserves independently exported remote Lane indexes and qualifies actual native historical checkout. Windows fixture publication bypasses only the pinned pending-object enumeration bug; the published `saveObjects` owns model/Lane merging and index/history publication.
+
 `harmony::merge_lifecycle` compares automatic lane snapshots and component
 merge globs/state predicates through materialization and final Version metadata.
 `harmony::merge_policy` checks hidden components, removed versions, workspace

@@ -74,10 +74,26 @@ fn historical_deprecation_and_removal_overlays_match_log_views() {
 #[test]
 fn historical_checkout_after_unrelated_merge_matches_node() {
     let (helper, _) = super::unrelated();
-    node(
-        &helper,
-        &format!("lane merge {}/right --resolve-unrelated ours -x", helper.scopes.remote),
-    );
+    checkout_unrelated(&helper);
+}
+
+#[test]
+fn canonical_remote_seed_preserves_independent_lanes_and_native_historical_checkout() {
+    let (helper, _) = super::unrelated_with(crate::helper::remote::seed_after_node_export);
+    for lane in ["left", "right"] {
+        let result = Helper::cmd_in_with(
+            &helper.scopes.remote_path,
+            &format!("cat-lane {lane}"),
+            &[("BIT_NATIVE", OsStr::new("off"))],
+        );
+        assert!(result.status.success(), "{lane}: {} {}", result.stdout, result.stderr);
+        assert_eq!(crate::helper::parse(&result.stdout)["name"], lane);
+    }
+    checkout_unrelated(&helper);
+}
+
+fn checkout_unrelated(helper: &Helper) {
+    node(helper, &format!("lane merge {}/right --resolve-unrelated ours -x", helper.scopes.remote));
     let baseline = helper.clone_workspace();
     let command = "checkout head~1 bar/foo --force-theirs -x";
     let expected = Helper::cmd_in_with(&baseline, command, &[("BIT_NATIVE", OsStr::new("off"))]);

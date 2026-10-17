@@ -198,7 +198,7 @@ such as `constructor`, break the package and are declined.
 - **Metadata.** `diffMetadata` is ported field by field. That covers `object-diff` and `array-difference` for the printable fields, `ComponentID` equality for dependencies, and npm `semver` loose comparison through `node-semver`'s `npm` module. Extension configurations are written to temporary files and compared with `git diff --no-index --color`, as `getOneFileDiff` does.
 - **Colors.** Metadata text is colored like chalk 4.1.2 when `supports-color` 7.2.0 would color stdout: flags such as `--no-color`, `FORCE_COLOR`, a terminal, `TERM`, CI variables.
 - **Dependency cache bypass.** With `BIT_FEATURES=no-fs-cache`, native status, diff and workspace commands detect dependencies afresh and validate their read set before committing, without reading, deleting or writing the dependency cache. Other documented fallback boundaries still apply.
-- **File order.** A component's files are listed in `globby`'s order: directories breadth first, each directory's entries in byte order, as libuv sorts them. Platform-specific path separators and loader ordering are qualified against the published CLI on Windows too.
+- **File order.** A component's files follow the published `globby` filesystem walk: each directory's entries use libuv's byte ordering, while independent directory batches can complete in different orders. Platform-specific path separators and loader ordering are qualified against the published CLI on Windows too.
 
 The Node.js CLI reports rows in a varying order, since components are processed concurrently. The native order is the bitmap's.
 

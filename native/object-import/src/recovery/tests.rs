@@ -226,3 +226,29 @@ fn copy_extended_acl_declines_without_mutating_destination() {
     assert!(super::copy::file(&source, &destination).is_err());
     assert_eq!(fs::read(destination).unwrap(), b"keep");
 }
+
+#[cfg(windows)]
+#[test]
+fn windows_copy_updates_regular_files_and_rejects_identical_paths() {
+    let fixture = Fixture::new();
+    let source = fixture.file("source", b"fresh");
+    let destination = fixture.file("destination", b"old");
+    super::copy::file(&source, &destination).unwrap();
+    assert_eq!(fs::read(&destination).unwrap(), b"fresh");
+    assert!(super::copy::file(&source, &source).is_err());
+    assert_eq!(fs::read(&source).unwrap(), b"fresh");
+}
+#[cfg(windows)]
+#[test]
+fn windows_copy_rejects_source_and_destination_hardlinks_before_mutation() {
+    let fixture = Fixture::new();
+    let source = fixture.file("source", b"fresh");
+    let destination = fixture.file("destination", b"keep");
+    let source_link = fixture.0.join("source-link");
+    fs::hard_link(&source, &source_link).unwrap();
+    assert!(super::copy::file(&source, &destination).is_err());
+    fs::remove_file(source_link).unwrap();
+    fs::hard_link(&destination, fixture.0.join("destination-link")).unwrap();
+    assert!(super::copy::file(&source, &destination).is_err());
+    assert_eq!(fs::read(&destination).unwrap(), b"keep");
+}

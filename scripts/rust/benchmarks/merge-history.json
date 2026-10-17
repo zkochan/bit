@@ -1,17 +1,17 @@
 {
-  "measured_at_utc": "2026-10-16 23:35:28 UTC",
+  "measured_at_utc": "2026-10-17 00:05:10 UTC",
   "platform": "Linux 7.2.5-200.fc44.x86_64; AMD Ryzen 9 9950X3D2 16-Core Processor",
   "node_version": "22.22.0",
   "bit_reference_version": "2.2.94",
   "build": "RUSTFLAGS=-D warnings cargo build --locked --release --workspace",
   "native_source": {
     "algorithm": "sha256 of sorted git ls-files -co --exclude-standard -z native, unique regular files: path NUL bytes NUL",
-    "file_count": 1201,
-    "native_source_sha256": "95aec7b68e85d70ee72ee5836f7c1110002ac0c160e3030ee7a4c86f8b1cf49a",
-    "native_git_tree": "6f5156a3dc49aca7c351e6809ebf6fbd3660ca31"
+    "file_count": 1205,
+    "native_source_sha256": "1f43f08af17514ea093ef6027050201a6e59bc1ee705908b76cb290c356a2218",
+    "native_git_tree": "948da1d9ccc3ed3529d251ae8e2a3d5d2ae25dd4"
   },
   "sha256": {
-    "release_bit": "a9089fba310e3e9a0954069289d6488e0e5fbe3f69c792845955103cb0b859e5",
+    "release_bit": "d052c10ba448594b708ad8d2b701bdb76356468a0c925ecfdfdce93ca3ac5cbf",
     "benchmark_helper": "98d7461483d6f42f100af75c363ede19a310341998e3a9e332b87c56f23cdad7",
     "shared_fingerprint_helper": "4ea79082ea31c4e9829de770faf7fca3fe67a4e0b322a12fc6c8fc63f1aaf1e9",
     "shared_output_verifier": "85ccb4f5be14859ee0c83db63ad635da9cece20d75c5047574c536ddbfa2223b",
@@ -63,9 +63,9 @@
   },
   "qualification": {
     "local_formal_gates": "all seven passed; release build passed",
-    "workspace_tests_passed": 1222,
+    "workspace_tests_passed": 1226,
     "workspace_existing_ignored": 1,
-    "e2e_passed": 447,
+    "e2e_passed": 448,
     "platform_ci": "All exact-head Linux and Windows PR checks must pass before merge."
   },
   "gates": [
@@ -80,7 +80,7 @@
       ],
       "environment": {},
       "exit": 0,
-      "seconds": 0.974,
+      "seconds": 0.941,
       "log": "/var/tmp/merge-qualified-format.log"
     },
     {
@@ -99,7 +99,7 @@
       ],
       "environment": {},
       "exit": 0,
-      "seconds": 11.357,
+      "seconds": 8.992,
       "log": "/var/tmp/merge-qualified-clippy.log"
     },
     {
@@ -118,7 +118,7 @@
         "RUSTFLAGS": "-D warnings"
       },
       "exit": 0,
-      "seconds": 14.343,
+      "seconds": 7.105,
       "log": "/var/tmp/merge-qualified-dylint.log"
     },
     {
@@ -134,7 +134,7 @@
         "RUSTDOCFLAGS": "-D warnings"
       },
       "exit": 0,
-      "seconds": 4.734,
+      "seconds": 4.657,
       "log": "/var/tmp/merge-qualified-doc.log"
     },
     {
@@ -148,7 +148,7 @@
       ],
       "environment": {},
       "exit": 0,
-      "seconds": 11.931,
+      "seconds": 12.343,
       "log": "/var/tmp/merge-qualified-workspace.log"
     },
     {
@@ -166,7 +166,7 @@
       ],
       "environment": {},
       "exit": 0,
-      "seconds": 159.692,
+      "seconds": 139.758,
       "log": "/var/tmp/merge-qualified-e2e.log"
     },
     {
@@ -178,7 +178,7 @@
       ],
       "environment": {},
       "exit": 0,
-      "seconds": 0.13,
+      "seconds": 0.123,
       "log": "/var/tmp/merge-qualified-plan.log"
     },
     {
@@ -194,7 +194,7 @@
         "RUSTFLAGS": "-D warnings"
       },
       "exit": 0,
-      "seconds": 0.517,
+      "seconds": 45.598,
       "log": "/var/tmp/merge-qualified-release.log"
     }
   ],
@@ -327,7 +327,7 @@
   },
   "runs": {
     "callbacks": {
-      "stage": "/var/tmp/merge-history-bench-qz22m1wq",
+      "stage": "/var/tmp/merge-history-bench-oamq8mew",
       "source": "/var/tmp/merge-history-benchmark-callbacks/workspace",
       "source_sha256": "d72aa179bb2b5b28bf865503f7301e75bd366fdd6a371914c4a9656041322d34",
       "remote": "/var/tmp/merge-history-benchmark-callbacks/remote",
@@ -344,18 +344,18 @@
       ],
       "runs_ms": {
         "node": [
-          1128.753,
-          1052.522,
-          1086.22,
-          1068.102,
-          1382.415
+          1205.529,
+          1078.736,
+          1127.264,
+          1100.013,
+          1061.145
         ],
         "rust": [
-          1009.738,
-          999.886,
-          999.625,
-          1026.922,
-          1020.756
+          1026.896,
+          1043.538,
+          1033.606,
+          992.522,
+          1274.995
         ]
       },
       "verified": [
@@ -436,12 +436,12 @@
         }
       ],
       "median_ms": {
-        "node": 1086.22,
-        "rust": 1009.738
+        "node": 1100.013,
+        "rust": 1033.606
       }
     },
     "automatic": {
-      "stage": "/var/tmp/merge-history-bench-gsvh8eoh",
+      "stage": "/var/tmp/merge-history-bench-i06atrzh",
       "source": "/var/tmp/merge-history-benchmark-ordinary",
       "source_sha256": "e810aac3405ff2cc01a3ea3aba82323991a99323d45efa6b3aa4a14be7d5438a",
       "remote": "/var/tmp/merge-history-benchmark-ordinary-remote",
@@ -458,18 +458,18 @@
       ],
       "runs_ms": {
         "node": [
-          876.182,
-          836.93,
-          869.717,
-          915.005,
-          1022.24
+          844.381,
+          861.492,
+          850.916,
+          848.34,
+          837.622
         ],
         "rust": [
-          266.642,
-          290.525,
-          293.623,
-          282.193,
-          297.45
+          315.706,
+          287.797,
+          307.784,
+          291.484,
+          283.929
         ]
       },
       "verified": [
@@ -550,12 +550,12 @@
         }
       ],
       "median_ms": {
-        "node": 876.182,
-        "rust": 290.525
+        "node": 848.34,
+        "rust": 291.484
       }
     },
     "pending": {
-      "stage": "/var/tmp/merge-history-bench-7tcouaph",
+      "stage": "/var/tmp/merge-history-bench-oawl8qzx",
       "source": "/var/tmp/merge-history-benchmark-ordinary",
       "source_sha256": "e810aac3405ff2cc01a3ea3aba82323991a99323d45efa6b3aa4a14be7d5438a",
       "remote": "/var/tmp/merge-history-benchmark-ordinary-remote",
@@ -571,18 +571,18 @@
       ],
       "runs_ms": {
         "node": [
-          762.394,
-          785.654,
-          792.765,
-          773.974,
-          780.089
+          750.606,
+          739.402,
+          740.182,
+          763.238,
+          755.453
         ],
         "rust": [
-          265.358,
-          293.479,
-          300.813,
-          282.182,
-          279.341
+          279.652,
+          290.969,
+          275.785,
+          272.538,
+          261.971
         ]
       },
       "verified": [
@@ -663,12 +663,12 @@
         }
       ],
       "median_ms": {
-        "node": 780.089,
-        "rust": 282.182
+        "node": 750.606,
+        "rust": 275.785
       }
     },
     "history": {
-      "stage": "/var/tmp/merge-history-bench-4gee_s9s",
+      "stage": "/var/tmp/merge-history-bench-p50v49v2",
       "source": "/var/tmp/merge-history-bench-ca7byhux/timed-0-node",
       "source_sha256": "5fe2bc7007712198efd6c270b766e70c68ee5a32a6e0b62ba4916553a5ab7ad0",
       "remote": "/var/tmp/merge-history-benchmark-ordinary-remote",
@@ -680,18 +680,18 @@
       ],
       "runs_ms": {
         "node": [
-          282.907,
-          268.743,
-          269.103,
-          264.982,
-          270.204
+          263.788,
+          264.627,
+          262.402,
+          263.347,
+          259.889
         ],
         "rust": [
-          2.871,
-          2.417,
-          2.284,
-          2.39,
-          2.493
+          1.897,
+          2.269,
+          2.271,
+          1.871,
+          2.146
         ]
       },
       "verified": [
@@ -772,8 +772,8 @@
         }
       ],
       "median_ms": {
-        "node": 269.103,
-        "rust": 2.417
+        "node": 263.347,
+        "rust": 2.146
       }
     }
   }

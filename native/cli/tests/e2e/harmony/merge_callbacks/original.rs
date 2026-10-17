@@ -36,10 +36,23 @@ fn timestamps(from: &Path, to: &Path) {
         if entry.file_type().unwrap().is_dir() {
             timestamps(&entry.path(), &target);
         } else if entry.file_type().unwrap().is_file() {
-            fs::File::open(target)
-                .unwrap()
+            timestamp_file(&target)
                 .set_times(fs::FileTimes::new().set_modified(metadata.modified().unwrap()))
                 .unwrap();
         }
     }
+}
+
+#[cfg(windows)]
+fn timestamp_file(path: &Path) -> fs::File {
+    use std::os::windows::fs::OpenOptionsExt;
+    // FILE_WRITE_ATTRIBUTES is required for SetFileTime, including readonly files.
+    fs::OpenOptions::new()
+        .access_mode(0x0100)
+        .open(path)
+        .unwrap()
+}
+#[cfg(not(windows))]
+fn timestamp_file(path: &Path) -> fs::File {
+    fs::File::open(path).unwrap()
 }

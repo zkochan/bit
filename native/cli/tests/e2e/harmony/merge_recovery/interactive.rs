@@ -14,6 +14,10 @@ fn interactive_abort_confirmation_precedes_providers_and_restoration() {
         assert_eq!(
             super::super::checkout_callbacks::stable_output(&native.stdout),
             super::super::checkout_callbacks::stable_output(&node.stdout),
+            "native stderr: {}\nnative trace: {}\nNode stderr: {}",
+            native.stderr,
+            native.trace,
+            node.stderr,
         );
         assert_eq!(native.stderr, node.stderr);
         for path in

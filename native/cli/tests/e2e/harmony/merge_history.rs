@@ -13,6 +13,10 @@ fn node(helper: &Helper, command: &str) {
 }
 
 pub(super) fn unrelated() -> (Helper, PathBuf) {
+    unrelated_with(crate::helper::remote::publish)
+}
+
+pub(super) fn unrelated_with(publish: fn(&Helper)) -> (Helper, PathBuf) {
     let helper = Helper::new();
     helper.set_workspace_with_remote_scope();
     let empty = helper.clone_workspace();
@@ -23,7 +27,7 @@ pub(super) fn unrelated() -> (Helper, PathBuf) {
         helper.create_component_bar_foo(&format!("module.exports = '{lane}';\n"));
         helper.add_component_bar_foo();
         node(&helper, &format!("snap --ignore-issues * --message {lane}"));
-        crate::helper::remote::publish(&helper);
+        publish(&helper);
         if lane == "left" {
             left = helper.clone_workspace();
         }
