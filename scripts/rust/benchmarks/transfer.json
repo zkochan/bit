@@ -66,47 +66,47 @@
       {
         "gate": "fmt",
         "code": 0,
-        "seconds": 0.982
+        "seconds": 1.272
       },
       {
         "gate": "clippy",
         "code": 0,
-        "seconds": 9.709
+        "seconds": 0.706
       },
       {
         "gate": "dylint",
         "code": 0,
-        "seconds": 7.897
+        "seconds": 7.449
       },
       {
         "gate": "doc",
         "code": 0,
-        "seconds": 3.985
+        "seconds": 0.781
       },
       {
         "gate": "unit",
         "code": 0,
-        "seconds": 15.464
+        "seconds": 9.043
       },
       {
         "gate": "export-packages",
         "code": 0,
-        "seconds": 7.944
+        "seconds": 6.375
       },
       {
         "gate": "export-callbacks",
         "code": 0,
-        "seconds": 7.237
+        "seconds": 8.01
       },
       {
         "gate": "e2e",
         "code": 0,
-        "seconds": 158.472
+        "seconds": 158.85
       },
       {
         "gate": "port-plan",
         "code": 0,
-        "seconds": 0.128
+        "seconds": 0.145
       }
     ],
     "platform_ci": "Exact-head Linux and Windows PR checks required before merge.",
@@ -114,7 +114,8 @@
     "workspace_existing_ignored": 1,
     "e2e_passed": 495,
     "focused_export_package_cases_passed": 17,
-    "focused_export_callback_cases_passed": 5
+    "focused_export_callback_cases_passed": 5,
+    "source_note": "Benchmarks used d97d20f634c944c44c724c907bf701feda8d43f9. Qualification replaces only five test PEM fixtures and the mTLS test diagnostic: server/client leaves now comply with macOS's 825-day limit. Production TLS verification is unchanged; the rebuilt release binary SHA256 is identical. The qualified source fingerprint is recorded separately."
   },
   "before_optimization": {
     "benchmark_helper_sha256": "a09009902d548a95fe580cfe9c1c583ab26bd3ea5dbcb864ed5f8673e508c63f",
@@ -1600,5 +1601,11 @@
       "TMPDIR": "/var/tmp",
       "PATH": "prepend pinned Node binary directory"
     }
+  },
+  "qualified_native_source": {
+    "algorithm": "sha256 of sorted git ls-files -co --exclude-standard -z native, unique regular files: path NUL bytes NUL",
+    "file_count": 1283,
+    "native_source_sha256": "2a2312088e830a3ad2647059111a595a26a5cc1c9aa31f26c789bc196eba09c1",
+    "native_git_tree": "5af20401bf676a4ade2d03c230341f328a5db685"
   }
 }

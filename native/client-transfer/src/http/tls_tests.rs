@@ -1,4 +1,5 @@
 //! A real mutual-TLS server requires the same configured certificate and key Node forwards.
+//! Renew the 824-day leaf fixtures before 2029-01-18; macOS permits at most 825 days.
 use super::{GlobalConfig, Network};
 use serde_json::json;
 use std::{
@@ -43,11 +44,20 @@ fn network_certificate_and_legacy_proxy_fallback_authenticate_mutual_tls() {
             (format!("{prefix}.key"), json!(include_str!("fixtures/key.pem"))),
         ]);
         let network = Network::new(&global, "2.2.94", None, None).unwrap();
-        assert_eq!(
-            runtime
-                .block_on(network.action(&url, "ExportValidate", &json!({})))
-                .unwrap(),
-            json!({"authorized":true}),
-        );
+        assert_eq!(action(&network, &runtime, &url), json!({"authorized":true}));
     }
+}
+
+// Keep production error text canonical; only a failed fixture exposes reqwest's TLS source chain.
+fn action(network: &Network, runtime: &tokio::runtime::Runtime, url: &str) -> serde_json::Value {
+    runtime
+        .block_on(network.action(url, "ExportValidate", &json!({})))
+        .unwrap_or_else(|error| {
+            let diagnostic = runtime.block_on(
+                network.client
+                    .post(format!("{url}/api/scope/action"))
+                    .send(),
+            );
+            panic!("mutual TLS failed: {error}; underlying request: {diagnostic:?}");
+        })
 }
