@@ -23,6 +23,7 @@ pub(super) fn validate(
             root_owner(row, owner, scope, directory, name, added_scope)?;
         }
         if parent != "." && directory.starts_with(&format!("{parent}/")) {
+            let directory = super::super::paths::diagnostic(directory);
             return Err(error(format!(
                 "components can't be nested under other components. unable to create a component in directory \"{directory}\" which is nested under component \"{scope}/{owner}\".\nusing 'bit create', choose a different path with the '--path' flag or if using 'bit add' put the component in a different directory",
             )));

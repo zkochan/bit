@@ -38,7 +38,9 @@ pub(super) fn persist(
 ) -> io::Result<bool> {
     let mut changed = false;
     for component in components {
-        let package = root.join("node_modules").join(&component.package_name);
+        let package = root
+            .join("node_modules")
+            .join(Path::new(&component.package_name).components().collect::<std::path::PathBuf>());
         if is_symlink(&package) {
             remove_path(&package)?;
         }

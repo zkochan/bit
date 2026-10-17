@@ -135,10 +135,16 @@ fn magic(pattern: &str) -> bool {
     pattern.contains(['*', '?', '[', '{', '('])
 }
 fn display(cwd: &Path, path: &Path) -> String {
-    path.strip_prefix(cwd)
-        .unwrap_or(path)
-        .to_string_lossy()
-        .replace('\\', "/")
+    diagnostic(
+        &path
+            .strip_prefix(cwd)
+            .unwrap_or(path)
+            .to_string_lossy(),
+    )
+}
+
+pub(super) fn diagnostic(path: &str) -> String {
+    path.replace('/', std::path::MAIN_SEPARATOR_STR)
 }
 
 fn outside_path(root: &Path, path: &Path) -> String {
@@ -161,3 +167,6 @@ fn outside_path(root: &Path, path: &Path) -> String {
     }
     relative.to_string_lossy().replace('\\', "/")
 }
+
+#[cfg(test)]
+mod tests;

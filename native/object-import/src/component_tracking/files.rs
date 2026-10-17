@@ -50,7 +50,11 @@ pub(super) fn read(
     if kept.is_empty() {
         return Err(error(format!(
             "warning: no files to add, the following files were ignored: {}",
-            original.join(", "),
+            original
+                .iter()
+                .map(|path| paths::diagnostic(path))
+                .collect::<Vec<_>>()
+                .join(", "),
         )));
     }
     retained_directories(plan, directory, &scanned)?;

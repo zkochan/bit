@@ -170,7 +170,9 @@ async fn link_component(
     context: &LinkContext<'_>,
 ) -> io::Result<(ComponentLinks, bool)> {
     let LinkContext { options, injected, .. } = *context;
-    let package_dir = root.join("node_modules").join(&component.package_name);
+    let package_dir = root
+        .join("node_modules")
+        .join(Path::new(&component.package_name).components().collect::<std::path::PathBuf>());
     let (new_links, existing) = plan_file_links(root, component, &package_dir);
     if is_symlink(&package_dir) {
         remove_path(&package_dir)?;

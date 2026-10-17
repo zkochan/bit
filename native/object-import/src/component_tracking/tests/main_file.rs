@@ -88,3 +88,14 @@ fn explicit_main_dsl_uses_file_name() {
     );
     std::fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn workspace_relative_main_preserves_inventory_spelling() {
+    let files = vec!["foo.js".to_owned()];
+    let result = choose("scope/bar", "Bar", &files, Some("bar/foo.js"), None);
+    if cfg!(windows) {
+        assert_eq!(result.unwrap(), "foo.js");
+    } else {
+        assert!(result.is_err());
+    }
+}

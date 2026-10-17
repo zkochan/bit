@@ -322,12 +322,12 @@ Non-TTY medians in milliseconds were:
 
 | Workload | Node | Rust |
 | --- | ---: | ---: |
-| Add one component | 444.229 | 268.779 |
-| Add 100 components / 1,100 files | 1620.211 | 1177.196 |
-| Add workspace root | 353.271 | 286.665 |
-| Re-add with a new main file | 447.144 | 283.806 |
-| Fully ignored input (native error) | 230.187 | 2.520 |
-| Blocked package link (native error) | 425.281 | 269.586 |
+| Add one component | 441.148 | 269.232 |
+| Add 100 components / 1,100 files | 1565.424 | 1161.509 |
+| Add workspace root | 353.013 | 280.176 |
+| Re-add with a new main file | 442.237 | 274.692 |
+| Fully ignored input (native error) | 225.821 | 2.049 |
+| Blocked package link (native error) | 414.086 | 262.987 |
 
 Every native median was faster across the three modes; delegated CI error rows
 are excluded from speed claims. These are controlled file-remote, warm builtin
@@ -336,7 +336,7 @@ claims. Records include source, binary, helper and fixture fingerprints and exac
 normalizations. A further 45 pairs in
 [`add-regressions.json`](../scripts/rust/benchmarks/add-regressions.json) qualify
 status, checkout and export using the same release binary. Peak aggregate CPU use
-was 15.9%, sampled every 0.5 seconds after a quiet-minute start gate. A representative
+was 16.5%, sampled every 0.5 seconds after a quiet-minute start gate. A representative
 contended trial is retained with `performance_valid: false` and excluded from timing
 evidence. Reproduce with `scripts/rust/bench-add.py`; fixture preparation and remote
 restoration happen outside each measured command.

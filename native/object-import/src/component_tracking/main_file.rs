@@ -55,12 +55,12 @@ fn inferred(directory: &str, files: &[String]) -> Option<String> {
     None
 }
 fn find(name: &str, directory: &str, files: &[String]) -> Option<String> {
-    if files.iter().any(|file| file == name) {
-        return Some(name.into());
+    if let Some(found) = files.iter().find(|file| same_path(file, name)) {
+        return Some(found.clone());
     }
     if let Some(found) = files
         .iter()
-        .find(|file| format!("{directory}/{file}") == name)
+        .find(|file| same_path(&format!("{directory}/{file}"), name))
     {
         return Some(found.clone());
     }
@@ -69,6 +69,9 @@ fn find(name: &str, directory: &str, files: &[String]) -> Option<String> {
         .filter(|file| Path::new(file).file_name().and_then(|name| name.to_str()) == Some(name))
         .min_by_key(|file| file.matches('/').count())
         .cloned()
+}
+fn same_path(left: &str, right: &str) -> bool {
+    if cfg!(windows) { left.eq_ignore_ascii_case(right) } else { left == right }
 }
 pub(super) fn resolve(
     root: &Path,
