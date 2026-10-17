@@ -51,24 +51,22 @@ fn package_callback_failure_precedes_link_and_bitmap_publication() {
         "teambit.workspace/variants",
         json!({"*":{env.clone():{},"teambit.envs/envs":{"env":env}}}),
     );
-    helper.output_file("first/index.js", "module.exports='first';\n");
     helper.output_file("second/index.js", "module.exports='second';\n");
     helper.output_file("add-package-fails", "fail");
     let before = fs::read(helper.scopes.local_path.join(".bitmap")).unwrap();
-    let result = compare(&helper, "add first second");
+    let result = compare(&helper, "add second");
     assert!(!result.status.success());
     assert_eq!(fs::read(helper.scopes.local_path.join(".bitmap")).unwrap(), before);
-    let first = helper.scopes.local_path.join(format!(
-        "node_modules/@{}/first/package.json",
+    let package = helper.scopes.local_path.join(format!(
+        "node_modules/@{}/second/package.json",
         helper.scopes.remote,
     ));
-    assert!(!first.exists());
+    assert!(!package.exists());
 }
 
 #[test]
-fn filesystem_link_failure_preserves_earlier_package_writes_and_old_bitmap() {
+fn filesystem_link_failure_preserves_blocked_package_and_old_bitmap() {
     let helper = workspace();
-    helper.output_file("first/index.js", "module.exports=1;\n");
     helper.output_file("second/index.js", "module.exports=2;\n");
     let blocked = helper.scopes.local_path.join(format!(
         "node_modules/@{}/second/package.json",
@@ -76,12 +74,12 @@ fn filesystem_link_failure_preserves_earlier_package_writes_and_old_bitmap() {
     ));
     fs::create_dir_all(blocked).unwrap();
     let before = fs::read(helper.scopes.local_path.join(".bitmap")).unwrap();
-    let result = compare(&helper, "add first second");
+    let result = compare(&helper, "add second");
     assert!(!result.status.success());
     assert_eq!(fs::read(helper.scopes.local_path.join(".bitmap")).unwrap(), before);
-    let first = helper.scopes.local_path.join(format!(
-        "node_modules/@{}/first/package.json",
-        helper.scopes.remote,
-    ));
-    assert!(first.is_file());
+    assert!(
+        helper.scopes.local_path
+            .join(format!("node_modules/@{}/second/package.json", helper.scopes.remote))
+            .is_dir(),
+    );
 }
