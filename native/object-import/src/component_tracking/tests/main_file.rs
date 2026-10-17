@@ -90,12 +90,27 @@ fn explicit_main_dsl_uses_file_name() {
 }
 
 #[test]
-fn workspace_relative_main_preserves_inventory_spelling() {
+fn unresolved_and_inferred_main_names_match_case_exactly() {
     let files = vec!["foo.js".to_owned()];
     let result = choose("scope/bar", "Bar", &files, Some("bar/foo.js"), None);
-    if cfg!(windows) {
-        assert_eq!(result.unwrap(), "foo.js");
-    } else {
-        assert!(result.is_err());
+    assert!(result.is_err());
+    assert!(choose("scope/bar", "Bar", &files, Some("FOO.js"), None).is_err());
+    let files = vec!["Index.js".to_owned(), "other.txt".to_owned()];
+    assert!(choose("scope/bar", "Bar", &files, None, None).is_err());
+}
+
+#[test]
+fn existing_main_uses_inventory_case_after_the_filesystem_existence_gate() {
+    let root = fixture();
+    for (inventory, requested, basename) in
+        [("Bar/foo.js", "bar/foo.js", "foo.js"), ("Bar/Ä.js", "bar/ä.js", "Ä.js")]
+    {
+        source(&root, inventory);
+        let exists = root.join(requested).is_file();
+        let main = resolve(&root, &root, Some(requested), &[inventory.into()]).unwrap().unwrap();
+        assert_eq!(main, if exists { inventory } else { requested });
+        let chosen = choose("scope/bar", "Bar", &[basename.into()], Some(&main), None);
+        assert_eq!(chosen.ok(), exists.then(|| basename.to_owned()));
     }
+    std::fs::remove_dir_all(root).unwrap();
 }

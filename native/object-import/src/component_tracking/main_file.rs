@@ -55,12 +55,15 @@ fn inferred(directory: &str, files: &[String]) -> Option<String> {
     None
 }
 fn find(name: &str, directory: &str, files: &[String]) -> Option<String> {
-    if let Some(found) = files.iter().find(|file| same_path(file, name)) {
+    if let Some(found) = files
+        .iter()
+        .find(|file| file.as_str() == name)
+    {
         return Some(found.clone());
     }
     if let Some(found) = files
         .iter()
-        .find(|file| same_path(&format!("{directory}/{file}"), name))
+        .find(|file| format!("{directory}/{file}") == name)
     {
         return Some(found.clone());
     }
@@ -69,9 +72,6 @@ fn find(name: &str, directory: &str, files: &[String]) -> Option<String> {
         .filter(|file| Path::new(file).file_name().and_then(|name| name.to_str()) == Some(name))
         .min_by_key(|file| file.matches('/').count())
         .cloned()
-}
-fn same_path(left: &str, right: &str) -> bool {
-    if cfg!(windows) { left.eq_ignore_ascii_case(right) } else { left == right }
 }
 pub(super) fn resolve(
     root: &Path,
@@ -91,7 +91,12 @@ pub(super) fn resolve(
         )));
     }
     if absolute.is_file() {
-        return Ok(Some(paths::relative(root, &absolute)?));
+        let relative = paths::relative(root, &absolute)?;
+        let folded = relative.to_lowercase();
+        let found = files
+            .iter()
+            .find(|file| file.to_lowercase() == folded);
+        return Ok(Some(found.cloned().unwrap_or(relative)));
     }
     Ok(Some(main))
 }
