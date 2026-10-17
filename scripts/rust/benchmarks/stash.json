@@ -1,0 +1,1031 @@
+{
+  "stage": "/var/tmp/stash-qualified-benchmark-v2",
+  "publishable": true,
+  "platform": "Linux-7.2.5-200.fc44.x86_64-x86_64-with-glibc2.43",
+  "native_source": {
+    "sha256": "5d1024c2b4df27f53996eae5fd3786ff7caff502497eb7dbee70e016d91ed892",
+    "file_count": 1373
+  },
+  "rust_sha256": "4d14fd95f59867734718d55e6b31218df94ac7e89498945b95a54dc029581aa2",
+  "node_binary_sha256": "1bec56ef7cfa9a76f3e0b7c0a87f220eb73f23102b9c0b4c7529a3f7c3ce7c31",
+  "node_cli_sha256": "71b324e03c4c9fb01cd3decb053ca4c3781c27ce06a8af53f7ad09d0ae42d033",
+  "node_version": "v22.22.0",
+  "bit_version": "2.2.94",
+  "bit_package_json_sha256": "eb77450196c8582827be7df68b4feb542354c5ba00ca0a81325ea5dfe7c632b7",
+  "published_stash_sha256": {
+    "stash-data.js": "cc0fc12e748cb3c4b2fc1afae3353530568fa9ed5e2134eead370c140db406b5",
+    "stash-files.js": "48925b1d5ac11dc22920bd9c0897af39f97949997a6a605aa2de0527f63c87b2",
+    "stash.aspect.js": "7feb244b2db4030c535550928bfbd3923bed70092fde0d0422c8c7a04d9b268b",
+    "stash.cmd.js": "5a6bc164329ce9c63fb5f8bc9fa31d8c7a9469a0e71ab6f454b435dbea81eb80",
+    "stash.main.runtime.js": "f8a2aaa3706394c140dc85d743d3645b3c9ffd8c64fbdc881baf427cebbe8210"
+  },
+  "fixture_sha256": {
+    "save": "ab3a2b90e1bb91cb134e1feb0c04a55174a2695f3fc4573660611e6d88ad39b4",
+    "save-new": "8fd6957c66cf16cd4113b52a411beb44d5b5a78545e8a45f68089f3e6096d913",
+    "list": "2467adaa47e88f6b24e3b244157599063c7c439499a2c016d37b82bc9286e197",
+    "load": "29d1e6228d43f501e9b735a0ba75e3bfde1f21b51a91efae9228161857f08754",
+    "load-conflict": "057635e6184db908102e20d5960a9ec9082220deb68084232ace122a07717183",
+    "restore-new": "6629786a5b3c78588b1770705033d1f635f30b9d2dc4e6fe59a10c8f95bd9eeb"
+  },
+  "fixtures": {
+    "workloads": {
+      "save": "/var/tmp/stash-qualified-benchmark-v2/baseline-save",
+      "save-new": "/var/tmp/stash-qualified-benchmark-v2/baseline-save-new",
+      "list": "/var/tmp/stash-qualified-benchmark-v2/baseline-list",
+      "load": "/var/tmp/stash-qualified-benchmark-v2/baseline-load",
+      "load-conflict": "/var/tmp/stash-qualified-benchmark-v2/baseline-load-conflict",
+      "restore-new": "/var/tmp/stash-qualified-benchmark-v2/baseline-restore-new"
+    },
+    "home": "/var/tmp/stash-qualified-benchmark-v2/baseline-home",
+    "globals": "/var/tmp/stash-qualified-benchmark-v2/baseline-globals",
+    "node_version": "v22.22.0",
+    "builtin_facts_prewarming": {
+      "method": "actual native status --json in isolated disposable workspace/home/globals",
+      "command": [
+        "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
+        "status",
+        "--json"
+      ],
+      "exit_status": 0,
+      "copied_only": "native-cli/node-builtins-a2c7991a3e586fb608213bf8f120f6fcb0d0f515.json",
+      "schema": "deduplicated ordered string array; builtinModules plus node: forms",
+      "source": "pinned Node require('module').builtinModules",
+      "fact_count": 136,
+      "cache_sha256": "46cd63c2c2531da08fe2a6727607773cd0c8f86e507105686d1ab9562cf0249b",
+      "cache_mode": 420,
+      "node_binary_sha256": "1bec56ef7cfa9a76f3e0b7c0a87f220eb73f23102b9c0b4c7529a3f7c3ce7c31",
+      "prewarming_rust_sha256": "0b734ff9976d498fe8a5e19eeede2449c633093b50605c5dac4f0544c4ec1234",
+      "timing_model": "warm metadata fixture for both implementations; no first-use performance claim"
+    }
+  },
+  "common_fixture_sha256": {
+    "home": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "globals": "c077e014705c64c36337641f36147944a4b6bb26c39916892c6753768e2e5925"
+  },
+  "metadata_cache_fixture": {
+    "method": "actual native status --json in isolated disposable workspace/home/globals",
+    "command": [
+      "/var/home/zoltan/src/bit/bit-rust-status-remote-lanes/native/target/release/bit",
+      "status",
+      "--json"
+    ],
+    "exit_status": 0,
+    "copied_only": "native-cli/node-builtins-a2c7991a3e586fb608213bf8f120f6fcb0d0f515.json",
+    "schema": "deduplicated ordered string array; builtinModules plus node: forms",
+    "source": "pinned Node require('module').builtinModules",
+    "fact_count": 136,
+    "cache_sha256": "46cd63c2c2531da08fe2a6727607773cd0c8f86e507105686d1ab9562cf0249b",
+    "cache_mode": 420,
+    "node_binary_sha256": "1bec56ef7cfa9a76f3e0b7c0a87f220eb73f23102b9c0b4c7529a3f7c3ce7c31",
+    "prewarming_rust_sha256": "0b734ff9976d498fe8a5e19eeede2449c633093b50605c5dac4f0544c4ec1234",
+    "timing_model": "warm metadata fixture for both implementations; no first-use performance claim"
+  },
+  "helper_sha256": {
+    "bench-stash.py": "6c907e247264d119c934a03fc6da69b34623f3a730543e990870896ff6b0839a",
+    "prepare-stash-benchmark.py": "b5bdaeab9ad8db99e9951de44e55b8874d6191b89d8cf6f7ea4e28b4bf2a7bf3",
+    "stash-benchmark-state.py": "2d0cfe777d6d5ff55c54018499be09cd1167c491ad099b721152fae83a699287"
+  },
+  "normalization": [
+    "native trace",
+    "completed-in durations",
+    "history ISO timestamp/PID",
+    "bitmap/workspace-config history timestamp filenames and matching metadata IDs",
+    "bitmap history: preserve every baseline filename/byte/mode and metadata prefix; compare fresh ordered reasons, final backup and full snapshot sequence with adjacent IDENTICAL byte+mode snapshots deduplicated (published same-second filename overwrite)",
+    "scope cache/components/{deps,docs}/index-v5: checksum-validated latest receipts per key, only time/metadata.timestamp removed; filenames, modes, integrity and content files stay exact",
+    "fresh detached Version log.date ONLY for manifest isNew=true; only fresh stash-referenced Version hashes mapped"
+  ],
+  "excluded_implementation_state": [
+    "scope objects compared separately after decoding",
+    "exact workspace-root debug.log",
+    "exact BIT_GLOBALS_DIR/logs subtree"
+  ],
+  "verified_pairs": 90,
+  "verified": [
+    {
+      "workload": "save",
+      "mode": "timed",
+      "pair": 0
+    },
+    {
+      "workload": "save",
+      "mode": "timed",
+      "pair": 1
+    },
+    {
+      "workload": "save",
+      "mode": "timed",
+      "pair": 2
+    },
+    {
+      "workload": "save",
+      "mode": "timed",
+      "pair": 3
+    },
+    {
+      "workload": "save",
+      "mode": "timed",
+      "pair": 4
+    },
+    {
+      "workload": "save",
+      "mode": "tty",
+      "pair": 0
+    },
+    {
+      "workload": "save",
+      "mode": "tty",
+      "pair": 1
+    },
+    {
+      "workload": "save",
+      "mode": "tty",
+      "pair": 2
+    },
+    {
+      "workload": "save",
+      "mode": "tty",
+      "pair": 3
+    },
+    {
+      "workload": "save",
+      "mode": "tty",
+      "pair": 4
+    },
+    {
+      "workload": "save",
+      "mode": "ci",
+      "pair": 0
+    },
+    {
+      "workload": "save",
+      "mode": "ci",
+      "pair": 1
+    },
+    {
+      "workload": "save",
+      "mode": "ci",
+      "pair": 2
+    },
+    {
+      "workload": "save",
+      "mode": "ci",
+      "pair": 3
+    },
+    {
+      "workload": "save",
+      "mode": "ci",
+      "pair": 4
+    },
+    {
+      "workload": "save-new",
+      "mode": "timed",
+      "pair": 0
+    },
+    {
+      "workload": "save-new",
+      "mode": "timed",
+      "pair": 1
+    },
+    {
+      "workload": "save-new",
+      "mode": "timed",
+      "pair": 2
+    },
+    {
+      "workload": "save-new",
+      "mode": "timed",
+      "pair": 3
+    },
+    {
+      "workload": "save-new",
+      "mode": "timed",
+      "pair": 4
+    },
+    {
+      "workload": "save-new",
+      "mode": "tty",
+      "pair": 0
+    },
+    {
+      "workload": "save-new",
+      "mode": "tty",
+      "pair": 1
+    },
+    {
+      "workload": "save-new",
+      "mode": "tty",
+      "pair": 2
+    },
+    {
+      "workload": "save-new",
+      "mode": "tty",
+      "pair": 3
+    },
+    {
+      "workload": "save-new",
+      "mode": "tty",
+      "pair": 4
+    },
+    {
+      "workload": "save-new",
+      "mode": "ci",
+      "pair": 0
+    },
+    {
+      "workload": "save-new",
+      "mode": "ci",
+      "pair": 1
+    },
+    {
+      "workload": "save-new",
+      "mode": "ci",
+      "pair": 2
+    },
+    {
+      "workload": "save-new",
+      "mode": "ci",
+      "pair": 3
+    },
+    {
+      "workload": "save-new",
+      "mode": "ci",
+      "pair": 4
+    },
+    {
+      "workload": "list",
+      "mode": "timed",
+      "pair": 0
+    },
+    {
+      "workload": "list",
+      "mode": "timed",
+      "pair": 1
+    },
+    {
+      "workload": "list",
+      "mode": "timed",
+      "pair": 2
+    },
+    {
+      "workload": "list",
+      "mode": "timed",
+      "pair": 3
+    },
+    {
+      "workload": "list",
+      "mode": "timed",
+      "pair": 4
+    },
+    {
+      "workload": "list",
+      "mode": "tty",
+      "pair": 0
+    },
+    {
+      "workload": "list",
+      "mode": "tty",
+      "pair": 1
+    },
+    {
+      "workload": "list",
+      "mode": "tty",
+      "pair": 2
+    },
+    {
+      "workload": "list",
+      "mode": "tty",
+      "pair": 3
+    },
+    {
+      "workload": "list",
+      "mode": "tty",
+      "pair": 4
+    },
+    {
+      "workload": "list",
+      "mode": "ci",
+      "pair": 0
+    },
+    {
+      "workload": "list",
+      "mode": "ci",
+      "pair": 1
+    },
+    {
+      "workload": "list",
+      "mode": "ci",
+      "pair": 2
+    },
+    {
+      "workload": "list",
+      "mode": "ci",
+      "pair": 3
+    },
+    {
+      "workload": "list",
+      "mode": "ci",
+      "pair": 4
+    },
+    {
+      "workload": "load",
+      "mode": "timed",
+      "pair": 0
+    },
+    {
+      "workload": "load",
+      "mode": "timed",
+      "pair": 1
+    },
+    {
+      "workload": "load",
+      "mode": "timed",
+      "pair": 2
+    },
+    {
+      "workload": "load",
+      "mode": "timed",
+      "pair": 3
+    },
+    {
+      "workload": "load",
+      "mode": "timed",
+      "pair": 4
+    },
+    {
+      "workload": "load",
+      "mode": "tty",
+      "pair": 0
+    },
+    {
+      "workload": "load",
+      "mode": "tty",
+      "pair": 1
+    },
+    {
+      "workload": "load",
+      "mode": "tty",
+      "pair": 2
+    },
+    {
+      "workload": "load",
+      "mode": "tty",
+      "pair": 3
+    },
+    {
+      "workload": "load",
+      "mode": "tty",
+      "pair": 4
+    },
+    {
+      "workload": "load",
+      "mode": "ci",
+      "pair": 0
+    },
+    {
+      "workload": "load",
+      "mode": "ci",
+      "pair": 1
+    },
+    {
+      "workload": "load",
+      "mode": "ci",
+      "pair": 2
+    },
+    {
+      "workload": "load",
+      "mode": "ci",
+      "pair": 3
+    },
+    {
+      "workload": "load",
+      "mode": "ci",
+      "pair": 4
+    },
+    {
+      "workload": "load-conflict",
+      "mode": "timed",
+      "pair": 0
+    },
+    {
+      "workload": "load-conflict",
+      "mode": "timed",
+      "pair": 1
+    },
+    {
+      "workload": "load-conflict",
+      "mode": "timed",
+      "pair": 2
+    },
+    {
+      "workload": "load-conflict",
+      "mode": "timed",
+      "pair": 3
+    },
+    {
+      "workload": "load-conflict",
+      "mode": "timed",
+      "pair": 4
+    },
+    {
+      "workload": "load-conflict",
+      "mode": "tty",
+      "pair": 0
+    },
+    {
+      "workload": "load-conflict",
+      "mode": "tty",
+      "pair": 1
+    },
+    {
+      "workload": "load-conflict",
+      "mode": "tty",
+      "pair": 2
+    },
+    {
+      "workload": "load-conflict",
+      "mode": "tty",
+      "pair": 3
+    },
+    {
+      "workload": "load-conflict",
+      "mode": "tty",
+      "pair": 4
+    },
+    {
+      "workload": "load-conflict",
+      "mode": "ci",
+      "pair": 0
+    },
+    {
+      "workload": "load-conflict",
+      "mode": "ci",
+      "pair": 1
+    },
+    {
+      "workload": "load-conflict",
+      "mode": "ci",
+      "pair": 2
+    },
+    {
+      "workload": "load-conflict",
+      "mode": "ci",
+      "pair": 3
+    },
+    {
+      "workload": "load-conflict",
+      "mode": "ci",
+      "pair": 4
+    },
+    {
+      "workload": "restore-new",
+      "mode": "timed",
+      "pair": 0
+    },
+    {
+      "workload": "restore-new",
+      "mode": "timed",
+      "pair": 1
+    },
+    {
+      "workload": "restore-new",
+      "mode": "timed",
+      "pair": 2
+    },
+    {
+      "workload": "restore-new",
+      "mode": "timed",
+      "pair": 3
+    },
+    {
+      "workload": "restore-new",
+      "mode": "timed",
+      "pair": 4
+    },
+    {
+      "workload": "restore-new",
+      "mode": "tty",
+      "pair": 0
+    },
+    {
+      "workload": "restore-new",
+      "mode": "tty",
+      "pair": 1
+    },
+    {
+      "workload": "restore-new",
+      "mode": "tty",
+      "pair": 2
+    },
+    {
+      "workload": "restore-new",
+      "mode": "tty",
+      "pair": 3
+    },
+    {
+      "workload": "restore-new",
+      "mode": "tty",
+      "pair": 4
+    },
+    {
+      "workload": "restore-new",
+      "mode": "ci",
+      "pair": 0
+    },
+    {
+      "workload": "restore-new",
+      "mode": "ci",
+      "pair": 1
+    },
+    {
+      "workload": "restore-new",
+      "mode": "ci",
+      "pair": 2
+    },
+    {
+      "workload": "restore-new",
+      "mode": "ci",
+      "pair": 3
+    },
+    {
+      "workload": "restore-new",
+      "mode": "ci",
+      "pair": 4
+    }
+  ],
+  "workloads": {
+    "save": {
+      "timed": {
+        "runs_ms": {
+          "node": [
+            451.783,
+            437.171,
+            433.995,
+            445.756,
+            439.323
+          ],
+          "rust": [
+            18.4,
+            19.187,
+            20.086,
+            16.9,
+            17.722
+          ]
+        },
+        "median_ms": {
+          "node": 439.323,
+          "rust": 18.4
+        }
+      },
+      "tty": {
+        "runs_ms": {
+          "node": [
+            440.519,
+            439.084,
+            445.203,
+            445.28,
+            443.764
+          ],
+          "rust": [
+            28.972,
+            28.332,
+            28.71,
+            29.698,
+            30.688
+          ]
+        },
+        "median_ms": {
+          "node": 443.764,
+          "rust": 28.972
+        }
+      },
+      "ci": {
+        "runs_ms": {
+          "node": [
+            428.582,
+            423.655,
+            424.541,
+            625.854,
+            463.241
+          ],
+          "rust": [
+            18.675,
+            15.885,
+            34.66,
+            24.865,
+            20.041
+          ]
+        },
+        "median_ms": {
+          "node": 428.582,
+          "rust": 20.041
+        }
+      }
+    },
+    "save-new": {
+      "timed": {
+        "runs_ms": {
+          "node": [
+            453.046,
+            442.453,
+            555.394,
+            505.619,
+            457.247
+          ],
+          "rust": [
+            18.76,
+            18.444,
+            28.25,
+            19.635,
+            20.619
+          ]
+        },
+        "median_ms": {
+          "node": 457.247,
+          "rust": 19.635
+        }
+      },
+      "tty": {
+        "runs_ms": {
+          "node": [
+            472.164,
+            465.445,
+            455.647,
+            464.983,
+            470.422
+          ],
+          "rust": [
+            33.15,
+            31.002,
+            35.152,
+            30.994,
+            32.609
+          ]
+        },
+        "median_ms": {
+          "node": 465.445,
+          "rust": 32.609
+        }
+      },
+      "ci": {
+        "runs_ms": {
+          "node": [
+            609.759,
+            465.649,
+            457.912,
+            452.183,
+            455.182
+          ],
+          "rust": [
+            21.441,
+            20.758,
+            21.088,
+            18.553,
+            19.817
+          ]
+        },
+        "median_ms": {
+          "node": 457.912,
+          "rust": 20.758
+        }
+      }
+    },
+    "list": {
+      "timed": {
+        "runs_ms": {
+          "node": [
+            224.755,
+            229.825,
+            223.93,
+            222.517,
+            255.236
+          ],
+          "rust": [
+            1.848,
+            1.622,
+            1.508,
+            1.555,
+            1.921
+          ]
+        },
+        "median_ms": {
+          "node": 224.755,
+          "rust": 1.622
+        }
+      },
+      "tty": {
+        "runs_ms": {
+          "node": [
+            231.797,
+            234.783,
+            238.233,
+            228.714,
+            238.739
+          ],
+          "rust": [
+            21.327,
+            21.475,
+            21.349,
+            21.419,
+            21.341
+          ]
+        },
+        "median_ms": {
+          "node": 234.783,
+          "rust": 21.349
+        }
+      },
+      "ci": {
+        "runs_ms": {
+          "node": [
+            226.926,
+            225.55,
+            219.184,
+            216.371,
+            231.308
+          ],
+          "rust": [
+            1.77,
+            1.624,
+            1.887,
+            1.553,
+            1.6
+          ]
+        },
+        "median_ms": {
+          "node": 225.55,
+          "rust": 1.624
+        }
+      }
+    },
+    "load": {
+      "timed": {
+        "runs_ms": {
+          "node": [
+            412.165,
+            429.828,
+            420.494,
+            428.026,
+            419.689
+          ],
+          "rust": [
+            8.044,
+            8.272,
+            8.906,
+            8.123,
+            7.859
+          ]
+        },
+        "median_ms": {
+          "node": 420.494,
+          "rust": 8.123
+        }
+      },
+      "tty": {
+        "runs_ms": {
+          "node": [
+            448.493,
+            431.289,
+            436.021,
+            438.883,
+            443.805
+          ],
+          "rust": [
+            21.489,
+            21.074,
+            21.187,
+            21.182,
+            21.167
+          ]
+        },
+        "median_ms": {
+          "node": 438.883,
+          "rust": 21.182
+        }
+      },
+      "ci": {
+        "runs_ms": {
+          "node": [
+            431.405,
+            411.651,
+            412.178,
+            421.074,
+            436.629
+          ],
+          "rust": [
+            9.286,
+            8.19,
+            8.582,
+            8.247,
+            9.747
+          ]
+        },
+        "median_ms": {
+          "node": 421.074,
+          "rust": 8.582
+        }
+      }
+    },
+    "load-conflict": {
+      "timed": {
+        "runs_ms": {
+          "node": [
+            437.135,
+            434.754,
+            445.781,
+            438.636,
+            447.597
+          ],
+          "rust": [
+            9.594,
+            8.711,
+            8.409,
+            7.865,
+            9.04
+          ]
+        },
+        "median_ms": {
+          "node": 438.636,
+          "rust": 8.711
+        }
+      },
+      "tty": {
+        "runs_ms": {
+          "node": [
+            440.752,
+            441.147,
+            441.676,
+            467.308,
+            487.707
+          ],
+          "rust": [
+            21.477,
+            20.928,
+            21.315,
+            21.421,
+            24.95
+          ]
+        },
+        "median_ms": {
+          "node": 441.676,
+          "rust": 21.421
+        }
+      },
+      "ci": {
+        "runs_ms": {
+          "node": [
+            427.26,
+            413.303,
+            441.651,
+            517.414,
+            468.586
+          ],
+          "rust": [
+            8.068,
+            9.144,
+            15.685,
+            13.393,
+            8.477
+          ]
+        },
+        "median_ms": {
+          "node": 441.651,
+          "rust": 9.144
+        }
+      }
+    },
+    "restore-new": {
+      "timed": {
+        "runs_ms": {
+          "node": [
+            600.168,
+            532.119,
+            535.133,
+            517.325,
+            505.355
+          ],
+          "rust": [
+            552.592,
+            491.263,
+            515.958,
+            490.606,
+            490.259
+          ]
+        },
+        "median_ms": {
+          "node": 532.119,
+          "rust": 491.263
+        }
+      },
+      "tty": {
+        "runs_ms": {
+          "node": [
+            539.046,
+            543.676,
+            511.708,
+            538.576,
+            515.746
+          ],
+          "rust": [
+            506.277,
+            503.132,
+            512.823,
+            513.312,
+            508.269
+          ]
+        },
+        "median_ms": {
+          "node": 538.576,
+          "rust": 508.269
+        }
+      },
+      "ci": {
+        "runs_ms": {
+          "node": [
+            837.305,
+            532.538,
+            558.343,
+            543.317,
+            526.784
+          ],
+          "rust": [
+            568.932,
+            509.433,
+            520.203,
+            506.894,
+            509.244
+          ]
+        },
+        "median_ms": {
+          "node": 543.317,
+          "rust": 509.433
+        }
+      }
+    }
+  },
+  "qualification": {
+    "verified_at_utc": "2026-10-17T14:51:52.784352+00:00",
+    "gates": [
+      {
+        "gate": "fmt",
+        "code": 0,
+        "seconds": 1.166
+      },
+      {
+        "gate": "clippy",
+        "code": 0,
+        "seconds": 2.795
+      },
+      {
+        "gate": "dylint",
+        "code": 0,
+        "seconds": 7.925
+      },
+      {
+        "gate": "doc",
+        "code": 0,
+        "seconds": 2.332
+      },
+      {
+        "gate": "unit",
+        "code": 0,
+        "seconds": 7.772
+      },
+      {
+        "gate": "export-packages",
+        "code": 0,
+        "seconds": 5.632
+      },
+      {
+        "gate": "export-callbacks",
+        "code": 0,
+        "seconds": 7.087
+      },
+      {
+        "gate": "e2e",
+        "code": 0,
+        "seconds": 161.514
+      },
+      {
+        "gate": "port-plan",
+        "code": 0,
+        "seconds": 0.122
+      }
+    ],
+    "workspace_tests_passed": 1299,
+    "workspace_tests_ignored": 1,
+    "e2e_tests_passed": 557,
+    "stash_oracles_passed": 26,
+    "focused_export_package_tests": 17,
+    "focused_export_callback_tests": 5,
+    "release_build": [
+      "cargo",
+      "build",
+      "--locked",
+      "--release",
+      "--workspace"
+    ],
+    "release_rustflags": "-D warnings",
+    "regression_verified_pairs": 45,
+    "source_and_release_fingerprints_rechecked_after_final_gates": true
+  }
+}

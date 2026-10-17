@@ -189,6 +189,8 @@ jobs:
             filters: merge_history merge_lifecycle merge_callbacks merge_policy merge_recovery
           - group: provisioning
             filters: commands::init harmony::config harmony::doctor
+          - group: stash
+            filters: harmony::stash
     timeout-minutes: 60
     defaults:
       run:
