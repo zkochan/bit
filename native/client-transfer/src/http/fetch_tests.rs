@@ -59,7 +59,12 @@ fn serve(body: Vec<u8>, cancellation: Option<Cancellation>) -> (String, thread::
         if let Some(cancellation) = cancellation {
             socket.write_all(&body[..700]).unwrap();
             cancellation.cancel();
-            assert_eq!(socket.read(&mut [0; 1]).unwrap(), 0);
+            // A cancelled response can close with FIN or reset unread response data.
+            match socket.read(&mut [0; 1]) {
+                Ok(0) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset => {}
+                result => panic!("cancelled fetch did not close its socket: {result:?}"),
+            }
         } else {
             for chunk in body.chunks(31) {
                 socket.write_all(chunk).unwrap();
