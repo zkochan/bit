@@ -27,6 +27,7 @@ pub(super) fn target(helper: &Helper, name: &str) -> std::path::PathBuf {
     helper.scopes.local_path.join(row["rootDir"].as_str().unwrap())
 }
 pub(in crate::harmony) fn assert_origins(helper: &Helper, names: &[&str]) {
+    assert_copy_barrier(helper);
     for name in names {
         let origin = support::aspect(helper, name, FORK).unwrap();
         assert_eq!(origin["forkedFrom"]["scope"], helper.scopes.remote);
@@ -34,6 +35,7 @@ pub(in crate::harmony) fn assert_origins(helper: &Helper, names: &[&str]) {
     }
 }
 pub(in crate::harmony) fn ids(helper: &Helper) -> Vec<String> {
+    assert_copy_barrier(helper);
     let mut ids = support::json(helper, "list --json")
         .as_array()
         .unwrap()
@@ -73,4 +75,26 @@ pub(in crate::harmony) fn delay_copies(helper: &Helper) {
         "fixture.tools/env/fork-batch-barrier",
         json!({}),
     );
+    copy_environment(helper);
+}
+fn copy_environment(helper: &Helper) {
+    let environment = json!({
+        "fixture.tools/env/fork-batch-barrier":{},
+        "teambit.envs/envs":{"env":"fixture.tools/env/fork-batch-barrier"}
+    });
+    config::set_workspace_key(
+        &helper.scopes.local_path,
+        "teambit.workspace/variants",
+        json!({"{comp*}":environment,"{comp*/**}":environment}),
+    );
+    helper.output_file("fork-batch-required", "actual target env onAdd barrier required\n");
+}
+
+/// Prove that scope subcommands loaded the real env and reached its onAdd slot.
+pub(super) fn assert_copy_barrier(helper: &Helper) {
+    if helper.scopes.local_path.join("fork-batch-required").exists() {
+        let observed = fs::read_to_string(helper.scopes.local_path.join("fork-batch-observed"))
+            .expect("actual fork batch onAdd barrier did not run");
+        assert!(!observed.is_empty());
+    }
 }

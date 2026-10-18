@@ -49,6 +49,7 @@ fn workspace_and_remote_duplicate_matches_retain_the_released_partial_failure() 
         &format!(r#"fork "{}/*" --scope target.scope -x"#, helper.scopes.remote),
     );
     assert!(!result.status.success());
+    support::assert_copy_barrier(&helper);
     let after = bitmap(&helper);
     assert_eq!(
         after[format!("{}/comp1", helper.scopes.remote)]["version"],
