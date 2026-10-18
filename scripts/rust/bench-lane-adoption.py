@@ -214,7 +214,7 @@ def installation_clocks(root, state, prefix, started, ended):
         raw = path.read_bytes()
         value = json.loads(raw)
         if field == 'prunedAt':
-            if value['layoutVersion'] != 5 or value['nodeLinker'] != 'isolated' or not value['packageManager'].startswith('pnpm@') or not isinstance(value['injectedDeps'], dict) or not isinstance(value['included'], dict):
+            if value['layoutVersion'] != 5 or value['nodeLinker'] != 'isolated' or not value['packageManager'].startswith('pnpm@') or ('injectedDeps' in value and not isinstance(value['injectedDeps'], dict)) or not isinstance(value['included'], dict):
                 raise RuntimeError('unknown pnpm modules metadata schema')
             parsed = email.utils.parsedate_to_datetime(value[field])
             if email.utils.format_datetime(parsed, usegmt=True) != value[field]:
