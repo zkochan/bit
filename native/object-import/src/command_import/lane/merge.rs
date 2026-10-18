@@ -252,9 +252,11 @@ fn stage_changed(
     if incoming.value["schema"].as_str().unwrap_or("0.0.0") == "0.0.0" {
         merged.value["schema"] = json!("0.0.0");
     }
+    let scope = incoming.value["scope"].as_str().ok_or_else(|| invalid("incoming lane scope"))?;
+    let wire = plan.lane_wire_object(scope, &incoming.hash)?;
     plan.overlay.objects.insert(
         merged.hash.clone(),
-        publish::object(&merged.hash, "Lane", merged.value.clone())?,
+        publish::reusing(&merged.hash, "Lane", merged.value.clone(), wire)?,
     );
     index(plan, merged)?;
     if !same_entries(&merged.value, &incoming.value)? {

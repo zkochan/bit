@@ -211,6 +211,17 @@ fn yn(value: &str) -> bool {
 
 pub(in crate::commands) struct JsHost(Arc<Host>, bool);
 
+fn lane_installation() -> bool {
+    let arguments = std::env::args()
+        .skip(1)
+        .take(2)
+        .collect::<Vec<_>>();
+    arguments
+        .first()
+        .is_some_and(|command| command == "switch")
+        || arguments == ["lane", "import"]
+}
+
 impl JsHost {
     pub(in crate::commands) fn new(host: Arc<Host>, quiet: bool) -> Self {
         Self(host, quiet)
@@ -231,6 +242,35 @@ impl JsHost {
 
 #[async_trait]
 impl bit_install::Host for JsHost {
+    async fn install_subscribers(&self, request: &Value) -> io::Result<Option<Value>> {
+        if !lane_installation() {
+            return Ok(None);
+        }
+        let result = self.call::<Value>("switchInstallSubscribers", request.clone()).await;
+        let output = self.0.take_stdout();
+        if !self.1 {
+            let mut stdout = io::stdout().lock();
+            stdout.write_all(output.as_bytes())?;
+            stdout.flush()?;
+        }
+        let result = result?;
+        Ok((!result.is_null()).then_some(result))
+    }
+
+    async fn configured_aspect_classes(&self) -> io::Result<()> {
+        if lane_installation() {
+            let result = self.call::<Value>("switchConfiguredAspectClasses", json!({})).await;
+            let output = self.0.take_stdout();
+            if !self.1 {
+                let mut stdout = io::stdout().lock();
+                stdout.write_all(output.as_bytes())?;
+                stdout.flush()?;
+            }
+            result?;
+        }
+        Ok(())
+    }
+
     async fn env_policy(&self, env_id: &str) -> io::Result<Option<Value>> {
         self.call("envPolicy", json!({ "envId": env_id })).await
     }

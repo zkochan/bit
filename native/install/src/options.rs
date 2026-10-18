@@ -77,6 +77,9 @@ pub struct InstallOptions {
     /// Parent operation's live bitmap insertion order; the disk bitmap is serialized separately.
     #[serde(skip)]
     pub workspace_component_order: Vec<String>,
+    /// A retained parent consumer already initialized dependency caching before its writes.
+    #[serde(skip)]
+    pub dependency_cache_initialized: bool,
 }
 
 /// What adding a package already in the workspace policy does

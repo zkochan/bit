@@ -11,10 +11,7 @@ pub(super) fn owned_command(
     pool: &rayon::ThreadPool,
 ) -> io::Result<(usize, Value)> {
     match request {
-        Request::ReadSetValidate { proofs } => pool.install(|| {
-            dependency_graph::proof::verify(&proofs)?;
-            Ok((proofs.len(), serde_json::json!({"valid":true})))
-        }),
+        Request::ReadSetValidate { proofs } => pool.install(|| validate_read_set(&proofs)),
         Request::CommandPlan(input) => pool.install(|| command::plan(&input, snapshots, pool)),
         Request::CommandMergeDeferSnapshot(input) => {
             command::merge_defer::run(&input, &mut snapshots.command)
@@ -36,6 +33,9 @@ pub(super) fn owned_command(
         }
         Request::CommandFinalize(input) => {
             pool.install(|| command::finalize(&input, &mut snapshots.command))
+        }
+        Request::CommandSwitchComplete(input) => {
+            command::switch_completion::complete(&input, &mut snapshots.command)
         }
         Request::CommandApply(input) => {
             pool.install(|| command::apply(&input, &mut snapshots.command))
@@ -64,4 +64,9 @@ fn owned_status_command(
         Request::InventoryCancel { token } => inventory::cancel(token, &mut snapshots.inventory),
         request => apply(request, pool),
     }
+}
+
+fn validate_read_set(proofs: &[dependency_graph::proof::Proof]) -> io::Result<(usize, Value)> {
+    dependency_graph::proof::verify(proofs)?;
+    Ok((proofs.len(), serde_json::json!({"valid":true})))
 }

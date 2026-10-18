@@ -30,6 +30,8 @@ pub struct Calculated {
     pub env_policies: IndexMap<String, EnvPolicy>,
     pub dependencies: IndexMap<String, ComponentDependencies>,
     pub outcome: ManifestOutcome,
+    pub subscriber_policy: Vec<PolicyEntry>,
+    pub subscriber_links: DependencyMap,
 }
 
 impl Calculated {
@@ -55,6 +57,7 @@ pub async fn calculate(
     // in `_getComponentsManifests`. The native linker runs after this
     // calculation and loads nothing, so both lines belong here.
     session.loading(loaded);
+    session.host.configured_aspect_classes().await?;
     session.loading(loaded);
     let components = loaded.components();
     let Resolved {
@@ -86,7 +89,14 @@ pub async fn calculate(
     // the manifests of the engine run.
     session.loading(loaded);
     session.loading(loaded);
-    Ok(Calculated { components, env_policies, dependencies, outcome })
+    Ok(Calculated {
+        components,
+        env_policies,
+        dependencies,
+        outcome,
+        subscriber_policy: root_policy,
+        subscriber_links: linked_root_deps.clone(),
+    })
 }
 
 /// `writeDependenciesToPackageJson`: the root manifest `_getComponentsManifests`
@@ -339,6 +349,7 @@ fn dependency_options(
         merge_config,
         update_dependents: update_dependents(loaded)?,
         use_cache: true,
+        cache_initialized: session.options.dependency_cache_initialized,
         dev_patterns: DevPatternConfig::from_aspects(&|id| loaded.config.aspect(id).cloned()),
         policy_slots: Vec::new(),
         workspace_aspects: workspace_aspects(session, loaded),

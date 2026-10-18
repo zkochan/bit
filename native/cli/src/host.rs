@@ -37,6 +37,8 @@ const SCRIPT: &str = concat!(
     include_str!("host/fork.js"),
     "\n",
     include_str!("host/import.js"),
+    "\n",
+    include_str!("host/switch.js"),
 );
 const EXIT_GRACE: Duration = Duration::from_secs(5);
 

@@ -145,6 +145,9 @@ pub(super) fn extend_models(
     Ok(())
 }
 fn validate(request: &Prepare) -> io::Result<()> {
+    if request.operation == Operation::Switch {
+        super::switch::validation::options(request)?;
+    }
     super::checkout_stash::validate(request)?;
     validate_revert(request)?;
     if request.defer_checkout_pattern
@@ -182,8 +185,8 @@ fn invalid_lifecycle_options(request: &Prepare) -> io::Result<bool> {
         || !options.scope.include_new_from_scope
             && !options.scope.scope_candidates.is_empty()
         || invalid_workspace_only
-        || conflicting_forces
-        || invalid_strategy
+        || conflicting_forces && request.operation != Operation::Switch
+        || invalid_strategy && request.operation != Operation::Switch
         || interrupted)
 }
 

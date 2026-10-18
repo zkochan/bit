@@ -128,6 +128,7 @@ enum Request {
     CommandDependencyDetect(command::policy::dependencies::Detect),
     CommandDependencyComplete(command::policy::dependencies::Complete),
     CommandApply(command::Apply),
+    CommandSwitchComplete(command::switch_completion::Complete),
     CommandFinalize(command::Finalize),
     CommandLaneFinalize(command::LaneFinalize),
     StatusContext(status_context::Request),
@@ -229,6 +230,7 @@ pub(crate) fn serve(
             canonical_error: None,
         },
         Err(error) => Response {
+            data: response::failure_data(&error),
             error: Some(error.to_string()),
             canonical_error: response::is_canonical(&error).then_some(true),
             ..failure(id)

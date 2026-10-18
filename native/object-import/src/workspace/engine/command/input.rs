@@ -64,6 +64,8 @@ pub(super) struct StashVersion {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct LaneOptions {
     pub(super) name: String,
+    pub(super) alias: Option<String>,
+    pub(super) pattern: Option<String>,
     #[serde(flatten)]
     pub(super) flags: LaneFlags,
 }

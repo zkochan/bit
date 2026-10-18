@@ -69,6 +69,18 @@ pub(crate) fn compare_with_history(
     assert!(tree(&helper.scopes.remote_path) == remote, "{command} mutated the remote");
     actual
 }
+/// Installation keeps the independent bitmap-write oracle and immutable remote.
+pub(crate) fn compare_install_with_history(
+    helper: &Helper,
+    command: &str,
+    stdout: fn(&str) -> String,
+    observe: &support::HistoryProjection<'_>,
+) -> Run {
+    let remote = tree(&helper.scopes.remote_path);
+    let actual = support::compare_install_with_history(helper, command, stdout, observe);
+    assert!(tree(&helper.scopes.remote_path) == remote, "{command} mutated the remote");
+    actual
+}
 /// The untimed released-CLI preparation must also leave its remote unchanged.
 pub(crate) fn prepare_history<Prepared>(
     helper: &Helper,

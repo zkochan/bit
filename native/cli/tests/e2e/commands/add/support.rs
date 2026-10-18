@@ -1,4 +1,6 @@
 //! Exact command bytes and filesystem state replayed at the same absolute workspace path.
+pub(crate) mod history_oracle;
+
 mod clock_phase;
 mod config_history;
 mod hardlinks;
@@ -51,6 +53,16 @@ pub(crate) fn compare_with_history(
     observe: &HistoryProjection<'_>,
 ) -> Run {
     compare_mode(helper, command, false, true, stdout, false, Some(observe))
+}
+
+/// Successful installation and a per-write oracle retain both independent clock proofs.
+pub(crate) fn compare_install_with_history(
+    helper: &Helper,
+    command: &str,
+    stdout: fn(&str) -> String,
+    observe: &HistoryProjection<'_>,
+) -> Run {
+    compare_mode(helper, command, false, true, stdout, true, Some(observe))
 }
 
 /// Untimed oracle preparation restores the identical source/cache/hardlink inputs afterwards.

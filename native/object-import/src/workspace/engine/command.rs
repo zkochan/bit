@@ -9,6 +9,7 @@ pub(super) mod recovery;
 pub(super) mod repository;
 pub(super) mod resolve;
 pub(super) mod stash;
+pub(super) mod switch_completion;
 
 mod checkout_stash;
 
@@ -70,6 +71,7 @@ struct PreparedPlan {
     snap_bitmap: Option<bitmap::Prepared>,
     reset_config: Option<reset_config::Prepared>,
     checkout_policy: Option<checkout_policy::Prepared>,
+    switch_completion: Option<switch_completion::Retained>,
 }
 pub(super) fn prepare(
     request: Prepare,

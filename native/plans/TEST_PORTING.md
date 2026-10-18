@@ -9,6 +9,40 @@ native yet, and asserts what the e2e case asserts.
 The list below names every case in `e2e/` with its file and line. It is a floor, not a
 ceiling: native-only cases for edge cases the e2e suite does not cover are welcome.
 
+## Lane adoption focused qualification
+
+The lane-adoption filter passed all 19 tests (18 strict integration fixtures and
+one completion-token test) against released Bit 2.2.94. All seven required checks
+plus Rust scope pass with 1,512 workspace tests and 796 e2e cases. Performance
+qualification remains pending; this is not a complete lane-command claim.
+Comparisons retain complete command output, native ownership, source/control/
+object/cache/history/link state and an unchanged real remote. The two-write
+installation case independently observes the released checkout/lane-switch write
+preimages, then validates every surviving raw clock-group backup and mode.
+
+The checked original assertions below map individually to these passed fixtures:
+
+| Original assertions | Native fixture and asserted behavior |
+| --- | --- |
+| `switch-lanes.e2e.ts:97,101` | `lane_adoption::remote_alias_preserves_both_local_alias_and_remote_name_lookup`: alias and remote-name lane lookups have the same component, with subsequent alias switching. |
+| `switch-lanes.e2e.ts:238,242` | `selection::main_keeps_lane_only_rows_unavailable_after_main_was_merged_elsewhere`: main lists no component and status reports one unavailable component. |
+| `switch-lanes.e2e.ts:478,483` | `selection::main_switch_reports_components_not_snapped_on_the_lane_as_skipped`: exact one-component switch report, one skipped component, and `details` identifies comp2. |
+| `switch-lanes.e2e.ts:511,516,519` | `conflicts::automatic_conflict_preserves_local_bytes_and_current_lane`: exact automatic-merge failure with strategy advice, unchanged source bytes and bitmap/current lane. |
+| `lane-import.e2e.ts:349` | `environment::patterned_lane_import_resolves_peer_plus_before_graceful_unpublished_peer_failure`: actual custom env plugin and snapped peer `+` resolve to `*`; the exact graceful unpublished-peer 404 remains, with no unsupported resolver or `@+` error. This original does not require successful installation. |
+| `lane-import.e2e.ts:384,390` | `selection::checkout_workspace_only_omits_new_lane_rows_and_ordinary_checkout_adds_them`: new lane row stays absent with the omission hint, then ordinary checkout adds it from the same input. |
+| `lane-import.e2e.ts:407` | `selection::checkout_workspace_only_does_not_offer_a_removed_new_component`: removed new row is neither added nor suggested. |
+
+Additional passed fixtures cover empty-workspace static patterns, real successful
+default installation with core and physically compiled provider environments,
+and actual onLoad/pre-install/post-install/compiler receipts observing the old
+lane before finalization. A mutable-subscriber fixture verifies real local links,
+optional-dependency settings, retained installer/argument identity and the released
+difference between mutation of an original options object and reassignment of an
+argument-bundle field. Broader mutable package-manager options remain unfinished.
+JSON's absent released handler and configured active-
+lane provider import remain explicit strict pre-effect delegation controls.
+Git branches, broader pattern grammar, and JSON success are not qualified here.
+
 ## Where ports live
 
 - `native/cli/tests/e2e/` is one test target (`main.rs`), mirroring `e2e/` by path:
@@ -2504,10 +2538,10 @@ row's fields, object path, header, logical identity, and remote index stay exact
 - [ ] `e2e/harmony/lanes/lane-import.e2e.ts:287` bit lane import operations › checking out to a different version from main › bit import should bring the version in the bitmap
 - [ ] `e2e/harmony/lanes/lane-import.e2e.ts:290` bit lane import operations › checking out to a different version from main › bit status should not throw ComponentsPendingImport
 - [ ] `e2e/harmony/lanes/lane-import.e2e.ts:308` bit lane import operations › create comp on a lane then same on main › bit status should not throw
-- [ ] `e2e/harmony/lanes/lane-import.e2e.ts:349` bit lane import operations › lane import with env using "+" version for component peer dependency (snaps) › should resolve "+" version and not pass it directly to pnpm
-- [ ] `e2e/harmony/lanes/lane-import.e2e.ts:384` bit lane import operations › getting new components from the lane › bit checkout with --workspace-only flag should not add the component and should suggest omitting --workspace-only flag
-- [ ] `e2e/harmony/lanes/lane-import.e2e.ts:390` bit lane import operations › getting new components from the lane › bit checkout without --workspace-only flag should add the new components
-- [ ] `e2e/harmony/lanes/lane-import.e2e.ts:407` bit lane import operations › getting new components from the lane › when the new component is soft-removed › bit checkout with --workspace-only flag, should not suggest omitting it
+- [x] `e2e/harmony/lanes/lane-import.e2e.ts:349` bit lane import operations › lane import with env using "+" version for component peer dependency (snaps) › should resolve "+" version and not pass it directly to pnpm
+- [x] `e2e/harmony/lanes/lane-import.e2e.ts:384` bit lane import operations › getting new components from the lane › bit checkout with --workspace-only flag should not add the component and should suggest omitting --workspace-only flag
+- [x] `e2e/harmony/lanes/lane-import.e2e.ts:390` bit lane import operations › getting new components from the lane › bit checkout without --workspace-only flag should add the new components
+- [x] `e2e/harmony/lanes/lane-import.e2e.ts:407` bit lane import operations › getting new components from the lane › when the new component is soft-removed › bit checkout with --workspace-only flag, should not suggest omitting it
 - [ ] `e2e/harmony/lanes/lane-import.e2e.ts:412` bit lane import operations › getting new components from the lane › when the new component is soft-removed › bit checkout head should not add it
 - [ ] `e2e/harmony/lanes/lane-import.e2e.ts:440` bit lane import operations › "bit lane import" current-lane behavior › when on the default lane (main) › should switch to the imported lane
 - [ ] `e2e/harmony/lanes/lane-import.e2e.ts:460` bit lane import operations › "bit lane import" current-lane behavior › when on a different lane with an uncommitted edit to a tracked component › should not switch lanes
@@ -2851,8 +2885,8 @@ row's fields, object path, header, logical identity, and remote index stay exact
 - [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:72` bit lane command › switching lanes › importing the lane objects and switching to that lane › changing the component and running bit diff › should not show the diff between the filesystem and main
 - [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:82` bit lane command › switching lanes › importing the lane objects and switching to that lane › snapping the component (so, it's an imported lane with local snaps) › bit status should show the component as staged
 - [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:86` bit lane command › switching lanes › importing the lane objects and switching to that lane › snapping the component (so, it's an imported lane with local snaps) › bit status --verbose should show the staged hash
-- [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:97` bit lane command › switching lanes › importing the lane objects and switching to that lane › switching with a different lane name › should save the remote-lane data into a local with the specified name
-- [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:101` bit lane command › switching lanes › importing the lane objects and switching to that lane › switching with a different lane name › should be able to retrieve the lane using the remote-name
+- [x] `e2e/harmony/lanes/switch-lanes.e2e.ts:97` bit lane command › switching lanes › importing the lane objects and switching to that lane › switching with a different lane name › should save the remote-lane data into a local with the specified name
+- [x] `e2e/harmony/lanes/switch-lanes.e2e.ts:101` bit lane command › switching lanes › importing the lane objects and switching to that lane › switching with a different lane name › should be able to retrieve the lane using the remote-name
 - [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:112` bit lane command › switching lanes › importing the lane objects and switching to that lane › switching to a local lane › should switch successfully
 - [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:118` bit lane command › switching lanes › importing the lane objects and switching to that lane › switching to a local lane › should not save the local lane in bitmap
 - [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:139` bit lane command › switching lanes with deleted files › should delete the comp1/comp1.spec.js file
@@ -2861,8 +2895,8 @@ row's fields, object path, header, logical identity, and remote index stay exact
 - [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:182` bit lane command › switching lanes and importing in a new scope from remote scope › should only import comp1 from the lane when on a lane
 - [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:211` bit lane command › switch to main after importing a lane › .bitmap should have the component with the main version
 - [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:215` bit lane command › switch to main after importing a lane › should list the component as 0.0.1 and not with a hash
-- [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:238` bit lane command › switch to main after merging the lane somewhere else › should not make the component available on main
-- [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:242` bit lane command › switch to main after merging the lane somewhere else › bit status should show a section of unavailable components on main
+- [x] `e2e/harmony/lanes/switch-lanes.e2e.ts:238` bit lane command › switch to main after merging the lane somewhere else › should not make the component available on main
+- [x] `e2e/harmony/lanes/switch-lanes.e2e.ts:242` bit lane command › switch to main after merging the lane somewhere else › bit status should show a section of unavailable components on main
 - [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:246` bit lane command › switch to main after merging the lane somewhere else › bit checkout should make it available
 - [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:264` bit lane command › switch from main to a lane when main has staged components › should block the switch and suggest to export or reset
 - [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:310` bit lane command › should use the dep from main and not from the previous lane
@@ -2875,11 +2909,11 @@ row's fields, object path, header, logical identity, and remote index stay exact
 - [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:440` bit lane command › switch with deprecated --head flag › should still switch successfully (no-op)
 - [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:456` bit lane command › switch with --force-ours › should switch successfully
 - [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:459` bit lane command › switch with --force-ours › should not change the files and keep them same as the lane
-- [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:478` bit lane command › switch to main when only one component was snapped on a lane › should switch the component on the lane only
-- [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:483` bit lane command › switch to main when only one component was snapped on a lane › bit details should show the full list of skipped components
-- [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:511` bit lane command › switching lanes while a component file has uncommitted local changes › should block the switch with an automatic-merge-failed error
-- [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:516` bit lane command › switching lanes while a component file has uncommitted local changes › should preserve the uncommitted local file changes
-- [ ] `e2e/harmony/lanes/switch-lanes.e2e.ts:519` bit lane command › switching lanes while a component file has uncommitted local changes › should not change the current lane
+- [x] `e2e/harmony/lanes/switch-lanes.e2e.ts:478` bit lane command › switch to main when only one component was snapped on a lane › should switch the component on the lane only
+- [x] `e2e/harmony/lanes/switch-lanes.e2e.ts:483` bit lane command › switch to main when only one component was snapped on a lane › bit details should show the full list of skipped components
+- [x] `e2e/harmony/lanes/switch-lanes.e2e.ts:511` bit lane command › switching lanes while a component file has uncommitted local changes › should block the switch with an automatic-merge-failed error
+- [x] `e2e/harmony/lanes/switch-lanes.e2e.ts:516` bit lane command › switching lanes while a component file has uncommitted local changes › should preserve the uncommitted local file changes
+- [x] `e2e/harmony/lanes/switch-lanes.e2e.ts:519` bit lane command › switching lanes while a component file has uncommitted local changes › should not change the current lane
 
 ### `e2e/harmony/lanes/unrelated-and-removed.e2e.ts`
 

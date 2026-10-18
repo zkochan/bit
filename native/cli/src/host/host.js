@@ -28,6 +28,7 @@ const identityMutationCommand = identityRenameCommand || ['move', 'mv', 'depreca
 const snapshotCommandName = cliArguments[0] === 't' ? 'tag' : cliArguments[0];
 let snapshotCommand = ['snap', 'tag'].includes(snapshotCommandName) || (cliArguments[0] === 'merge' && cliArguments.includes('--resolve'));
 const checkoutCommand = (cliArguments[0] === 'merge' && cliArguments.includes('--abort')) || (cliArguments[0] === 'lane' && cliArguments[1] === 'merge-abort') || ['checkout', 'U', 'revert', 'switch'].includes(cliArguments[0]) || (cliArguments[0] === 'lane' && cliArguments[1] === 'import');
+const laneSwitchCommand = cliArguments[0] === 'switch' || (cliArguments[0] === 'lane' && cliArguments[1] === 'import');
 const mergeCommand = (cliArguments[0] === 'merge' && !cliArguments.includes('--abort') && !cliArguments.includes('--resolve')) || (cliArguments[0] === 'lane' && cliArguments[1] === 'merge');
 const exportCommand = ['export', 'e', 'resume-export'].includes(cliArguments[0]);
 const bufferedCommand = snapshotCommand || checkoutCommand || mergeCommand || exportCommand || identityMutationCommand || ['stash', 'add', 'a'].includes(cliArguments[0]);
@@ -180,6 +181,9 @@ const handlers = {
   exportPackages,
   exportFinish,
   hostInfo,
+  switchCompile,
+  switchConfiguredAspectClasses,
+  switchInstallSubscribers,
   collationOrder: ({ ids }) => ids.map((_, index) => index).sort((left, right) => ids[left].localeCompare(ids[right])),
   envPolicy: ({ envId }) => envPolicy(envId),
   compilerFacts: async ({ envId }) => {
@@ -208,7 +212,7 @@ const handlers = {
     for (const entry of entries) trackingDocumentation.set(entry.path, entry.docs);
     return true;
   },
-  trackingDocs: async ({ components }) => {
+  trackingDocs: async ({ components, nativeCacheOnly = false }) => {
     const workspace = (await loadHarmony()).get('teambit.workspace/workspace');
     const { SourceFile } = bitRequire('@teambit/component.sources');
     const { parser } = bitRequire('@teambit/semantics.doc-parser');
@@ -221,7 +225,7 @@ const handlers = {
         const filename = path.join(directory, entry.relativePath);
         const file = SourceFile.load(filename, directory, root);
         const docs = await parser(file, {
-          getDocsFromCache: (key) => cache.getDocsFromCache(key),
+          getDocsFromCache: (key) => nativeCacheOnly ? undefined : cache.getDocsFromCache(key),
           saveDocsInCache: async (key, value) => { writes.push({path:key,docs:value}); },
         });
         trackingDocumentation.set(filename, docs);
@@ -267,7 +271,17 @@ const handlers = {
       if (!receipt || receipt.mainFile !== componentMap.mainFile) {
         throw new Error('native tracking component inventory mismatch');
       }
-      componentMap.files = receipt.files.map((file) => ({ ...file }));
+      const previous = laneSwitchCommand && retainLoaded
+        ? workspace.consumer.bitMap.components.find(component => component.id.isEqual(componentMap.id)
+          && component.rootDir === componentMap.rootDir && component.mainFile === componentMap.mainFile)
+        : undefined;
+      const files = new Map(receipt.files.map(file => [file.relativePath, file]));
+      // ComponentWriter changes selected entries in the live bitmap. An untouched
+      // provider keeps its existing inventory order, even when disk scanning sorts it.
+      const unchangedFiles = previous && previous.files.length === files.size
+        && previous.files.every(file => files.has(file.relativePath));
+      componentMap.files = (unchangedFiles ? previous.files.map(file => files.get(file.relativePath)) : receipt.files)
+        .map(file => ({ ...file }));
       if(Object.hasOwn(receipt,'trackingVersion')) componentMap.id=componentMap.id.changeVersion(receipt.trackingVersion??undefined);
     }
     if (!retainLoaded) {
@@ -762,11 +776,12 @@ async function afterInstall(request) {
   workspace.inInstallContext = true;
   workspace.inInstallAfterPmContext = true;
   const previousProgress = snapshotBootstrapProgress;
-  if (cliArguments[0] === 'fork' || (cliArguments[0] === 'scope' && cliArguments[1] === 'rename')) snapshotBootstrapProgress = true;
+  if (laneSwitchCommand || cliArguments[0] === 'fork' || (cliArguments[0] === 'scope' && cliArguments[1] === 'rename')) snapshotBootstrapProgress = true;
   try {
-    await workspace.clearCache();
+    if (!laneSwitchCommand) await workspace.clearCache();
     await install.reloadMovedEnvs();
     await install.reloadNonLoadedEnvs();
+    if (laneSwitchCommand && install.shouldClearCacheOnInstall()) await workspace.clearCache();
     let compiled = 0;
     let distDirs = null;
     if (request.compile) {
@@ -946,7 +961,7 @@ async function hydrateStatusComponent(row, sourceConsumer) {
       if (Object.hasOwn(row.scope.currentVersion, field)) consumer[field] = row.scope.currentVersion[field];
     }
   }
-  if ((identityMutationCommand || ['add','a'].includes(cliArguments[0])) && trackingDocumentation.size) {
+  if ((identityMutationCommand || checkoutCommand || ['add','a'].includes(cliArguments[0])) && trackingDocumentation.size) {
     consumer.docs = row.files.flatMap((file) => trackingDocumentation.get(path.join(directory, file)) ?? []);
   }
   consumer.defaultScope = id.scope;

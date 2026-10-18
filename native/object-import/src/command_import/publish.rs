@@ -126,7 +126,7 @@ impl PreparedImport {
         Ok(())
     }
 }
-fn write_file(path: &Path, bytes: &[u8]) -> io::Result<()> {
+pub(super) fn write_file(path: &Path, bytes: &[u8]) -> io::Result<()> {
     let parent = path.parent().ok_or_else(|| invalid("import publication parent"))?;
     fs::create_dir_all(parent)?;
     // Canonical outputFile preserves the existing inode and its owner/ACLs.

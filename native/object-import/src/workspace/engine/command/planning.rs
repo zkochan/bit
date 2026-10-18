@@ -123,6 +123,20 @@ fn import_selected(record: &mut Record, selections: &[Value]) -> io::Result<()> 
     if super::checkout_stash::loading(&record.request.options) {
         return Ok(());
     }
+    let mut expanded = expanded_imports(record, selections)?;
+    if record.request.operation == input::Operation::Switch {
+        super::switch::progress::additions(&record.context, &mut expanded)?;
+        record.context["switchCheckoutImport"] =
+            record.repository.prepare_switch_versions(&expanded)?;
+        Ok(())
+    } else {
+        record.repository.prepare_versions(&expanded)
+    }
+}
+fn expanded_imports(
+    record: &Record,
+    selections: &[Value],
+) -> io::Result<Vec<command_import::Target>> {
     let targets = record.targets
         .iter()
         .zip(selections)
@@ -145,7 +159,7 @@ fn import_selected(record: &mut Record, selections: &[Value]) -> io::Result<()> 
             });
         }
     }
-    record.repository.prepare_versions(&expanded)
+    Ok(expanded)
 }
 fn failure(result: &mut Value, target: &Value, selected: &Value) -> io::Result<()> {
     if selected["legitimate"] != true || selected["shouldBeRemoved"] == true {

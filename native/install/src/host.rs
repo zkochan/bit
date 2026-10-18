@@ -108,6 +108,17 @@ pub struct DetectRequest<'a> {
 /// workspace actually needs it.
 #[async_trait]
 pub trait Host: Send + Sync {
+    /// Run actual package-manager subscribers over the native installation metadata.
+    async fn install_subscribers(&self, request: &Value) -> io::Result<Option<Value>> {
+        let _ = request;
+        Ok(None)
+    }
+
+    /// Load configured aspect classes at the root-policy phase without aggregating policy.
+    async fn configured_aspect_classes(&self) -> io::Result<()> {
+        Ok(())
+    }
+
     /// Dependency policy (`EnvPolicyConfigObject`) of an env that has no
     /// `env.jsonc`: core envs and legacy envs implementing `getDependencies()`.
     /// `None` when the env cannot be loaded.
