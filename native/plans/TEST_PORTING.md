@@ -11,7 +11,7 @@ ceiling: native-only cases for edge cases the e2e suite does not cover are welco
 
 ## Lane adoption focused qualification
 
-The lane-adoption filter passed all 20 tests (19 strict integration fixtures and
+The lane-adoption filter passed all 21 tests (20 strict integration fixtures and
 one completion-token test) against released Bit 2.2.94. All seven required checks
 plus Rust scope must pass before qualification. Performance qualification remains
 pending; this is not a complete lane-command claim.
@@ -35,6 +35,8 @@ The checked original assertions below map individually to these passed fixtures:
 Additional passed fixtures cover empty-workspace static patterns, including
 bracket classes selecting a strict subset without adding excluded rows, real successful
 default installation with core and physically compiled provider environments,
+including explicit root-components-disabled installation without root-manifest
+loading phases,
 and actual onLoad/pre-install/post-install/compiler receipts observing the old
 lane before finalization. A mutable-subscriber fixture verifies real local links,
 optional-dependency settings, retained installer/argument identity and the released

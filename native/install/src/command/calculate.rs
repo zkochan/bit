@@ -85,10 +85,11 @@ pub async fn calculate(
         },
     )?;
     session.output.success(DEDUPING, None);
-    // The component loads the TypeScript command performs while it finishes
-    // the manifests of the engine run.
-    session.loading(loaded);
-    session.loading(loaded);
+    // Node loads env and app root manifests only when root components are enabled.
+    if loaded.config.dependency_resolver.has_root_components() {
+        session.loading(loaded);
+        session.loading(loaded);
+    }
     Ok(Calculated {
         components,
         env_policies,

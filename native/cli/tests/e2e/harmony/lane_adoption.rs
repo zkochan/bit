@@ -104,3 +104,38 @@ fn lane_import_pattern_adopts_only_selected_component_on_main() {
     assert!(bitmap.get("comp1").is_none());
     assert!(bitmap.get("comp2").is_some());
 }
+
+#[test]
+fn remote_pattern_default_installation_without_root_components_preserves_all_state() {
+    let helper = exported(2);
+    empty(&helper);
+    let path = helper.scopes.local_path.join("workspace.jsonc");
+    let mut workspace = config::read_jsonc(&path);
+    let resolver = workspace
+        .as_object_mut()
+        .unwrap()
+        .entry("teambit.dependencies/dependency-resolver")
+        .or_insert_with(|| serde_json::json!({}));
+    resolver["rootComponents"] = serde_json::json!(false);
+    config::set_workspace_key(
+        &helper.scopes.local_path,
+        "teambit.dependencies/dependency-resolver",
+        resolver.clone(),
+    );
+    let command = format!("switch {} -p {}/comp1", lane(&helper), helper.scopes.remote);
+    let output = crate::commands::add::support::history_oracle::compare(
+        &helper,
+        &command,
+        output::durations,
+        ["checkout", "lane-switch"],
+        true,
+    );
+    assert!(output.status.success(), "{} {}", output.stdout, output.stderr);
+    let bitmap = support::bitmap(&helper);
+    assert!(bitmap.get("comp1").is_some());
+    assert!(bitmap.get("comp2").is_none());
+    assert!(helper.scopes.local_path.join("pnpm-lock.yaml").is_file());
+    assert!(helper.scopes.local_path.join("node_modules/.modules.yaml").is_file());
+    let workspace = config::read_jsonc(&path);
+    assert_eq!(workspace["teambit.dependencies/dependency-resolver"]["rootComponents"], false);
+}
