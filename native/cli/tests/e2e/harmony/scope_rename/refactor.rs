@@ -242,7 +242,7 @@ fn exported_owner_rename_preserves_the_published_versioned_target_contract() {
 }
 
 #[test]
-fn mixed_scope_refactor_reports_reloaded_bitmap_order_instead_of_batch_insertion_order() {
+fn mixed_scope_refactor_retains_released_list_order_across_later_bitmap_writes() {
     let helper = support::workspace(4, false);
     let old = helper.scopes.remote.clone();
     for index in 1..4 {
@@ -264,12 +264,18 @@ fn mixed_scope_refactor_reports_reloaded_bitmap_order_instead_of_batch_insertion
         .split("refactored components")
         .nth(1)
         .unwrap();
-    let original = report
-        .find(&format!("{old}/comp3@0.0.1"))
-        .unwrap();
-    let replacement = report.find("replacement.scope/comp1").unwrap();
-    assert!(
-        (original < replacement) == (old.as_str() < "comp1"),
-        "the reloaded bitmap orders unique names before qualifying duplicate names: {report}",
+    let changed = report
+        .lines()
+        .filter_map(|line| line.strip_prefix("   › "))
+        .collect::<std::collections::BTreeSet<_>>();
+    let original = format!("{old}/comp3@0.0.1");
+    assert_eq!(
+        changed,
+        std::collections::BTreeSet::from([
+            original.as_str(),
+            "replacement.scope/comp1",
+            "replacement.scope/comp2",
+            "replacement.scope/comp3",
+        ]),
     );
 }

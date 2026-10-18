@@ -25,6 +25,7 @@ pub(super) fn initial(
             linker.link(root, entries.batch.bitmap(), std::slice::from_ref(&added), false, chalk)?;
             print!("{}", linker.take_stdout());
             entries.batch.write(&workspace_command::file_id(), &format!("adding {target}"))?;
+            load_added(root, entries.batch.bitmap(), &added, &target, linker)?;
             linker.call(
                 root,
                 "renameTooling",
@@ -41,6 +42,21 @@ pub(super) fn initial(
             .ok_or_else(|| io::Error::other("scope rename source package"))?;
         entries.batch.retire(index, &workspace_command::file_id(), package)?;
     }
+    Ok(())
+}
+fn load_added(
+    root: &Path,
+    bitmap: &Value,
+    added: &String,
+    requested: &str,
+    linker: &mut ProjectedLinker,
+) -> io::Result<()> {
+    if added != requested {
+        return Ok(());
+    }
+    let rows = linker.capture(root, bitmap, std::slice::from_ref(added))?;
+    linker.call(root, "identityUseCached", &json!({"components":rows}))?;
+    print!("{}", linker.take_stdout());
     Ok(())
 }
 pub(super) fn pairs(entries: &Entries) -> io::Result<Vec<(String, String)>> {
