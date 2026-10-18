@@ -7,9 +7,11 @@ full object/state validation and narrowly validated history/cache timestamps.
 """
 import argparse
 import base64
+import datetime
 import email.utils
 import json
 import platform
+import re
 import os
 import shlex
 import statistics
@@ -127,10 +129,12 @@ def execute(args, stage, fixtures, workload, mode, run, implementation):
     if workload in PREPARE.INSTALLATIONS:
         installation_clocks(root, workspace, prefix, host_before['time_ns'], host_after['time_ns'])
     verify_postconditions(root, workload)
+    globals_state = STATE.tree(stage / 'globals', globals_directory=True)
+    command_details_clock(stage / 'globals', globals_state, prefix, host_before['time_ns'], host_after['time_ns'], Path(fixtures['globals']))
     result = {'status': output.returncode, 'stdout': STATE.normalized(output.stdout),
               'stderr': STATE.normalized(output.stderr),
               'workspace': workspace,
-              'globals': STATE.tree(stage / 'globals', globals_directory=True),
+              'globals': globals_state,
               'home': STATE.tree(stage / 'home'),
               'remote': STATE.tree(stage / 'remote')}
     prefix.with_suffix('.state.json').write_text(json.dumps(result, indent=2) + '\n')
@@ -201,6 +205,59 @@ def provider_postconditions(root, workload):
             raise RuntimeError('original subscriber PM option was ignored')
         if (root / 'subscriber-ignored-root').exists():
             raise RuntimeError('reassigned args root incorrectly changed formal install root')
+
+
+def command_details_clock(globalsdir, tree, prefix, hostbefore_ns, hostafter_ns, baselineglobals):
+    """Project only a canonical, command-window-validated last-command timestamp."""
+    name = 'last-command-details/meta.json'
+    path = globalsdir / name
+    if path.is_symlink() or path.parent.is_symlink():
+        raise RuntimeError('nonregular last-command metadata')
+    if not path.exists():
+        return
+    if not path.is_file():
+        raise RuntimeError('nonregular last-command metadata')
+    raw = path.read_bytes()
+    mode = path.stat().st_mode & 0o7777
+    if tree.get(name) != ['file', mode, STATE.sha(raw)]:
+        raise RuntimeError('last-command metadata was otherwise projected')
+    baseline = baselineglobals / name
+    if baseline.is_symlink() or baseline.parent.is_symlink() or (baseline.exists() and not baseline.is_file()):
+        raise RuntimeError('nonregular immutable baseline command metadata')
+    baseline_raw = baseline.read_bytes() if baseline.exists() else None
+    if raw == baseline_raw:
+        prefix.with_suffix('.command-details-clock.json').write_text(json.dumps({
+            'path': name, 'bytes_base64': base64.b64encode(raw).decode(), 'mode': mode,
+            'baseline_sha256': STATE.sha(baseline_raw), 'projection': 'none: immutable baseline bytes unchanged',
+            'interval_start_ns': hostbefore_ns, 'interval_end_ns': hostafter_ns,
+            'projected_sha256': STATE.sha(raw)}, indent=2) + '\n')
+        return
+    value = json.loads(raw)
+    if not isinstance(value, dict) or set(value) != {'command', 'timestamp'} or value['command'] != 'switch':
+        raise RuntimeError('unknown last-command metadata schema')
+    timestamp = value['timestamp']
+    if not isinstance(timestamp, str) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z', timestamp):
+        raise RuntimeError('noncanonical last-command timestamp')
+    parsed = datetime.datetime.strptime(timestamp, '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=datetime.timezone.utc)
+    delta = parsed - datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)
+    millis = (delta.days * 86400 + delta.seconds) * 1000 + delta.microseconds // 1000
+    if not hostbefore_ns // 1_000_000 <= millis <= hostafter_ns // 1_000_000:
+        raise RuntimeError('last-command timestamp outside observed command interval')
+    canonical = json.dumps(value, ensure_ascii=False, separators=(',', ':')).encode()
+    token = b'"timestamp":' + json.dumps(timestamp).encode()
+    if raw != canonical or raw.count(token) != 1:
+        raise RuntimeError('last-command metadata is not compact canonical JSON with one timestamp token')
+    begin = raw.index(token) + len(b'"timestamp":')
+    end = begin + len(json.dumps(timestamp).encode())
+    projected = raw[:begin] + b'"<command-timestamp>"' + raw[end:]
+    tree[name] = ['file', mode, STATE.sha(projected)]
+    prefix.with_suffix('.command-details-clock.json').write_text(json.dumps({
+        'path': name, 'bytes_base64': base64.b64encode(raw).decode(), 'mode': mode,
+        'baseline_sha256': STATE.sha(baseline_raw) if baseline_raw is not None else None,
+        'projection': 'only fresh command-window timestamp scalar',
+        'timestamp': timestamp, 'interval_start_ns': hostbefore_ns, 'interval_end_ns': hostafter_ns,
+        'timestamp_precision': 'UTC milliseconds; observed interval endpoints compared at the same precision',
+        'projected_sha256': STATE.sha(projected)}, indent=2) + '\n')
 
 
 def installation_clocks(root, state, prefix, started, ended):
@@ -386,7 +443,8 @@ def main():
                                 'validated command-history ISO timestamps/PIDs',
                                 'config histories retain strict snapshots/reasons',
                                 'lane bitmap histories: every surviving raw backup validated against independent last-writer preimages; overwritten preimages remain oracle-only',
-                                'checksum-validated cache-index receipt timestamps'],
+                                'checksum-validated cache-index receipt timestamps',
+                                'last-command-details/meta.json: immutable baseline bytes unchanged; otherwise only compact canonical fresh switch timestamp inside observed command window'],
               'intentional_boundaries': ['missing published switch JSON handler', 'configured active-lane import delegation', 'Git branch management'],
               'excluded_implementation_state': ['exact workspace-root debug.log', 'exact globals/logs subtree'],
               'ownership_note': 'Every measured command must remain native in all three presentation modes.',
