@@ -27,7 +27,7 @@ pub(super) struct PackageMatcher {
     regex: Option<Regex>,
 }
 impl PackageMatcher {
-    fn new(source: &str, target: &str) -> Self {
+    pub(super) fn new(source: &str, target: &str) -> Self {
         Self { source: source.into(), target: target.into(), regex: None }
     }
     pub(super) fn apply(&mut self, bytes: &[u8]) -> io::Result<Vec<u8>> {
