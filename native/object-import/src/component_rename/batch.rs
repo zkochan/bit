@@ -16,6 +16,7 @@ pub struct Batch {
     bitmap: Value,
     expected: Vec<u8>,
     refactored: Vec<super::files::Change>,
+    packages: Option<super::refactor::PackageMatchers>,
 }
 impl Batch {
     /// Prepare independent read-only plans concurrently, preserving caller order and first error.
@@ -56,6 +57,7 @@ impl Batch {
             original,
             expected,
             refactored: Vec::new(),
+            packages: None,
         })
     }
     #[must_use]
@@ -144,7 +146,7 @@ impl Batch {
         row: &Value,
         pairs: &[(String, String)],
     ) -> io::Result<bool> {
-        let plan = self.plan_mut(index)?;
+        let (plan, matchers) = self.plan_packages(index, pairs)?;
         let preserve = plan.options.preserve;
         let refactor = plan.options.refactor;
         plan.options.preserve = false;
@@ -154,13 +156,29 @@ impl Batch {
         plan.options.refactor = refactor;
         result?;
         if refactor {
-            super::files::batch::packages_all(plan, pairs)
+            super::files::batch::packages_all(plan, matchers)
         } else {
             if preserve {
                 plan.files.clear();
             }
             Ok(false)
         }
+    }
+    fn plan_packages(
+        &mut self,
+        index: usize,
+        pairs: &[(String, String)],
+    ) -> io::Result<(&mut Plan, &mut super::refactor::PackageMatchers)> {
+        if self.packages
+            .as_ref()
+            .is_none_or(|matchers| !matchers.matches(pairs))
+        {
+            self.packages = Some(super::refactor::PackageMatchers::new(pairs));
+        }
+        let plan = self.plans.get_mut(index).ok_or_else(|| invalid("scope rename plan index"))?;
+        let matchers =
+            self.packages.as_mut().ok_or_else(|| invalid("scope rename package matchers"))?;
+        Ok((plan, matchers))
     }
     pub fn refactor_loaded(
         &mut self,

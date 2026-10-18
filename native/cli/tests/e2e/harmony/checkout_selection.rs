@@ -194,8 +194,7 @@ fn parsed_short_reference(raw: &str) -> String {
     bit_object_import::stringify_json(&serde_json::json!(number), false).unwrap()
 }
 
-// Windows owns the released missing-short-ref error; Unix still delegates that error before effects.
-#[cfg(windows)]
+// Truly absent short references retain the released pre-effect delegation boundary.
 #[test]
 fn numeric_checkout_and_revert_targets_preserve_released_errors_without_writes() {
     let helper = workspace();
@@ -203,7 +202,7 @@ fn numeric_checkout_and_revert_targets_preserve_released_errors_without_writes()
     for target in ["38938e0", "0xabc", "0012345", "9007199254740992"] {
         for command in [format!("checkout {target} comp1 -x"), format!("revert comp1 {target} -x")]
         {
-            let result = compare_with(&helper, &command, false);
+            let result = compare_owned(&helper, &command, false, false);
             assert!(!result.status.success(), "{command}");
             assert_eq!(short_ref_workspace_files(&helper), before);
         }

@@ -2,14 +2,12 @@ use super::{Change, Plan, Value, dependent_file, refactor, unsupported};
 use std::io;
 pub(in crate::component_rename) fn packages_all(
     plan: &mut Plan,
-    pairs: &[(String, String)],
+    matchers: &mut refactor::PackageMatchers,
 ) -> io::Result<bool> {
     let mut changed = false;
     for file in &mut plan.files {
         let before = file.bytes.clone();
-        for (source, target) in pairs {
-            file.bytes = refactor::package(&file.bytes, source, target)?;
-        }
+        file.bytes = matchers.apply(&file.bytes)?;
         changed |= file.bytes != before;
     }
     if plan.options.preserve && !changed {
@@ -23,6 +21,7 @@ pub(in crate::component_rename) fn batch_dependents(
     pairs: &[(String, String)],
     targets: &[String],
 ) -> io::Result<(Vec<Change>, Vec<String>)> {
+    let mut matchers = refactor::PackageMatchers::new(pairs);
     let mut output = Vec::new();
     let mut identities = Vec::new();
     for row in rows {
@@ -34,7 +33,7 @@ pub(in crate::component_rename) fn batch_dependents(
         {
             continue;
         }
-        let changes = batch_component(plan, row, pairs)?;
+        let changes = batch_component(plan, row, &mut matchers)?;
         if !changes.is_empty() {
             identities.push(id.to_owned());
             output.extend(changes);
@@ -45,7 +44,7 @@ pub(in crate::component_rename) fn batch_dependents(
 fn batch_component(
     plan: &mut Plan,
     row: &Value,
-    pairs: &[(String, String)],
+    matchers: &mut refactor::PackageMatchers,
 ) -> io::Result<Vec<Change>> {
     let directory =
         row["directory"].as_str().ok_or_else(|| unsupported("scope rename loaded directory"))?;
@@ -61,9 +60,7 @@ fn batch_component(
             .ok_or_else(|| unsupported("scope rename loaded path"))?;
         let (mut change, _) = dependent_file(plan, &component, directory, relative, ("", ""))?;
         let before = change.bytes.clone();
-        for (source, target) in pairs {
-            change.bytes = refactor::package(&change.bytes, source, target)?;
-        }
+        change.bytes = matchers.apply(&change.bytes)?;
         changed |= before != change.bytes;
         changes.push(change);
     }

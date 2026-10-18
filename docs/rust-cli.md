@@ -277,6 +277,14 @@ startup timer redraw immediately before its hard-link banner; final progress,
 package summaries, lifecycle order and filesystem state remain exact. Focused
 checks retain changed counters, controls, positions and duplicate redraws.
 
+The [numeric-target qualification](../scripts/rust/benchmarks/workspace-mutation-checkout-fix-qualification.json)
+measures source `3d404801a` after checkout/revert positional coercion changed.
+All 270 correctness pairs passed; 51 of 52 eligible native medians were lower.
+Scope rename in TTY mode was slower (1030.642 ms Rust versus 1018.141 ms Node),
+and the complete valid result remains preserved. Batch package refactoring now
+reuses lazily compiled matchers, and fully cached capture avoids seeding the
+same classes twice; neither change removes lifecycle callbacks or input proofs.
+
 ### Ignore rules
 
 The workspace inventory follows `.gitignore`, `.bitignore` and Bit's own lists

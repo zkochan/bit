@@ -100,3 +100,22 @@ fn mismatched_inputs_fail_before_reading_the_workspace() {
     assert_eq!(result.err().unwrap().kind(), io::ErrorKind::InvalidInput);
     assert!(Batch::prepare_plans(directory.path(), &[], &[]).unwrap().is_empty());
 }
+
+#[test]
+fn missing_dependent_file_precedes_lazy_invalid_package_regex() {
+    let (directory, options, facts) = workspace();
+    let plans = Batch::prepare_plans(directory.path(), &options, &facts).unwrap();
+    let mut batch = Batch::prepare(directory.path(), plans).unwrap();
+    let rows =
+        vec![json!({"identity":"my.scope/dependent","directory":"first","files":["missing.js"]})];
+    let error = batch
+        .refactor_loaded(&rows, &[("[".into(), "invalid".into())])
+        .unwrap_err();
+    assert_eq!(error.kind(), io::ErrorKind::NotFound);
+    assert!(
+        !directory
+            .path()
+            .join("components")
+            .exists(),
+    );
+}
