@@ -118,6 +118,7 @@ const handlers = {
   renameAst,
   renameSourceConfig,
   identityUseCached,
+  identityListOrder,
   identityConsumerMode,
   identityLinkFacts,
   identityMaterialized,

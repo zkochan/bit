@@ -1,6 +1,20 @@
 /** Actual identity classes are reused by get/list/link/compiler, as WorkspaceComponentLoader does. */
 const identityLoadedComponents = new Map();
 
+/** WorkspaceComponentLoader.getMany returns newly loaded classes before cache hits. */
+async function identityListOrder({ ids }) {
+  const workspace = (await loadHarmony()).get('teambit.workspace/workspace');
+  const available = workspace.consumer.bitMap.getAllIdsAvailableOnLane();
+  const options = { loadExtensions: false, executeLoadSlot: false, loadSeedersAsAspects: true, resolveExtensionsVersions: false };
+  const fresh = [], cached = [];
+  for (const identity of ids) {
+    const id = available.find(id => id.toStringWithoutVersion() === identity);
+    if (!id) throw new Error(`scope rename list identity missing: ${identity}`);
+    (workspace.componentLoader.getFromCache(id, options) ? cached : fresh).push(identity);
+  }
+  return [...fresh, ...cached];
+}
+
 function identityLoadedComponent(identity) {
   return identityRenameCommand ? identityLoadedComponents.get(identity) : undefined;
 }

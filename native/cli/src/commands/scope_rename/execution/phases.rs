@@ -89,12 +89,14 @@ pub(super) fn refactor(
 ) -> io::Result<Vec<String>> {
     let bitmap = published_bitmap(root)?;
     let all = bitmap_ids(&bitmap)?;
+    let order: Vec<String> =
+        serde_json::from_value(linker.call(root, "identityListOrder", &json!({"ids":all}))?)?;
     output.status(&format!("loading {} component(s)", all.len()));
     let rows = linker.capture_cached(root, entries.batch.bitmap(), &all)?;
     print!("{}", linker.take_stdout());
     let mut changed = entries.batch.refactor_loaded(&rows, &pairs(entries)?)?;
     changed.extend_from_slice(targets);
-    let changed = order_changed(&bitmap, &changed)?;
+    let changed = order_changed(&bitmap, &order, &changed)?;
     entries.batch.apply_refactored()?;
     entries.batch.write_refactored_targets(targets)?;
     linker.call(root, "identityMaterialized", &entries.batch.refactored_materialized())?;
@@ -143,15 +145,17 @@ fn row_id(key: &str, row: &Value) -> Option<String> {
         .or_else(|| row["defaultScope"].as_str())?;
     Some(format!("{scope}/{name}"))
 }
-fn order_changed(bitmap: &Value, changed: &[String]) -> io::Result<Vec<String>> {
+fn order_changed(bitmap: &Value, order: &[String], changed: &[String]) -> io::Result<Vec<String>> {
     let rows = bitmap.as_object().ok_or_else(|| io::Error::other("scope rename bitmap"))?;
-    Ok(rows
+    Ok(order
         .iter()
-        .filter_map(|(key, row)| {
-            let id = row_id(key, row)?;
-            if !changed.contains(&id) {
+        .filter_map(|id| {
+            if !changed.contains(id) {
                 return None;
             }
+            let row = rows
+                .iter()
+                .find_map(|(key, row)| (row_id(key, row).as_ref() == Some(id)).then_some(row))?;
             Some(
                 row["version"]
                     .as_str()

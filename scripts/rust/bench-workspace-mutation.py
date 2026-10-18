@@ -57,6 +57,19 @@ def clock_phase(workload):
     raise RuntimeError('could not satisfy the predeclared scope rename start-clock phase')
 
 
+def workspace_state(root, baseline_objects, baseline_history, workload):
+    """Remove moves models/versions to trash; compare the exact removed IDs and preimages."""
+    if workload != 'remove-tagged-batch':
+        return STATE.state(root, baseline_objects, baseline_history)
+    found = STATE.objects(root)
+    retained = {key: value for key, value in baseline_objects.items() if key in found}
+    result = STATE.state(root, retained, baseline_history)
+    result['removed_objects'] = {
+        key: [kind, STATE.sha(body), {'file': mode, 'prefix_directory': prefix_mode}]
+        for key, (kind, body, mode, prefix_mode) in baseline_objects.items() if key not in found}
+    return result
+
+
 def execute(args, stage, fixtures, workload, mode, run, implementation):
     for source, name in [(fixtures['workloads'][workload], 'workspace'),
                          (fixtures['home'], 'home'), (fixtures['globals'], 'globals'),
@@ -96,7 +109,7 @@ def execute(args, stage, fixtures, workload, mode, run, implementation):
         'start_clock_phase': phase}, indent=2) + '\n')
     result = {'status': output.returncode, 'stdout': STATE.normalized(output.stdout),
               'stderr': STATE.normalized(output.stderr),
-              'workspace': STATE.state(root, baseline_objects, baseline_history),
+              'workspace': workspace_state(root, baseline_objects, baseline_history, workload),
               'globals': STATE.tree(stage / 'globals', globals_directory=True),
               'home': STATE.tree(stage / 'home'),
               'remote': STATE.tree(stage / 'remote')}
