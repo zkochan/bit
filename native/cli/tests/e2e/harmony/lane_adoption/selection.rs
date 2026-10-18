@@ -7,7 +7,7 @@ fn workspace_only_switches_existing_component_without_adding_new_lane_rows() {
     empty(&helper);
     support::setup(&helper, &format!("import {}/comp1 -x", helper.scopes.remote));
     let output =
-        support::successful(&helper, &format!("switch {} --workspace-only -x", lane(&helper)));
+        two_write_success(&helper, &format!("switch {} --workspace-only -x", lane(&helper)));
     assert!(output.stdout.contains("successfully switched 1 components"), "{}", output.stdout);
     let bitmap = support::bitmap(&helper);
     assert!(bitmap.get("comp1").is_some());
@@ -19,7 +19,7 @@ fn ordinary_switch_adds_components_omitted_by_workspace_only() {
     let helper = exported(2);
     empty(&helper);
     support::setup(&helper, &format!("import {}/comp1 -x", helper.scopes.remote));
-    support::successful(&helper, &format!("switch {} -x", lane(&helper)));
+    two_write_success(&helper, &format!("switch {} -x", lane(&helper)));
     assert!(support::bitmap(&helper).get("comp2").is_some());
 }
 
@@ -30,7 +30,7 @@ fn main_switch_reports_components_not_snapped_on_the_lane_as_skipped() {
     support::setup(&helper, "lane create dev");
     support::setup(&helper, "snap comp1 --unmodified --ignore-issues * --message lane");
     remote::publish(&helper);
-    let output = support::successful(&helper, "switch main -x");
+    let output = two_write_success(&helper, "switch main -x");
     assert!(output.stdout.contains("1 skipped component(s)"), "{}", output.stdout);
     let details = support::setup(&helper, "details");
     assert!(details.contains("comp2"), "{details}");
@@ -55,7 +55,7 @@ fn workspace_only_does_not_suggest_restoring_a_removed_lane_component() {
     empty(&helper);
     support::setup(&helper, &format!("import {}/comp1 -x", helper.scopes.remote));
     let output =
-        support::successful(&helper, &format!("switch {} --workspace-only -x", lane(&helper)));
+        two_write_success(&helper, &format!("switch {} --workspace-only -x", lane(&helper)));
     assert!(!output.stdout.contains("omit --workspace-only"), "{}", output.stdout);
     assert!(support::bitmap(&helper).get("comp2").is_none());
 }
@@ -141,7 +141,7 @@ fn checkout(helper: &crate::helper::Helper, command: &str) -> crate::helper::Run
 fn empty_workspace_bracket_pattern_selects_only_matching_lane_components() {
     let helper = exported(4);
     empty(&helper);
-    let output = support::successful(
+    let output = two_write_success(
         &helper,
         &format!("switch {} --pattern {}/comp[13] -x", lane(&helper), helper.scopes.remote),
     );
@@ -153,4 +153,19 @@ fn empty_workspace_bracket_pattern_selects_only_matching_lane_components() {
     assert!(!output.stdout.contains("skipped component"), "{}", output.stdout);
     assert!(!output.stdout.contains("comp2"), "{}", output.stdout);
     assert!(!output.stdout.contains("comp4"), "{}", output.stdout);
+}
+
+pub(super) fn two_write_success(
+    helper: &crate::helper::Helper,
+    command: &str,
+) -> crate::helper::Run {
+    let output = crate::commands::add::support::history_oracle::compare(
+        helper,
+        command,
+        str::to_owned,
+        ["checkout", "lane-switch"],
+        false,
+    );
+    assert!(output.status.success(), "{} {}", output.stdout, output.stderr);
+    output
 }

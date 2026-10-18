@@ -165,7 +165,10 @@ impl Terminal {
         let tty = io::stdout().is_terminal();
         Self {
             color: color_enabled(tty),
-            tty,
+            // Ora's `is-interactive` excludes dumb terminals and any defined CI variable.
+            tty: tty
+                && env::var_os("TERM").is_none_or(|term| term != "dumb")
+                && env::var_os("CI").is_none(),
             loader: !env::var("BIT_DISABLE_SPINNER").is_ok_and(|value| yn(&value)),
             non_interactive: argv
                 .iter()

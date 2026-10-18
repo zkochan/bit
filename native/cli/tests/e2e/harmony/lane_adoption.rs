@@ -40,7 +40,7 @@ fn lane(helper: &Helper) -> String {
 fn remote_alias_preserves_both_local_alias_and_remote_name_lookup() {
     let helper = exported(1);
     empty(&helper);
-    support::successful(&helper, &format!("switch {} -n adopted -x", lane(&helper)));
+    selection::two_write_success(&helper, &format!("switch {} -n adopted -x", lane(&helper)));
     let local = support::json(&helper, "lane show adopted --json");
     let remote = support::json(&helper, "lane show dev --json");
     assert_eq!(local["components"], remote["components"]);
@@ -51,8 +51,8 @@ fn remote_alias_preserves_both_local_alias_and_remote_name_lookup() {
             .len(),
         1,
     );
-    support::successful(&helper, "switch main -x");
-    support::successful(&helper, "switch adopted --skip-fetch -x");
+    selection::two_write_success(&helper, "switch main -x");
+    selection::two_write_success(&helper, "switch adopted --skip-fetch -x");
 }
 
 #[test]
@@ -96,7 +96,7 @@ fn remote_pattern_performs_real_default_installation() {
 fn lane_import_pattern_adopts_only_selected_component_on_main() {
     let helper = exported(2);
     empty(&helper);
-    support::successful(
+    selection::two_write_success(
         &helper,
         &format!("lane import {} -p {}/comp2 -x", lane(&helper), helper.scopes.remote),
     );
