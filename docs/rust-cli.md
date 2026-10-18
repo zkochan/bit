@@ -64,13 +64,21 @@ BIT_NODE_CLI=$PWD/../bin/bit.js ./target/debug/bit status
 ## Setup
 
 `native/` is a pnpm project with Cargo support (`cargo.enabled` in its
-`pnpm-workspace.yaml`), so the only prerequisite is pnpm 12.11 or later:
+`pnpm-workspace.yaml`). Install pnpm 12.11 or later, a C compiler and CMake 3.14
+or later:
 
 ```sh
 cd native
 pnpm install          # the Rust toolchain rust-toolchain.toml names, and the crates
 pnpm run build        # target/release/bit (build:debug for target/debug/bit)
 ```
+
+Object compression statically links bundled zlib-ng. The repository's CMake
+toolchain disables its new compression strategies to reproduce released Node's
+default compressed bytes. A custom `CMAKE_TOOLCHAIN_FILE` must also set
+`WITH_NEW_STRATEGIES=OFF`; the compression regression tests verify exact streams.
+Cross-compilation requires a toolchain file that also selects the target system
+and C compiler.
 
 `pnpm install` downloads the toolchain once per machine into pnpm's store,
 verified against the Rust release signing key, and links it into

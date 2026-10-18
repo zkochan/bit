@@ -97,6 +97,7 @@ impl Loaded {
         // `reportOptions.appendOnly = optimizeReportForNonTerminal`.
         if let Some(reporter) = engine.reporter.as_mut() {
             reporter.append_only |= session.options.append_only;
+            reporter.apply_throttle_progress(session.options.throttle_progress.as_ref())?;
         }
         Ok(Self { config, global, effective, workspace, engine })
     }

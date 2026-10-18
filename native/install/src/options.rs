@@ -66,6 +66,8 @@ pub struct InstallOptions {
     pub skip_prune: bool,
     /// `optimizeReportForNonTerminal`: the package manager appends output lines.
     pub append_only: bool,
+    /// Programmatic package-manager reporter throttle in milliseconds (`throttleProgress`).
+    pub throttle_progress: Option<Value>,
     /// `copyPeerToRuntimeOnRoot`; unset means `true`.
     pub copy_peer_to_runtime_on_root: Option<bool>,
     /// `copyPeerToRuntimeOnComponents`

@@ -33,6 +33,9 @@ pub(super) fn apply(
         assign(changed, "forcedHarmonyVersion", &mut plan.forced_harmony_version)?;
         layout(changed, &mut settings)?;
         resolution(changed, &mut settings)?;
+        if let Some(reporter) = settings.reporter.as_mut() {
+            reporter.apply_throttle_progress(changed.get("throttleProgress"))?;
+        }
         cleanup(root, receipt)?;
     }
     Ok((plan, settings))
@@ -64,6 +67,7 @@ fn validate_changes(values: &Value) -> io::Result<()> {
         "minimumReleaseAge",
         "minimumReleaseAgeExclude",
         "peerDependencyRules",
+        "throttleProgress",
     ];
     let fields =
         values.as_object().ok_or_else(|| io::Error::other("subscriber PM change receipt"))?;

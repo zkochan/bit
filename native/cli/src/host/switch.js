@@ -113,8 +113,14 @@ function switchSubscriberEffective(context) {
   for (const key of new Set([...Object.keys(initialPackageOptions), ...Object.keys(originals.packageManagerOptions)])) {
     const value = originals.packageManagerOptions[key];
     if (typeof value === 'function') throw new Error(`native lane installation subscriber function option is not yet supported: ${key}`);
-    if (JSON.stringify(value) !== JSON.stringify(initialPackageOptions[key])) {
-      const effective = value === undefined ? receiver[key] : value;
+    if (JSON.stringify(value) !== JSON.stringify(initialPackageOptions[key])
+        || (key === 'throttleProgress' && typeof value === 'number' && !Number.isFinite(value))) {
+      let effective = value === undefined ? receiver[key] : value;
+      // Preserve N-API ToUint32 for NaN/Infinity before JSON would turn them into null.
+      if (key === 'throttleProgress') {
+        if (typeof effective === 'number') effective = effective >>> 0;
+        else if (effective === undefined) effective = null;
+      }
       if (effective !== undefined) packageManagerChanges[key] = effective;
     }
   }

@@ -82,6 +82,8 @@ fn ci_default_switch_installation_reuses_the_real_provider_session() {
 fn default_switch_installation(ci: bool) {
     let helper = installation_fixture();
     helper.output_file("lane-adoption-record-phases", "active");
+    // A real subscriber sets the same supported pnpm throttle for both implementations.
+    helper.output_file("lane-adoption-throttle-progress", "active");
     let compare = if ci {
         crate::commands::add::support::history_oracle::compare_ci
     } else {
@@ -94,6 +96,25 @@ fn default_switch_installation(ci: bool) {
     assert!(helper.scopes.local_path.join("pnpm-lock.yaml").is_file());
     assert!(helper.scopes.local_path.join("node_modules/.modules.yaml").is_file());
     assert_phases(&helper);
+    assert_throttle_receipts(&helper);
+}
+
+fn assert_throttle_receipts(helper: &crate::helper::Helper) {
+    let text = std::fs::read_to_string(helper.scopes.local_path.join(
+        "lane-adoption-throttle-receipts.jsonl",
+    ))
+    .unwrap();
+    let rows: Vec<serde_json::Value> = text
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(
+        rows,
+        vec![
+            json!({"phase":"pre","throttleProgress":60000}),
+            json!({"phase":"post","throttleProgress":60000}),
+        ],
+    );
 }
 
 pub(crate) fn installation_fixture() -> crate::helper::Helper {

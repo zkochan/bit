@@ -50,6 +50,9 @@ fn package_options(
         "overrides":calculated.outcome.plan.overrides,
     });
     copy_config(&raw, &mut options);
+    if let Some(throttle) = &session.options.throttle_progress {
+        options["throttleProgress"] = throttle.clone();
+    }
     if let Some(graph) = &session.options.dependencies_graph {
         options["dependenciesGraph"] = graph.clone();
     }

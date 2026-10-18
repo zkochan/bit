@@ -37,9 +37,17 @@ class LaneAdoptionLifecycle {
       }
     });
     let retainedInstall;
+    const throttleInstall = () => active() && fs.existsSync(path.join(workspace.path, 'lane-adoption-throttle-progress'));
+    const throttleReceipt = (phase, args) => {
+      if (!throttleInstall()) return;
+      fs.appendFileSync(path.join(workspace.path, 'lane-adoption-throttle-receipts.jsonl'),
+        JSON.stringify({phase, throttleProgress: args.packageManagerOptions.throttleProgress}) + '\n');
+    };
     const mutableInstall = () => active() && fs.existsSync(path.join(workspace.path, 'lane-adoption-mutate-install'));
     resolver.registerPreInstallSubscribers([(installer, args) => {
       receipt('preInstall');
+      if (throttleInstall()) args.packageManagerOptions.throttleProgress = 60000;
+      throttleReceipt('pre', args);
       if (!mutableInstall()) return;
       retainedInstall = {installer, args, options: args.options, packageOptions: args.packageManagerOptions, root: args.rootDir};
       retainedInstall.packageOptions.includeOptionalDeps = false;
@@ -51,6 +59,7 @@ class LaneAdoptionLifecycle {
     }]);
     resolver.registerPostInstallSubscribers([(installer, args) => {
       receipt('postInstall');
+      throttleReceipt('post', args);
       if (!mutableInstall()) return;
       fs.appendFileSync(path.join(workspace.path, 'lane-adoption-subscriber-receipts.jsonl'), JSON.stringify({
         sameInstaller: installer === retainedInstall.installer,
