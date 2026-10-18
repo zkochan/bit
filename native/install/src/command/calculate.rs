@@ -2,9 +2,14 @@
 //! the configured aspects and generator envs, the components' dependencies and
 //! the manifests of one engine run.
 
+pub(super) use initial::calculate_linked;
+
+mod initial;
+mod resolution;
+
 use super::session::{Loaded, Session};
 use crate::{
-    dependencies::{self, DependencyOptions, DevPatternConfig, default_package_name, glob},
+    dependencies::{DependencyOptions, DevPatternConfig, default_package_name, glob},
     import::{self, remotes::global_remotes},
     manifests::{
         self, ManifestContext, ManifestInput, ManifestOptions, ManifestOutcome,
@@ -18,6 +23,7 @@ use crate::{
     workspace::{ScopeObjects, external_env_packages},
 };
 use indexmap::IndexMap;
+use resolution::{Resolved, resolve, resolve_initialized};
 use serde_json::Value;
 use std::io;
 
@@ -27,7 +33,7 @@ const DEDUPING: &str = "deduping dependencies for installation";
 /// One calculation of what to install.
 pub struct Calculated {
     pub components: Vec<WorkspaceComponent>,
-    pub linking_components: Vec<WorkspaceComponent>,
+    pub engine_components: Vec<WorkspaceComponent>,
     pub env_policies: IndexMap<String, EnvPolicy>,
     pub dependencies: IndexMap<String, ComponentDependencies>,
     pub outcome: ManifestOutcome,
@@ -53,8 +59,6 @@ pub async fn calculate(
     loaded: &Loaded,
     linked_root_deps: &DependencyMap,
 ) -> io::Result<Calculated> {
-    let linking_components =
-        super::session::installation_components::load(session, loaded, "linking").await?;
     session.host.configured_aspect_classes().await?;
     let components =
         super::session::installation_components::load(session, loaded, "manifests").await?;
@@ -62,7 +66,7 @@ pub async fn calculate(
         env_policies,
         workspace_policy,
         dependencies,
-    } = resolve(session, loaded, &components).await?;
+    } = resolve_initialized(session, loaded, &components, true).await?;
     let (linked_root_deps, env_packages) =
         &with_env_links(session, loaded, linked_root_deps, &components, &dependencies)?;
     let apps = apps(session, loaded, &components).await?;
@@ -83,10 +87,10 @@ pub async fn calculate(
         },
     )?;
     session.output.success_status();
-    root_manifest_loading(session, loaded);
+    root_manifest_loading(session, loaded).await?;
     Ok(Calculated {
+        engine_components: components.clone(),
         components,
-        linking_components,
         env_policies,
         dependencies,
         outcome,
@@ -95,12 +99,13 @@ pub async fn calculate(
     })
 }
 
-fn root_manifest_loading(session: &Session<'_>, loaded: &Loaded) {
+async fn root_manifest_loading(session: &Session<'_>, loaded: &Loaded) -> io::Result<()> {
     // Node loads env and app root manifests only when root components are enabled.
     if loaded.config.dependency_resolver.has_root_components() {
-        session.loading(loaded);
-        session.loading(loaded);
+        super::session::installation_components::load(session, loaded, "root-envs").await?;
+        super::session::installation_components::load(session, loaded, "root-apps").await?;
     }
+    Ok(())
 }
 
 /// `writeDependenciesToPackageJson`: the root manifest `_getComponentsManifests`
@@ -144,41 +149,6 @@ pub async fn package_json_dependencies(
     })?;
     session.output.success_status();
     Ok(result)
-}
-
-/// The env policies, the workspace policy and the components' dependencies.
-struct Resolved {
-    env_policies: IndexMap<String, EnvPolicy>,
-    workspace_policy: Vec<PolicyEntry>,
-    dependencies: IndexMap<String, ComponentDependencies>,
-}
-
-async fn resolve(
-    session: &Session<'_>,
-    loaded: &Loaded,
-    components: &[WorkspaceComponent],
-) -> io::Result<Resolved> {
-    // `InstallMain.install` loads the components before the manifests; the envs that
-    // registers are the only ones the env requests see until the package manager ran.
-    session.host.prepare_install(&workspace_aspects(session, loaded)).await?;
-    let objects = ScopeObjects::new(&loaded.workspace.scope_path);
-    let env_policies = policy::load_env_policies(&session.root, components, session.host).await?;
-    let workspace_policy = workspace_policy(loaded)?;
-    let mut options = dependency_options(session, loaded, components)?;
-    options.policy_slots =
-        policy::slots::registry(components, &session.info.core_aspects, &objects, session.host)
-            .await?;
-    let dependencies = dependencies::compute(
-        &session.root,
-        components,
-        &workspace_policy,
-        &env_policies,
-        loaded.workspace.root_package_json.as_ref(),
-        &options,
-        session.host,
-    )
-    .await?;
-    Ok(Resolved { env_policies, workspace_policy, dependencies })
 }
 
 /// `linkDepsResolvedFromEnv` (off with root components), and the external env packages

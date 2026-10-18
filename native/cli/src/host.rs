@@ -38,6 +38,8 @@ const SCRIPT: &str = concat!(
     "\n",
     include_str!("host/import.js"),
     "\n",
+    include_str!("host/directory_identity.js"),
+    "\n",
     include_str!("host/switch.js"),
 );
 const EXIT_GRACE: Duration = Duration::from_secs(5);
@@ -270,6 +272,9 @@ fn progress_mode() -> &'static str {
         && env::var_os("CI").is_none();
     if progress { "1" } else { "0" }
 }
+
+#[cfg(test)]
+mod path_tests;
 
 #[cfg(all(test, unix))]
 mod tests;

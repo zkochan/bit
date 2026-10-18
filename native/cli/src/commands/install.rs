@@ -238,6 +238,10 @@ impl bit_install::Host for JsHost {
         result.map(Some)
     }
 
+    async fn component_links_changed(&self, ids: &[String]) -> io::Result<()> {
+        request::links_changed(self, ids).await
+    }
+
     async fn initial_installation_components(&self, aspect_ids: &[String]) -> io::Result<bool> {
         let arguments = std::env::args()
             .skip(1)

@@ -39,6 +39,7 @@ async function switchConfiguredAspectClasses() {
 
 let switchInstallationClasses;
 let switchInstallationDirectoryMap;
+let switchInstallationEngineIds;
 /** Execute the published class load at its native-owned installation boundary. */
 async function switchInstallationComponents({ phase, ids }) {
   if (!laneSwitchCommand) throw new Error('installation classes outside lane adoption');
@@ -58,7 +59,7 @@ async function switchInstallationComponents({ phase, ids }) {
     }
     if (phase === 'linking') {
       const { ComponentID } = bitRequire('@teambit/component-id');
-      const previousIds = switchInstallationClasses?.filter(component =>
+      const previousIds = switchInstallationEngineIds ?? switchInstallationClasses?.filter(component =>
         workspace.componentDir(component.id) !== workspace.path).map(component => component.id);
       const requested = previousIds ?? ids.map(id => ComponentID.fromString(id));
       switchInstallationClasses = requested.length ? await workspace.getMany(requested, {
@@ -69,16 +70,41 @@ async function switchInstallationComponents({ phase, ids }) {
         id: component.id.toString(), directory: workspace.componentDir(component.id)
       })) };
     }
+    if (phase === 'root-envs' || phase === 'root-apps') {
+      if (phase === 'root-envs') {
+        await loaded.get('teambit.workspace/install')._getAllUsedEnvIds();
+      } else {
+        await loaded.get('teambit.harmony/application').listAppsComponents();
+      }
+      return { components: switchInstallationClasses.map(component => ({
+        id: component.id.toString(), directory: workspace.componentDir(component.id)
+      })) };
+    }
     if (!['manifests', 'engine'].includes(phase)) throw new Error('installation class phase');
     const directoryMap = await loaded.get('teambit.workspace/install').getComponentsDirectory([]);
     switchInstallationClasses = directoryMap.toArray().map(([component]) => component);
-    if (phase === 'engine') switchInstallationDirectoryMap = directoryMap;
+    if (phase === 'manifests') switchInstallationDirectoryMap = directoryMap;
+    if (phase === 'engine') switchInstallationEngineIds = switchInstallationClasses.map(component => component.id);
     return { components: directoryMap.toArray().map(([component, directory]) => ({
       id: component.id.toString(), directory
     })) };
   } finally {
     snapshotBootstrapProgress = previous;
   }
+}
+
+/** NodeModuleLinker invalidates dependency/class caches only after changed package manifests. */
+async function switchInstallationLinked({ ids }) {
+  if (!laneSwitchCommand) throw new Error('installation link cache outside lane adoption');
+  const workspace = (await loadHarmony()).get('teambit.workspace/workspace');
+  const components = switchInstallationClasses.filter(component =>
+    workspace.componentDir(component.id) !== workspace.path);
+  if (components.length !== ids.length || components.some((component, index) =>
+    component.id.toString() !== ids[index])) throw new Error('installation link class inventory changed');
+  await Promise.all(components.map(component => workspace.consumer.componentFsCache
+    .deleteDependenciesDataCache(component.state._consumer.id.toString())));
+  workspace.clearAllComponentsCache();
+  return null;
 }
 
 let switchSubscriberContext;
@@ -116,7 +142,7 @@ async function switchSubscriberInputs(request, loaded, resolver) {
   const componentDirectoryMap = switchInstallationDirectoryMap ?? new ComponentMap(new Map(entries));
   const actual = componentDirectoryMap.toArray();
   if (actual.length !== request.components.length || actual.some(([component, directory], index) =>
-    component.id.toString() !== request.components[index].id || directory !== request.components[index].directory)) {
+    component.id.toString() !== request.components[index].id || !installationDirectoryEquals(directory, request.components[index].directory))) {
     throw new Error('switch subscriber directory inventory changed');
   }
   const args = {componentDirectoryMap, options: request.options,

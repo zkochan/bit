@@ -42,7 +42,7 @@ async fn load_with_status(
     ordered(&session.root, components, &receipt)
 }
 
-fn identity(component: &WorkspaceComponent) -> String {
+pub(crate) fn identity(component: &WorkspaceComponent) -> String {
     let id = component.id.to_string_without_version();
     match component.id.version
         .as_deref()

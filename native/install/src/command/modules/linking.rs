@@ -1,15 +1,13 @@
 //! The links around the engine run: `calculateLinkedDeps`, `linkCodemods` and
 //! `syncCoreAspectLinksForEnvs`.
 
-use super::super::{
-    calculate::Calculated,
-    session::{Loaded, Session},
-};
+use super::super::session::{Loaded, Session};
 use crate::{
     links::{self, ComponentLinkOptions, LinkOptions},
-    model::{DependencyMap, WorkspaceComponent},
+    model::{ComponentDependencies, DependencyMap, WorkspaceComponent},
     workspace::{ScopeObjects, aspect_env_ids},
 };
+use indexmap::IndexMap;
 use std::{io, time::Instant};
 
 const LINKING: &str = "linking components";
@@ -44,20 +42,11 @@ pub fn root_links(
     Ok(links)
 }
 
-/// The first `linkCodemods`, before the engine runs.
-pub async fn link_components_timed(
-    session: &Session<'_>,
-    loaded: &Loaded,
-    calculated: &Calculated,
-) -> io::Result<()> {
-    link_components(session, loaded, calculated, &calculated.linking_components).await
-}
-
 /// `linkCodemods`: every component as a package in `node_modules`.
 pub async fn link_components(
     session: &Session<'_>,
     loaded: &Loaded,
-    calculated: &Calculated,
+    dependencies: &IndexMap<String, ComponentDependencies>,
     components: &[WorkspaceComponent],
 ) -> io::Result<()> {
     let config = &loaded.config.dependency_resolver;
@@ -68,12 +57,19 @@ pub async fn link_components(
     let options = ComponentLinkOptions {
         has_root_components: config.has_root_components(),
         root_components_dir: &root_components_dir,
-        dependencies: &calculated.dependencies,
+        dependencies,
         cloud_domain: &cloud_domain,
         windows: cfg!(windows),
         aspect_env_ids: &aspect_env_ids,
     };
-    links::link_components(&session.root, components, session.host, &options).await?;
+    let result = links::link_components(&session.root, components, session.host, &options).await?;
+    if result.package_json_changed {
+        let ids = components
+            .iter()
+            .map(super::super::session::installation_components::identity)
+            .collect::<Vec<_>>();
+        session.host.component_links_changed(&ids).await?;
+    }
     Ok(())
 }
 
@@ -81,7 +77,7 @@ pub async fn link_components(
 pub fn sync_core_aspects(
     session: &Session<'_>,
     loaded: &Loaded,
-    calculated: &Calculated,
+    components: &[WorkspaceComponent],
 ) -> io::Result<()> {
     if loaded.config.dependency_resolver.link_core_aspects() {
         return Ok(());
@@ -90,7 +86,7 @@ pub fn sync_core_aspects(
     let warning = links::sync_core_aspect_links_for_envs(
         &session.root,
         session.info,
-        &calculated.components,
+        components,
         global_virtual_store,
     )?;
     if let Some(warning) = warning {

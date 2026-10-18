@@ -124,6 +124,12 @@ pub trait Host: Send + Sync {
         Ok(None)
     }
 
+    /// Invalidate retained component classes after the native linker changed package manifests.
+    async fn component_links_changed(&self, ids: &[String]) -> io::Result<()> {
+        let _ = ids;
+        Ok(())
+    }
+
     /// Run actual package-manager subscribers over the native installation metadata.
     async fn install_subscribers(&self, request: &Value) -> io::Result<Option<Value>> {
         let _ = request;

@@ -3,7 +3,7 @@
 use super::JsHost;
 use crate::host::Host;
 use serde::de::DeserializeOwned;
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::{io, sync::Arc};
 
 pub(super) fn lane_installation() -> bool {
@@ -38,4 +38,11 @@ impl JsHost {
             .map_err(io::Error::other)??;
         serde_json::from_value(value).map_err(io::Error::other)
     }
+}
+
+pub(super) async fn links_changed(host: &JsHost, ids: &[String]) -> io::Result<()> {
+    if lane_installation() {
+        host.call::<Value>("switchInstallationLinked", json!({ "ids": ids })).await?;
+    }
+    Ok(())
 }

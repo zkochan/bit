@@ -185,6 +185,7 @@ const handlers = {
   switchCompile,
   switchConfiguredAspectClasses,
   switchInstallationComponents,
+  switchInstallationLinked,
   historyInstallationComponents,
   switchInstallSubscribers,
   collationOrder: ({ ids }) => ids.map((_, index) => index).sort((left, right) => ids[left].localeCompare(ids[right])),
