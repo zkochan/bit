@@ -13,10 +13,12 @@ fn corrupt_restored_source_fails_after_the_existing_component_revert_is_persiste
     let fixture = fixture::deleted(true);
     let before = fixture::version(&fixture.helper, "comp3");
     let paths = corrupt_source(&fixture);
-    let result = support::compare_with_stdout(
+    let variants = super::inflate_origin::qualified_errors(&fixture.helper);
+    let result = support::compare_with_error_variants(
         &fixture.helper,
         &format!("lane revert {} --restore-deleted-components -x", fixture.history),
         durations,
+        &variants,
     );
     assert!(!result.status.success());
     assert_existing_prefix(&fixture.helper, &before, "module.exports=()=> 'comp3';\n");

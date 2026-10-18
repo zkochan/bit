@@ -43,6 +43,19 @@ pub(crate) fn compare_with_stdout(
     assert!(tree(&helper.scopes.remote_path) == remote, "{command} mutated the remote");
     actual
 }
+/// An exact independently qualified error set retains every filesystem comparison.
+pub(crate) fn compare_with_error_variants(
+    helper: &Helper,
+    command: &str,
+    stdout: fn(&str) -> String,
+    variants: &[String; 2],
+) -> Run {
+    let remote = tree(&helper.scopes.remote_path);
+    let actual = support::compare_with_error_variants(helper, command, stdout, variants);
+    assert!(tree(&helper.scopes.remote_path) == remote, "{command} mutated the remote");
+    actual
+}
+
 /// Keep delegation explicit and preserve the real remote invariant.
 pub(crate) fn compare_declined(helper: &Helper, command: &str, stdout: fn(&str) -> String) -> Run {
     let remote = tree(&helper.scopes.remote_path);

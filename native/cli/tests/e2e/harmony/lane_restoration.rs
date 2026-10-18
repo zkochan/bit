@@ -2,6 +2,7 @@
 mod callbacks;
 mod errors;
 mod fixture;
+mod inflate_origin;
 mod phase_failure;
 mod refresh;
 mod versions;

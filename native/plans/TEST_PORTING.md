@@ -61,6 +61,15 @@ raw backup bytes, modes, ordering and command clock windows exact. The mixed-ver
 case also snaps the retained comp3 and exports the workspace. Fresh 49-workload
 performance qualification remains pending.
 
+The corrupt restored-Source case independently executes the published
+`ObjectFetcher` and `ObjectsWritable` with an ended and an open readable. Node
+emits the same complete zlib failure either bare or with the actual remote scope
+when pipeline destruction echoes that writable failure onto the readable. The
+fixture accepts only those two independently proven complete messages; exact
+cause, advice, scope, stdout, exit, ownership and all local/remote/history state
+remain checked. Other diagnostics remain byte-exact. Negative cases reject a
+changed scope, cause, advice and extra output.
+
 ## Where ports live
 
 - `native/cli/tests/e2e/` is one test target (`main.rs`), mirroring `e2e/` by path:
