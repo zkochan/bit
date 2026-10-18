@@ -181,6 +181,10 @@ const handlers = {
   snapshotWorkspaceIssues: async () => (await loadHarmony()).get('teambit.workspace/workspace').getWorkspaceIssues({includeNonBlocking:false}).map((error)=>error.message),
   statusWorkspaceIssues: async () => (await loadHarmony()).get('teambit.workspace/workspace').getWorkspaceIssues().map((error) => error.message),
   statusLoadCallbacks,
+  trackingCachedDocs: ({ entries }) => {
+    for (const entry of entries) trackingDocumentation.set(entry.path, entry.docs);
+    return true;
+  },
   trackingDocs: async ({ components }) => {
     const workspace = (await loadHarmony()).get('teambit.workspace/workspace');
     const { SourceFile } = bitRequire('@teambit/component.sources');
