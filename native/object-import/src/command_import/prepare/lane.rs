@@ -1,4 +1,5 @@
 mod fetch;
+mod history;
 
 use super::{PreparedImport, Target, invalid, read_model, receive, remote};
 use crate::command_import::lane::{Id, Record, entries};
@@ -103,6 +104,7 @@ impl PreparedImport {
                 .unwrap()
                 .components
                 .insert(identity.to_owned());
+            super::transfer::merge_model(self, &target, &model, true)?;
             super::transfer::record_remote_head(self, &target, &model)?;
             return Ok(());
         }

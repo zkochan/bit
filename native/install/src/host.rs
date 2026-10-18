@@ -108,6 +108,12 @@ pub struct DetectRequest<'a> {
 /// workspace actually needs it.
 #[async_trait]
 pub trait Host: Send + Sync {
+    /// Load the retained component classes before root linking, when the parent needs them.
+    async fn initial_installation_components(&self, aspect_ids: &[String]) -> io::Result<bool> {
+        let _ = aspect_ids;
+        Ok(false)
+    }
+
     /// Run actual package-manager subscribers over the native installation metadata.
     async fn install_subscribers(&self, request: &Value) -> io::Result<Option<Value>> {
         let _ = request;

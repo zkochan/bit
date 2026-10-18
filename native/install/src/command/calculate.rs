@@ -359,7 +359,7 @@ fn dependency_options(
 
 /// `getNotLoadedConfiguredExtensions` of the CLI start: the `workspace.jsonc` aspects
 /// that are not core, whose providers run in TypeScript before any component loads.
-fn workspace_aspects(session: &Session<'_>, loaded: &Loaded) -> Vec<String> {
+pub(super) fn workspace_aspects(session: &Session<'_>, loaded: &Loaded) -> Vec<String> {
     let core_aspects = &session.info.core_aspects;
     loaded.config
         .user_aspect_ids(&session.core_ids())

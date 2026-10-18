@@ -1,5 +1,6 @@
 //! Lane identity and object reads share the command import capture. None of
 //! these operations publishes an object or changes the workspace's active lane.
+pub(in crate::command_import) mod merge;
 pub(crate) use tracking::SwitchTracking;
 
 use super::{PreparedImport, invalid};
@@ -7,7 +8,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::io;
 mod artifacts;
-mod merge;
 mod tracking;
 
 #[cfg(test)]

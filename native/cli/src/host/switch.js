@@ -7,9 +7,12 @@ async function switchCompile({ installationSucceeded }) {
   const loader = bitRequire('@teambit/legacy.loader').loader;
   // Pnpm turns the loader off before its engine and restores it only on success.
   // Rust ran that engine; preserve its failed-install loader state for the real compiler.
-  if (!installationSucceeded) loader.off();
+  const failedBeforePm = laneHistoryCommand && historyInstallationFailedBeforePm;
+  if (!installationSucceeded && !failedBeforePm) loader.off();
   const previous = snapshotBootstrapProgress;
-  snapshotBootstrapProgress = loader.isStarted;
+  snapshotBootstrapProgress = failedBeforePm
+    ? !cliArguments.some(argument => ['--json', '-j'].includes(argument))
+    : loader.isStarted;
   try {
     await loaded.get('teambit.compilation/compiler').compileOnWorkspace();
     return { error: null };
@@ -123,4 +126,28 @@ function switchSubscriberEffective(context) {
   return {options: originals.options, packageManagerChanges,
     cleanComponents: !originals.packageManagerOptions.rootComponents && !originals.packageManagerOptions.keepExistingModulesDir,
     componentDirectories: originals.componentDirectoryMap.toArray().map(([component, directory]) => ({id: component.id.toString(), directory}))};
+}
+
+let historyInstallationFailedBeforePm = false;
+/** InstallMain.calculateLinks loads the same live Consumers before publishing any links. */
+async function historyInstallationComponents({ aspectIds }) {
+  if (!laneHistoryCommand) throw new Error('history class load outside lane restoration');
+  const workspace = (await loadHarmony()).get('teambit.workspace/workspace');
+  captureBootstrapProgress(workspace);
+  const previous = snapshotBootstrapProgress;
+  historyInstallationFailedBeforePm = false;
+  snapshotBootstrapProgress = !cliArguments.some(argument => ['--json', '-j'].includes(argument));
+  try {
+    await prepareInstall(aspectIds);
+    await loadInstallComponents();
+    historyInstallationPrepared = true;
+    return { error: null };
+  } catch (error) {
+    // ComponentWriter catches installation failures and then compiles in this same session.
+    // A protocol-level failure would retire the Host and replay provider startup.
+    historyInstallationFailedBeforePm = true;
+    return { error: error.message };
+  } finally {
+    snapshotBootstrapProgress = previous;
+  }
 }

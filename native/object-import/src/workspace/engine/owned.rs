@@ -55,6 +55,10 @@ fn owned_status_command(
     pool: &rayon::ThreadPool,
 ) -> io::Result<(usize, Value)> {
     match request {
+        Request::CommandLaneHistoryPrepare(input) => {
+            command::lane_history::run(input, &mut snapshots.command)
+        }
+
         Request::StatusPrepare(input) => client_status::prepare(input, &mut snapshots.status),
         Request::StatusScan(input) => client_status::scan(&input, &mut snapshots.status, pool),
         Request::StatusFinish(input) => client_status::finish(&input, &mut snapshots.status, pool),

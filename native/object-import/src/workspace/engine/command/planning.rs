@@ -61,6 +61,10 @@ fn checkout_captured(
         directories: Vec::new(),
         result: json!({"components":[],"failedComponents":[],"removedComponents":[]}),
     };
+    if super::lane_history::phase(&record.request.options).is_some() {
+        plan.result["newFromLaneAdded"] = json!(false);
+    }
+    super::lane_history::planning::attach(record, &mut plan)?;
     let selections = select_captured(record, &mut plan, semver, recovery_reset)?;
     import_selected(record, &selections)?;
     prepare_selections(record, &mut plan, &selections, snapshots)?;
@@ -129,6 +133,8 @@ fn import_selected(record: &mut Record, selections: &[Value]) -> io::Result<()> 
         record.context["switchCheckoutImport"] =
             record.repository.prepare_switch_versions(&expanded)?;
         Ok(())
+    } else if super::lane_history::phase(&record.request.options).is_some() {
+        super::lane_history::progress::import(record, &expanded)
     } else {
         record.repository.prepare_versions(&expanded)
     }
@@ -348,11 +354,17 @@ fn modification(
     } else {
         comparison::compare(&captured.target, &captured.metadata, &version)?["modified"] == true
     };
+    let source = super::lane_history::heads::source(
+        &record.request.options,
+        &record.context,
+        identity,
+        model,
+    );
     let distance = staged.distance(
         &record.request.root,
         identity,
         model,
-        [model["head"].as_str(), remote],
+        [source, remote],
         &mut record.repository,
     )?;
     Ok((

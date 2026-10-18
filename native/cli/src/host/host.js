@@ -27,8 +27,9 @@ const identityRenameCommand = ['rename', 'fork'].includes(cliArguments[0]) || (c
 const identityMutationCommand = identityRenameCommand || ['move', 'mv', 'deprecate', 'd', 'undeprecate', 'remove', 'rm', 'delete', 'recover'].includes(cliArguments[0]);
 const snapshotCommandName = cliArguments[0] === 't' ? 'tag' : cliArguments[0];
 let snapshotCommand = ['snap', 'tag'].includes(snapshotCommandName) || (cliArguments[0] === 'merge' && cliArguments.includes('--resolve'));
-const checkoutCommand = (cliArguments[0] === 'merge' && cliArguments.includes('--abort')) || (cliArguments[0] === 'lane' && cliArguments[1] === 'merge-abort') || ['checkout', 'U', 'revert', 'switch'].includes(cliArguments[0]) || (cliArguments[0] === 'lane' && cliArguments[1] === 'import');
-const laneSwitchCommand = cliArguments[0] === 'switch' || (cliArguments[0] === 'lane' && cliArguments[1] === 'import');
+const laneHistoryCommand = cliArguments[0] === 'lane' && ['checkout', 'revert'].includes(cliArguments[1]);
+const checkoutCommand = laneHistoryCommand || (cliArguments[0] === 'merge' && cliArguments.includes('--abort')) || (cliArguments[0] === 'lane' && cliArguments[1] === 'merge-abort') || ['checkout', 'U', 'revert', 'switch'].includes(cliArguments[0]) || (cliArguments[0] === 'lane' && cliArguments[1] === 'import');
+const laneSwitchCommand = laneHistoryCommand || cliArguments[0] === 'switch' || (cliArguments[0] === 'lane' && cliArguments[1] === 'import');
 const mergeCommand = (cliArguments[0] === 'merge' && !cliArguments.includes('--abort') && !cliArguments.includes('--resolve')) || (cliArguments[0] === 'lane' && cliArguments[1] === 'merge');
 const exportCommand = ['export', 'e', 'resume-export'].includes(cliArguments[0]);
 const bufferedCommand = snapshotCommand || checkoutCommand || mergeCommand || exportCommand || identityMutationCommand || ['stash', 'add', 'a'].includes(cliArguments[0]);
@@ -183,6 +184,7 @@ const handlers = {
   hostInfo,
   switchCompile,
   switchConfiguredAspectClasses,
+  historyInstallationComponents,
   switchInstallSubscribers,
   collationOrder: ({ ids }) => ids.map((_, index) => index).sort((left, right) => ids[left].localeCompare(ids[right])),
   envPolicy: ({ envId }) => envPolicy(envId),
@@ -488,7 +490,12 @@ let beforePackageManager = false;
  * depend on run on the first request that needs Harmony (`loadInstallComponents`), so an
  * install no env or aspect request reaches never loads Harmony.
  */
+let historyInstallationPrepared = false;
 async function prepareInstall(aspectIds) {
+  if (laneHistoryCommand && historyInstallationPrepared) {
+    historyInstallationPrepared = false;
+    return null;
+  }
   beforePackageManager = true;
   pendingInstallLoad = aspectIds ?? [];
   return null;
@@ -1034,7 +1041,7 @@ async function statusLoadCallbacks({ components, directory, snapshot, checkout }
       }
       else {
         await statusApplyLoadCallbacks(component, { workspace, envs, resolver });
-        if (['remove', 'rm', 'delete'].includes(cliArguments[0])) {
+        if (laneHistoryCommand || ['remove', 'rm', 'delete'].includes(cliArguments[0])) {
           workspace.componentLoader.saveInCache(component, { loadExtensions: true, executeLoadSlot: true });
           workspace.consumer.componentLoader.componentsCache.set(component.id.toString(), component.state._consumer);
         }

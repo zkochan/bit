@@ -81,3 +81,18 @@ fn captured(path: &std::path::Path, capture: &mut super::super::Capture) -> supe
         .unwrap()
         .unwrap()
 }
+
+#[test]
+fn unchanged_second_candidate_preserves_the_original_stream_after_a_different_local_value() {
+    let directory = tempfile::tempdir().unwrap();
+    let mut capture = super::super::Capture::default();
+    let incoming = captured(directory.path(), &mut capture);
+    let bytes = incoming.bytes.clone();
+    let value = incoming.value.clone().unwrap();
+    let mut local = value.clone();
+    local["deprecated"] = Value::Bool(true);
+    let local = super::object(HASH, "Component", local).unwrap();
+    let result = super::reusing_candidates(HASH, "Component", value, [local, incoming]).unwrap();
+    assert_eq!(result.bytes, bytes);
+    capture.validate().unwrap();
+}

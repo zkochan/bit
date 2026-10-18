@@ -222,7 +222,12 @@ fn lane_installation() -> bool {
     arguments
         .first()
         .is_some_and(|command| command == "switch")
-        || arguments == ["lane", "import"]
+        || arguments
+            .first()
+            .is_some_and(|command| command == "lane")
+            && arguments
+                .get(1)
+                .is_some_and(|command| matches!(command.as_str(), "import" | "checkout" | "revert"))
 }
 
 impl JsHost {
@@ -245,6 +250,36 @@ impl JsHost {
 
 #[async_trait]
 impl bit_install::Host for JsHost {
+    async fn initial_installation_components(&self, aspect_ids: &[String]) -> io::Result<bool> {
+        let arguments = std::env::args()
+            .skip(1)
+            .take(2)
+            .collect::<Vec<_>>();
+        if arguments
+            .first()
+            .is_none_or(|command| command != "lane")
+            || arguments
+                .get(1)
+                .is_none_or(|command| !matches!(command.as_str(), "checkout" | "revert"))
+        {
+            return Ok(false);
+        }
+        let receipt =
+            self.call::<Value>("historyInstallationComponents", json!({"aspectIds":aspect_ids}))
+                .await;
+        let output = self.0.take_stdout();
+        if !self.1 {
+            let mut stdout = io::stdout().lock();
+            stdout.write_all(output.as_bytes())?;
+            stdout.flush()?;
+        }
+        match &receipt?["error"] {
+            Value::Null => Ok(true),
+            Value::String(message) => Err(io::Error::other(message.clone())),
+            _ => Err(io::Error::other("history installation class receipt")),
+        }
+    }
+
     async fn install_subscribers(&self, request: &Value) -> io::Result<Option<Value>> {
         if !lane_installation() {
             return Ok(None);

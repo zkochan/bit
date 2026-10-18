@@ -1,3 +1,4 @@
+mod compression;
 use super::{empty, exported, lane};
 use crate::{commands::move_paths::support, helper::remote};
 

@@ -85,6 +85,31 @@ pub fn plan_with_startup(
     plan_with(root, request, false, false, Some(startup), false, None)
 }
 
+/// Preserve the native lane-history owner and the already initialized provider session.
+pub(in crate::commands) fn plan_retained(
+    root: &Path,
+    request: &Request<'_>,
+    startup: &mut super::status::autosync::Startup,
+    environment: Option<super::status::environments::Environments>,
+    engine: Engine,
+) -> io::Result<Planned> {
+    let mut prepared =
+        preparation::capture_retained(root, request, Some(&mut *startup), environment, engine)?;
+    let plan = preparation::owned_result(
+        plan_captured(&mut prepared, request, false, Some(&mut *startup)),
+        &mut prepared.docs,
+        Some(&mut *startup),
+    )?;
+    stage_captured(root, request, false, false, prepared, plan, Some(&mut *startup))
+}
+
+impl Planned {
+    /// Return the session containing the retained history selection after a checkout phase.
+    pub(in crate::commands) fn into_engine(self) -> Engine {
+        self.engine
+    }
+}
+
 /// Preserve one initialized provider session through switch and installation.
 pub(in crate::commands) fn plan_with_environment(
     root: &Path,

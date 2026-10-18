@@ -215,7 +215,10 @@ fn index_entry(index: &mut Value, lane: &Record) -> io::Result<bool> {
     Ok(true)
 }
 
-pub(super) fn remote_refs(plan: &mut PreparedImport, lane: &Record) -> io::Result<()> {
+pub(in crate::command_import) fn remote_refs(
+    plan: &mut PreparedImport,
+    lane: &Record,
+) -> io::Result<()> {
     let scope = lane.value["scope"].as_str().ok_or_else(|| invalid("lane remote scope"))?;
     let name = lane.value["name"].as_str().ok_or_else(|| invalid("lane remote name"))?;
     let file = plan.environment.local_directory

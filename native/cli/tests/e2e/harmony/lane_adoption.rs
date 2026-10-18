@@ -1,8 +1,9 @@
 //! Lane adoption compares the released command at the same absolute workspace path.
-mod callbacks;
+pub(crate) mod callbacks;
+pub(crate) mod output;
+
 mod conflicts;
 mod environment;
-mod output;
 mod selection;
 mod subscribers;
 

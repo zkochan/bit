@@ -2,6 +2,7 @@ pub(super) mod checkout_pattern;
 pub(super) mod checkout_policy;
 pub(super) mod inbound;
 pub(super) mod input;
+pub(super) mod lane_history;
 pub(super) mod merge_defer;
 pub(crate) mod outbound;
 pub(super) mod policy;
@@ -54,6 +55,7 @@ pub(crate) struct State {
     inbound: Option<inbound::Retained>,
     outbound: Option<outbound::Retained>,
     stash: Option<Box<stash::Retained>>,
+    lane_history: Option<Box<lane_history::Retained>>,
 }
 struct Record {
     request: Prepare,

@@ -82,6 +82,7 @@ enum Request {
     CommandStashStageGraph(command::stash::Persist),
     CommandStashPersist(command::stash::Persist),
     CommandPrepare(command::input::Prepare),
+    CommandLaneHistoryPrepare(command::lane_history::Prepare),
     CommandCheckoutSelect(command::checkout_pattern::Request),
     CommandInboundPrepare(command::inbound::Prepare),
     CommandInboundLocalPreflight(command::inbound::Prepare),

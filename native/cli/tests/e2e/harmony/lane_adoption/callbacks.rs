@@ -96,7 +96,7 @@ fn default_switch_installation(ci: bool) {
     assert_phases(&helper);
 }
 
-pub(super) fn installation_fixture() -> crate::helper::Helper {
+pub(crate) fn installation_fixture() -> crate::helper::Helper {
     let helper = support::workspace(1, false);
     configure(&helper, false);
     std::fs::remove_file(helper.scopes.local_path.join("lane-adoption-provider-active")).unwrap();

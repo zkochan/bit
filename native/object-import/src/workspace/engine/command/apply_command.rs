@@ -19,6 +19,7 @@ pub(super) fn run(input: &Apply, state: &mut State) -> io::Result<(usize, Value)
     }
     validate(&record, &prepared)?;
     let (warning, notifications) = publish(&record, &mut prepared, &input.file_id)?;
+    super::lane_history::applied(state, &record.request, &prepared.bitmap.publication_receipt()?)?;
     let count = prepared.plan.result["components"].as_array().map_or(0, Vec::len);
     let mut output =
         json!({"applied":true,"warning":warning,"postPersistNotifications":notifications});

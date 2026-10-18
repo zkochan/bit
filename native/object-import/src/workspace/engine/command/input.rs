@@ -44,6 +44,7 @@ pub(super) struct ScopeOptions {
     pub(super) include_new_from_scope: bool,
     #[serde(default)]
     pub(super) scope_candidates: Vec<String>,
+    pub(super) lane_history: Option<super::lane_history::Options>,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

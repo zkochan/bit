@@ -6,7 +6,7 @@ mod engine_run;
 mod linking;
 
 use super::{
-    calculate::{Calculated, calculate},
+    calculate::{Calculated, calculate, workspace_aspects},
     packages, restore,
     session::{Loaded, Session},
     workspace_jsonc,
@@ -35,7 +35,9 @@ pub async fn install(session: &Session<'_>, mut loaded: Loaded) -> io::Result<In
     let output = &session.output;
     let manager = output.paint(Style::Cyan, "teambit.dependencies/pnpm");
     output.console(&format!("installing dependencies in workspace using pnpm ({manager})"));
-    let links = linking::root_links(session, &loaded)?;
+    let classes_loaded =
+        session.host.initial_installation_components(&workspace_aspects(session, &loaded)).await?;
+    let links = linking::root_links(session, &loaded, classes_loaded)?;
     let mut calculated = calculate(session, &loaded, &links).await?;
     linking::link_components_timed(session, &loaded, &calculated).await?;
     if session.options.add_missing_deps

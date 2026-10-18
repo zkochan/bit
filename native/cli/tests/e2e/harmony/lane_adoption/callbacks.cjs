@@ -29,7 +29,12 @@ class LaneAdoptionLifecycle {
         JSON.stringify({module: __filename, workspace: workspace.path}));
     }
     workspace.registerOnComponentLoad(component => {
-      if (component.id.fullName === 'comp1') receipt('onLoad');
+      if (component.id.fullName === 'comp1') {
+        receipt('onLoad');
+        if (active() && fs.existsSync(path.join(workspace.path, 'lane-history-fail-load'))) {
+          throw new Error('lane history actual onLoad failure');
+        }
+      }
     });
     let retainedInstall;
     const mutableInstall = () => active() && fs.existsSync(path.join(workspace.path, 'lane-adoption-mutate-install'));

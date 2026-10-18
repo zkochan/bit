@@ -24,8 +24,34 @@ pub(super) fn capture(
     mut startup: Option<&mut Startup>,
     inherited: Option<crate::commands::status::environments::Environments>,
 ) -> io::Result<Prepared> {
-    let mut reader =
-        Reader::start(root, request, preview_snapshot, startup.as_deref_mut(), inherited)?;
+    let reader = Reader::start(
+        root,
+        request,
+        preview_snapshot,
+        startup.as_deref_mut(),
+        inherited,
+        Engine::new()?,
+    )?;
+    capture_reader(root, request, startup, reader)
+}
+
+pub(super) fn capture_retained(
+    root: &Path,
+    request: &Request<'_>,
+    mut startup: Option<&mut Startup>,
+    inherited: Option<crate::commands::status::environments::Environments>,
+    engine: Engine,
+) -> io::Result<Prepared> {
+    let reader = Reader::start(root, request, false, startup.as_deref_mut(), inherited, engine)?;
+    capture_reader(root, request, startup, reader)
+}
+
+fn capture_reader(
+    root: &Path,
+    request: &Request<'_>,
+    mut startup: Option<&mut Startup>,
+    mut reader: Reader,
+) -> io::Result<Prepared> {
     let (targets, selector_loads, captured) = checkout_selection::select(
         &mut reader.engine,
         root,
@@ -207,8 +233,9 @@ impl Reader {
         preview: bool,
         mut startup: Option<&mut Startup>,
         inherited: Option<crate::commands::status::environments::Environments>,
+        engine: Engine,
     ) -> io::Result<Self> {
-        let reader = Self::new(root, request, preview, startup.as_deref_mut(), inherited)
+        let reader = Self::new(root, request, preview, startup.as_deref_mut(), inherited, engine)
             .inspect_err(|error| {
                 if let Some(progress) = crate::commands::engine::canonical_progress(error)
                     && let Some(startup) = startup.as_deref_mut()
@@ -230,9 +257,9 @@ impl Reader {
         preview: bool,
         mut startup: Option<&mut Startup>,
         inherited: Option<crate::commands::status::environments::Environments>,
+        mut engine: Engine,
     ) -> io::Result<Self> {
         let home = home();
-        let mut engine = Engine::new()?;
         let environments = match inherited {
             Some(environment) => Some(environment.for_checkout()),
             None => checkout_lifecycle::bootstrap(

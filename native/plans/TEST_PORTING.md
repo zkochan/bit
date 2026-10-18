@@ -49,6 +49,18 @@ JSON's absent released handler and configured active-
 lane provider import remain explicit strict pre-effect delegation controls.
 Git branches, broader pattern grammar, and JSON success are not qualified here.
 
+## Lane history restoration correctness
+
+All 14 strict same-path `harmony::lane_restoration` cases pass against released Bit
+2.2.94. They cover historical checkout, revert with and without deleted-component
+restoration, preserved existing versions, the real revert JSON handler, remote
+history refresh, unpublished local history and retained provider installation and
+compilation. Failure cases retain the exact onLoad/Source prefix and the released
+graceful phase-two tooling result. Independent Node bitmap-write transcripts keep
+raw backup bytes, modes, ordering and command clock windows exact. The mixed-version
+case also snaps the retained comp3 and exports the workspace. Fresh 49-workload
+performance qualification remains pending.
+
 ## Where ports live
 
 - `native/cli/tests/e2e/` is one test target (`main.rs`), mirroring `e2e/` by path:
@@ -2507,11 +2519,11 @@ row's fields, object path, header, logical identity, and remote index stay exact
 
 ### `e2e/harmony/lanes/lane-history-with-deleted-components.e2e.ts`
 
-- [ ] `e2e/harmony/lanes/lane-history-with-deleted-components.e2e.ts:48` lane history with deleted components › a lane where two of three components were deleted with bit delete --lane › bit lane checkout to the entry before the deletion › should checkout without errors about missing components
-- [ ] `e2e/harmony/lanes/lane-history-with-deleted-components.e2e.ts:52` lane history with deleted components › a lane where two of three components were deleted with bit delete --lane › bit lane checkout to the entry before the deletion › should restore all deleted components
-- [ ] `e2e/harmony/lanes/lane-history-with-deleted-components.e2e.ts:70` lane history with deleted components › a lane where two of three components were deleted with bit delete --lane › bit lane revert to that entry, without --restore-deleted-components › should not throw (revert leaves deleted components deleted)
-- [ ] `e2e/harmony/lanes/lane-history-with-deleted-components.e2e.ts:81` lane history with deleted components › a lane where two of three components were deleted with bit delete --lane › bit lane revert to that entry, with --restore-deleted-components › should restore the deleted components
-- [ ] `e2e/harmony/lanes/lane-history-with-deleted-components.e2e.ts:123` lane history with deleted components › reverting with a mixed scenario: one component modified, two deleted › should keep modified component version in bitmap but restore its files
+- [x] `e2e/harmony/lanes/lane-history-with-deleted-components.e2e.ts:48` lane history with deleted components › a lane where two of three components were deleted with bit delete --lane › bit lane checkout to the entry before the deletion › should checkout without errors about missing components — `harmony::lane_restoration::checkout_restores_deleted_components_at_the_historical_versions`
+- [x] `e2e/harmony/lanes/lane-history-with-deleted-components.e2e.ts:52` lane history with deleted components › a lane where two of three components were deleted with bit delete --lane › bit lane checkout to the entry before the deletion › should restore all deleted components — `harmony::lane_restoration::checkout_restores_deleted_components_at_the_historical_versions`
+- [x] `e2e/harmony/lanes/lane-history-with-deleted-components.e2e.ts:70` lane history with deleted components › a lane where two of three components were deleted with bit delete --lane › bit lane revert to that entry, without --restore-deleted-components › should not throw (revert leaves deleted components deleted) — `harmony::lane_restoration::revert_without_restoration_leaves_deleted_components_deleted`
+- [x] `e2e/harmony/lanes/lane-history-with-deleted-components.e2e.ts:81` lane history with deleted components › a lane where two of three components were deleted with bit delete --lane › bit lane revert to that entry, with --restore-deleted-components › should restore the deleted components — `harmony::lane_restoration::revert_restores_deleted_components_without_changing_the_active_lane`
+- [x] `e2e/harmony/lanes/lane-history-with-deleted-components.e2e.ts:123` lane history with deleted components › reverting with a mixed scenario: one component modified, two deleted › should keep modified component version in bitmap but restore its files — `harmony::lane_restoration::versions::mixed_revert_keeps_the_existing_version_and_restores_historical_file_bytes`
 
 ### `e2e/harmony/lanes/lane-import-git-branch.e2e.ts`
 

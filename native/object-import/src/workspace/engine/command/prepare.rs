@@ -1,6 +1,7 @@
 mod checkout_import;
 mod checkout_lane;
 mod checkout_scope;
+mod roots;
 use super::input::{Operation, Prepare};
 use crate::{
     command_import,
@@ -17,6 +18,9 @@ pub(super) fn context(
     pool: &rayon::ThreadPool,
 ) -> io::Result<(Value, Option<command_import::PreparedImport>)> {
     validate(request)?;
+    if super::lane_history::phase(&request.options).is_some() {
+        return super::lane_history::context::prepare(request, pool);
+    }
     if request.operation == Operation::Switch {
         return super::switch::context(request, pool);
     }
@@ -28,6 +32,12 @@ pub(super) fn context(
         extend_models(request, pool, &mut context, imported.as_ref())?;
         return Ok((context, imported));
     }
+    ordinary_context(request, pool)
+}
+fn ordinary_context(
+    request: &Prepare,
+    pool: &rayon::ThreadPool,
+) -> io::Result<(Value, Option<command_import::PreparedImport>)> {
     let input = status_context::Request {
         root: request.root.clone(),
         home: request.home.clone(),
@@ -192,6 +202,7 @@ fn invalid_lifecycle_options(request: &Prepare) -> io::Result<bool> {
 
 fn validate_revert(request: &Prepare) -> io::Result<()> {
     if request.options.revert
+        && super::lane_history::phase(&request.options).is_none()
         && (request.operation != Operation::Checkout
             || request.options.pattern.is_none()
             || request.options.all
@@ -235,7 +246,10 @@ fn import_targets(request: &Prepare) -> io::Result<Vec<command_import::Target>> 
 
 pub(super) fn selected(request: &Prepare, context: &Value) -> io::Result<Vec<Value>> {
     let targets = context["targets"].as_array().ok_or_else(|| invalid("command targets"))?;
-    validate_roots(targets)?;
+    roots::validate(targets)?;
+    if super::lane_history::phase(&request.options).is_some() {
+        return Ok(targets.clone());
+    }
     if let Some(selected) = super::checkout_stash::selected(&request.options, targets)? {
         return Ok(selected);
     }
@@ -307,7 +321,7 @@ fn lane_selected(context: &Value, targets: &[Value]) -> io::Result<Vec<Value>> {
     if let Some(inactive) = context["lane"]["inactiveTargets"].as_array() {
         pool.extend(inactive.iter().cloned());
     }
-    validate_roots(&pool)?;
+    roots::validate(&pool)?;
     Ok(pool
         .into_iter()
         .filter(|target| {
@@ -318,31 +332,6 @@ fn lane_selected(context: &Value, targets: &[Value]) -> io::Result<Vec<Value>> {
         .collect())
 }
 
-fn validate_roots(targets: &[Value]) -> io::Result<()> {
-    let mut roots = targets
-        .iter()
-        .map(|target| target["directory"].as_str().ok_or_else(|| invalid("command component root")))
-        .collect::<io::Result<Vec<_>>>()?;
-    roots.sort_unstable_by(|left, right| {
-        std::path::Path::new(left).cmp(std::path::Path::new(right))
-    });
-    if roots
-        .iter()
-        .filter(|root| **root == ".")
-        .count()
-        > 1
-    {
-        return Err(invalid("command duplicate workspace root"));
-    }
-    roots.retain(|root| *root != ".");
-    if roots
-        .windows(2)
-        .any(|pair| std::path::Path::new(pair[1]).starts_with(pair[0]))
-    {
-        return Err(invalid("command nested component roots"));
-    }
-    Ok(())
-}
 fn select_pattern(targets: &[Value], pattern: &str) -> io::Result<Vec<Value>> {
     let directory = pattern.strip_prefix("./").unwrap_or(pattern);
     if directory

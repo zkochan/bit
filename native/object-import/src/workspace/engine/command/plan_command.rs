@@ -18,7 +18,8 @@ pub(super) fn run(
     record.proofs.extend(input.dependency_read_set.iter().cloned());
     validate_versions(&mut record)?;
     let mut planned = plan_operation(&mut record, input, snapshots, pool)
-        .map_err(|error| super::switch::progress::failure(error, &record))?;
+        .map_err(|error| super::switch::progress::failure(error, &record))
+        .map_err(|error| super::lane_history::progress::failure(error, &record))?;
     if record.request.operation == input::Operation::Switch {
         super::switch::append_skipped(&record.context, &record.targets, &mut planned.result)?;
     }
