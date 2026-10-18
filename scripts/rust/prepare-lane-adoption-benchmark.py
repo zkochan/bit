@@ -155,7 +155,19 @@ def provider_fixture(workspace, run, workload):
     config = json.loads(config_path.read_text())
     config[f'{SCOPE}/env/lane-adoption'] = {}
     config_path.write_text(json.dumps(config))
-    run('env', 'set', 'comp1', f'{SCOPE}/env/lane-adoption')
+    # Match the qualified Rust fixture's explicit configuration. The provider is
+    # physically compiled and registers its actual Node environment when loaded;
+    # `env set` additionally validates the pre-registration component descriptor.
+    raw = path.read_text()
+    bitmap = json.loads(raw[raw.index('{'):])
+    specific = bitmap['comp1'].setdefault('config', {})
+    old_env = specific.get('teambit.envs/envs', {}).get('env')
+    env = f'{SCOPE}/env/lane-adoption'
+    if old_env and old_env != env:
+        specific.pop(old_env, None)
+    specific[env] = {}
+    specific['teambit.envs/envs'] = {'env': env}
+    path.write_text(json.dumps(bitmap, indent=4))
     run('tag', '--ignore-issues', '*', '--message', 'main')
     run('export')
     run('lane', 'create', 'dev')
