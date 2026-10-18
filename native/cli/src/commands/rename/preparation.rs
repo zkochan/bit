@@ -5,11 +5,11 @@ use bit_object_import::component_rename::{Options, Plan};
 use serde_json::{Value, json};
 use std::{fs, io, path::Path};
 
-pub(super) struct Prepared {
-    pub(super) plan: Plan,
-    pub(super) facts: Value,
+pub(in crate::commands) struct Prepared {
+    pub(in crate::commands) plan: Plan,
+    pub(in crate::commands) facts: Value,
 }
-pub(super) fn prepare(root: &Path, options: &Options) -> io::Result<Prepared> {
+pub(in crate::commands) fn prepare(root: &Path, options: &Options) -> io::Result<Prepared> {
     let bitmap = bit_object_import::parse_jsonc(&fs::read(root.join(".bitmap"))?)?;
     let mut engine = Engine::new()?;
     let context:Value=engine.request(&json!({"kind":"trackingContext","root":root,"home":workspace_command::home(),"bitmap":bitmap}))?;

@@ -2,11 +2,11 @@
 const identityLoadedComponents = new Map();
 
 function identityLoadedComponent(identity) {
-  return cliArguments[0] === 'rename' ? identityLoadedComponents.get(identity) : undefined;
+  return identityRenameCommand ? identityLoadedComponents.get(identity) : undefined;
 }
 
 async function identityUseCached({ components }) {
-  if (cliArguments[0] !== 'rename') return true;
+  if (!identityRenameCommand) return true;
   const loaded = await loadHarmony();
   const workspace = loaded.get('teambit.workspace/workspace');
   const envs = loaded.get('teambit.envs/envs');
@@ -54,5 +54,14 @@ async function identityMaterialized({ identity, directory, mainFile, files }) {
       consumer.mainFile = mainFile;
     }
   }
+  return true;
+}
+
+/** ComponentStatusLoader loads a legacy Consumer before a later workspace getMany. */
+let identityConsumerOnly = false;
+const identityConsumers = new Map();
+function identityConsumerMode({ enabled }) {
+  if (enabled) identityConsumers.clear();
+  identityConsumerOnly = enabled;
   return true;
 }

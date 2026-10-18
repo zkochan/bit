@@ -1,4 +1,6 @@
 //! Local `bit delete` parity against the pinned Node.js CLI.
+mod completion;
+mod selectors;
 
 use super::remove::scope_objects;
 use crate::helper::Helper;
@@ -117,7 +119,7 @@ fn new_component_delete_delegates_untouched() {
     let command = "delete bar/foo --silent";
     let node = Helper::cmd_in_with(&node_root, command, &[("BIT_NATIVE", OsStr::new("off"))]);
     let actual = helper.cmd(command);
-    assert!(!actual.native, "{}", actual.trace);
+    assert!(actual.native, "{}", actual.trace);
     assert_eq!(actual.status.code(), node.status.code());
     assert_eq!(actual.stdout, node.stdout);
     assert_eq!(actual.stderr, node.stderr);
@@ -139,7 +141,7 @@ fn unexported_lane_delete_delegates_untouched() {
     let command = "delete bar/foo --silent --lane";
     let node = Helper::cmd_in_with(&node_root, command, &[("BIT_NATIVE", OsStr::new("off"))]);
     let actual = helper.cmd(command);
-    assert!(!actual.native, "{}", actual.trace);
+    assert!(actual.native, "{}", actual.trace);
     assert_eq!(actual.status.code(), node.status.code());
     assert_eq!(actual.stdout, node.stdout);
     assert_eq!(actual.stderr, node.stderr);

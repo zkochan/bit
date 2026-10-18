@@ -1,4 +1,6 @@
 //! Local removal against the pinned Node.js CLI.
+mod completion;
+mod selectors;
 
 use crate::helper::Helper;
 use std::{ffi::OsStr, fs};
@@ -249,7 +251,7 @@ fn tagged_missing_main_file_delegates_before_removal() {
     let command = "remove bar/foo --silent --force";
     let node = Helper::cmd_in_with(&node_root, command, &[("BIT_NATIVE", OsStr::new("off"))]);
     let delegated = helper.cmd(command);
-    assert!(!delegated.native, "{}", delegated.trace);
+    assert!(delegated.native, "{}", delegated.trace);
     assert_eq!(delegated.status.code(), node.status.code());
     assert_eq!(delegated.stdout, node.stdout);
     assert_eq!(delegated.stderr, node.stderr);
@@ -277,7 +279,7 @@ fn modified_tagged_component_delegates_without_force() {
     let command = "remove bar/foo --silent";
     let node = Helper::cmd_in_with(&node_root, command, &[("BIT_NATIVE", OsStr::new("off"))]);
     let delegated = helper.cmd(command);
-    assert!(!delegated.native, "{}", delegated.trace);
+    assert!(delegated.native, "{}", delegated.trace);
     assert_eq!(delegated.status.code(), node.status.code());
     assert_eq!(delegated.stdout, node.stdout);
     assert_eq!(delegated.stderr, node.stderr);
@@ -384,7 +386,7 @@ fn modified_imported_component_delegates_unless_forced() {
     let files = format!("{}/bar/foo/foo.js", helper.scopes.remote);
     helper.output_file(&files, "module.exports = 'changed';");
     let baseline = helper.clone_workspace();
-    for (suffix, native_expected) in [("", false), (" --force", true)] {
+    for (suffix, native_expected) in [("", true), (" --force", true)] {
         helper.get_cloned_workspace(&baseline);
         let node_root = helper.clone_workspace();
         let command = format!("remove {}/bar/foo --silent{suffix}", helper.scopes.remote);
@@ -525,7 +527,7 @@ fn modified_lane_component_delegates_unless_forced() {
     helper.run("snap --message lane");
     helper.output_file("bar/foo.js", "module.exports = 'modified';");
     let baseline = helper.clone_workspace();
-    for (suffix, native_expected) in [("", false), (" --force", true)] {
+    for (suffix, native_expected) in [("", true), (" --force", true)] {
         helper.get_cloned_workspace(&baseline);
         let node_root = helper.clone_workspace();
         let command = format!("remove bar/foo --silent{suffix}");

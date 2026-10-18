@@ -31,3 +31,13 @@ fn invalid_new_names_are_rejected_before_sources_are_read() {
     assert!(identity::validate_name("Invalid").is_err());
     assert!(identity::validate_name("nested//component").is_err());
 }
+
+#[test]
+fn same_name_replacements_qualify_new_components_by_their_default_scope() {
+    let mut rows=serde_json::json!({"comp1":{"name":"comp1","scope":"old.scope","version":"0.0.1","defaultScope":"old.scope"}}).as_object().unwrap().clone();
+    let key =
+        super::configuration::target_key(&mut rows, "comp1", "replacement.scope/comp1").unwrap();
+    assert_eq!(key, "replacement.scope/comp1");
+    assert!(rows.contains_key("old.scope/comp1"));
+    assert!(!rows.contains_key("comp1"));
+}
