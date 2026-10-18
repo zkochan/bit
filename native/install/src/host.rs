@@ -114,6 +114,16 @@ pub trait Host: Send + Sync {
         Ok(false)
     }
 
+    /// Actual component class loads and ordered directory facts at an installation phase.
+    async fn installation_components(
+        &self,
+        phase: &str,
+        ids: &[String],
+    ) -> io::Result<Option<Value>> {
+        let _ = (phase, ids);
+        Ok(None)
+    }
+
     /// Run actual package-manager subscribers over the native installation metadata.
     async fn install_subscribers(&self, request: &Value) -> io::Result<Option<Value>> {
         let _ = request;

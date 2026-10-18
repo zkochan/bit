@@ -7,7 +7,7 @@ use super::super::{
 };
 use crate::{
     links::{self, ComponentLinkOptions, LinkOptions},
-    model::DependencyMap,
+    model::{DependencyMap, WorkspaceComponent},
     workspace::{ScopeObjects, aspect_env_ids},
 };
 use std::{io, time::Instant};
@@ -26,12 +26,8 @@ const ASPECT_ENVS: [&str; 3] = [
 pub fn root_links(
     session: &Session<'_>,
     loaded: &Loaded,
-    classes_loaded: bool,
+    components: &[WorkspaceComponent],
 ) -> io::Result<DependencyMap> {
-    // `calculateLinks` loads the components (`getComponentsDirectory`) first.
-    if !classes_loaded {
-        session.loading(loaded);
-    }
     session.output.status(LINKING);
     let started = Instant::now();
     let config = &loaded.config.dependency_resolver;
@@ -40,8 +36,7 @@ pub fn root_links(
         link_core_aspects: config.link_core_aspects(),
         link_nested_deps_in_nm: !config.has_root_components(),
     };
-    let links =
-        links::linked_root_deps(&session.root, session.info, &loaded.components(), &options)?;
+    let links = links::linked_root_deps(&session.root, session.info, components, &options)?;
     if loaded.engine.layout.enable_global_virtual_store {
         links::link_core_aspects_to_hoisted_store(&session.root, &links)?;
     }
@@ -55,7 +50,7 @@ pub async fn link_components_timed(
     loaded: &Loaded,
     calculated: &Calculated,
 ) -> io::Result<()> {
-    link_components(session, loaded, calculated).await
+    link_components(session, loaded, calculated, &calculated.linking_components).await
 }
 
 /// `linkCodemods`: every component as a package in `node_modules`.
@@ -63,15 +58,13 @@ pub async fn link_components(
     session: &Session<'_>,
     loaded: &Loaded,
     calculated: &Calculated,
+    components: &[WorkspaceComponent],
 ) -> io::Result<()> {
     let config = &loaded.config.dependency_resolver;
     let root_components_dir = loaded.config.root_components_path(&session.root);
     let cloud_domain = loaded.effective.cloud_domain();
-    let aspect_env_ids = aspect_env_ids(
-        &calculated.components,
-        &ScopeObjects::new(&loaded.workspace.scope_path),
-        &ASPECT_ENVS,
-    )?;
+    let aspect_env_ids =
+        aspect_env_ids(components, &ScopeObjects::new(&loaded.workspace.scope_path), &ASPECT_ENVS)?;
     let options = ComponentLinkOptions {
         has_root_components: config.has_root_components(),
         root_components_dir: &root_components_dir,
@@ -80,7 +73,7 @@ pub async fn link_components(
         windows: cfg!(windows),
         aspect_env_ids: &aspect_env_ids,
     };
-    links::link_components(&session.root, &calculated.components, session.host, &options).await?;
+    links::link_components(&session.root, components, session.host, &options).await?;
     Ok(())
 }
 

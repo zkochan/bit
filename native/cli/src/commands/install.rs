@@ -1,6 +1,9 @@
 //! Native `bit install` (`docs/rust/native-install.md`): the `bit-install`
 //! crate runs the command; the JavaScript host serves what aspects implement.
 
+mod request;
+
+use self::request::lane_installation;
 use crate::{
     commands::Command,
     discovery::{self, NodeCli, Target},
@@ -13,7 +16,6 @@ use async_trait::async_trait;
 use bit_install::{
     AfterInstall, AfterInstallResult, DetectRequest, HostInfo, Outcome as Installed,
 };
-use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use std::{
     env,
@@ -214,42 +216,28 @@ fn yn(value: &str) -> bool {
 
 pub(in crate::commands) struct JsHost(Arc<Host>, bool);
 
-fn lane_installation() -> bool {
-    let arguments = std::env::args()
-        .skip(1)
-        .take(2)
-        .collect::<Vec<_>>();
-    arguments
-        .first()
-        .is_some_and(|command| command == "switch")
-        || arguments
-            .first()
-            .is_some_and(|command| command == "lane")
-            && arguments
-                .get(1)
-                .is_some_and(|command| matches!(command.as_str(), "import" | "checkout" | "revert"))
-}
-
-impl JsHost {
-    pub(in crate::commands) fn new(host: Arc<Host>, quiet: bool) -> Self {
-        Self(host, quiet)
-    }
-
-    async fn call<Response: DeserializeOwned>(
-        &self,
-        method: &'static str,
-        params: Value,
-    ) -> io::Result<Response> {
-        let host = Arc::clone(&self.0);
-        let value = tokio::task::spawn_blocking(move || host.call(method, &params))
-            .await
-            .map_err(io::Error::other)??;
-        serde_json::from_value(value).map_err(io::Error::other)
-    }
-}
-
 #[async_trait]
 impl bit_install::Host for JsHost {
+    async fn installation_components(
+        &self,
+        phase: &str,
+        ids: &[String],
+    ) -> io::Result<Option<Value>> {
+        if !lane_installation() {
+            return Ok(None);
+        }
+        let result =
+            self.call::<Value>("switchInstallationComponents", json!({"phase":phase,"ids":ids}))
+                .await;
+        let output = self.0.take_stdout();
+        if !self.1 {
+            let mut stdout = io::stdout().lock();
+            stdout.write_all(output.as_bytes())?;
+            stdout.flush()?;
+        }
+        result.map(Some)
+    }
+
     async fn initial_installation_components(&self, aspect_ids: &[String]) -> io::Result<bool> {
         let arguments = std::env::args()
             .skip(1)
@@ -262,6 +250,9 @@ impl bit_install::Host for JsHost {
                 .get(1)
                 .is_none_or(|command| !matches!(command.as_str(), "checkout" | "revert"))
         {
+            if lane_installation() {
+                self.prepare_install(aspect_ids).await?;
+            }
             return Ok(false);
         }
         let receipt =

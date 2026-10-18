@@ -37,6 +37,50 @@ async function switchConfiguredAspectClasses() {
   }
 }
 
+let switchInstallationClasses;
+let switchInstallationDirectoryMap;
+/** Execute the published class load at its native-owned installation boundary. */
+async function switchInstallationComponents({ phase, ids }) {
+  if (!laneSwitchCommand) throw new Error('installation classes outside lane adoption');
+  const loaded = await loadHarmony();
+  const workspace = loaded.get('teambit.workspace/workspace');
+  captureBootstrapProgress(workspace);
+  const previous = snapshotBootstrapProgress;
+  snapshotBootstrapProgress = !cliArguments.some(argument => ['--json', '-j'].includes(argument));
+  try {
+    await loadInstallComponents();
+    if (phase === 'initial') {
+      laneInstallationPrepared = true;
+      return { components: (switchInstallationClasses ?? []).filter(component =>
+        workspace.componentDir(component.id) !== workspace.path).map(component => ({
+          id: component.id.toString(), directory: workspace.componentDir(component.id)
+        })) };
+    }
+    if (phase === 'linking') {
+      const { ComponentID } = bitRequire('@teambit/component-id');
+      const previousIds = switchInstallationClasses?.filter(component =>
+        workspace.componentDir(component.id) !== workspace.path).map(component => component.id);
+      const requested = previousIds ?? ids.map(id => ComponentID.fromString(id));
+      switchInstallationClasses = requested.length ? await workspace.getMany(requested, {
+        idsToNotLoadAsAspects: requested.map(id => id.toString()),
+        loadSeedersAsAspects: false, loadExtensions: false
+      }) : [];
+      return { components: switchInstallationClasses.map(component => ({
+        id: component.id.toString(), directory: workspace.componentDir(component.id)
+      })) };
+    }
+    if (!['manifests', 'engine'].includes(phase)) throw new Error('installation class phase');
+    const directoryMap = await loaded.get('teambit.workspace/install').getComponentsDirectory([]);
+    switchInstallationClasses = directoryMap.toArray().map(([component]) => component);
+    if (phase === 'engine') switchInstallationDirectoryMap = directoryMap;
+    return { components: directoryMap.toArray().map(([component, directory]) => ({
+      id: component.id.toString(), directory
+    })) };
+  } finally {
+    snapshotBootstrapProgress = previous;
+  }
+}
+
 let switchSubscriberContext;
 /** Rust owns the package operation; subscribers receive the actual retained receiver/classes. */
 async function switchInstallSubscribers(request) {
@@ -58,7 +102,7 @@ async function switchSubscriberInputs(request, loaded, resolver) {
   const { ComponentID } = bitRequire('@teambit/component-id');
   const { ComponentMap } = bitRequire('@teambit/component');
   const { WorkspacePolicy } = bitRequire('@teambit/dependency-resolver');
-  const entries = request.components.map(row => {
+  const entries = switchInstallationDirectoryMap ? [] : request.components.map(row => {
     const component = workspace.componentLoader.getFromCache(ComponentID.fromString(row.id), {
       loadExtensions: false, executeLoadSlot: false, loadSeedersAsAspects: false, resolveExtensionsVersions: false
     });
@@ -69,7 +113,13 @@ async function switchSubscriberInputs(request, loaded, resolver) {
     dependencyId: row.name, lifecycleType: row.lifecycle,
     value: {version: row.version, ...(row.preserve == null ? {} : {preserve: row.preserve})}
   })));
-  const args = {componentDirectoryMap: new ComponentMap(new Map(entries)), options: request.options,
+  const componentDirectoryMap = switchInstallationDirectoryMap ?? new ComponentMap(new Map(entries));
+  const actual = componentDirectoryMap.toArray();
+  if (actual.length !== request.components.length || actual.some(([component, directory], index) =>
+    component.id.toString() !== request.components[index].id || directory !== request.components[index].directory)) {
+    throw new Error('switch subscriber directory inventory changed');
+  }
+  const args = {componentDirectoryMap, options: request.options,
     packageManagerOptions: request.packageManagerOptions, rootDir: request.rootDir, rootPolicy};
   const installer = resolver.getInstaller({});
   const originals = {componentDirectoryMap: args.componentDirectoryMap, options: args.options,
@@ -146,7 +196,7 @@ async function historyInstallationComponents({ aspectIds }) {
   try {
     await prepareInstall(aspectIds);
     await loadInstallComponents();
-    historyInstallationPrepared = true;
+    laneInstallationPrepared = true;
     return { error: null };
   } catch (error) {
     // ComponentWriter catches installation failures and then compiles in this same session.

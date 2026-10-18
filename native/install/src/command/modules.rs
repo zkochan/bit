@@ -37,7 +37,9 @@ pub async fn install(session: &Session<'_>, mut loaded: Loaded) -> io::Result<In
     output.console(&format!("installing dependencies in workspace using pnpm ({manager})"));
     let classes_loaded =
         session.host.initial_installation_components(&workspace_aspects(session, &loaded)).await?;
-    let links = linking::root_links(session, &loaded, classes_loaded)?;
+    let initial_components =
+        super::session::installation_components::initial(session, &loaded, classes_loaded).await?;
+    let links = linking::root_links(session, &loaded, &initial_components)?;
     let mut calculated = calculate(session, &loaded, &links).await?;
     linking::link_components_timed(session, &loaded, &calculated).await?;
     if session.options.add_missing_deps
@@ -51,7 +53,8 @@ pub async fn install(session: &Session<'_>, mut loaded: Loaded) -> io::Result<In
     let restore = restore::input(session, has_root_components, &calculated)?;
     prepare_directories(&loaded, &calculated)?;
     // `_installModulesProfiled` loads the component directory map before the engine runs.
-    session.loading(&loaded);
+    calculated.components =
+        super::session::installation_components::load(session, &loaded, "engine").await?;
     let context = CycleContext { loaded: &loaded, links: &links, restore: restore.as_ref() };
     let old_non_loaded_envs = run_cycles(session, &context, &mut calculated).await?;
     linking::sync_core_aspects(session, &loaded, &calculated)?;
@@ -81,8 +84,9 @@ async fn run_cycles(
         let has_missing_local_components = calculated.outcome.has_missing_local_components;
         let result = engine_run::run(session, loaded, calculated, restore).await?;
         // `linkCodemods` loads the components it links.
-        session.loading(loaded);
-        linking::link_components(session, loaded, calculated).await?;
+        let linking_components =
+            super::session::installation_components::load(session, loaded, "linking").await?;
+        linking::link_components(session, loaded, calculated, &linking_components).await?;
         linking::sync_core_aspects(session, loaded, calculated)?;
         let old_non_loaded_envs = calculated.non_loaded_envs();
         after_install(session, loaded, calculated, &old_non_loaded_envs).await?;

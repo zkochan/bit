@@ -38,6 +38,18 @@ fn automatic_conflict_preserves_local_bytes_and_current_lane() {
 fn explicit_merge_strategies_preserve_canonical_conflict_materialization() {
     for strategy in ["ours", "theirs", "manual"] {
         let helper = fixture();
-        support::successful(&helper, &format!("switch lane-b -r {strategy} -x"));
+        let command = format!("switch lane-b -r {strategy} -x");
+        let result = if strategy == "ours" {
+            crate::commands::add::support::history_oracle::compare(
+                &helper,
+                &command,
+                str::to_owned,
+                ["lane-switch"],
+                false,
+            )
+        } else {
+            super::selection::two_write_success(&helper, &command)
+        };
+        assert!(result.status.success(), "{} {}", result.stdout, result.stderr);
     }
 }

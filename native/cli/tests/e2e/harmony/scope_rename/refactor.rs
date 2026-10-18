@@ -264,10 +264,7 @@ fn mixed_scope_refactor_retains_released_list_order_across_later_bitmap_writes()
     }
     remote::publish(&helper);
     super::fixture::delay(&helper, &["comp1", "comp2", "comp3", "comp4"]);
-    let result = successful(
-        &helper,
-        &format!("scope rename {old} replacement.scope --refactor --deprecate -x"),
-    );
+    let result = compare_mixed_refactor(&helper, &old);
     let report = result.stdout
         .split("refactored components")
         .nth(1)
@@ -286,4 +283,25 @@ fn mixed_scope_refactor_retains_released_list_order_across_later_bitmap_writes()
             "replacement.scope/comp3",
         ]),
     );
+}
+
+fn compare_mixed_refactor(helper: &crate::helper::Helper, old: &str) -> crate::helper::Run {
+    let deprecate3 = format!("deprecate {old}/comp3@0.0.1");
+    let deprecate4 = format!("deprecate {old}/comp4@0.0.1");
+    let result = crate::commands::add::support::history_oracle::compare(
+        helper,
+        &format!("scope rename {old} replacement.scope --refactor --deprecate -x"),
+        str::to_owned,
+        [
+            "adding replacement.scope/comp3",
+            deprecate3.as_str(),
+            "adding replacement.scope/comp4",
+            deprecate4.as_str(),
+            "rename",
+            "rename",
+        ],
+        false,
+    );
+    assert!(result.status.success(), "{} {}", result.stdout, result.stderr);
+    result
 }

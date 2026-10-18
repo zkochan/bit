@@ -184,6 +184,7 @@ const handlers = {
   hostInfo,
   switchCompile,
   switchConfiguredAspectClasses,
+  switchInstallationComponents,
   historyInstallationComponents,
   switchInstallSubscribers,
   collationOrder: ({ ids }) => ids.map((_, index) => index).sort((left, right) => ids[left].localeCompare(ids[right])),
@@ -490,10 +491,10 @@ let beforePackageManager = false;
  * depend on run on the first request that needs Harmony (`loadInstallComponents`), so an
  * install no env or aspect request reaches never loads Harmony.
  */
-let historyInstallationPrepared = false;
+let laneInstallationPrepared = false;
 async function prepareInstall(aspectIds) {
-  if (laneHistoryCommand && historyInstallationPrepared) {
-    historyInstallationPrepared = false;
+  if (laneSwitchCommand && laneInstallationPrepared) {
+    laneInstallationPrepared = false;
     return null;
   }
   beforePackageManager = true;
@@ -524,7 +525,7 @@ async function loadInstallComponents() {
   await loadWorkspaceAspects(aspectIds);
   const workspace = (await loadHarmony()).get('teambit.workspace/workspace');
   workspace.inInstallContext = true;
-  await workspace.list(undefined, { loadSeedersAsAspects: false });
+  switchInstallationClasses = await workspace.list(undefined, { loadSeedersAsAspects: false });
 }
 
 /**

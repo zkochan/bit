@@ -27,6 +27,7 @@ const DEDUPING: &str = "deduping dependencies for installation";
 /// One calculation of what to install.
 pub struct Calculated {
     pub components: Vec<WorkspaceComponent>,
+    pub linking_components: Vec<WorkspaceComponent>,
     pub env_policies: IndexMap<String, EnvPolicy>,
     pub dependencies: IndexMap<String, ComponentDependencies>,
     pub outcome: ManifestOutcome,
@@ -52,14 +53,11 @@ pub async fn calculate(
     loaded: &Loaded,
     linked_root_deps: &DependencyMap,
 ) -> io::Result<Calculated> {
-    // The TypeScript command loads the components twice before the manifests:
-    // `linkCodemods` right after the root links, then `getComponentsDirectory`
-    // in `_getComponentsManifests`. The native linker runs after this
-    // calculation and loads nothing, so both lines belong here.
-    session.loading(loaded);
+    let linking_components =
+        super::session::installation_components::load(session, loaded, "linking").await?;
     session.host.configured_aspect_classes().await?;
-    session.loading(loaded);
-    let components = loaded.components();
+    let components =
+        super::session::installation_components::load(session, loaded, "manifests").await?;
     let Resolved {
         env_policies,
         workspace_policy,
@@ -85,19 +83,24 @@ pub async fn calculate(
         },
     )?;
     session.output.success_status();
-    // Node loads env and app root manifests only when root components are enabled.
-    if loaded.config.dependency_resolver.has_root_components() {
-        session.loading(loaded);
-        session.loading(loaded);
-    }
+    root_manifest_loading(session, loaded);
     Ok(Calculated {
         components,
+        linking_components,
         env_policies,
         dependencies,
         outcome,
         subscriber_policy: root_policy,
         subscriber_links: linked_root_deps.clone(),
     })
+}
+
+fn root_manifest_loading(session: &Session<'_>, loaded: &Loaded) {
+    // Node loads env and app root manifests only when root components are enabled.
+    if loaded.config.dependency_resolver.has_root_components() {
+        session.loading(loaded);
+        session.loading(loaded);
+    }
 }
 
 /// `writeDependenciesToPackageJson`: the root manifest `_getComponentsManifests`

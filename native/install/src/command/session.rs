@@ -1,6 +1,8 @@
 //! What one `bit install` invocation works with: the process facts, and the
 //! workspace state loaded from disk (reloaded after every config edit).
 
+pub(super) mod installation_components;
+
 mod component_order;
 
 use crate::{
