@@ -240,7 +240,8 @@ AST proofs avoid redundant parsing; other sources retain the published parser.
 
 The [complete qualification evidence](../scripts/rust/benchmarks/workspace-mutation-qualification.json)
 measures source `a3393697c` against Node 22.22.0 / Bit 2.2.94. Subsequent Windows
-timestamp, remote-publication and installation-output fixture fixes change tests only; production sources and the measured
+timestamp, remote-publication, installation-output and offline HTTPS fixture fixes
+change tests only; production sources and the measured
 release binary remain unchanged. Five alternating pairs per non-TTY, CI and TTY
 mode passed all 270 full-output, exit-code, filesystem, cache, object, history,
 link/mode and file-remote comparisons. Of these, 260 pairs ran natively; ten
