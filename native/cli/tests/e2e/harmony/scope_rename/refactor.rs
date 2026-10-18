@@ -14,7 +14,15 @@ fn mixed_exported_and_new_scope_refactoring_rewrites_the_chain_and_aspect_key() 
     remote::publish(&helper);
     super::fixture::delay(&helper, &["comp1", "comp2", "comp3"]);
     compile_mixed_baseline(&helper);
-    successful(&helper, &format!("scope rename {old} replacement.scope --refactor --deprecate -x"));
+    let deprecate = format!("deprecate {old}/comp3@0.0.1");
+    let output = crate::commands::add::support::history_oracle::compare(
+        &helper,
+        &format!("scope rename {old} replacement.scope --refactor --deprecate -x"),
+        str::to_owned,
+        ["adding replacement.scope/comp3", deprecate.as_str(), "rename", "rename"],
+        false,
+    );
+    assert!(output.status.success(), "{} {}", output.stdout, output.stderr);
     let map = bitmap(&helper);
     for name in ["comp1", "comp2"] {
         let row = map

@@ -1,4 +1,4 @@
-//! Two published writes are compared independently of their live second-resolution grouping.
+//! An exact caller-declared sequence of published writes retains its full raw history proof.
 mod raw;
 
 use crate::{
@@ -8,32 +8,32 @@ use crate::{
 use serde_json::Value;
 use std::{collections::BTreeMap, ffi::OsStr, fs, path::Path};
 
-pub(crate) fn compare(
+pub(crate) fn compare<const WRITE_COUNT: usize>(
     helper: &Helper,
     command: &str,
     stdout: fn(&str) -> String,
-    reasons: [&str; 2],
+    reasons: [&str; WRITE_COUNT],
     installation: bool,
 ) -> Run {
     compare_mode(helper, command, stdout, reasons, installation, false)
 }
 
 /// The untimed oracle and both measured commands receive CI independently.
-pub(crate) fn compare_ci(
+pub(crate) fn compare_ci<const WRITE_COUNT: usize>(
     helper: &Helper,
     command: &str,
     stdout: fn(&str) -> String,
-    reasons: [&str; 2],
+    reasons: [&str; WRITE_COUNT],
     installation: bool,
 ) -> Run {
     compare_mode(helper, command, stdout, reasons, installation, true)
 }
 
-fn compare_mode(
+fn compare_mode<const WRITE_COUNT: usize>(
     helper: &Helper,
     command: &str,
     stdout: fn(&str) -> String,
-    reasons: [&str; 2],
+    reasons: [&str; WRITE_COUNT],
     installation: bool,
     ci: bool,
 ) -> Run {
@@ -57,12 +57,12 @@ fn compare_mode(
         support::compare_with_history_ci(helper, command, stdout, &observe, ci)
     }
 }
-fn prepare(
+fn prepare<const WRITE_COUNT: usize>(
     helper: &Helper,
     command: &str,
     evidence: &Path,
     baseline: &raw::Snapshot,
-    reasons: [&str; 2],
+    reasons: [&str; WRITE_COUNT],
     ci: bool,
 ) -> Oracle {
     let started = chrono::Utc::now().timestamp_millis();
@@ -119,15 +119,22 @@ struct Oracle {
     final_bitmap: Vec<u8>,
 }
 impl Oracle {
-    fn read(root: &Path, baseline: &raw::Snapshot, evidence: &Path, reasons: [&str; 2]) -> Self {
+    fn read<const WRITE_COUNT: usize>(
+        root: &Path,
+        baseline: &raw::Snapshot,
+        evidence: &Path,
+        reasons: [&str; WRITE_COUNT],
+    ) -> Self {
         let journal = fs::read_to_string(evidence.join("transitions.jsonl")).unwrap();
         let transitions: Vec<Value> = journal
             .lines()
             .map(|line| serde_json::from_str(line).unwrap())
             .collect();
-        assert_eq!(transitions.len(), 2, "exact two published writes: {journal}");
+        assert!(WRITE_COUNT > 0, "oracle requires a nonempty exact write sequence");
+        assert_eq!(transitions.len(), WRITE_COUNT, "exact published write count: {journal}");
         for (index, row) in transitions.iter().enumerate() {
             assert_eq!(row["sequence"], index);
+            assert_eq!(row["reason"], reasons[index], "exact published write reason: {journal}");
             for field in ["capture_error", "original_error", "validation_error"] {
                 assert!(row.get(field).is_none(), "invalid oracle: {journal}");
             }
@@ -144,8 +151,6 @@ impl Oracle {
         }
         let initial = fs::read(evidence.join("baseline.bitmap")).unwrap();
         assert_eq!(transitions[0]["preimage_hex"], hex(&initial));
-        assert_eq!(transitions[0]["reason"], reasons[0]);
-        assert_eq!(transitions[1]["reason"], reasons[1]);
         fs::write(evidence.join("final.bitmap"), fs::read(root.join(".bitmap")).unwrap()).unwrap();
         Self {
             baseline: baseline.clone(),
