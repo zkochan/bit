@@ -63,10 +63,7 @@ fn prepare(
     selection: &Selection,
     linker: &mut ProjectedLinker,
 ) -> io::Result<Entries> {
-    let mut prepared = selection.entries
-        .iter()
-        .map(|option| rename::preparation::prepare(root, option))
-        .collect::<io::Result<Vec<_>>>()?;
+    let mut prepared = rename::preparation::prepare_many(root, &selection.entries)?;
     let workspace = bit_object_import::parse_jsonc(&std::fs::read(root.join("workspace.jsonc"))?)?;
     let tracking_scope = workspace["teambit.workspace/workspace"]["defaultScope"].clone();
     for (component, option) in prepared.iter_mut().zip(&selection.entries) {

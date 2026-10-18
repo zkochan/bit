@@ -1,6 +1,9 @@
 //! One retained bitmap/configuration transaction around a published renameMultiple batch.
 mod publication;
-use super::{Plan, invalid};
+#[cfg(test)]
+mod tests;
+use super::{Options, Plan, invalid};
+use rayon::prelude::*;
 use serde_json::Value;
 use std::{
     fs, io,
@@ -15,6 +18,29 @@ pub struct Batch {
     refactored: Vec<super::files::Change>,
 }
 impl Batch {
+    /// Prepare independent read-only plans concurrently, preserving caller order and first error.
+    pub fn prepare_plans(
+        root: &Path,
+        options: &[Options],
+        facts: &[Value],
+    ) -> io::Result<Vec<Plan>> {
+        if options.len() != facts.len() {
+            return Err(invalid("rename plan options/facts length mismatch"));
+        }
+        if options.is_empty() {
+            return Ok(Vec::new());
+        }
+        let threads = std::thread::available_parallelism().map_or(1, std::num::NonZero::get).min(4);
+        let pool = crate::session::shared_pool(threads)?;
+        let results = pool.install(|| {
+            options
+                .par_iter()
+                .zip(facts.par_iter())
+                .map(|(options, facts)| Plan::prepare(root, options, facts))
+                .collect::<Vec<_>>()
+        });
+        results.into_iter().collect()
+    }
     pub fn prepare(root: &Path, mut plans: Vec<Plan>) -> io::Result<Self> {
         let expected = fs::read(root.join(".bitmap"))?;
         let original = crate::parse_jsonc(&expected)?;
