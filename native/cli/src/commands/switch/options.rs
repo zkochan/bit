@@ -131,11 +131,18 @@ impl Options {
             .is_none_or(|pattern| {
                 !pattern.contains(['$', '&'])
                     && !pattern.contains(" AND ")
-                    && crate::commands::patterns::matching(
-                        &[],
-                        &crate::commands::patterns::split(pattern),
-                    )
-                    .is_ok()
+                    && crate::commands::patterns::split(pattern)
+                        .iter()
+                        .all(|part| {
+                            let glob = part
+                                .split('@')
+                                .next()
+                                .unwrap_or_default();
+                            let glob = glob.strip_prefix('!').unwrap_or(glob);
+                            !glob.is_empty()
+                                && !glob.starts_with('#')
+                                && !glob.contains(['{', '}', '(', ')', '+', '!', '\\'])
+                        })
             })
     }
 }

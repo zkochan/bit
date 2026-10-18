@@ -11,10 +11,10 @@ ceiling: native-only cases for edge cases the e2e suite does not cover are welco
 
 ## Lane adoption focused qualification
 
-The lane-adoption filter passed all 19 tests (18 strict integration fixtures and
+The lane-adoption filter passed all 20 tests (19 strict integration fixtures and
 one completion-token test) against released Bit 2.2.94. All seven required checks
-plus Rust scope pass with 1,512 workspace tests and 796 e2e cases. Performance
-qualification remains pending; this is not a complete lane-command claim.
+plus Rust scope must pass before qualification. Performance qualification remains
+pending; this is not a complete lane-command claim.
 Comparisons retain complete command output, native ownership, source/control/
 object/cache/history/link state and an unchanged real remote. The two-write
 installation case independently observes the released checkout/lane-switch write
@@ -32,7 +32,8 @@ The checked original assertions below map individually to these passed fixtures:
 | `lane-import.e2e.ts:384,390` | `selection::checkout_workspace_only_omits_new_lane_rows_and_ordinary_checkout_adds_them`: new lane row stays absent with the omission hint, then ordinary checkout adds it from the same input. |
 | `lane-import.e2e.ts:407` | `selection::checkout_workspace_only_does_not_offer_a_removed_new_component`: removed new row is neither added nor suggested. |
 
-Additional passed fixtures cover empty-workspace static patterns, real successful
+Additional passed fixtures cover empty-workspace static patterns, including
+bracket classes selecting a strict subset without adding excluded rows, real successful
 default installation with core and physically compiled provider environments,
 and actual onLoad/pre-install/post-install/compiler receipts observing the old
 lane before finalization. A mutable-subscriber fixture verifies real local links,

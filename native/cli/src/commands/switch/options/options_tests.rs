@@ -68,3 +68,31 @@ fn lane_import_has_its_own_flag_set_but_retains_semantic_errors() {
     assert!(parse(&["remote/dev", "-p", "--force-ours"]).is_none());
     assert!(parse(&["remote/dev", "-n", "one", "--alias", "two"]).is_none());
 }
+
+#[test]
+fn static_bracket_patterns_remain_native_without_enabling_state_expressions() {
+    let options = parse(&["remote/dev", "--pattern", "remote/comp0[024]", "-x"]).unwrap();
+    assert!(options.supported_pattern());
+    assert!(parse(&["remote/dev", "-p", "remote/comp[1-3]"]).unwrap().supported_pattern());
+    assert_eq!(options.request()["lane"]["pattern"], "remote/comp0[024]");
+    assert!(
+        options
+            .request()
+            .get("pattern")
+            .is_none(),
+    );
+    for pattern in [
+        "$modified",
+        "remote/* AND $modified",
+        "remote/*&other/*",
+        "remote/comp{1..3}",
+        "remote/comp{a..c}",
+        "remote/comp!1",
+        "#comment",
+        ",",
+        "remote/comp{1,3}",
+        "remote/comp+(1|3)",
+    ] {
+        assert!(!parse(&["remote/dev", "-p", pattern]).unwrap().supported_pattern());
+    }
+}

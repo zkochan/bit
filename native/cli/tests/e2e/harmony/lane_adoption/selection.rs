@@ -136,3 +136,21 @@ fn checkout(helper: &crate::helper::Helper, command: &str) -> crate::helper::Run
     assert!(output.status.success(), "{} {}", output.stdout, output.stderr);
     output
 }
+
+#[test]
+fn empty_workspace_bracket_pattern_selects_only_matching_lane_components() {
+    let helper = exported(4);
+    empty(&helper);
+    let output = support::successful(
+        &helper,
+        &format!("switch {} --pattern {}/comp[13] -x", lane(&helper), helper.scopes.remote),
+    );
+    let bitmap = support::bitmap(&helper);
+    assert!(bitmap.get("comp1").is_some());
+    assert!(bitmap.get("comp3").is_some());
+    assert!(bitmap.get("comp2").is_none());
+    assert!(bitmap.get("comp4").is_none());
+    assert!(!output.stdout.contains("skipped component"), "{}", output.stdout);
+    assert!(!output.stdout.contains("comp2"), "{}", output.stdout);
+    assert!(!output.stdout.contains("comp4"), "{}", output.stdout);
+}
