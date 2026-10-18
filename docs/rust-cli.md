@@ -196,7 +196,9 @@ Configured providers load before the authoritative mutation plan. A retained Har
 Unknown grammar and unsupported inputs delegate only before provider startup or another observable prefix. Once providers, caches, links or source publication have produced effects, failures remain owned by the native command. These operations preserve partial publication and callback output rather than rerunning the command through Node.
 
 The Linux release measurements in [`identity.json`](../scripts/rust/benchmarks/identity.json)
-compare complete commands against Node 22.22.0 / Bit 2.2.94. Five alternating pairs
+measure source `50ac1ea7c` against Node 22.22.0 / Bit 2.2.94. Subsequent Windows
+fixture and doctor diagnostic changes affect tests only; production sources and
+the measured release binary are unchanged. Five alternating pairs
 per non-TTY, CI and TTY mode passed all 75 output, filesystem, cache, history and
 file-remote comparisons. Non-TTY medians in milliseconds were:
 

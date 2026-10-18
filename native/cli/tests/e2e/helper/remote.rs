@@ -44,7 +44,7 @@ pub(crate) fn seed_after_export_at(helper: &Helper, workspace: &Path) {
 }
 fn seed_selected_at(helper: &Helper, workspace: &Path, identities: &[String]) {
     let scope = bit_object_import::scope_path(workspace);
-    promote_workspace(helper, &scope, workspace);
+    promote_workspace(helper, &scope, workspace, identities);
     let shared = setup::shared();
     let output = Command::new("node")
         .arg(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/e2e/helper/publish_objects.js"))
@@ -72,7 +72,7 @@ fn node_export_at(workspace: &Path) {
     assert!(!scope.join("staged-snaps").exists());
 }
 
-fn promote_workspace(helper: &Helper, scope: &Path, workspace: &Path) {
+fn promote_workspace(helper: &Helper, scope: &Path, workspace: &Path, requested: &[String]) {
     let path = workspace.join(".bitmap");
     let mut bitmap = config::read_jsonc(&path);
     let mut identities = HashSet::new();
@@ -82,25 +82,14 @@ fn promote_workspace(helper: &Helper, scope: &Path, workspace: &Path) {
         .values_mut()
         .filter(|row| row.get("rootDir").is_some())
     {
-        let component_scope = row
-            .get("defaultScope")
-            .and_then(Value::as_str)
-            .filter(|scope| !scope.is_empty())
-            .unwrap_or(&helper.scopes.remote)
-            .to_owned();
-        if row["scope"].as_str().is_none_or(str::is_empty) {
-            row["scope"] = Value::String(component_scope);
-            row.as_object_mut()
-                .unwrap()
-                .remove("defaultScope");
+        let before = row.clone();
+        let unversioned = row["version"].as_str().is_none_or(str::is_empty);
+        if let Some(identity) = promote_row(row, &helper.scopes.remote, requested) {
+            identities.insert(identity);
         }
-        identities.insert((
-            row["scope"]
-                .as_str()
-                .unwrap()
-                .to_owned(),
-            row["name"].as_str().unwrap().to_owned(),
-        ));
+        if unversioned {
+            assert_eq!(*row, before, "publication changed unversioned bitmap row");
+        }
     }
     let lane = &bitmap["_bit_lane"]["id"];
     let relative =
@@ -111,6 +100,37 @@ fn promote_workspace(helper: &Helper, scope: &Path, workspace: &Path) {
         };
     clear_staged_config(&scope.join("staged-config").join(relative), &identities);
     config::write_json(&path, &bitmap, b"    ");
+}
+
+fn promote_row(
+    row: &mut Value,
+    default_scope: &str,
+    requested: &[String],
+) -> Option<(String, String)> {
+    if row["version"].as_str().is_none_or(str::is_empty) {
+        return None;
+    }
+    let component_scope = row["scope"]
+        .as_str()
+        .filter(|scope| !scope.is_empty())
+        .or_else(|| {
+            row["defaultScope"]
+                .as_str()
+                .filter(|scope| !scope.is_empty())
+        })
+        .unwrap_or(default_scope)
+        .to_owned();
+    let name = row["name"].as_str().unwrap().to_owned();
+    if !requested.is_empty() && !requested.contains(&format!("{component_scope}/{name}")) {
+        return None;
+    }
+    if row["scope"].as_str().is_none_or(str::is_empty) {
+        row["scope"] = Value::String(component_scope.clone());
+        row.as_object_mut()
+            .unwrap()
+            .remove("defaultScope");
+    }
+    Some((component_scope, name))
 }
 
 fn clear_staged_config(path: &std::path::Path, identities: &HashSet<(String, String)>) {
