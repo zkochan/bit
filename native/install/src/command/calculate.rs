@@ -84,7 +84,7 @@ pub async fn calculate(
             env_packages,
         },
     )?;
-    session.output.success(DEDUPING, None);
+    session.output.success_status();
     // Node loads env and app root manifests only when root components are enabled.
     if loaded.config.dependency_resolver.has_root_components() {
         session.loading(loaded);
@@ -139,7 +139,7 @@ pub async fn package_json_dependencies(
             env_packages: &env_packages,
         },
     })?;
-    session.output.success(DEDUPING, None);
+    session.output.success_status();
     Ok(result)
 }
 

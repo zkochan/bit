@@ -71,15 +71,24 @@ fn configure_package(helper: &crate::helper::Helper) {
 
 #[test]
 fn default_switch_installation_reuses_the_real_provider_session() {
+    default_switch_installation(false);
+}
+
+#[test]
+fn ci_default_switch_installation_reuses_the_real_provider_session() {
+    default_switch_installation(true);
+}
+
+fn default_switch_installation(ci: bool) {
     let helper = installation_fixture();
     helper.output_file("lane-adoption-record-phases", "active");
-    let output = crate::commands::add::support::history_oracle::compare(
-        &helper,
-        "switch dev",
-        super::output::durations,
-        ["checkout", "lane-switch"],
-        true,
-    );
+    let compare = if ci {
+        crate::commands::add::support::history_oracle::compare_ci
+    } else {
+        crate::commands::add::support::history_oracle::compare
+    };
+    let output =
+        compare(&helper, "switch dev", super::output::durations, ["checkout", "lane-switch"], true);
     assert!(output.status.success(), "{} {}", output.stdout, output.stderr);
     assert_eq!(output.stdout.matches("lane adoption configured provider started").count(), 1);
     assert!(helper.scopes.local_path.join("pnpm-lock.yaml").is_file());

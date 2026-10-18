@@ -65,6 +65,34 @@ pub(crate) fn compare_install_with_history(
     compare_mode(helper, command, false, true, stdout, true, Some(observe))
 }
 
+/// CI is scoped to this command while retaining full installation/history state.
+pub(crate) fn compare_install_with_history_ci(
+    helper: &Helper,
+    command: &str,
+    stdout: fn(&str) -> String,
+    observe: &HistoryProjection<'_>,
+    ci: bool,
+) -> Run {
+    if !ci {
+        return compare_install_with_history(helper, command, stdout, observe);
+    }
+    compare_mode(helper, command, true, true, stdout, true, Some(observe))
+}
+
+/// The same history projection with per-command CI selection.
+pub(crate) fn compare_with_history_ci(
+    helper: &Helper,
+    command: &str,
+    stdout: fn(&str) -> String,
+    observe: &HistoryProjection<'_>,
+    ci: bool,
+) -> Run {
+    if !ci {
+        return compare_with_history(helper, command, stdout, observe);
+    }
+    compare_mode(helper, command, true, true, stdout, false, Some(observe))
+}
+
 /// Untimed oracle preparation restores the identical source/cache/hardlink inputs afterwards.
 pub(crate) fn prepare_history<Prepared>(
     helper: &Helper,

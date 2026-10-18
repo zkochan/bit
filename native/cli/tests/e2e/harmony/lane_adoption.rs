@@ -107,6 +107,15 @@ fn lane_import_pattern_adopts_only_selected_component_on_main() {
 
 #[test]
 fn remote_pattern_default_installation_without_root_components_preserves_all_state() {
+    default_installation_without_roots(false);
+}
+
+#[test]
+fn ci_default_installation_without_root_components_preserves_exact_output_and_state() {
+    default_installation_without_roots(true);
+}
+
+fn default_installation_without_roots(ci: bool) {
     let helper = exported(2);
     empty(&helper);
     let path = helper.scopes.local_path.join("workspace.jsonc");
@@ -123,13 +132,12 @@ fn remote_pattern_default_installation_without_root_components_preserves_all_sta
         resolver.clone(),
     );
     let command = format!("switch {} -p {}/comp1", lane(&helper), helper.scopes.remote);
-    let output = crate::commands::add::support::history_oracle::compare(
-        &helper,
-        &command,
-        output::durations,
-        ["checkout", "lane-switch"],
-        true,
-    );
+    let compare = if ci {
+        crate::commands::add::support::history_oracle::compare_ci
+    } else {
+        crate::commands::add::support::history_oracle::compare
+    };
+    let output = compare(&helper, &command, output::durations, ["checkout", "lane-switch"], true);
     assert!(output.status.success(), "{} {}", output.stdout, output.stderr);
     let bitmap = support::bitmap(&helper);
     assert!(bitmap.get("comp1").is_some());

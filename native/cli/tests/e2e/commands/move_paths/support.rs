@@ -81,6 +81,40 @@ pub(crate) fn compare_install_with_history(
     assert!(tree(&helper.scopes.remote_path) == remote, "{command} mutated the remote");
     actual
 }
+/// Per-command CI preserves installation, independent history and the real remote.
+pub(crate) fn compare_install_with_history_ci(
+    helper: &Helper,
+    command: &str,
+    stdout: fn(&str) -> String,
+    observe: &support::HistoryProjection<'_>,
+    ci: bool,
+) -> Run {
+    if !ci {
+        return compare_install_with_history(helper, command, stdout, observe);
+    }
+    let remote = tree(&helper.scopes.remote_path);
+    let actual = support::compare_install_with_history_ci(helper, command, stdout, observe, ci);
+    assert!(tree(&helper.scopes.remote_path) == remote, "{command} mutated the remote");
+    actual
+}
+
+/// Per-command CI retains the same non-installing history/remote contract.
+pub(crate) fn compare_with_history_ci(
+    helper: &Helper,
+    command: &str,
+    stdout: fn(&str) -> String,
+    observe: &support::HistoryProjection<'_>,
+    ci: bool,
+) -> Run {
+    if !ci {
+        return compare_with_history(helper, command, stdout, observe);
+    }
+    let remote = tree(&helper.scopes.remote_path);
+    let actual = support::compare_with_history_ci(helper, command, stdout, observe, ci);
+    assert!(tree(&helper.scopes.remote_path) == remote, "{command} mutated the remote");
+    actual
+}
+
 /// The untimed released-CLI preparation must also leave its remote unchanged.
 pub(crate) fn prepare_history<Prepared>(
     helper: &Helper,

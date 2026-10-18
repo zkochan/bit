@@ -6,6 +6,15 @@ use std::fs;
 
 #[test]
 fn install_subscribers_mutate_original_inputs_and_retain_reassigned_argument_fields() {
+    install_subscribers(false);
+}
+
+#[test]
+fn ci_install_subscribers_mutate_original_inputs_and_retain_reassigned_argument_fields() {
+    install_subscribers(true);
+}
+
+fn install_subscribers(ci: bool) {
     let helper = installation_fixture();
     helper.output_file("lane-adoption-record-phases", "active");
     helper.output_file("lane-adoption-mutate-install", "active");
@@ -18,13 +27,9 @@ fn install_subscribers_mutate_original_inputs_and_retain_reassigned_argument_fie
         "subscriber-linked/index.js",
         "module.exports='subscriber local package';\n",
     );
-    let output = history_oracle::compare(
-        &helper,
-        "switch dev",
-        super::output::durations,
-        ["checkout", "lane-switch"],
-        true,
-    );
+    let compare = if ci { history_oracle::compare_ci } else { history_oracle::compare };
+    let output =
+        compare(&helper, "switch dev", super::output::durations, ["checkout", "lane-switch"], true);
     assert!(output.status.success(), "{} {}", output.stdout, output.stderr);
     assert_phases(&helper);
     assert_receipt(&helper);

@@ -15,6 +15,28 @@ pub(crate) fn compare(
     reasons: [&str; 2],
     installation: bool,
 ) -> Run {
+    compare_mode(helper, command, stdout, reasons, installation, false)
+}
+
+/// The untimed oracle and both measured commands receive CI independently.
+pub(crate) fn compare_ci(
+    helper: &Helper,
+    command: &str,
+    stdout: fn(&str) -> String,
+    reasons: [&str; 2],
+    installation: bool,
+) -> Run {
+    compare_mode(helper, command, stdout, reasons, installation, true)
+}
+
+fn compare_mode(
+    helper: &Helper,
+    command: &str,
+    stdout: fn(&str) -> String,
+    reasons: [&str; 2],
+    installation: bool,
+    ci: bool,
+) -> Run {
     let evidence = tempfile::Builder::new()
         .prefix("bitmap write history ")
         .tempdir()
@@ -26,13 +48,13 @@ pub(crate) fn compare(
     fs::write(evidence.join("baseline.bitmap"), fs::read(root.join(".bitmap")).unwrap()).unwrap();
     baseline.wait_past();
     let oracle = support::prepare_history(helper, || {
-        prepare(helper, command, &evidence, &baseline, reasons)
+        prepare(helper, command, &evidence, &baseline, reasons, ci)
     });
     let observe = |root: &Path, started, ended| oracle.validate(root, started, ended, &evidence);
     if installation {
-        support::compare_install_with_history(helper, command, stdout, &observe)
+        support::compare_install_with_history_ci(helper, command, stdout, &observe, ci)
     } else {
-        support::compare_with_history(helper, command, stdout, &observe)
+        support::compare_with_history_ci(helper, command, stdout, &observe, ci)
     }
 }
 fn prepare(
@@ -41,9 +63,10 @@ fn prepare(
     evidence: &Path,
     baseline: &raw::Snapshot,
     reasons: [&str; 2],
+    ci: bool,
 ) -> Oracle {
     let started = chrono::Utc::now().timestamp_millis();
-    let output = observe(helper, command, evidence);
+    let output = observe(helper, command, evidence, ci);
     let ended = chrono::Utc::now().timestamp_millis();
     fs::write(evidence.join("preparation.stdout"), &output.stdout).unwrap();
     fs::write(evidence.join("preparation.stderr"), &output.stderr).unwrap();
@@ -58,7 +81,7 @@ fn prepare(
     oracle.validate(&helper.scopes.local_path, started, ended, evidence);
     oracle
 }
-fn observe(helper: &Helper, command: &str, evidence: &Path) -> Run {
+fn observe(helper: &Helper, command: &str, evidence: &Path, ci: bool) -> Run {
     let script = evidence.join("observe.cjs");
     fs::write(&script, include_str!("history_oracle/observe.cjs")).unwrap();
     let options = format!("--require={}", serde_json::to_string(script.to_str().unwrap()).unwrap());
@@ -67,18 +90,27 @@ fn observe(helper: &Helper, command: &str, evidence: &Path) -> Run {
         .unwrap()
         .parent()
         .unwrap();
-    Helper::cmd_in_with(
-        &helper.scopes.local_path,
-        command,
-        &[
-            ("BIT_NATIVE", OsStr::new("off")),
-            ("BIT_NATIVE_QUIET", OsStr::new("1")),
-            ("NODE_OPTIONS", OsStr::new(&options)),
-            ("BITMAP_HISTORY_ORACLE_DIRECTORY", evidence.as_os_str()),
-            ("BITMAP_HISTORY_ORACLE_ROOT", helper.scopes.local_path.as_os_str()),
-            ("BITMAP_HISTORY_ORACLE_PACKAGE", package.as_os_str()),
-        ],
+    let mut environment = vec![
+        ("BIT_NATIVE", OsStr::new("off")),
+        ("BIT_NATIVE_QUIET", OsStr::new("1")),
+        ("NODE_OPTIONS", OsStr::new(&options)),
+        ("BITMAP_HISTORY_ORACLE_DIRECTORY", evidence.as_os_str()),
+        ("BITMAP_HISTORY_ORACLE_ROOT", helper.scopes.local_path.as_os_str()),
+        ("BITMAP_HISTORY_ORACLE_PACKAGE", package.as_os_str()),
+    ];
+    if ci {
+        environment.push(("CI", OsStr::new("1")));
+    }
+    let recorded: BTreeMap<_, _> = environment
+        .iter()
+        .map(|(key, value)| (*key, value.to_string_lossy().into_owned()))
+        .collect();
+    fs::write(
+        evidence.join("preparation.environment.json"),
+        serde_json::to_vec(&recorded).unwrap(),
     )
+    .unwrap();
+    Helper::cmd_in_with(&helper.scopes.local_path, command, &environment)
 }
 
 struct Oracle {

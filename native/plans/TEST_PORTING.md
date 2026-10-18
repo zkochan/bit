@@ -11,7 +11,7 @@ ceiling: native-only cases for edge cases the e2e suite does not cover are welco
 
 ## Lane adoption focused qualification
 
-The lane-adoption filter passed all 21 tests (20 strict integration fixtures and
+The lane-adoption filter passed all 24 tests (23 strict integration fixtures and
 one completion-token test) against released Bit 2.2.94. All seven required checks
 plus Rust scope must pass before qualification. Performance qualification remains
 pending; this is not a complete lane-command claim.
@@ -41,7 +41,10 @@ and actual onLoad/pre-install/post-install/compiler receipts observing the old
 lane before finalization. A mutable-subscriber fixture verifies real local links,
 optional-dependency settings, retained installer/argument identity and the released
 difference between mutation of an original options object and reassignment of an
-argument-bundle field. Broader mutable package-manager options remain unfinished.
+argument-bundle field. CI variants cover core, provider and mutable-subscriber
+installation with per-command environments shared by the independent Node oracle.
+Message-less completion retains the released loader status when CI suppresses
+status updates. Broader mutable package-manager options remain unfinished.
 JSON's absent released handler and configured active-
 lane provider import remain explicit strict pre-effect delegation controls.
 Git branches, broader pattern grammar, and JSON success are not qualified here.
