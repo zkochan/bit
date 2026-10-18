@@ -229,6 +229,52 @@ timing. Rename launches use the same recorded clock phase on both implementation
 because published backup filenames have second precision; clocks and snapshot
 comparisons remain unchanged.
 
+### Workspace tracking and mutation qualification
+
+Scope/owner batch renaming and patterned remove/delete/recover complete the
+workspace tracking and mutation milestone. Batch renaming shares a read-only
+inventory and prepares independent plans on the bounded Rust worker pool, while
+preserving every input proof, first-error order and serial provider/publication
+lifecycle. Native documentation cache reads and conservative empty-documentation
+AST proofs avoid redundant parsing; other sources retain the published parser.
+
+The [complete qualification evidence](../scripts/rust/benchmarks/workspace-mutation-qualification.json)
+measures source `a3393697c` against Node 22.22.0 / Bit 2.2.94. Subsequent Windows
+timestamp, remote-publication and installation-output fixture fixes change tests only; production sources and the measured
+release binary remain unchanged. Five alternating pairs per non-TTY, CI and TTY
+mode passed all 270 full-output, exit-code, filesystem, cache, object, history,
+link/mode and file-remote comparisons. Of these, 260 pairs ran natively; ten
+intentionally delegated add CI error pairs are excluded from native speed claims.
+All 52 eligible native workload/mode medians were lower. Non-TTY medians in
+milliseconds for the new mutation workloads were:
+
+| Workload | Node | Rust |
+| --- | ---: | ---: |
+| Remove 20 tagged components | 539.317 | 293.926 |
+| Delete 20 tagged components | 506.325 | 325.221 |
+| Recover 20 deleted components | 291.797 | 226.099 |
+| Rename a mixed new/exported scope with refactoring | 1033.198 | 1007.402 |
+
+Scope gains were modest: 1.4–4.3% across the three modes. The
+[mutation samples](../scripts/rust/benchmarks/workspace-mutation.json),
+[identity samples](../scripts/rust/benchmarks/workspace-mutation-identity.json),
+[add samples](../scripts/rust/benchmarks/workspace-mutation-add.json) and
+[status/checkout/export regressions](../scripts/rust/benchmarks/workspace-mutation-regressions.json)
+use the same measured source and binary. Each complete workload qualified after
+20 consecutive seconds below 30% aggregate host CPU, with a closed 0.5-second
+monitor remaining below 80%. The first qualified scope run is retained without
+remeasurement. Earlier source trials, including slower scope modes, remain in the
+archive with their original fingerprints and samples. Raw reports retain their
+unqualified flags; the outer closed-monitor evidence qualifies eligible rows.
+These are controlled warm-metadata Linux file-remote fixtures, not first-use,
+network-remote or cross-platform speed claims. Fixture preparation and restoration
+are outside command timing. Ten direct published-parser oracle checks supplement
+the empty-documentation proof tests and are not counted as command pairs. The
+separate installation e2e masks completion durations and one exact optional pnpm
+startup timer redraw immediately before its hard-link banner; final progress,
+package summaries, lifecycle order and filesystem state remain exact. Focused
+checks retain changed counters, controls, positions and duplicate redraws.
+
 ### Ignore rules
 
 The workspace inventory follows `.gitignore`, `.bitignore` and Bit's own lists

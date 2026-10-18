@@ -299,7 +299,7 @@ fn clean_imported_removal_matches_node_with_force_and_keep_files() {
     helper.create_component_bar_foo("module.exports = 'new';");
     helper.add_component_bar_foo();
     helper.tag_without_build("bar/foo", "");
-    helper.run("export");
+    crate::helper::remote::publish(&helper);
     helper.re_init_workspace();
     helper.add_remote_scope();
     helper.run(&format!("import {}/bar/foo -x", helper.scopes.remote));
@@ -346,7 +346,7 @@ fn imported_package_removal_matches_node() {
     helper.create_component_bar_foo("module.exports = 'new';");
     helper.add_component_bar_foo();
     helper.tag_without_build("bar/foo", "");
-    helper.run("export");
+    crate::helper::remote::publish(&helper);
     helper.re_init_workspace();
     helper.add_remote_scope();
     helper.run(&format!("import {}/bar/foo", helper.scopes.remote));
@@ -379,7 +379,7 @@ fn modified_imported_component_delegates_unless_forced() {
     helper.create_component_bar_foo("module.exports = 'new';");
     helper.add_component_bar_foo();
     helper.tag_without_build("bar/foo", "");
-    helper.run("export");
+    crate::helper::remote::publish(&helper);
     helper.re_init_workspace();
     helper.add_remote_scope();
     helper.run(&format!("import {}/bar/foo -x", helper.scopes.remote));

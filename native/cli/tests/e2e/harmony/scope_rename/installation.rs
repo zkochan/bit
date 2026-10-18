@@ -1,3 +1,5 @@
+mod startup_progress;
+
 use crate::{
     commands::{add::support as paired, move_paths::support},
     helper::config,
@@ -22,9 +24,11 @@ fn ordinary_scope_rename_runs_real_installation_and_then_compilation() {
     );
 }
 fn durations(text: &str) -> String {
-    text.split_inclusive('\n')
+    let durations = text
+        .split_inclusive('\n')
         .map(completion)
-        .collect()
+        .collect::<String>();
+    startup_progress::project(&durations)
 }
 fn completion(line: &str) -> String {
     let (body, newline) = if let Some(body) = line.strip_suffix("\r\n") {

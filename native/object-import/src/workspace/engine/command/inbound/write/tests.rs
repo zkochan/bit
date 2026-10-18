@@ -296,7 +296,9 @@ fn empty_history_copy_keeps_the_source_modified_time() {
     let root = root();
     fs::write(root.join(".bitmap"), []).unwrap();
     let source_time = UNIX_EPOCH + Duration::from_secs(1_600_000_000);
-    fs::File::open(root.join(".bitmap"))
+    fs::File::options()
+        .write(true)
+        .open(root.join(".bitmap"))
         .unwrap()
         .set_times(fs::FileTimes::new().set_accessed(source_time).set_modified(source_time))
         .unwrap();
