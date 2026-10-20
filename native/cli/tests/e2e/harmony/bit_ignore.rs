@@ -37,19 +37,19 @@ fn adding_bitignore_in_a_comp_dir() {
         files
             .iter()
             .any(|file| file == ".bitignore"),
-        "{files:?}"
+        "{files:?}",
     );
     assert!(
         !files
             .iter()
             .any(|file| file == "hello.json"),
-        "{files:?}"
+        "{files:?}",
     );
     assert!(
         files
             .iter()
             .any(|file| file == "index.js"),
-        "{files:?}"
+        "{files:?}",
     );
 }
 
@@ -67,13 +67,13 @@ fn adding_bitignore_in_the_root_dir() {
         !files
             .iter()
             .any(|file| file == "hello.json"),
-        "{files:?}"
+        "{files:?}",
     );
     assert!(
         files
             .iter()
             .any(|file| file == "index.js"),
-        "{files:?}"
+        "{files:?}",
     );
 }
 
@@ -92,7 +92,7 @@ fn adding_gitignore_and_an_empty_bitignore_in_the_root_dir() {
         files
             .iter()
             .any(|file| file == "hello.json"),
-        "{files:?}"
+        "{files:?}",
     );
 }
 
@@ -110,13 +110,13 @@ fn adding_only_gitignore_in_the_component_dir() {
         files
             .iter()
             .any(|file| file == ".gitignore"),
-        "{files:?}"
+        "{files:?}",
     );
     assert!(
         !files
             .iter()
             .any(|file| file == "hello.json"),
-        "{files:?}"
+        "{files:?}",
     );
 }
 
@@ -138,13 +138,13 @@ fn using_ignored_files_config_in_workspace_jsonc() {
         !files
             .iter()
             .any(|file| file == "hello.json"),
-        "{files:?}"
+        "{files:?}",
     );
     assert!(
         files
             .iter()
             .any(|file| file == "index.js"),
-        "{files:?}"
+        "{files:?}",
     );
 }
 
@@ -163,12 +163,12 @@ fn adding_gitignore_and_bitignore_in_the_component_dir() {
         files
             .iter()
             .any(|file| file == ".gitignore"),
-        "{files:?}"
+        "{files:?}",
     );
     assert!(
         files
             .iter()
             .any(|file| file == "hello.json"),
-        "{files:?}"
+        "{files:?}",
     );
 }

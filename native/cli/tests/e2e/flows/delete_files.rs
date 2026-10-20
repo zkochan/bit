@@ -61,12 +61,12 @@ fn adding_a_file_tagging_it_deleting_it_and_then_tagging_again() {
         files
             .iter()
             .any(|file| file == "foo.js"),
-        "{files:?}"
+        "{files:?}",
     );
     assert!(
         !files
             .iter()
             .any(|file| file == "baz.js"),
-        "{files:?}"
+        "{files:?}",
     );
 }

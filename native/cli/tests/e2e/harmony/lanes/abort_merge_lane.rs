@@ -93,12 +93,12 @@ fn when_the_merged_lane_introduced_new_components() {
     assert!(
         helper.scopes.local_path
             .join(format!("{scope}/comp2"))
-            .is_dir()
+            .is_dir(),
     );
     helper.native("lane merge-abort --silent --skip-dependency-installation");
     assert!(
         !helper.scopes.local_path
             .join(format!("{scope}/comp2"))
-            .exists()
+            .exists(),
     );
 }

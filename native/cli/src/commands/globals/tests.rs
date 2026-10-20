@@ -25,8 +25,9 @@ fn renders_globals_text_and_json_formats() {
     assert!(report.starts_with(
         r#"the following global directories are used by Bit. to change the global root directory, set the "BIT_GLOBALS_DIR" environment variable"#,
     ));
+    let expected_scope = Path::new("/tmp/bit-globals").join("scope");
     assert!(report.contains("Global Dir        /tmp/bit-globals"));
-    assert!(report.contains("Global Scope Dir  /tmp/bit-globals/scope"));
+    assert!(report.contains(&format!("Global Scope Dir  {}", expected_scope.display())));
     assert!(report.contains("Config Dir        /tmp/bit-globals/config"));
     assert!(report.contains("Capsules Dir      /tmp/bit-globals/capsules"));
 
