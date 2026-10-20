@@ -1,6 +1,6 @@
 //! `e2e/commands/remove.e2e.ts`.
 
-use crate::helper::Helper;
+use crate::helper::{Helper, remote};
 use std::fs;
 
 /// bit remove command › with tagged components and --track=false
@@ -46,7 +46,7 @@ fn with_remote_scope_without_dependencies() {
     helper.create_component_bar_foo("module.exports = 'foo';");
     helper.add_component_bar_foo();
     helper.tag_component_bar_foo();
-    helper.run("export");
+    remote::publish(&helper);
 
     let output = helper.run(&format!("remove {}/bar/foo --silent", helper.scopes.remote));
     assert!(output.contains("removed components") || output.contains("bar/foo"));
@@ -64,7 +64,7 @@ fn with_imported_components_no_dependencies() {
     helper.create_component_bar_foo("module.exports = 'foo';");
     helper.add_component_bar_foo();
     helper.tag_component_bar_foo();
-    helper.run("export");
+    remote::publish(&helper);
 
     helper.re_init_workspace();
     helper.add_remote_scope();
@@ -126,7 +126,7 @@ fn remove_a_component_when_a_dependency_has_same_content_file() {
     helper.run("add comp2-b");
     helper.run("tag --message first");
     helper.run("tag --unmodified --ver 1.0.0 --message second");
-    helper.run("export");
+    remote::publish(&helper);
 
     helper.re_init_workspace();
     helper.add_remote_scope();
@@ -146,7 +146,7 @@ fn soft_remove_workflow() {
     helper.set_workspace_with_remote_scope();
     helper.populate_components(2, true, "");
     helper.run("tag --message first");
-    helper.run("export");
+    remote::publish(&helper);
 
     helper.native("delete comp2 --silent");
     let status = helper.run("status");
@@ -158,8 +158,7 @@ fn soft_remove_workflow() {
 
     helper.output_file("comp1/index.js", "module.exports = 'clean';");
     helper.run("tag --message second");
-    let export_out = helper.run("export");
-    assert!(export_out.contains("exported") || export_out.contains("comp2"));
+    remote::publish(&helper);
 
     helper.re_init_workspace();
     helper.add_remote_scope();
@@ -174,10 +173,10 @@ fn removing_from_workspace_when_it_had_dependents_previously_in_old_tags() {
     helper.set_workspace_with_remote_scope();
     helper.populate_components(2, true, "");
     helper.run("tag --message first");
-    helper.run("export");
+    remote::publish(&helper);
     helper.output_file("comp1/index.js", "module.exports = 'no dep';");
     helper.run("tag --message second");
-    helper.run("export");
+    remote::publish(&helper);
     helper.native("remove comp2 --silent");
     let bit_map = fs::read_to_string(helper.scopes.local_path.join(".bitmap")).unwrap();
     assert!(!bit_map.contains(r#""comp2""#));
@@ -219,7 +218,7 @@ fn soft_remove_then_import() {
     helper.run("lane create dev");
     helper.populate_components(2, true, "");
     helper.run("snap --message first");
-    helper.run("export");
+    remote::publish(&helper);
     helper.run("delete comp2 --lane --silent");
     let import_out = helper.run(&format!("import {}/comp2 -x", helper.scopes.remote));
     assert!(!import_out.contains("error"));
@@ -232,7 +231,7 @@ fn soft_remove_dependent_issues() {
     helper.set_workspace_with_remote_scope();
     helper.populate_components(2, true, "");
     helper.run("tag --message first");
-    helper.run("export");
+    remote::publish(&helper);
     helper.native("delete comp2 --silent");
     let status = helper.run("status");
     assert!(

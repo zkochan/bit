@@ -4,6 +4,7 @@
 mod add;
 mod cat;
 mod checkout;
+mod clear_cache;
 mod color;
 mod config;
 mod delete;
@@ -25,6 +26,7 @@ mod installation;
 mod inventory;
 mod lane;
 mod list;
+mod local_only;
 mod log;
 mod logout;
 mod merge;
@@ -75,6 +77,7 @@ pub const COMMANDS: &[Command] = &[
     cat::COMMAND,
     checkout::COMMAND,
     checkout::REVERT,
+    clear_cache::COMMAND,
     config::COMMAND,
     delete::COMMAND,
     deprecate::COMMAND,
@@ -94,6 +97,7 @@ pub const COMMANDS: &[Command] = &[
     install::COMMAND,
     lane::COMMAND,
     list::COMMAND,
+    local_only::COMMAND,
     log::COMMAND,
     logout::COMMAND,
     merge::COMMAND,

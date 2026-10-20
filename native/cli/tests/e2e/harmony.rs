@@ -67,3 +67,8 @@ mod untag;
 mod uninstall_cmd;
 
 mod use_cmd;
+
+mod export_harmony;
+mod init_harmony;
+mod recover;
+mod set_default_owner_and_scope;

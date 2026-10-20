@@ -1,6 +1,6 @@
 //! `e2e/harmony/delete.e2e.ts`.
 
-use crate::helper::Helper;
+use crate::helper::{Helper, remote};
 
 /// bit delete command › import a scope with deleted components
 #[test]
@@ -9,10 +9,10 @@ fn import_a_scope_with_deleted_components() {
     helper.set_workspace_with_remote_scope();
     helper.populate_components(3, true, "");
     helper.run("tag --message first");
-    helper.run("export");
+    remote::publish(&helper);
     helper.native("delete comp1 --silent");
     helper.run("tag --message second");
-    helper.run("export");
+    remote::publish(&helper);
 
     helper.re_init_workspace();
     helper.add_remote_scope();
@@ -49,10 +49,10 @@ fn deleting_component_then_creating_a_new_one_with_same_name() {
     helper.set_workspace_with_remote_scope();
     helper.populate_components(1, true, "");
     helper.run("tag --message first");
-    helper.run("export");
+    remote::publish(&helper);
     helper.native("delete comp1 --silent");
     helper.run("tag --message second");
-    helper.run("export");
+    remote::publish(&helper);
 
     helper.re_init_workspace();
     helper.add_remote_scope();
@@ -73,7 +73,7 @@ fn delete_and_then_remove() {
     helper.set_workspace_with_remote_scope();
     helper.populate_components(1, true, "");
     helper.run("tag --message first");
-    helper.run("export");
+    remote::publish(&helper);
     helper.native("delete comp1 --silent");
     helper.run("tag --message second");
     helper.run(&format!("import {}/comp1 -x", helper.scopes.remote));
