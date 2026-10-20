@@ -44,6 +44,7 @@ mod reset;
 mod scope_rename;
 mod scope_set;
 mod scope_trust;
+mod search;
 mod snap;
 mod stash;
 mod status;
@@ -52,6 +53,7 @@ mod system;
 mod tag;
 #[cfg(test)]
 mod test_support;
+mod uninstall;
 mod unuse_cmd;
 mod use_cmd;
 mod version;
@@ -106,12 +108,14 @@ pub const COMMANDS: &[Command] = &[
     reset::COMMAND,
     rename::COMMAND,
     scope_rename::COMMAND,
+    search::COMMAND,
     snap::COMMAND,
     stash::COMMAND,
     status::COMMAND,
     switch::COMMAND,
     system::COMMAND,
     tag::COMMAND,
+    uninstall::COMMAND,
     unuse_cmd::COMMAND,
     use_cmd::COMMAND,
     version::COMMAND,

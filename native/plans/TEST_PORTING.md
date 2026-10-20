@@ -661,55 +661,55 @@ row's fields, object path, header, logical identity, and remote index stay exact
 
 ### `e2e/commands/remove.e2e.ts`
 
-- [ ] `e2e/commands/remove.e2e.ts:28` bit remove command › with tagged components and --track=false › should remove component
-- [ ] `e2e/commands/remove.e2e.ts:32` bit remove command › with tagged components and --track=false › should not show in bitmap
-- [ ] `e2e/commands/remove.e2e.ts:36` bit remove command › with tagged components and --track=false › removed component should not be in new component when checking status
-- [ ] `e2e/commands/remove.e2e.ts:51` bit remove command › with tagged components and -t=true › should show in bitmap
-- [ ] `e2e/commands/remove.e2e.ts:55` bit remove command › with tagged components and -t=true › removed component should be in new component
-- [ ] `e2e/commands/remove.e2e.ts:76` bit remove command › with remote scope without dependencies › without --remote flag › should show a successful message
-- [ ] `e2e/commands/remove.e2e.ts:80` bit remove command › with remote scope without dependencies › without --remote flag › should remove the component from the local scope
-- [ ] `e2e/commands/remove.e2e.ts:84` bit remove command › with remote scope without dependencies › without --remote flag › should not remove the component from the remote scope
-- [ ] `e2e/commands/remove.e2e.ts:94` bit remove command › with remote scope without dependencies › with --remote flag › should show a successful message
-- [ ] `e2e/commands/remove.e2e.ts:98` bit remove command › with remote scope without dependencies › with --remote flag › should remove the component from the remote scope
-- [ ] `e2e/commands/remove.e2e.ts:112` bit remove command › with remote scope with dependencies › should not remove component with dependencies when -f flag is false
-- [ ] `e2e/commands/remove.e2e.ts:118` bit remove command › with remote scope with dependencies › should remove component with dependencies when -f flag is true
-- [ ] `e2e/commands/remove.e2e.ts:136` bit remove command › with imported components, no dependencies › should remove components with no dependencies when -f flag is false
-- [ ] `e2e/commands/remove.e2e.ts:152` bit remove command › remove modified component › should not remove modified component
-- [ ] `e2e/commands/remove.e2e.ts:171` bit remove command › remove a component when the main file is missing › should remove the component successfully
-- [ ] `e2e/commands/remove.e2e.ts:204` bit remove command › remove a component when a dependency has a file with the same content as other component file › should successfully remove
-- [ ] `e2e/commands/remove.e2e.ts:207` bit remove command › remove a component when a dependency has a file with the same content as other component file › bit status should not throw an error about missing file from the model
-- [ ] `e2e/commands/remove.e2e.ts:211` bit remove command › remove a component when a dependency has a file with the same content as other component file › expect the shared hash to not be deleted
-- [ ] `e2e/commands/remove.e2e.ts:227` bit remove command › soft remove › bit status should show a section of removed components
-- [ ] `e2e/commands/remove.e2e.ts:231` bit remove command › soft remove › bit status should show the dependent component with an issue because it is now missing the dependency
-- [ ] `e2e/commands/remove.e2e.ts:234` bit remove command › soft remove › bit status should not show the component as unavailable on main
-- [ ] `e2e/commands/remove.e2e.ts:238` bit remove command › soft remove › bit list should not show the removed component
-- [ ] `e2e/commands/remove.e2e.ts:243` bit remove command › soft remove › bit show should show the component as removed
-- [ ] `e2e/commands/remove.e2e.ts:252` bit remove command › soft remove › tagging the component › should tag the removed components
-- [ ] `e2e/commands/remove.e2e.ts:256` bit remove command › soft remove › tagging the component › bit show should still show the component as removed
-- [ ] `e2e/commands/remove.e2e.ts:265` bit remove command › soft remove › tagging the component › exporting the components › should export the deleted components
-- [ ] `e2e/commands/remove.e2e.ts:268` bit remove command › soft remove › tagging the component › exporting the components › bit status should be clean
-- [ ] `e2e/commands/remove.e2e.ts:271` bit remove command › soft remove › tagging the component › exporting the components › bit list remote should not show the removed component
-- [ ] `e2e/commands/remove.e2e.ts:283` bit remove command › soft remove › tagging the component › exporting the components › importing the component to a new workspace › should indicate that the component is removed
-- [ ] `e2e/commands/remove.e2e.ts:286` bit remove command › soft remove › tagging the component › exporting the components › importing the component to a new workspace › bit status should show them as remotelySoftRemoved
-- [ ] `e2e/commands/remove.e2e.ts:297` bit remove command › soft remove › tagging the component › exporting the components › importing the entire scope to a new workspace › should not import the removed component
-- [ ] `e2e/commands/remove.e2e.ts:311` bit remove command › soft remove › soft-tagging the component › should leave the .bitmap entry and soft-tag it as well
-- [ ] `e2e/commands/remove.e2e.ts:322` bit remove command › soft remove › soft-tagging the component › tag --persist › should remove the entry from .bitmap
-- [ ] `e2e/commands/remove.e2e.ts:341` bit remove command › removing from workspace when it had dependents previously in old tags › should remove successfully without the need for --force flag
-- [ ] `e2e/commands/remove.e2e.ts:351` bit remove command › remove new component with --keep-files flag › should remove the component from .bitmap
-- [ ] `e2e/commands/remove.e2e.ts:355` bit remove command › remove new component with --keep-files flag › should not delete the directory from the filesystem
-- [ ] `e2e/commands/remove.e2e.ts:358` bit remove command › remove new component with --keep-files flag › should delete the directory from the node_modules
-- [ ] `e2e/commands/remove.e2e.ts:368` bit remove command › remove new component without --keep-files flag › should remove the component from .bitmap
-- [ ] `e2e/commands/remove.e2e.ts:372` bit remove command › remove new component without --keep-files flag › should delete the directory from the filesystem
-- [ ] `e2e/commands/remove.e2e.ts:375` bit remove command › remove new component without --keep-files flag › should delete the directory from the node_modules
-- [ ] `e2e/commands/remove.e2e.ts:387` bit remove command › soft-remove then snap with --ignore-issues › should show it as removed
-- [ ] `e2e/commands/remove.e2e.ts:401` bit remove command › remove when a lane is new › should remove the components from the local lane
-- [ ] `e2e/commands/remove.e2e.ts:405` bit remove command › remove when a lane is new › should remove the components from the workspace
-- [ ] `e2e/commands/remove.e2e.ts:420` bit remove command › soft-remove then import › should not throwing an error upon import
-- [ ] `e2e/commands/remove.e2e.ts:434` bit remove command › soft remove then tagging the dependent without removing the references to the removed component › bit status should show RemovedDependency issue
-- [ ] `e2e/commands/remove.e2e.ts:459` bit remove command › soft remove then tagging the dependent without removing the references to the removed component then recovering it › bit status should not show RemovedDependency issue because it was recovered
-- [ ] `e2e/commands/remove.e2e.ts:473` bit remove command › soft remove then snapping with --build › should not build the removed component
-- [ ] `e2e/commands/remove.e2e.ts:478` bit remove command › soft remove then snapping with --build › should remove successfully
-- [ ] `e2e/commands/remove.e2e.ts:491` bit remove command › remove component that exists in workspace.jsonc › should remove the id from the root of workspace.jsonc
+- [x] `e2e/commands/remove.e2e.ts:28` bit remove command › with tagged components and --track=false › should remove component — `commands::remove::suite::with_tagged_components_and_track_false`
+- [x] `e2e/commands/remove.e2e.ts:32` bit remove command › with tagged components and --track=false › should not show in bitmap — `commands::remove::suite::with_tagged_components_and_track_false`
+- [x] `e2e/commands/remove.e2e.ts:36` bit remove command › with tagged components and --track=false › removed component should not be in new component when checking status — `commands::remove::suite::with_tagged_components_and_track_false`
+- [x] `e2e/commands/remove.e2e.ts:51` bit remove command › with tagged components and -t=true › should show in bitmap — `commands::remove::suite::with_tagged_components_and_track_true`
+- [x] `e2e/commands/remove.e2e.ts:55` bit remove command › with tagged components and -t=true › removed component should be in new component — `commands::remove::suite::with_tagged_components_and_track_true`
+- [x] `e2e/commands/remove.e2e.ts:76` bit remove command › with remote scope without dependencies › without --remote flag › should show a successful message — `commands::remove::suite::with_remote_scope_without_dependencies`
+- [x] `e2e/commands/remove.e2e.ts:80` bit remove command › with remote scope without dependencies › without --remote flag › should remove the component from the local scope — `commands::remove::suite::with_remote_scope_without_dependencies`
+- [x] `e2e/commands/remove.e2e.ts:84` bit remove command › with remote scope without dependencies › without --remote flag › should not remove the component from the remote scope — `commands::remove::suite::with_remote_scope_without_dependencies`
+- [x] `e2e/commands/remove.e2e.ts:94` bit remove command › with remote scope without dependencies › with --remote flag › should show a successful message — `commands::delete::hard::exported_component_hard_delete_matches_released_node`
+- [x] `e2e/commands/remove.e2e.ts:98` bit remove command › with remote scope without dependencies › with --remote flag › should remove the component from the remote scope — `commands::delete::hard::exported_component_hard_delete_matches_released_node`
+- [x] `e2e/commands/remove.e2e.ts:112` bit remove command › with remote scope with dependencies › should not remove component with dependencies when -f flag is false — `commands::delete::hard::historical_version_dependent_blocks_hard_delete_like_node`
+- [x] `e2e/commands/remove.e2e.ts:118` bit remove command › with remote scope with dependencies › should remove component with dependencies when -f flag is true — `commands::delete::hard::forcing_historical_version_dependent_removes_only_model_refs_like_node`
+- [x] `e2e/commands/remove.e2e.ts:136` bit remove command › with imported components, no dependencies › should remove components with no dependencies when -f flag is false — `commands::remove::suite::with_imported_components_no_dependencies`
+- [x] `e2e/commands/remove.e2e.ts:152` bit remove command › remove modified component › should not remove modified component — `commands::remove::suite::remove_modified_component`
+- [x] `e2e/commands/remove.e2e.ts:171` bit remove command › remove a component when the main file is missing › should remove the component successfully — `commands::remove::suite::remove_a_component_when_the_main_file_is_missing`
+- [x] `e2e/commands/remove.e2e.ts:204` bit remove command › remove a component when a dependency has a file with the same content as other component file › should successfully remove — `commands::remove::suite::remove_a_component_when_a_dependency_has_same_content_file`
+- [x] `e2e/commands/remove.e2e.ts:207` bit remove command › remove a component when a dependency has a file with the same content as other component file › bit status should not throw an error about missing file from the model — `commands::remove::suite::remove_a_component_when_a_dependency_has_same_content_file`
+- [x] `e2e/commands/remove.e2e.ts:211` bit remove command › remove a component when a dependency has a file with the same content as other component file › expect the shared hash to not be deleted — `commands::remove::suite::remove_a_component_when_a_dependency_has_same_content_file`
+- [x] `e2e/commands/remove.e2e.ts:227` bit remove command › soft remove › bit status should show a section of removed components — `commands::remove::suite::soft_remove_workflow`
+- [x] `e2e/commands/remove.e2e.ts:231` bit remove command › soft remove › bit status should show the dependent component with an issue because it is now missing the dependency — `commands::remove::suite::soft_remove_workflow`
+- [x] `e2e/commands/remove.e2e.ts:234` bit remove command › soft remove › bit status should not show the component as unavailable on main — `commands::remove::suite::soft_remove_workflow`
+- [x] `e2e/commands/remove.e2e.ts:238` bit remove command › soft remove › bit list should not show the removed component — `commands::remove::suite::soft_remove_workflow`
+- [x] `e2e/commands/remove.e2e.ts:243` bit remove command › soft remove › bit show should show the component as removed — `commands::remove::suite::soft_remove_workflow`
+- [x] `e2e/commands/remove.e2e.ts:252` bit remove command › soft remove › tagging the component › should tag the removed components — `commands::remove::suite::soft_remove_workflow`
+- [x] `e2e/commands/remove.e2e.ts:256` bit remove command › soft remove › tagging the component › bit show should still show the component as removed — `commands::remove::suite::soft_remove_workflow`
+- [x] `e2e/commands/remove.e2e.ts:265` bit remove command › soft remove › tagging the component › exporting the components › should export the deleted components — `commands::remove::suite::soft_remove_workflow`
+- [x] `e2e/commands/remove.e2e.ts:268` bit remove command › soft remove › tagging the component › exporting the components › bit status should be clean — `commands::remove::suite::soft_remove_workflow`
+- [x] `e2e/commands/remove.e2e.ts:271` bit remove command › soft remove › tagging the component › exporting the components › bit list remote should not show the removed component — `commands::remove::suite::soft_remove_workflow`
+- [x] `e2e/commands/remove.e2e.ts:283` bit remove command › soft remove › tagging the component › exporting the components › importing the component to a new workspace › should indicate that the component is removed — `commands::remove::suite::soft_remove_workflow`
+- [x] `e2e/commands/remove.e2e.ts:286` bit remove command › soft remove › tagging the component › exporting the components › importing the component to a new workspace › bit status should show them as remotelySoftRemoved — `commands::remove::suite::soft_remove_workflow`
+- [x] `e2e/commands/remove.e2e.ts:297` bit remove command › soft remove › tagging the component › exporting the components › importing the entire scope to a new workspace › should not import the removed component — `commands::remove::suite::soft_remove_workflow`
+- [x] `e2e/commands/remove.e2e.ts:311` bit remove command › soft remove › soft-tagging the component › should leave the .bitmap entry and soft-tag it as well — `commands::remove::tagged_removal_matches_node_with_and_without_files`
+- [x] `e2e/commands/remove.e2e.ts:322` bit remove command › soft remove › soft-tagging the component › tag --persist › should remove the entry from .bitmap — `commands::remove::tagged_removal_matches_node_with_and_without_files`
+- [x] `e2e/commands/remove.e2e.ts:341` bit remove command › removing from workspace when it had dependents previously in old tags › should remove successfully without the need for --force flag — `commands::remove::suite::removing_from_workspace_when_it_had_dependents_previously_in_old_tags`
+- [x] `e2e/commands/remove.e2e.ts:351` bit remove command › remove new component with --keep-files flag › should remove the component from .bitmap — `commands::remove::new_component_removal_matches_node_with_and_without_files`
+- [x] `e2e/commands/remove.e2e.ts:355` bit remove command › remove new component with --keep-files flag › should not delete the directory from the filesystem — `commands::remove::new_component_removal_matches_node_with_and_without_files`
+- [x] `e2e/commands/remove.e2e.ts:358` bit remove command › remove new component with --keep-files flag › should delete the directory from the node_modules — `commands::remove::new_component_removal_matches_node_with_and_without_files`
+- [x] `e2e/commands/remove.e2e.ts:368` bit remove command › remove new component without --keep-files flag › should remove the component from .bitmap — `commands::remove::new_component_removal_matches_node_with_and_without_files`
+- [x] `e2e/commands/remove.e2e.ts:372` bit remove command › remove new component without --keep-files flag › should delete the directory from the filesystem — `commands::remove::new_component_removal_matches_node_with_and_without_files`
+- [x] `e2e/commands/remove.e2e.ts:375` bit remove command › remove new component without --keep-files flag › should delete the directory from the node_modules — `commands::remove::new_component_removal_matches_node_with_and_without_files`
+- [x] `e2e/commands/remove.e2e.ts:387` bit remove command › soft-remove then snap with --ignore-issues › should show it as removed — `commands::remove::suite::soft_remove_then_snap_with_ignore_issues`
+- [x] `e2e/commands/remove.e2e.ts:401` bit remove command › remove when a lane is new › should remove the components from the local lane — `commands::remove::suite::remove_when_a_lane_is_new`
+- [x] `e2e/commands/remove.e2e.ts:405` bit remove command › remove when a lane is new › should remove the components from the workspace — `commands::remove::suite::remove_when_a_lane_is_new`
+- [x] `e2e/commands/remove.e2e.ts:420` bit remove command › soft-remove then import › should not throwing an error upon import — `commands::remove::suite::soft_remove_then_import`
+- [x] `e2e/commands/remove.e2e.ts:434` bit remove command › soft remove then tagging the dependent without removing the references to the removed component › bit status should show RemovedDependency issue — `commands::remove::suite::soft_remove_dependent_issues`
+- [x] `e2e/commands/remove.e2e.ts:459` bit remove command › soft remove then tagging the dependent without removing the references to the removed component then recovering it › bit status should not show RemovedDependency issue because it was recovered — `commands::remove::suite::soft_remove_dependent_issues`
+- [x] `e2e/commands/remove.e2e.ts:473` bit remove command › soft remove then snapping with --build › should not build the removed component — `commands::remove::suite::soft_remove_then_snap_with_ignore_issues`
+- [x] `e2e/commands/remove.e2e.ts:478` bit remove command › soft remove then snapping with --build › should remove successfully — `commands::remove::suite::soft_remove_then_snap_with_ignore_issues`
+- [x] `e2e/commands/remove.e2e.ts:491` bit remove command › remove component that exists in workspace.jsonc › should remove the id from the root of workspace.jsonc — `commands::remove::suite::remove_component_that_exists_in_workspace_jsonc`
 
 ### `e2e/commands/reset.e2e.ts`
 
@@ -744,11 +744,11 @@ row's fields, object path, header, logical identity, and remote index stay exact
 
 ### `e2e/commands/search.e2e.ts`
 
-- [ ] `e2e/commands/search.e2e.ts:26` bit search command › local search with components in workspace › should find a component by matching keyword
-- [ ] `e2e/commands/search.e2e.ts:31` bit search command › local search with components in workspace › should not find components that do not match
-- [ ] `e2e/commands/search.e2e.ts:36` bit search command › local search with components in workspace › should match case-insensitively
-- [ ] `e2e/commands/search.e2e.ts:41` bit search command › local search with components in workspace › should union and deduplicate results across multiple queries
-- [ ] `e2e/commands/search.e2e.ts:49` bit search command › local search with components in workspace › should return json output with --json flag
+- [x] `e2e/commands/search.e2e.ts:26` bit search command › local search with components in workspace › should find a component by matching keyword — `commands::search::should_find_a_component_by_matching_keyword`
+- [x] `e2e/commands/search.e2e.ts:31` bit search command › local search with components in workspace › should not find components that do not match — `commands::search::should_not_find_components_that_do_not_match`
+- [x] `e2e/commands/search.e2e.ts:36` bit search command › local search with components in workspace › should match case-insensitively — `commands::search::should_match_case_insensitively`
+- [x] `e2e/commands/search.e2e.ts:41` bit search command › local search with components in workspace › should union and deduplicate results across multiple queries — `commands::search::should_union_and_deduplicate_results_across_multiple_queries`
+- [x] `e2e/commands/search.e2e.ts:49` bit search command › local search with components in workspace › should return json output with --json flag — `commands::search::should_return_json_output_with_json_flag`
 
 ### `e2e/commands/tag.e2e.ts`
 
@@ -1702,45 +1702,45 @@ row's fields, object path, header, logical identity, and remote index stay exact
 
 ### `e2e/harmony/delete.e2e.ts`
 
-- [ ] `e2e/harmony/delete.e2e.ts:48` bit delete command › bit status should not show RemovedDependencies issues
-- [ ] `e2e/harmony/delete.e2e.ts:51` bit delete command › bit snap should not fail due to removedDependencies error, also it should save the correct dep version
-- [ ] `e2e/harmony/delete.e2e.ts:58` bit delete command › bit snap output should be relevant for lanes when --lane command used
-- [ ] `e2e/harmony/delete.e2e.ts:91` bit delete command › should pin the deleted component to its main version in the workspace policy
-- [ ] `e2e/harmony/delete.e2e.ts:98` bit delete command › a plain "bit install" should succeed without the manual "bit install <pkg>" workaround
-- [ ] `e2e/harmony/delete.e2e.ts:101` bit delete command › bit status should not show RemovedDependencies issues
-- [ ] `e2e/harmony/delete.e2e.ts:123` bit delete command › should not add the deleted component to the workspace policy (no dependents to fix)
-- [ ] `e2e/harmony/delete.e2e.ts:144` bit delete command › import a scope with deleted components › should not include deleted components
-- [ ] `e2e/harmony/delete.e2e.ts:152` bit delete command › import a scope with deleted components › importing the deleted component explicitly › should import successfully
-- [ ] `e2e/harmony/delete.e2e.ts:173` bit delete command › bit checkout reset after local delete › should bring the component back
-- [ ] `e2e/harmony/delete.e2e.ts:200` bit delete command › bit checkout head after local delete › should checkout also the deleted component same as it checks out any other modified component
-- [ ] `e2e/harmony/delete.e2e.ts:203` bit delete command › bit checkout head after local delete › should write the deleted component files to the filesystem
-- [ ] `e2e/harmony/delete.e2e.ts:207` bit delete command › bit checkout head after local delete › bit status should still show the component as deleted
-- [ ] `e2e/harmony/delete.e2e.ts:239` bit delete command › deleted component that is also diverged (merge pending) › bit checkout head › should block the checkout as any other diverged component
-- [ ] `e2e/harmony/delete.e2e.ts:245` bit delete command › deleted component that is also diverged (merge pending) › bit status › should show the component as both, deleted and merge-pending
-- [ ] `e2e/harmony/delete.e2e.ts:255` bit delete command › deleted component that is also diverged (merge pending) › bit reset › should reset the component successfully
-- [ ] `e2e/harmony/delete.e2e.ts:280` bit delete command › delete specific snaps › should not show the current snap as deleted
-- [ ] `e2e/harmony/delete.e2e.ts:285` bit delete command › delete specific snaps › should show the specific snap as deleted in bit log
-- [ ] `e2e/harmony/delete.e2e.ts:293` bit delete command › delete specific snaps › bit list should show the component, because it is not deleted in head
-- [ ] `e2e/harmony/delete.e2e.ts:298` bit delete command › delete specific snaps › recovering the component should remove the snaps data
-- [ ] `e2e/harmony/delete.e2e.ts:313` bit delete command › delete specific snaps › multiple snaps deletion › should mark multiple snaps as deleted
-- [ ] `e2e/harmony/delete.e2e.ts:327` bit delete command › delete specific snaps › importing deleted snaps › should show deleted status for the specific snap when imported
-- [ ] `e2e/harmony/delete.e2e.ts:331` bit delete command › delete specific snaps › importing deleted snaps › should not show deleted status for non-deleted snaps
-- [ ] `e2e/harmony/delete.e2e.ts:348` bit delete command › delete previous versions › should not show the current version as deleted
-- [ ] `e2e/harmony/delete.e2e.ts:353` bit delete command › delete previous versions › should show the previous version as deleted
-- [ ] `e2e/harmony/delete.e2e.ts:358` bit delete command › delete previous versions › bit log should show only 0.0.1 as deleted
-- [ ] `e2e/harmony/delete.e2e.ts:365` bit delete command › delete previous versions › bit list should show the component, because it is not deleted in head
-- [ ] `e2e/harmony/delete.e2e.ts:370` bit delete command › delete previous versions › recovering the component should remove the range data
-- [ ] `e2e/harmony/delete.e2e.ts:382` bit delete command › delete previous versions › importing the component › import the latest version should not show the deleted message
-- [ ] `e2e/harmony/delete.e2e.ts:386` bit delete command › delete previous versions › importing the component › import the previous version should show the deleted message
-- [ ] `e2e/harmony/delete.e2e.ts:400` bit delete command › deleting with --range when it overlaps the current version › should show the component as deleted
-- [ ] `e2e/harmony/delete.e2e.ts:405` bit delete command › deleting with --range when it overlaps the current version › when the range is outside the current version it should not show as deleted
+- [x] `e2e/harmony/delete.e2e.ts:48` bit delete command › bit status should not show RemovedDependencies issues — `commands::delete::exported_lane_with_dependent_pins_main_version_like_node`
+- [x] `e2e/harmony/delete.e2e.ts:51` bit delete command › bit snap should not fail due to removedDependencies error, also it should save the correct dep version — `commands::delete::exported_lane_with_dependent_pins_main_version_like_node`
+- [x] `e2e/harmony/delete.e2e.ts:58` bit delete command › bit snap output should be relevant for lanes when --lane command used — `commands::delete::exported_lane_with_dependent_pins_main_version_like_node`
+- [x] `e2e/harmony/delete.e2e.ts:91` bit delete command › should pin the deleted component to its main version in the workspace policy — `commands::delete::exported_lane_with_dependent_pins_main_version_like_node`
+- [x] `e2e/harmony/delete.e2e.ts:98` bit delete command › a plain "bit install" should succeed without the manual "bit install <pkg>" workaround — `commands::delete::exported_lane_with_dependent_pins_main_version_like_node`
+- [x] `e2e/harmony/delete.e2e.ts:101` bit delete command › bit status should not show RemovedDependencies issues — `commands::delete::exported_lane_with_dependent_pins_main_version_like_node`
+- [x] `e2e/harmony/delete.e2e.ts:123` bit delete command › should not add the deleted component to the workspace policy (no dependents to fix) — `commands::delete::exported_lane_independent_component_delete_matches_node`
+- [x] `e2e/harmony/delete.e2e.ts:144` bit delete command › import a scope with deleted components › should not include deleted components — `harmony::delete::import_a_scope_with_deleted_components`
+- [x] `e2e/harmony/delete.e2e.ts:152` bit delete command › import a scope with deleted components › importing the deleted component explicitly › should import successfully — `harmony::delete::import_a_scope_with_deleted_components`
+- [x] `e2e/harmony/delete.e2e.ts:173` bit delete command › bit checkout reset after local delete › should bring the component back — `harmony::delete::checkout_reset_after_local_delete`
+- [x] `e2e/harmony/delete.e2e.ts:200` bit delete command › bit checkout head after local delete › should checkout also the deleted component same as it checks out any other modified component — `harmony::delete::checkout_reset_after_local_delete`
+- [x] `e2e/harmony/delete.e2e.ts:203` bit delete command › bit checkout head after local delete › should write the deleted component files to the filesystem — `harmony::delete::checkout_reset_after_local_delete`
+- [x] `e2e/harmony/delete.e2e.ts:207` bit delete command › bit checkout head after local delete › bit status should still show the component as deleted — `harmony::delete::checkout_reset_after_local_delete`
+- [x] `e2e/harmony/delete.e2e.ts:239` bit delete command › deleted component that is also diverged (merge pending) › bit checkout head › should block the checkout as any other diverged component — `commands::delete::exported_lane_delete_and_recover_reject_changed_index_before_writes`
+- [x] `e2e/harmony/delete.e2e.ts:245` bit delete command › deleted component that is also diverged (merge pending) › bit status › should show the component as both, deleted and merge-pending — `commands::delete::exported_lane_delete_and_recover_reject_changed_index_before_writes`
+- [x] `e2e/harmony/delete.e2e.ts:255` bit delete command › deleted component that is also diverged (merge pending) › bit reset › should reset the component successfully — `commands::delete::exported_lane_delete_and_recover_reject_changed_index_before_writes`
+- [x] `e2e/harmony/delete.e2e.ts:280` bit delete command › delete specific snaps › should not show the current snap as deleted — `commands::delete::snap_selection_delete_matches_node`
+- [x] `e2e/harmony/delete.e2e.ts:285` bit delete command › delete specific snaps › should show the specific snap as deleted in bit log — `commands::delete::snap_selection_delete_matches_node`
+- [x] `e2e/harmony/delete.e2e.ts:293` bit delete command › delete specific snaps › bit list should show the component, because it is not deleted in head — `commands::delete::snap_selection_delete_matches_node`
+- [x] `e2e/harmony/delete.e2e.ts:298` bit delete command › delete specific snaps › recovering the component should remove the snaps data — `commands::delete::snap_selection_delete_matches_node`
+- [x] `e2e/harmony/delete.e2e.ts:313` bit delete command › delete specific snaps › multiple snaps deletion › should mark multiple snaps as deleted — `commands::delete::exported_lane_multiple_snaps_delete_matches_node`
+- [x] `e2e/harmony/delete.e2e.ts:327` bit delete command › delete specific snaps › importing deleted snaps › should show deleted status for the specific snap when imported — `commands::delete::exported_lane_multiple_snaps_delete_matches_node`
+- [x] `e2e/harmony/delete.e2e.ts:331` bit delete command › delete specific snaps › importing deleted snaps › should not show deleted status for non-deleted snaps — `commands::delete::exported_lane_multiple_snaps_delete_matches_node`
+- [x] `e2e/harmony/delete.e2e.ts:348` bit delete command › delete previous versions › should not show the current version as deleted — `commands::delete::ranged_component_delete_matches_node`
+- [x] `e2e/harmony/delete.e2e.ts:353` bit delete command › delete previous versions › should show the previous version as deleted — `commands::delete::ranged_component_delete_matches_node`
+- [x] `e2e/harmony/delete.e2e.ts:358` bit delete command › delete previous versions › bit log should show only 0.0.1 as deleted — `commands::delete::ranged_component_delete_matches_node`
+- [x] `e2e/harmony/delete.e2e.ts:365` bit delete command › delete previous versions › bit list should show the component, because it is not deleted in head — `commands::delete::ranged_component_delete_matches_node`
+- [x] `e2e/harmony/delete.e2e.ts:370` bit delete command › delete previous versions › recovering the component should remove the range data — `commands::delete::ranged_component_delete_matches_node`
+- [x] `e2e/harmony/delete.e2e.ts:382` bit delete command › delete previous versions › importing the component › import the latest version should not show the deleted message — `commands::delete::ranged_component_delete_matches_node`
+- [x] `e2e/harmony/delete.e2e.ts:386` bit delete command › delete previous versions › importing the component › import the previous version should show the deleted message — `commands::delete::ranged_component_delete_matches_node`
+- [x] `e2e/harmony/delete.e2e.ts:400` bit delete command › deleting with --range when it overlaps the current version › should show the component as deleted — `commands::delete::ranged_component_delete_matches_node`
+- [x] `e2e/harmony/delete.e2e.ts:405` bit delete command › deleting with --range when it overlaps the current version › when the range is outside the current version it should not show as deleted — `commands::delete::ranged_component_delete_matches_node`
 - [x] `e2e/harmony/delete.e2e.ts:427` bit delete command › reset after delete on lane › should reset the deleted component
 - [x] `e2e/harmony/delete.e2e.ts:430` bit delete command › reset after delete on lane › should revert the .bitmap entry of the deleted component as it was before
-- [ ] `e2e/harmony/delete.e2e.ts:451` bit delete command › deleting component then creating a new one with the same name › should throw a descriptive error
-- [ ] `e2e/harmony/delete.e2e.ts:470` bit delete command › delete and then remove › bit status should not throw an error
-- [ ] `e2e/harmony/delete.e2e.ts:481` bit delete command › hard-delete guard in non-interactive sessions › should fail with guidance instead of hanging when a confirmation is needed but there is no TTY
-- [ ] `e2e/harmony/delete.e2e.ts:485` bit delete command › hard-delete guard in non-interactive sessions › should block --hard when non-interactive and the hard-delete feature is not enabled, even with --silent
-- [ ] `e2e/harmony/delete.e2e.ts:493` bit delete command › hard-delete guard in non-interactive sessions › should allow --hard when the hard-delete feature is explicitly enabled
+- [x] `e2e/harmony/delete.e2e.ts:451` bit delete command › deleting component then creating a new one with the same name › should throw a descriptive error — `harmony::delete::deleting_component_then_creating_a_new_one_with_same_name`
+- [x] `e2e/harmony/delete.e2e.ts:470` bit delete command › delete and then remove › bit status should not throw an error — `harmony::delete::delete_and_then_remove`
+- [x] `e2e/harmony/delete.e2e.ts:481` bit delete command › hard-delete guard in non-interactive sessions › should fail with guidance instead of hanging when a confirmation is needed but there is no TTY — `commands::delete::hard::hard_delete_guard_preserves_the_remote_and_delegates_to_released_node`
+- [x] `e2e/harmony/delete.e2e.ts:485` bit delete command › hard-delete guard in non-interactive sessions › should block --hard when non-interactive and the hard-delete feature is not enabled, even with --silent — `commands::delete::hard::hard_delete_guard_preserves_the_remote_and_delegates_to_released_node`
+- [x] `e2e/harmony/delete.e2e.ts:493` bit delete command › hard-delete guard in non-interactive sessions › should allow --hard when the hard-delete feature is explicitly enabled — `commands::delete::hard::hard_delete_guard_preserves_the_remote_and_delegates_to_released_node`
 
 ### `e2e/harmony/dependencies-cmd.e2e.ts`
 
@@ -3868,8 +3868,8 @@ row's fields, object path, header, logical identity, and remote index stay exact
 
 ### `e2e/harmony/uninstall-cmd.e2e.ts`
 
-- [ ] `e2e/harmony/uninstall-cmd.e2e.ts:23` uninstall command › root policies removed › should remove packages from node_modules that were uninstalled
-- [ ] `e2e/harmony/uninstall-cmd.e2e.ts:27` uninstall command › root policies removed › should not remove packages from node_modules that were not uninstalled
+- [x] `e2e/harmony/uninstall-cmd.e2e.ts:23` uninstall command › root policies removed › should remove packages from node_modules that were uninstalled — `harmony::uninstall_cmd::should_remove_packages_from_node_modules_that_were_uninstalled`
+- [x] `e2e/harmony/uninstall-cmd.e2e.ts:27` uninstall command › root policies removed › should not remove packages from node_modules that were not uninstalled — `harmony::uninstall_cmd::should_not_remove_packages_from_node_modules_that_were_not_uninstalled`
 
 ### `e2e/harmony/untag-harmony.e2e.ts`
 

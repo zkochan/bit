@@ -1,6 +1,7 @@
 //! `e2e/harmony/`.
 mod add;
 mod bit_ignore;
+mod delete;
 mod deprecation;
 mod fork;
 mod install_compat;
@@ -62,5 +63,7 @@ mod file_history;
 mod stash;
 
 mod untag;
+
+mod uninstall_cmd;
 
 mod use_cmd;
