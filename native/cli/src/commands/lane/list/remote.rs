@@ -19,10 +19,12 @@ use std::{
     process::ExitCode,
 };
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn run(
     root: &Path,
     bare: bool,
     args: &[OsString],
+    command: &'static str,
     scope: &str,
     json: bool,
     details: bool,
@@ -48,9 +50,9 @@ pub(super) fn run(
     let text = text_report(&lanes, &current.0, raw.as_deref(), merged, details, args);
     let report = Report { data: text, code: 0, details: None };
     if bare {
-        workspace_command::execute_with_scope(root, args, "list", &report)
+        workspace_command::execute_with_scope(root, args, command, &report)
     } else {
-        workspace_command::execute_with(root, args, "list", &report, |_| Ok(()))
+        workspace_command::execute_with(root, args, command, &report, |_| Ok(()))
     }
 }
 

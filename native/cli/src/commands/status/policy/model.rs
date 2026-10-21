@@ -34,7 +34,23 @@ pub(super) fn stored_version<'c>(
         (Some(_), None) => return Err(decline("status pending import")),
         (None, Some(_)) => return Err(decline("status bitmap normalization required")),
         (None, None) => return Ok(projected),
-        (Some(_), Some(_)) => {}
+        (Some(_), Some(model)) => {
+            if target["scoped"] != true
+                && (model["head"].is_string()
+                    || model["versions"]
+                        .as_object()
+                        .is_some_and(|versions| !versions.is_empty()))
+                && !model["state"]["versions"]
+                    .as_object()
+                    .is_some_and(|versions| {
+                        versions
+                            .values()
+                            .any(|v| v["local"] == true)
+                    })
+            {
+                return Err(decline("status bitmap normalization required"));
+            }
+        }
     }
     if projected.is_some() {
         return Ok(projected);

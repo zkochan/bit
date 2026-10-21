@@ -44,6 +44,7 @@ pub(super) struct ModelBytes {
 pub(super) struct HistoryBytes {
     pub(super) hash: String,
     pub(super) bytes: Vec<u8>,
+    pub(super) hashes: Vec<String>,
 }
 
 struct Identity {
@@ -90,6 +91,16 @@ pub(super) fn select(input: &Prepare) -> io::Result<Vec<Selected>> {
         candidates,
         input.options.all || input.options.all_versions || input.options.head_only,
     )?;
+    if !input.ids.is_empty() {
+        let bitmap = crate::recovery::jsonc::parse(&fs::read(input.root.join(".bitmap"))?)?;
+        for (row, _) in &selected {
+            let scope = row["id"]["scope"].as_str().unwrap_or_default();
+            let name = row["id"]["name"].as_str().unwrap_or_default();
+            if !super::publication::reconcile_present(&bitmap, scope, name) {
+                return Err(invalid("outbound explicit id absent from bitmap"));
+            }
+        }
+    }
     let mut components = Vec::new();
     for (row, model) in selected {
         let component = select_one(input, &row, model)?;

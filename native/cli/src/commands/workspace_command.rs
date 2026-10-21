@@ -77,11 +77,24 @@ impl Planned {
     pub(in crate::commands) fn merge_cache_ids(&self) -> io::Result<Vec<String>> {
         let rows = array(self.plan["result"].get("components"), "merged components")?;
         let targets = self.context["lane"]["targets"].as_array();
+        let workspace_targets = self.context["targets"].as_array();
         let mut ids = Vec::new();
         for row in rows {
             let current = text(row.get("id"))?;
             ids.push(current.to_owned());
             let identity = current.rsplit_once('@').map_or(current, |(identity, _)| identity);
+            if let Some(version) = workspace_targets
+                .into_iter()
+                .flatten()
+                .find(|target| target["identity"] == identity)
+                .and_then(|target| target["version"].as_str())
+                .filter(|version| !version.is_empty())
+            {
+                let workspace_id = format!("{identity}@{version}");
+                if !ids.contains(&workspace_id) {
+                    ids.push(workspace_id);
+                }
+            }
             let incoming = targets
                 .into_iter()
                 .flatten()
@@ -89,7 +102,7 @@ impl Planned {
                 .and_then(|target| target["head"].as_str());
             if let Some(head) = incoming {
                 let incoming = format!("{identity}@{head}");
-                if incoming != current {
+                if !ids.contains(&incoming) {
                     ids.push(incoming);
                 }
             }
@@ -317,6 +330,18 @@ impl Steps<'_> {
         };
         if let Some(preparation) = plan.get("lanePreparation").cloned() {
             self.finalize_lane(plan, &preparation)?;
+        }
+        if defer_snapshot && let Some(rows) = plan["result"]["components"].as_array() {
+            let modified = rows
+                .iter()
+                .filter_map(|row| row["id"].as_str())
+                .map(|id| {
+                    id.rsplit_once('@')
+                        .map_or(id, |(base, _)| base)
+                        .to_owned()
+                })
+                .collect::<std::collections::HashSet<_>>();
+            capture.cache.block_dependencies(&modified);
         }
         capture.cache.replacements = caches;
         capture.cache.replacements_only = snap_failed;

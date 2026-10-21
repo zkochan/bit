@@ -139,6 +139,11 @@ fn select(
             target.version.clone_from(head);
             selected.push(target);
         } else {
+            if !input.ids.is_empty() && target.version != "latest" {
+                return Err(invalid(
+                    "inbound explicit version on lane requires canonical history check",
+                ));
+            }
             main.push(key);
             main_targets.push(target);
         }

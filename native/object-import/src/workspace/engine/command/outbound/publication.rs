@@ -1,6 +1,7 @@
 //! Publish all original-scope export batches locally after remote `ExportPersist`.
 mod reconcile;
 mod removed;
+pub(super) use reconcile::present as reconcile_present;
 
 use super::{Prepare, invalid, model::Selected};
 use crate::store::Store;
@@ -43,6 +44,7 @@ pub(super) struct Prepared {
     bitmap: super::super::bitmap::Prepared,
     file_id: String,
     expected_ids: HashSet<String>,
+    known_ids: HashSet<String>,
 }
 
 pub(super) fn prepare(
@@ -63,6 +65,16 @@ pub(super) fn prepare(
         .collect::<io::Result<BTreeMap<_, _>>>()?;
     let output = prepare_output(input, selected, &preimage, refs)?;
     let expected_ids = expected_ids(selected)?;
+    let mut known_ids = expected_ids.clone();
+    known_ids.extend(
+        selected
+            .iter()
+            .flat_map(|item| {
+                item.history.hashes
+                    .iter()
+                    .map(|hash| format!("{}/{}@{hash}", item.scope, item.name))
+            }),
+    );
     let components = selected
         .iter()
         .map(|item| Component {
@@ -82,6 +94,7 @@ pub(super) fn prepare(
         bitmap,
         file_id: input.transport.bitmap_history_file_id.clone(),
         expected_ids,
+        known_ids,
     })
 }
 
@@ -239,7 +252,7 @@ impl Prepared {
         if ids.len() != exported_ids.len()
             || exported_ids
                 .iter()
-                .any(|id| !self.expected_ids.contains(id))
+                .any(|id| !self.known_ids.contains(id))
         {
             return Err(invalid("outbound remote acknowledgement"));
         }

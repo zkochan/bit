@@ -103,9 +103,27 @@ impl LaneData {
 
 /// `args` starts after `list`.
 pub(super) fn run(args: &[OsString], list_args: &[&str]) -> io::Result<Outcome> {
+    run_with_command(args, list_args, "list")
+}
+
+/// `bit lane` without a subcommand delegates `report()` to `LaneListCmd` (`LaneCmd` has no `json()`).
+pub(super) fn run_default(args: &[OsString], list_args: &[&str]) -> io::Result<Outcome> {
+    run_with_command(args, list_args, "lane")
+}
+
+fn run_with_command(
+    args: &[OsString],
+    list_args: &[&str],
+    command: &'static str,
+) -> io::Result<Outcome> {
     let Some((json, details, merged, remote)) = parse(list_args) else {
         return Ok(Outcome::Declined("lane list flags outside the native grammar".to_string()));
     };
+    if command == "lane" && json {
+        return Ok(
+            Outcome::Declined("lane without subcommand does not implement json".to_string()),
+        );
+    }
     let scope_root = match super::scope_root::discover() {
         Ok(Some(scope_root)) => scope_root,
         Ok(None) => return Ok(Outcome::Declined("not inside a scope".to_string())),
@@ -113,19 +131,21 @@ pub(super) fn run(args: &[OsString], list_args: &[&str]) -> io::Result<Outcome> 
     };
     let root = scope_root.path;
     if let Some(scope) = remote {
-        return remote::run(&root, scope_root.bare, args, scope, json, details, merged);
+        return remote::run(&root, scope_root.bare, args, command, scope, json, details, merged);
     }
     let selection = match read_for_scope(&root, scope_root.bare, merged.is_some()) {
         Ok(read) => read,
         Err(error) => return Ok(Outcome::Declined(format!("lane list: {error}"))),
     };
-    display_local(&root, scope_root.bare, args, json, details, merged, selection)
+    display_local(&root, scope_root.bare, args, command, json, details, merged, selection)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn display_local(
     root: &Path,
     bare: bool,
     args: &[OsString],
+    command: &'static str,
     json: bool,
     details: bool,
     merged: Option<bool>,
@@ -143,9 +163,9 @@ fn display_local(
         details: None,
     };
     if bare {
-        workspace_command::execute_with_scope(root, args, "list", &report)
+        workspace_command::execute_with_scope(root, args, command, &report)
     } else {
-        workspace_command::execute_with(root, args, "list", &report, |_| Ok(()))
+        workspace_command::execute_with(root, args, command, &report, |_| Ok(()))
     }
 }
 

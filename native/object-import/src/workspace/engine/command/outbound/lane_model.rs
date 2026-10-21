@@ -219,7 +219,11 @@ fn select_components(
     let (rows, exhaustive) = selection_rows(input, loaded)?;
     let component_rows =
         loaded.index["components"].as_array().ok_or_else(|| invalid("outbound component index"))?;
-    let remote_heads = remote_heads(&input.root, scope, name)?;
+    let lane_heads = remote_heads(&input.root, scope, name)?;
+    let fork_heads = match &loaded.forked_from {
+        Some((parent_scope, parent_name)) => remote_heads(&input.root, parent_scope, parent_name)?,
+        None => Vec::new(),
+    };
     let host = remote::configured_host(input, scope)?;
     let context = ComponentContext { input, loaded, scope, name, host: &host };
     let mut seen_ids = HashSet::new();
@@ -229,12 +233,17 @@ fn select_components(
         if !seen_ids.insert(component.id.clone()) {
             return Err(invalid("outbound duplicate lane component"));
         }
-        let previous_head = remote_heads
+        let lane_remote_head = lane_heads
             .iter()
             .find(|row| component.matches(row))
             .and_then(|row| row["head"].as_str());
+        let fork_remote_head = fork_heads
+            .iter()
+            .find(|row| component.matches(row))
+            .and_then(|row| row["head"].as_str());
+        let previous_head = lane_remote_head.or(fork_remote_head);
         if (!exhaustive || input.options.head_only)
-            && previous_head == Some(component.head)
+            && lane_remote_head == Some(component.head)
             && !(input.options.fork_lane_new_scope
                 && staged::missing_remote_head(&host, component.head)?)
         {
@@ -347,12 +356,14 @@ fn select_component(
     )?;
     let after = model::encode(hash, "Component", &component)?;
     let versions = staged::selected_versions(context, id, &component, previous_head, exhaustive)?;
-    selected.histories.push(model::prepare_history(dir, id.scope, id.name, id.head)?);
-    selected.expected_ids.extend(
-        versions
-            .iter()
-            .map(|version| format!("{}@{version}", id.id)),
-    );
+    let history = model::prepare_history(dir, id.scope, id.name, id.head)?;
+    let mut expected = HashSet::new();
+    for version in versions.iter().chain(&history.hashes) {
+        if expected.insert(version.clone()) {
+            selected.expected_ids.push(format!("{}@{version}", id.id));
+        }
+    }
+    selected.histories.push(history);
     for object in model::collect(
         dir,
         hash,

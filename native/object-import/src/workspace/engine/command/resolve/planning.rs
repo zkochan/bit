@@ -318,7 +318,15 @@ pub(super) fn material(
     let version =
         projection::version(&stored, &current.target.current, &current.metadata, receipt)?;
     let head = current_head(retained, identity, &model)?;
+    let pending = retained.pending
+        .iter()
+        .find(|row| selection::identity(&row["id"]).ok().as_ref() == Some(identity))
+        .cloned();
+    let has_unrelated = pending
+        .as_ref()
+        .is_some_and(|pending| pending["unrelated"] == true || pending["unrelated"].is_object());
     if reference != head
+        && !has_unrelated
         && !retained.snap.as_ref().is_some_and(|options| options.policy.ignore_newest_version)
     {
         return Err(invalid("resolve detached component"));
@@ -332,10 +340,7 @@ pub(super) fn material(
             .ok_or_else(|| invalid("resolve files"))?
             .clone(),
         version_state: VersionState { current_head: reference, tagged_version: None },
-        pending: retained.pending
-            .iter()
-            .find(|row| selection::identity(&row["id"]).ok().as_ref() == Some(identity))
-            .cloned(),
+        pending,
         hidden: false,
         participation,
     })
