@@ -334,7 +334,24 @@ pub(super) fn metadata_guard(projected: &[Value]) -> io::Result<()> {
             return Err(invalid("command unsupported non-policy metadata change"));
         }
     }
+    if projected.iter().any(has_remove_extension) {
+        return Err(invalid("command unsupported non-policy metadata change"));
+    }
     Ok(())
+}
+
+fn has_remove_extension(version: &Value) -> bool {
+    version["extensions"]
+        .as_array()
+        .is_some_and(|rows| {
+            rows.iter()
+                .any(|row| {
+                    row["name"]
+                        .as_str()
+                        .or_else(|| row["extensionId"].as_str())
+                        .is_some_and(|id| id.split('@').next() == Some("teambit.component/remove"))
+                })
+        })
 }
 
 fn file_statuses(removals: &Value) -> io::Result<serde_json::Map<String, Value>> {
