@@ -243,7 +243,7 @@ fn report(chalk: Chalk) -> String {
         .join("\n");
     let divider = chalk.yellow(&"━".repeat(80));
     let config_snippet = chalk.cyan(&format!(
-        "\"{ISSUES_ASPECT_ID}\": {{\n     \"ignoreIssues\": [\"IssueName1\", \"IssueName2\"]\n   }}"
+        "\"{ISSUES_ASPECT_ID}\": {{\n     \"ignoreIssues\": [\"IssueName1\", \"IssueName2\"]\n   }}",
     ));
     let bypass_instructions = format!(
         "\n{divider}\n{}\n{divider}\n\n{}, it is possible to ignore issues in two ways:\n\n{}\n   Use the --ignore-issues flag with tag/snap/build commands:\n\n   {}\n   {}\n   {}  {}\n\n{}\n   Add to your workspace.jsonc:\n\n   {config_snippet}\n\n{}  {} Ignoring issues may lead to broken components, failed builds,\n   or other problems. Only use this in emergency situations where you understand\n   the consequences and have a plan to fix the underlying issues.\n",
@@ -262,29 +262,4 @@ fn report(chalk: Chalk) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parses_component_issues_flags() {
-        assert_eq!(parse(&[]), Some(false));
-        assert_eq!(parse(&["-j"]), Some(true));
-        assert_eq!(parse(&["--json"]), Some(true));
-        assert_eq!(parse(&["--help"]), None);
-        assert_eq!(parse(&["extra"]), None);
-    }
-
-    #[test]
-    fn lists_all_24_component_issues_in_order() {
-        let json = issues_json();
-        let arr = json.as_array().expect("array");
-        assert_eq!(arr.len(), 24);
-        assert_eq!(arr[0]["name"], "MissingPackagesDependenciesOnFs");
-        assert_eq!(arr[23]["name"], "LoadFailures");
-        let text = report(Chalk::new(false));
-        assert!(text.contains("MissingPackagesDependenciesOnFs"));
-        assert!(text.contains("LoadFailures"));
-        assert!(text.contains("IGNORING ISSUES (Emergency Use Only)"));
-        assert!(text.contains(r#""teambit.component/issues""#));
-    }
-}
+mod tests;

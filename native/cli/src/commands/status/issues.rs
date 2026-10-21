@@ -108,28 +108,7 @@ pub(super) fn collect_graph(
             .get("workspace")
             .and_then(|workspace| workspace.get(RESOLVER)),
     );
-    let workspace_ids: HashSet<&str> = components
-        .iter()
-        .map(|component| component.identity.as_str())
-        .collect();
-    let unresolved: HashSet<&str> = components
-        .iter()
-        .filter(|component| has_unresolved_deps(root, component))
-        .map(|component| component.identity.as_str())
-        .collect();
-    let filtered_graph: Vec<Component> = graph
-        .iter()
-        .map(|component| {
-            if workspace_ids.contains(component.identity.as_str()) {
-                return component.clone();
-            }
-            let mut ext = component.clone();
-            ext.dependencies.retain(|dep| {
-                !workspace_ids.contains(dep.as_str()) || unresolved.contains(dep.as_str())
-            });
-            ext
-        })
-        .collect();
+    let filtered_graph = filter_graph_for_cycles(root, components, graph);
     let circular = if context["ignoreCircularDependencies"] == true {
         HashSet::new()
     } else {
@@ -149,6 +128,35 @@ pub(super) fn collect_graph(
         .map(|component| checks.issues(component))
         .collect::<io::Result<Vec<_>>>()
         .map(Some)
+}
+
+fn filter_graph_for_cycles(
+    root: &Path,
+    components: &[Component],
+    graph: &[Component],
+) -> Vec<Component> {
+    let workspace_ids: HashSet<&str> = components
+        .iter()
+        .map(|component| component.identity.as_str())
+        .collect();
+    let unresolved: HashSet<&str> = components
+        .iter()
+        .filter(|component| has_unresolved_deps(root, component))
+        .map(|component| component.identity.as_str())
+        .collect();
+    graph
+        .iter()
+        .map(|component| {
+            if workspace_ids.contains(component.identity.as_str()) {
+                return component.clone();
+            }
+            let mut ext = component.clone();
+            ext.dependencies.retain(|dep| {
+                !workspace_ids.contains(dep.as_str()) || unresolved.contains(dep.as_str())
+            });
+            ext
+        })
+        .collect()
 }
 
 /// What the per-component checks share.
@@ -367,8 +375,8 @@ fn has_unresolved_deps(root: &Path, component: &Component) -> bool {
                                 | "MissingDependenciesOnFs"
                                 | "UntrackedDependencies"
                                 | "ParseErrors"
-                                | "ResolveErrors"
-                        )
+                                | "ResolveErrors",
+                        ),
                     )
                 })
         })

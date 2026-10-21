@@ -59,7 +59,7 @@ fn consumer_with_a_tagged_component_and_scope_with_the_same_component_as_exporte
     helper.expect_status_to_be_clean_from_output(&status);
     let bitmap = helper.read_bit_map();
     assert_eq!(bitmap["bar/foo"]["version"].as_str().unwrap(), "0.0.1");
-    assert_eq!(bitmap["bar/foo"]["scope"].as_str().unwrap(), helper.scopes.remote,);
+    assert_eq!(bitmap["bar/foo"]["scope"].as_str().unwrap(), helper.scopes.remote);
 }
 
 #[test]
@@ -104,7 +104,7 @@ fn consumer_with_no_components_and_scope_with_staged_or_exported_components() {
     helper2.add_component_bar_foo();
     let bitmap = helper2.read_bit_map();
     assert_eq!(bitmap["bar/foo"]["version"].as_str().unwrap(), "0.0.1");
-    assert_eq!(bitmap["bar/foo"]["scope"].as_str().unwrap(), helper2.scopes.remote,);
+    assert_eq!(bitmap["bar/foo"]["scope"].as_str().unwrap(), helper2.scopes.remote);
 }
 
 #[test]
@@ -176,7 +176,7 @@ fn consumer_has_tagged_or_exported_component_with_a_version_that_not_exist_in_th
         let combined = format!("{}{}", err.stdout, err.stderr);
         assert!(
             combined.to_lowercase().contains("your workspace has outdated objects"),
-            "{cmd}: {combined}"
+            "{cmd}: {combined}",
         );
     }
 

@@ -1,4 +1,8 @@
 //! Publish a local, unexported lane rename or remote-scope change.
+pub use readme::{ReadmePlan, ReadmeRemoval};
+
+mod readme;
+
 use crate::{inspection, recovery, store::Store, workspace::engine::command::outbound};
 use serde_json::{Value, json};
 use std::{
@@ -70,132 +74,6 @@ impl Plan {
     }
 }
 
-pub enum ReadmePlan {
-    NoReadme(String),
-    Remove(Box<ReadmeRemoval>),
-}
-
-pub struct ReadmeRemoval {
-    root: PathBuf,
-    label: String,
-    objects: Objects,
-    bitmap: Value,
-}
-
-impl ReadmeRemoval {
-    #[must_use]
-    pub fn label(&self) -> &str {
-        &self.label
-    }
-}
-
-impl ReadmePlan {
-    pub fn prepare(
-        root: &Path,
-        lane_name: Option<&str>,
-        mut log: Value,
-        history_key: &str,
-    ) -> io::Result<Self> {
-        if history_key.is_empty() {
-            return Err(invalid());
-        }
-        let documents = Documents::read(root)?;
-        let (current_name, current_scope) = documents.current_or_default()?;
-        let label = lane_name.unwrap_or(&current_name).to_owned();
-        let (target_name, target_scope) = match lane_name {
-            Some(name) => documents.resolve_lane_id(name)?,
-            None => (current_name, current_scope),
-        };
-        if target_name == "main" {
-            return Ok(Self::NoReadme(label));
-        }
-        let target = Original { name: target_name, scope: target_scope };
-        let Ok(lane_hash) = documents.lane_hash(&target) else {
-            return Ok(Self::NoReadme(label));
-        };
-        let mut objects = Objects::read(root, &lane_hash, &target)?;
-        let Some(readme) = objects.lane
-            .get("readmeComponent")
-            .filter(|v| !v.is_null())
-            .cloned()
-        else {
-            return Ok(Self::NoReadme(label));
-        };
-        let mut bitmap = documents.bitmap;
-        remove_readme_from_bitmap(root, &mut bitmap, &target, &readme)?;
-        objects.lane
-            .as_object_mut()
-            .ok_or_else(invalid)?
-            .remove("readmeComponent");
-        let components = history_components(&objects.lane)?;
-        let dependents = objects.lane["updateDependents"]
-            .as_array()
-            .cloned()
-            .unwrap_or_default();
-        let items = objects.history["history"].as_object_mut().ok_or_else(invalid)?;
-        if items.contains_key(history_key) {
-            return Err(invalid());
-        }
-        log["message"] = json!("remove readme");
-        items.insert(
-            history_key.into(),
-            json!({"log":log,"components":components,"updateDependents":dependents}),
-        );
-        Ok(Self::Remove(Box::new(ReadmeRemoval { root: root.into(), label, objects, bitmap })))
-    }
-
-    pub fn commit(&self) -> io::Result<()> {
-        let Self::Remove(removal) = self else {
-            return Ok(());
-        };
-        let ReadmeRemoval { root, objects, bitmap, .. } = removal.as_ref();
-        let store = Store::new(bit_workspace_config::scope_path(root).join("objects"), None)?;
-        objects.persist(&store)?;
-        fs::write(root.join(".bitmap"), inspection::render_bitmap(bitmap)?)
-    }
-}
-
-fn remove_readme_from_bitmap(
-    root: &Path,
-    bitmap: &mut Value,
-    target: &Original,
-    readme: &Value,
-) -> io::Result<()> {
-    let readme_name = readme["id"]["name"].as_str().ok_or_else(invalid)?;
-    let readme_scope = readme["id"]["scope"]
-        .as_str()
-        .filter(|s| !s.is_empty());
-    let map = bitmap.as_object_mut().ok_or_else(invalid)?;
-    let (_, entry) = map
-        .iter_mut()
-        .find(|(key, value)| {
-            *key != "$schema-version"
-                && *key != "_bit_lane"
-                && value.is_object()
-                && (*key == readme_name
-                    || readme_scope.is_some_and(|scope| *key == &format!("{scope}/{readme_name}")))
-        })
-        .ok_or_else(invalid)?;
-    if let Some(root_dir) = entry["rootDir"].as_str()
-        && root
-            .join(root_dir)
-            .join("component.json")
-            .exists()
-    {
-        return Err(invalid());
-    }
-    let remote_lane_id = format!("{}/{}", target.scope, target.name);
-    if let Some(readme_cfg) = entry
-        .get_mut("config")
-        .and_then(|c| c.get_mut("teambit.lanes/lanes"))
-        .and_then(|l| l.get_mut("readme"))
-        .and_then(Value::as_object_mut)
-    {
-        readme_cfg.remove(&remote_lane_id);
-    }
-    Ok(())
-}
-
 impl Documents {
     fn read(root: &Path) -> io::Result<Self> {
         Ok(Self {
@@ -259,23 +137,34 @@ impl Documents {
                 .to_owned();
             return Ok(("main".to_owned(), scope));
         }
-        if let Some(tracked) = self.scope_json["lanes"]["tracking"]
+        if let Some(pair) = self.tracked_lane_id(name)? {
+            return Ok(pair);
+        }
+        self.indexed_lane_id(name)
+    }
+
+    fn tracked_lane_id(&self, name: &str) -> io::Result<Option<(String, String)>> {
+        let Some(tracked) = self.scope_json["lanes"]["tracking"]
             .as_array()
             .and_then(|rows| {
                 rows.iter()
                     .find(|row| row["localLane"] == name)
             })
-        {
-            let remote_lane = tracked["remoteLane"]
-                .as_str()
-                .ok_or_else(invalid)?
-                .to_owned();
-            let remote_scope = tracked["remoteScope"]
-                .as_str()
-                .ok_or_else(invalid)?
-                .to_owned();
-            return Ok((remote_lane, remote_scope));
-        }
+        else {
+            return Ok(None);
+        };
+        let remote_lane = tracked["remoteLane"]
+            .as_str()
+            .ok_or_else(invalid)?
+            .to_owned();
+        let remote_scope = tracked["remoteScope"]
+            .as_str()
+            .ok_or_else(invalid)?
+            .to_owned();
+        Ok(Some((remote_lane, remote_scope)))
+    }
+
+    fn indexed_lane_id(&self, name: &str) -> io::Result<(String, String)> {
         let matches: Vec<&Value> = self.index["lanes"]
             .as_array()
             .ok_or_else(invalid)?

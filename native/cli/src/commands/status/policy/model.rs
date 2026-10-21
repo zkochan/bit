@@ -34,23 +34,7 @@ pub(super) fn stored_version<'c>(
         (Some(_), None) => return Err(decline("status pending import")),
         (None, Some(_)) => return Err(decline("status bitmap normalization required")),
         (None, None) => return Ok(projected),
-        (Some(_), Some(model)) => {
-            if target["scoped"] != true
-                && (model["head"].is_string()
-                    || model["versions"]
-                        .as_object()
-                        .is_some_and(|versions| !versions.is_empty()))
-                && !model["state"]["versions"]
-                    .as_object()
-                    .is_some_and(|versions| {
-                        versions
-                            .values()
-                            .any(|v| v["local"] == true)
-                    })
-            {
-                return Err(decline("status bitmap normalization required"));
-            }
-        }
+        (Some(_), Some(model)) => validate_unscoped_model(target, model)?,
     }
     if projected.is_some() {
         return Ok(projected);
@@ -78,6 +62,25 @@ pub(super) fn stored_version<'c>(
         })
         .and_then(|row| nullish(row.get(1)));
     version.map(Some).ok_or_else(|| decline("status version absent"))
+}
+
+fn validate_unscoped_model(target: &Value, model: &Value) -> io::Result<()> {
+    if target["scoped"] != true
+        && (model["head"].is_string()
+            || model["versions"]
+                .as_object()
+                .is_some_and(|versions| !versions.is_empty()))
+        && !model["state"]["versions"]
+            .as_object()
+            .is_some_and(|versions| {
+                versions
+                    .values()
+                    .any(|entry| entry["local"] == true)
+            })
+    {
+        return Err(decline("status bitmap normalization required"));
+    }
+    Ok(())
 }
 
 fn is_hash(text: &str) -> bool {

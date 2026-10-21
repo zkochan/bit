@@ -27,7 +27,7 @@ fn local_is_diverged_from_the_remote() {
             .as_array()
             .unwrap()
             .len(),
-        1
+        1,
     );
 
     // 2. bit reset should not throw
@@ -52,7 +52,7 @@ fn local_is_diverged_from_the_remote() {
             .as_array()
             .unwrap()
             .len(),
-        1
+        1,
     );
 }
 
@@ -92,6 +92,6 @@ fn local_is_diverged_from_the_remote_and_another_lane_has_a_more_recent_snap() {
             .as_array()
             .unwrap()
             .len(),
-        1
+        1,
     );
 }

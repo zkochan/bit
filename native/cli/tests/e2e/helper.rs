@@ -178,11 +178,11 @@ impl Helper {
             .unwrap()
             .filter_map(Result::ok)
             .map(|e| e.path())
-            .filter(|p| {
-                p.file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| n.ends_with("-remote"))
-                    && p.join("scope.json").is_file()
+            .filter(|path| {
+                path.file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.ends_with("-remote"))
+                    && path.join("scope.json").is_file()
             })
             .collect();
         for a in &scopes {

@@ -60,13 +60,13 @@ fn stale_pinned_dependency_lives_in_another_scope_cross_scope_pin() {
             .as_array()
             .unwrap()
             .len(),
-        0
+        0,
     );
 
     // 5. bit import --dependencies should work — the missing pinned dep version is skipped silently
     let deps_import = helper.try_cmd(&format!(
         "import {}/comp1 --dependencies --override -x",
-        helper.scopes.remote
+        helper.scopes.remote,
     ));
     assert!(deps_import.status.success(), "{deps_import:?}");
 

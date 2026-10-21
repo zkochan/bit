@@ -28,7 +28,7 @@ fn lane_b_was_forked_from_lane_a_and_they_are_now_diverged() {
             .as_array()
             .unwrap()
             .len(),
-        1
+        1,
     );
 
     // 2. the file added on lane-a should not be on the filesystem while on lane-b
@@ -41,7 +41,7 @@ fn lane_b_was_forked_from_lane_a_and_they_are_now_diverged() {
     // 3. should keep both parents (current lane first, merged lane second) and record no squash data
     let new_head = helper.get_head_from_lane("lane-b", "comp1");
     let cat = parse(&helper.cat_component(&format!("{remote}/comp1@{new_head}")));
-    assert_eq!(cat["parents"], serde_json::json!([head_on_lane_b, head_on_lane_a]),);
+    assert_eq!(cat["parents"], serde_json::json!([head_on_lane_b, head_on_lane_a]));
     assert!(cat.get("squashed").is_none() || cat["squashed"].is_null());
 
     // 4. should write the file that was newly added on lane-a

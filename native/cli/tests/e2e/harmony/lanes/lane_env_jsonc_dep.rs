@@ -8,7 +8,7 @@ fn env_with_workspace_component_as_peer_dep_in_env_jsonc_on_lane() {
     helper.set_workspace_with_remote_scope();
     let remote = &helper.scopes.remote;
 
-    helper.write_file("comp1/index.ts", "export const comp1 = \"v1\";");
+    helper.write_file("comp1/index.ts", r#"export const comp1 = "v1";"#);
     helper.add_component("comp1", "");
 
     let env_name = "my-env";
@@ -20,7 +20,7 @@ fn env_with_workspace_component_as_peer_dep_in_env_jsonc_on_lane() {
     helper.add_component(env_name, "");
     helper.add_extension_to_variant(env_name, "teambit.envs/env", serde_json::json!({}));
 
-    helper.write_file("comp2/index.ts", "export const comp2 = \"v1\";");
+    helper.write_file("comp2/index.ts", r#"export const comp2 = "v1";"#);
     helper.add_component("comp2", "");
     helper.run_cmd(&format!("envs set comp2 {env_name}"));
 
@@ -46,7 +46,7 @@ fn env_with_workspace_component_as_peer_dep_in_env_jsonc_on_lane() {
     helper.export("");
 
     helper.create_lane("dev", "");
-    helper.write_file("comp1/index.ts", "export const comp1 = \"v2\";");
+    helper.write_file("comp1/index.ts", r#"export const comp1 = "v2";"#);
     helper.snap_all_components_without_build("");
 
     let check_not_modified = |helper: &Helper| {
@@ -55,9 +55,9 @@ fn env_with_workspace_component_as_peer_dep_in_env_jsonc_on_lane() {
             .as_array()
             .unwrap()
             .iter()
-            .map(|c| {
-                c.as_str()
-                    .or_else(|| c["id"].as_str())
+            .map(|comp| {
+                comp.as_str()
+                    .or_else(|| comp["id"].as_str())
                     .unwrap_or_default()
                     .to_owned()
             })
@@ -73,7 +73,7 @@ fn env_with_workspace_component_as_peer_dep_in_env_jsonc_on_lane() {
     assert!(!diff_output.contains("0.0.1"), "{diff_output}");
 
     // after a second snap on the lane
-    helper.write_file("comp1/index.ts", "export const comp1 = \"v3\";");
+    helper.write_file("comp1/index.ts", r#"export const comp1 = "v3";"#);
     helper.snap_all_components_without_build("");
 
     // 3. should not show the env as modified
@@ -84,7 +84,7 @@ fn env_with_workspace_component_as_peer_dep_in_env_jsonc_on_lane() {
     assert!(!diff_output.contains("0.0.1"), "{diff_output}");
 
     // after a third snap on the lane (verifying no flip-flop)
-    helper.write_file("comp1/index.ts", "export const comp1 = \"v4\";");
+    helper.write_file("comp1/index.ts", r#"export const comp1 = "v4";"#);
     helper.snap_all_components_without_build("");
 
     // 5. should not show the env as modified

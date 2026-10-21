@@ -16,7 +16,7 @@ fn vh_hashes(scope_path: &Path, comp_id: &str) -> Vec<String> {
         .as_array()
         .unwrap()
         .iter()
-        .filter_map(|v| v["hash"].as_str().map(str::to_owned))
+        .filter_map(|ver| ver["hash"].as_str().map(str::to_owned))
         .collect()
 }
 
@@ -27,17 +27,18 @@ fn dangling_parents_in(scope_path: &Path, comp_id: &str) -> Vec<String> {
     let versions = vh["versions"].as_array().unwrap();
     let hashes: HashSet<&str> = versions
         .iter()
-        .filter_map(|v| v["hash"].as_str())
+        .filter_map(|ver| ver["hash"].as_str())
         .collect();
     let mut dangling = Vec::new();
-    for v in versions {
-        let h = v["hash"].as_str().unwrap();
-        if let Some(parents) = v["parents"].as_array() {
-            for p in parents {
-                let p = p.as_str().unwrap();
-                if !hashes.contains(p) {
-                    dangling.push(format!("{} -> {}", &h[..8], &p[..8]));
-                }
+    for ver in versions {
+        let Some(parents) = ver["parents"].as_array() else {
+            continue;
+        };
+        let hash = ver["hash"].as_str().unwrap();
+        for parent in parents {
+            let parent_hash = parent.as_str().unwrap();
+            if !hashes.contains(parent_hash) {
+                dangling.push(format!("{} -> {}", &hash[..8], &parent_hash[..8]));
             }
         }
     }
@@ -122,7 +123,7 @@ fn lane_in_scope_l_with_components_in_scope_c_main_advances_merge_main_into_lane
         .as_array()
         .unwrap()
         .iter()
-        .filter_map(|e| e["hash"].as_str())
+        .filter_map(|entry| entry["hash"].as_str())
         .collect();
     for h in [&merge_snap, &lane_snap, &main_snap4, &main_snap3, &main_snap2, &main_snap1] {
         assert!(log_hashes.contains(&h.as_str()));
@@ -213,7 +214,7 @@ fn fork_a_lean_lane_to_a_third_scope_then_re_import_in_a_fresh_workspace() {
         helper
             .try_cmd(&format!("lane import {scope_f}/forked -x"))
             .status
-            .success()
+            .success(),
     );
 
     // 4. bit status and bit log should work in the fresh consumer of the forked lane
@@ -223,8 +224,8 @@ fn fork_a_lean_lane_to_a_third_scope_then_re_import_in_a_fresh_workspace() {
         log.as_array()
             .unwrap()
             .iter()
-            .filter_map(|e| e["hash"].as_str())
-            .any(|hash| hash == snap_on_fork.as_str())
+            .filter_map(|entry| entry["hash"].as_str())
+            .any(|hash| hash == snap_on_fork.as_str()),
     );
 
     // 5. bit lane merge main should succeed (traversal finds the common ancestor)
@@ -232,7 +233,7 @@ fn fork_a_lean_lane_to_a_third_scope_then_re_import_in_a_fresh_workspace() {
         helper
             .try_cmd("lane merge main --auto-merge-resolve theirs --ignore-config-changes -x")
             .status
-            .success()
+            .success(),
     );
 
     // 6. consumer VersionHistory should be a closed graph (no dangling parent refs)
@@ -282,7 +283,7 @@ fn fresh_consumer_of_a_lean_lane_create_new_lane_plus_change_scope() {
             .as_array()
             .unwrap()
             .len(),
-        0
+        0,
     );
 }
 
@@ -365,7 +366,7 @@ fn lane_with_multiple_components_and_deep_main_history_merged_repeatedly() {
         .as_array()
         .unwrap()
         .iter()
-        .filter_map(|e| e["hash"].as_str())
+        .filter_map(|entry| entry["hash"].as_str())
         .collect();
     assert!(log_hashes.contains(&first_merge_snap.as_str()));
     assert!(log_hashes.contains(&second_merge_snap.as_str()));
@@ -488,8 +489,8 @@ fn chained_local_forks_and_lane_far_behind_main() {
         .as_array()
         .unwrap()
         .iter()
-        .find(|s| {
-            s["id"]
+        .find(|item| {
+            item["id"]
                 .as_str()
                 .is_some_and(|id| id.ends_with("/comp1"))
         })
@@ -572,7 +573,7 @@ fn cross_scope_chained_lane_forks_and_deleted_upstream_degradation() {
         helper
             .try_cmd("lane merge main --auto-merge-resolve theirs --ignore-config-changes -x")
             .status
-            .success()
+            .success(),
     );
 
     // 2. forked-from lane deleted upstream — export degrades to home-scope fetch
@@ -605,7 +606,7 @@ fn cross_scope_chained_lane_forks_and_deleted_upstream_degradation() {
     helper3.run_cmd(&format!("lane remove {scope_l3}/lane-a --remote --silent --force"));
 
     helper3.switch_local_lane("main", "");
-    helper3.write_file("comp2/index.js", "console.log(\"comp2\");");
+    helper3.write_file("comp2/index.js", r#"console.log("comp2");"#);
     helper3.add_component("comp2", "");
     helper3.tag_all_without_build("");
     helper3.export("");

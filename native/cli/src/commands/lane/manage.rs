@@ -56,7 +56,7 @@ pub(super) fn remove_readme(args: &[OsString], lane_args: &[&str]) -> io::Result
         ReadmePlan::NoReadme(label) => {
             workspace_command::execute_then(&root, args, "remove-readme", |_| {
                 Err(io::Error::other(format!(
-                    "there is no readme component added to the lane {label}"
+                    "there is no readme component added to the lane {label}",
                 )))
             })
         }
@@ -65,7 +65,7 @@ pub(super) fn remove_readme(args: &[OsString], lane_args: &[&str]) -> io::Result
             let report = Report {
                 data: chalk.green(&format!(
                     "the readme component has been successfully removed from the lane {}",
-                    removal.label()
+                    removal.label(),
                 )),
                 code: 0,
                 details: None,

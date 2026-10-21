@@ -160,13 +160,6 @@ fn install_retained(root: &Path, planned: &mut Planned, mut info: HostInfo) -> i
         .ok_or_else(|| io::Error::other("merge installation provider session"))?;
     print!("{}", ProjectedLinker::project_installation_workspace(root, &mut environment)?);
     let component_ids = planned.merge_cache_ids()?;
-    let deps_cache = bit_object_import::scope_path(root)
-        .join("cache")
-        .join("components")
-        .join("deps");
-    for id in &component_ids {
-        let _ = bit_install::dependencies::cache::remove_entry(&deps_cache, id);
-    }
     print!("{}", environment.merge_load_apps(root, &component_ids)?);
     let host = Arc::new(
         environment

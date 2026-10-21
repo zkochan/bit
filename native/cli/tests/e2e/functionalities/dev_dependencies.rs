@@ -11,7 +11,7 @@ fn environment_with_compiler_and_tester() {
     helper.write_file(
         "comp1/comp1.spec.js",
         &format!(
-            "const expect = require('chai').expect;\nconst foo = require('@{remote}/comp2');\ndescribe('comp1', () => {{ it('should display \"comp2 and comp3\"', () => {{ expect(foo()).to.equal('comp2 and comp3'); }}); }});"
+            "const expect = require('chai').expect;\nconst foo = require('@{remote}/comp2');\ndescribe('comp1', () => {{ it('should display \"comp2 and comp3\"', () => {{ expect(foo()).to.equal('comp2 and comp3'); }}); }});",
         ),
     );
     helper.npm_add_fake_package("chai", "4.1.2", false);
@@ -29,11 +29,11 @@ fn environment_with_compiler_and_tester() {
             .as_array()
             .unwrap()
             .len(),
-        0
+        0,
     );
 
     // 2. should save "chai" in the dev-packages because it is only required in the tests files
-    assert_eq!(bar_foo["devPackageDependencies"]["chai"].as_str(), Some("4.1.2"),);
+    assert_eq!(bar_foo["devPackageDependencies"]["chai"].as_str(), Some("4.1.2"));
 
     // 3. should not save "chai" in the packages because it is not required in non-test files
     assert_eq!(bar_foo["packageDependencies"], serde_json::json!({}));
@@ -44,7 +44,7 @@ fn environment_with_compiler_and_tester() {
             .as_array()
             .unwrap()
             .len(),
-        1
+        1,
     );
     assert_eq!(bar_foo["dependencies"][0]["id"]["name"].as_str().unwrap(), "comp2");
     assert_eq!(bar_foo["dependencies"][0]["id"]["version"].as_str().unwrap(), "0.0.1");
@@ -60,7 +60,7 @@ fn environment_with_compiler_and_tester() {
 
     // without dependencies and with dev-dependencies
     helper.get_cloned_workspace(&cloned_scope);
-    helper.write_file("comp1/index.js", "console.log(\"foo\")");
+    helper.write_file("comp1/index.js", r#"console.log("foo")"#);
     helper.tag_all_without_build("");
     let bar_foo = parse(&helper.cat_component("comp1@0.0.1"));
 
@@ -70,7 +70,7 @@ fn environment_with_compiler_and_tester() {
             .as_array()
             .unwrap()
             .len(),
-        1
+        1,
     );
     assert_eq!(
         bar_foo["devDependencies"][0]["id"],
@@ -92,7 +92,7 @@ fn environment_with_compiler_and_tester() {
             .as_array()
             .unwrap()
             .len(),
-        0
+        0,
     );
 
     // 9. bit status should not show any component as modified
@@ -102,7 +102,7 @@ fn environment_with_compiler_and_tester() {
             .as_array()
             .unwrap()
             .len(),
-        0
+        0,
     );
 }
 
@@ -130,7 +130,7 @@ fn dev_dependency_nested_chains_and_deps_remove() {
             .as_array()
             .unwrap()
             .len(),
-        3
+        3,
     );
 
     // 2. dev-dependency of a nested component that originated from a dev dep
@@ -147,7 +147,7 @@ fn dev_dependency_nested_chains_and_deps_remove() {
         .as_array()
         .unwrap()
         .iter()
-        .filter_map(|d| d["name"].as_str())
+        .filter_map(|dep| dep["name"].as_str())
         .collect();
     assert!(names.contains(&"comp3"));
     assert!(names.contains(&"comp2"));
@@ -165,14 +165,14 @@ fn dev_dependency_nested_chains_and_deps_remove() {
             .as_array()
             .unwrap()
             .len(),
-        0
+        0,
     );
     assert_eq!(
         bar_foo["devDependencies"]
             .as_array()
             .unwrap()
             .len(),
-        1
+        1,
     );
     assert_eq!(bar_foo["devDependencies"][0]["id"]["name"].as_str().unwrap(), "comp2");
     assert!(
@@ -180,8 +180,8 @@ fn dev_dependency_nested_chains_and_deps_remove() {
             .as_array()
             .unwrap()
             .iter()
-            .filter_map(|e| e["name"].as_str())
-            .any(|name| name == "comp3")
+            .filter_map(|entry| entry["name"].as_str())
+            .any(|name| name == "comp3"),
     );
 
     // 4. component with devDependency coming from an env and is used as prod: should be able to remove it from DevDependency only by "bit deps remove --dev"

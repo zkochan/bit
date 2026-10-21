@@ -11,7 +11,7 @@ fn merging_main_into_local_lane_and_when_deleted_or_tagged() {
     helper.populate_components(1, false, "");
     helper.snap_all_components_without_build("");
     let merge_output = helper.merge_lane("main", "-x");
-    assert!(!merge_output.contains("unable to switch to \"main\", the lane was not found"));
+    assert!(!merge_output.contains(r#"unable to switch to "main", the lane was not found"#));
 
     // 2. merge main into a lane when it is locally deleted on the lane: should show a descriptive error explaining why it cannot be merged
     let helper2 = Helper::new();
@@ -80,7 +80,7 @@ fn merging_main_when_on_lane_and_some_workspace_components_belong_to_the_lane_so
             .as_array()
             .unwrap()
             .len(),
-        1
+        1,
     );
 
     // 2. should update comp1 on the lane because it is part of the lane
@@ -105,7 +105,7 @@ fn merging_main_when_on_lane_and_some_workspace_components_belong_to_the_lane_so
             .as_array()
             .unwrap()
             .len(),
-        1
+        1,
     );
 
     // 6. should update comp1 on the lane because it is part of the lane
@@ -129,13 +129,13 @@ fn merging_main_when_on_lane_and_some_workspace_components_belong_to_the_lane_so
         !helper
             .try_cmd(&format!("cat-object {comp1_tag2}"))
             .status
-            .success()
+            .success(),
     );
     assert!(
         !helper
             .try_cmd(&format!("cat-object {comp1_tag3}"))
             .status
-            .success()
+            .success(),
     );
 
     // 11. should not import the history of workspace components that are not on the lane
@@ -143,13 +143,13 @@ fn merging_main_when_on_lane_and_some_workspace_components_belong_to_the_lane_so
         !helper
             .try_cmd(&format!("cat-object {comp2_tag2}"))
             .status
-            .success()
+            .success(),
     );
     assert!(
         !helper
             .try_cmd(&format!("cat-object {comp2_tag3}"))
             .status
-            .success()
+            .success(),
     );
 
     // 12. should export the lane successfully after the merge
@@ -197,7 +197,7 @@ fn merge_main_to_lane_when_they_are_diverged_with_dependencies_update_auto_after
     helper.export("");
     helper.switch_local_lane("main", "-x");
     helper.run_cmd("deps unset comp1 lodash");
-    helper.tag_all_without_build("--unmodified -m \"second tag on main\"");
+    helper.tag_all_without_build(r#"--unmodified -m "second tag on main""#);
     helper.export("");
     helper.switch_local_lane("dev", "-x");
     helper.merge_lane("main", "-x --ignore-config-changes");
@@ -209,7 +209,7 @@ fn merge_main_to_lane_when_they_are_diverged_with_dependencies_update_auto_after
         .as_array()
         .unwrap()
         .iter()
-        .find(|e| e["name"] == "teambit.dependencies/dependency-resolver")
+        .find(|ext| ext["name"] == "teambit.dependencies/dependency-resolver")
         .unwrap();
 
     // 1. should remove the dependency that was unset in main from the config.policy
@@ -223,8 +223,8 @@ fn merge_main_to_lane_when_they_are_diverged_with_dependencies_update_auto_after
         .as_array()
         .unwrap()
         .iter()
-        .find(|d| {
-            d["id"]
+        .find(|dep| {
+            dep["id"]
                 .as_str()
                 .unwrap()
                 .contains("comp2")
@@ -263,7 +263,7 @@ fn bit_merge_on_main_when_the_remote_main_has_advanced_by_multiple_snaps_diverge
     // 1. should generate a snap-merge snap with two parents, the local and the remote
     let head = helper.get_head("comp1");
     let cat_ver = parse(&helper.cat_object(&head, false));
-    assert_eq!(cat_ver["parents"], serde_json::json!([local_snap, remote_head_snap]),);
+    assert_eq!(cat_ver["parents"], serde_json::json!([local_snap, remote_head_snap]));
 
     // 2. should not import the gap between the common-snap and the remote head
     let cat_gap = helper.try_cmd(&format!("cat-object {remote_gap_snap}"));
@@ -279,7 +279,7 @@ fn bit_merge_on_main_when_the_remote_main_has_advanced_by_multiple_snaps_diverge
         .as_array()
         .unwrap()
         .iter()
-        .filter_map(|e| e["hash"].as_str())
+        .filter_map(|entry| entry["hash"].as_str())
         .collect();
     assert!(hashes.contains(&remote_gap_snap.as_str()));
     assert!(hashes.contains(&remote_head_snap.as_str()));
@@ -329,6 +329,6 @@ fn merging_main_into_a_lane_when_main_added_a_new_package_dependency() {
     assert!(
         helper.scopes.local_path
             .join(format!("node_modules/{pkg_name}"))
-            .exists()
+            .exists(),
     );
 }

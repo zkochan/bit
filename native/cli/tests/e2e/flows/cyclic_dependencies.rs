@@ -72,7 +72,7 @@ fn complex_case_with_a_long_chain_of_dependencies() {
     helper.write_file(
         "comp/a1/a1.js",
         &format!(
-            "const a2 = require('@{remote}/comp.a2'); const b1 = require('@{remote}/comp.b1');"
+            "const a2 = require('@{remote}/comp.a2'); const b1 = require('@{remote}/comp.b1');",
         ),
     );
     helper.write_file("comp/a2/a2.js", &format!("const a3 = require('@{remote}/comp.a3');"));
@@ -81,7 +81,7 @@ fn complex_case_with_a_long_chain_of_dependencies() {
     helper.write_file(
         "comp/b2/b2.js",
         &format!(
-            "const b3 = require('@{remote}/comp.b3'); const a1 = require('@{remote}/comp.a1');"
+            "const b3 = require('@{remote}/comp.b3'); const a1 = require('@{remote}/comp.a1');",
         ),
     );
     helper.write_file("comp/b3/b3.js", &format!("const b4 = require('@{remote}/comp.b4');"));
@@ -93,7 +93,7 @@ fn complex_case_with_a_long_chain_of_dependencies() {
     helper.create_component_utils_is_type("");
     helper.add_component_utils_is_type();
     helper.create_component_utils_is_string(&format!(
-        "const isType = require('@{remote}/utils.is-type');\nmodule.exports = function isString() {{ return isType() + ' and got is-string'; }};\n"
+        "const isType = require('@{remote}/utils.is-type');\nmodule.exports = function isString() {{ return isType() + ' and got is-string'; }};\n",
     ));
     helper.add_component_utils_is_string();
     helper.link("");
@@ -123,14 +123,14 @@ fn complex_case_with_a_long_chain_of_dependencies() {
                 .as_array()
                 .unwrap()
                 .len(),
-            0
+            0,
         );
         assert_eq!(
             cat["flattenedDependencies"]
                 .as_array()
                 .unwrap()
                 .len(),
-            0
+            0,
         );
     }
 
@@ -152,14 +152,14 @@ fn complex_case_with_a_long_chain_of_dependencies() {
             .as_array()
             .unwrap()
             .len(),
-        2
+        2,
     );
     assert_eq!(
         a1["flattenedDependencies"]
             .as_array()
             .unwrap()
             .len(),
-        8
+        8,
     );
 
     // 6. B2 should have A1 and B3 as direct dependencies, and all the rest as flattenedDependencies
@@ -169,14 +169,14 @@ fn complex_case_with_a_long_chain_of_dependencies() {
             .as_array()
             .unwrap()
             .len(),
-        2
+        2,
     );
     assert_eq!(
         b2["flattenedDependencies"]
             .as_array()
             .unwrap()
             .len(),
-        8
+        8,
     );
 
     // 7. B1 should have B2 as direct dependencies, and all the rest as flattenedDependencies
@@ -186,14 +186,14 @@ fn complex_case_with_a_long_chain_of_dependencies() {
             .as_array()
             .unwrap()
             .len(),
-        1
+        1,
     );
     assert_eq!(
         b1["flattenedDependencies"]
             .as_array()
             .unwrap()
             .len(),
-        8
+        8,
     );
 
     // 8. B3 should have B4 as direct dependencies, and B4, is-type, is-string as flattenedDependencies
@@ -203,14 +203,14 @@ fn complex_case_with_a_long_chain_of_dependencies() {
             .as_array()
             .unwrap()
             .len(),
-        1
+        1,
     );
     assert_eq!(
         b3["flattenedDependencies"]
             .as_array()
             .unwrap()
             .len(),
-        3
+        3,
     );
 
     // 9. B4 should have is-string as a direct dependency, and is-type, is-string as flattenedDependencies
@@ -220,14 +220,14 @@ fn complex_case_with_a_long_chain_of_dependencies() {
             .as_array()
             .unwrap()
             .len(),
-        1
+        1,
     );
     assert_eq!(
         b4["flattenedDependencies"]
             .as_array()
             .unwrap()
             .len(),
-        2
+        2,
     );
 
     // 10. exporting the component: should export successfully with no errors
@@ -268,7 +268,7 @@ fn same_component_require_itself_and_modified_component_depends_on_previous_vers
             .as_array()
             .unwrap()
             .len(),
-        0
+        0,
     );
 
     // 2. modified component depends on a non-workspace component that depends on its previous version
@@ -288,7 +288,7 @@ fn same_component_require_itself_and_modified_component_depends_on_previous_vers
         &format!("{}/comp2/index.js", helper2.scopes.remote),
         &format!(
             "const comp1 = require('@{}/comp1');\nmodule.exports = () => 'comp2 and ' + comp1();",
-            helper2.scopes.remote
+            helper2.scopes.remote,
         ),
     );
 

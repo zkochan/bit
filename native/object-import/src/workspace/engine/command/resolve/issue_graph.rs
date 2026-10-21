@@ -158,7 +158,7 @@ fn validate_ordinary_version(version: &Value) -> io::Result<()> {
                 .any(|extension| {
                     matches!(
                         extension["name"].as_str(),
-                        Some("teambit.component/deprecation" | "teambit.component/remove")
+                        Some("teambit.component/deprecation" | "teambit.component/remove"),
                     )
                 })
         })

@@ -26,7 +26,7 @@ fn naming_conflict_introduced_during_the_merge() {
         helper.scopes.local_path
             .join(&helper.scopes.remote)
             .join("comp1_1")
-            .exists()
+            .exists(),
     );
 }
 
@@ -142,7 +142,7 @@ fn merging_from_main_when_main_is_ahead_so_then_a_snap_of_an_existing_tag_is_in_
             .as_array()
             .unwrap()
             .len(),
-        0
+        0,
     );
 
     // 2. the dependency should use the tag not the snap
@@ -209,7 +209,7 @@ fn merging_lane_with_a_component_newly_introduced_where_it_was_a_package_before(
     assert!(
         ws_before["teambit.dependencies/dependency-resolver"]["policy"]["dependencies"]
             .get(&pkg)
-            .is_some()
+            .is_some(),
     );
 
     helper.merge_lane("lane-b", "-x");
@@ -217,7 +217,7 @@ fn merging_lane_with_a_component_newly_introduced_where_it_was_a_package_before(
     assert!(
         ws_after["teambit.dependencies/dependency-resolver"]["policy"]["dependencies"]
             .get(&pkg)
-            .is_none()
+            .is_none(),
     );
 }
 
@@ -256,7 +256,7 @@ fn bit_lane_merge_move_command() {
             .as_array()
             .unwrap()
             .len(),
-        3
+        3,
     );
     assert_eq!(helper.get_head_from_lane("new-lane", "comp1"), new_snap_comp1);
 
@@ -304,7 +304,7 @@ fn no_snap_vs_no_auto_snap() {
             .as_array()
             .unwrap()
             .len(),
-        0
+        0,
     );
 
     // with --no-snap
@@ -320,13 +320,13 @@ fn no_snap_vs_no_auto_snap() {
             .as_array()
             .unwrap()
             .len(),
-        2
+        2,
     );
     // 5. after snapping: should save two parents, from the current lane and from the merged lane
     helper.snap_all_components_without_build("");
     let head = helper.get_head_from_lane("lane-a", "comp1");
     let ver = parse(&helper.cat_object(&head, false));
-    assert_eq!(ver["parents"], serde_json::json!([comp1_head_on_lane_a, comp1_head_on_lane_b]),);
+    assert_eq!(ver["parents"], serde_json::json!([comp1_head_on_lane_a, comp1_head_on_lane_b]));
 }
 
 #[test]
@@ -375,7 +375,7 @@ fn merge_with_detach_head() {
     assert_eq!(ver["parents"], serde_json::json!([common_snap]));
 
     // 4. should squash successfully
-    assert_eq!(ver["squashed"]["previousParents"][0].as_str().unwrap(), first_snap_on_lane,);
+    assert_eq!(ver["squashed"]["previousParents"][0].as_str().unwrap(), first_snap_on_lane);
 }
 
 #[test]
@@ -402,5 +402,5 @@ fn merge_with_build_loose() {
     // 1. should succeed despite test failures
     assert!(merge_output.contains("Total Snapped: 1"));
     // 2. should indicate that the test failed
-    assert!(merge_output.contains("task \"teambit.defender/tester:JestTest\" has failed"));
+    assert!(merge_output.contains(r#"task "teambit.defender/tester:JestTest" has failed"#));
 }

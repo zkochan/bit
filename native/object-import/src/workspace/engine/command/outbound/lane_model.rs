@@ -219,11 +219,7 @@ fn select_components(
     let (rows, exhaustive) = selection_rows(input, loaded)?;
     let component_rows =
         loaded.index["components"].as_array().ok_or_else(|| invalid("outbound component index"))?;
-    let lane_heads = remote_heads(&input.root, scope, name)?;
-    let fork_heads = match &loaded.forked_from {
-        Some((parent_scope, parent_name)) => remote_heads(&input.root, parent_scope, parent_name)?,
-        None => Vec::new(),
-    };
+    let heads = RemoteLaneHeads::load(input, loaded, scope, name)?;
     let host = remote::configured_host(input, scope)?;
     let context = ComponentContext { input, loaded, scope, name, host: &host };
     let mut seen_ids = HashSet::new();
@@ -233,22 +229,9 @@ fn select_components(
         if !seen_ids.insert(component.id.clone()) {
             return Err(invalid("outbound duplicate lane component"));
         }
-        let lane_remote_head = lane_heads
-            .iter()
-            .find(|row| component.matches(row))
-            .and_then(|row| row["head"].as_str());
-        let fork_remote_head = fork_heads
-            .iter()
-            .find(|row| component.matches(row))
-            .and_then(|row| row["head"].as_str());
-        let previous_head = lane_remote_head.or(fork_remote_head);
-        if (!exhaustive || input.options.head_only)
-            && lane_remote_head == Some(component.head)
-            && !(input.options.fork_lane_new_scope
-                && staged::missing_remote_head(&host, component.head)?)
-        {
+        let Some(previous_head) = heads.should_select(&context, &component, exhaustive)? else {
             continue;
-        }
+        };
         let row = component_rows
             .iter()
             .find(|row| component.matches(row))
@@ -256,6 +239,48 @@ fn select_components(
         select_component(&context, &component, row, previous_head, exhaustive, &mut selected)?;
     }
     Ok(selected)
+}
+
+struct RemoteLaneHeads {
+    lane: Vec<Value>,
+    fork: Vec<Value>,
+}
+
+impl RemoteLaneHeads {
+    fn load(input: &Prepare, loaded: &Loaded, scope: &str, name: &str) -> io::Result<Self> {
+        let lane = remote_heads(&input.root, scope, name)?;
+        let fork = match &loaded.forked_from {
+            Some((parent_scope, parent_name)) => {
+                remote_heads(&input.root, parent_scope, parent_name)?
+            }
+            None => Vec::new(),
+        };
+        Ok(Self { lane, fork })
+    }
+
+    fn should_select<'a>(
+        &'a self,
+        context: &ComponentContext<'_>,
+        component: &ComponentId<'_>,
+        exhaustive: bool,
+    ) -> io::Result<Option<Option<&'a str>>> {
+        let lane_remote_head = self.lane
+            .iter()
+            .find(|row| component.matches(row))
+            .and_then(|row| row["head"].as_str());
+        let fork_remote_head = self.fork
+            .iter()
+            .find(|row| component.matches(row))
+            .and_then(|row| row["head"].as_str());
+        if (!exhaustive || context.input.options.head_only)
+            && lane_remote_head == Some(component.head)
+            && !(context.input.options.fork_lane_new_scope
+                && staged::missing_remote_head(context.host, component.head)?)
+        {
+            return Ok(None);
+        }
+        Ok(Some(lane_remote_head.or(fork_remote_head)))
+    }
 }
 
 fn selection_rows(input: &Prepare, loaded: &Loaded) -> io::Result<(Vec<Value>, bool)> {

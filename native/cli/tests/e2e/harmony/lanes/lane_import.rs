@@ -31,7 +31,7 @@ fn update_components_from_remote_lane() {
             .as_array()
             .unwrap()
             .len(),
-        3
+        3,
     );
 
     // 3. bit checkout head --all should update them all to the head version
@@ -42,7 +42,7 @@ fn update_components_from_remote_lane() {
             .as_array()
             .unwrap()
             .len(),
-        0
+        0,
     );
 
     // running "bit import" when the remote is behind
@@ -58,7 +58,7 @@ fn update_components_from_remote_lane() {
             .as_array()
             .unwrap()
             .len(),
-        0
+        0,
     );
 
     // 5. bit status should still show the components as staged
@@ -67,7 +67,7 @@ fn update_components_from_remote_lane() {
             .as_array()
             .unwrap()
             .len(),
-        3
+        3,
     );
 
     // running "bit import" when the remote and the local have diverged
@@ -90,7 +90,7 @@ fn update_components_from_remote_lane() {
             .as_array()
             .unwrap()
             .len(),
-        0
+        0,
     );
 
     // 7. bit status should show the components as pending-merge
@@ -99,7 +99,7 @@ fn update_components_from_remote_lane() {
             .as_array()
             .unwrap()
             .len(),
-        3
+        3,
     );
 
     // 8. bit merge with no args should merge them
@@ -111,7 +111,7 @@ fn update_components_from_remote_lane() {
             .as_array()
             .unwrap()
             .len(),
-        0
+        0,
     );
 }
 
@@ -187,7 +187,7 @@ fn import_from_one_lane_to_another_directly_and_lane_a_snap_blocking() {
         combined.contains(
             "unable to import the following component(s) as they belong to other lane(s)"
         ),
-        "{combined}"
+        "{combined}",
     );
 
     // importing a lane-a snap from a workspace that is not on lane-a
@@ -202,7 +202,7 @@ fn import_from_one_lane_to_another_directly_and_lane_a_snap_blocking() {
         combined.contains(
             "unable to import the following component(s) as they belong to other lane(s)"
         ),
-        "{combined}"
+        "{combined}",
     );
 
     // when on another lane that does not have the component: should block the import
@@ -216,7 +216,7 @@ fn import_from_one_lane_to_another_directly_and_lane_a_snap_blocking() {
         combined.contains(
             "unable to import the following component(s) as they belong to other lane(s)"
         ),
-        "{combined}"
+        "{combined}",
     );
 }
 
@@ -310,7 +310,7 @@ fn lane_import_with_env_using_plus_version_for_component_peer_dependency_snaps()
     helper.set_workspace_with_remote_scope();
     let remote = &helper.scopes.remote;
 
-    helper.write_file("comp1/index.js", "module.exports = function() { return \"comp1\"; };");
+    helper.write_file("comp1/index.js", r#"module.exports = function() { return "comp1"; };"#);
     helper.add_component("comp1", "");
 
     helper.write_file(
@@ -335,7 +335,7 @@ fn lane_import_with_env_using_plus_version_for_component_peer_dependency_snaps()
     });
     helper.write_file("empty-env/env.jsonc", &serde_json::to_string_pretty(&env_jsonc).unwrap());
 
-    helper.write_file("comp2/index.js", "module.exports = function() { return \"comp2\"; };");
+    helper.write_file("comp2/index.js", r#"module.exports = function() { return "comp2"; };"#);
     helper.add_component("comp2", "");
     helper.run_cmd("envs set comp2 empty-env");
 
@@ -447,11 +447,11 @@ fn bit_lane_import_current_lane_behavior() {
         .as_array()
         .unwrap()
         .iter()
-        .filter_map(|c| c["id"].as_str())
+        .filter_map(|comp| comp["id"].as_str())
         .collect();
     assert!(
         ids.iter()
-            .any(|id| id.contains("comp-on-b"))
+            .any(|id| id.contains("comp-on-b")),
     );
 
     // 4. should print a hint instructing the user to run "bit switch" to actually switch
@@ -465,13 +465,13 @@ fn bit_lane_import_current_lane_behavior() {
             .as_array()
             .unwrap()
             .iter()
-            .filter_map(|l| {
-                l["name"]
+            .filter_map(|lane| {
+                lane["name"]
                     .as_str()
-                    .or_else(|| l["id"]["name"].as_str())
+                    .or_else(|| lane["id"]["name"].as_str())
             })
             .any(|name| name == "lane-a"),
-        "{lanes}"
+        "{lanes}",
     );
 }
 

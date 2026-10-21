@@ -30,7 +30,7 @@ fn with_dependencies_of_dependencies() {
         bar_foo["flattenedDependencies"]
             .as_array()
             .unwrap()
-            .contains(&serde_json::json!({ "scope": helper.scopes.remote, "name": "comp3", "version": "0.0.2" }))
+            .contains(&serde_json::json!({ "scope": helper.scopes.remote, "name": "comp3", "version": "0.0.2" })),
     );
 
     // 3. should update the dependencies and the flattenedDependencies of the dependent of the dependent with the new versions
@@ -52,28 +52,28 @@ fn with_dependencies_of_dependencies() {
             .as_array()
             .unwrap()
             .len(),
-        0
+        0,
     );
     let staged: Vec<&str> = status["stagedComponents"]
         .as_array()
         .unwrap()
         .iter()
-        .filter_map(|s| s["id"].as_str())
+        .filter_map(|item| item["id"].as_str())
         .collect();
     assert!(
         staged
             .iter()
-            .any(|s| s.ends_with("comp1"))
+            .any(|s| s.ends_with("comp1")),
     );
     assert!(
         staged
             .iter()
-            .any(|s| s.ends_with("comp2"))
+            .any(|s| s.ends_with("comp2")),
     );
     assert!(
         staged
             .iter()
-            .any(|s| s.ends_with("comp3"))
+            .any(|s| s.ends_with("comp3")),
     );
 
     // with --skip-auto-tag

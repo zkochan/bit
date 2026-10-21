@@ -19,10 +19,8 @@ use std::{
     process::ExitCode,
 };
 
-#[allow(clippy::too_many_arguments)]
 pub(super) fn run(
-    root: &Path,
-    bare: bool,
+    scope_root: &super::super::scope_root::ScopeRoot,
     args: &[OsString],
     command: &'static str,
     scope: &str,
@@ -30,6 +28,8 @@ pub(super) fn run(
     details: bool,
     merged: Option<bool>,
 ) -> io::Result<Outcome> {
+    let root = &scope_root.path;
+    let bare = scope_root.bare;
     // Published LanesMain has no workspace consumer in a bare scope, so
     // getRemoteByName resolves against global remotes only.
     let mut session = if bare { Session::new(None, args) } else { Session::new(Some(root), args) };

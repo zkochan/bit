@@ -8,16 +8,16 @@ fn bit_reset_removes_the_lane_history_entry_of_the_reset_snap() {
     helper.set_workspace_with_remote_scope();
     helper.populate_components(2, true, "");
     helper.create_lane("dev", "");
-    helper.snap_all_components_without_build("-m \"snap A\"");
+    helper.snap_all_components_without_build(r#"-m "snap A""#);
     helper.export("");
 
     helper.populate_components(2, true, "v2");
-    helper.snap_all_components_without_build("-m \"snap B\"");
+    helper.snap_all_components_without_build(r#"-m "snap B""#);
 
     helper.run_cmd("reset --silent");
 
     helper.populate_components(2, true, "v3");
-    helper.snap_all_components_without_build("-m \"snap C\"");
+    helper.snap_all_components_without_build(r#"-m "snap C""#);
     helper.export("");
 
     helper.re_init_workspace();
@@ -30,22 +30,22 @@ fn bit_reset_removes_the_lane_history_entry_of_the_reset_snap() {
     // 1. should not have a lane-history entry for the reset snap
     let messages: Vec<&str> = entries
         .iter()
-        .filter_map(|e| e["message"].as_str())
+        .filter_map(|entry| entry["message"].as_str())
         .collect();
     assert!(
         messages
             .iter()
-            .any(|m| m.contains("snap A"))
+            .any(|m| m.contains("snap A")),
     );
     assert!(
         messages
             .iter()
-            .any(|m| m.contains("snap C"))
+            .any(|m| m.contains("snap C")),
     );
     assert!(
         !messages
             .iter()
-            .any(|m| m.contains("snap B"))
+            .any(|m| m.contains("snap B")),
     );
 
     // 2. no args: should diff latest against its predecessor without errors

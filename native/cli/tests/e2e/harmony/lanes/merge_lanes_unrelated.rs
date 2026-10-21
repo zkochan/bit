@@ -38,7 +38,7 @@ fn multiple_scopes_when_a_component_in_the_origin_is_different_than_on_the_lane(
             .as_array()
             .unwrap()
             .len(),
-        1
+        1,
     );
     assert_eq!(
         status["pendingUpdatesFromMain"][0]["divergeData"]["err"]["name"].as_str().unwrap(),
@@ -72,7 +72,7 @@ fn multiple_scopes_when_a_component_in_the_origin_is_different_than_on_the_lane(
     assert_eq!(cat_obj["parents"][0].as_str().unwrap(), main_head);
 
     // 7. version object should hold a reference for the abandoned component
-    assert_eq!(cat_obj["unrelated"]["head"].as_str().unwrap(), lane_scope_head,);
+    assert_eq!(cat_obj["unrelated"]["head"].as_str().unwrap(), lane_scope_head);
 
     // 8. should export the component successfully
     let export = helper.try_cmd("export");
@@ -100,7 +100,7 @@ fn multiple_scopes_when_a_component_in_the_origin_is_different_than_on_the_lane(
     assert_eq!(cat_obj["parents"][0].as_str().unwrap(), main_head);
 
     // 12. version object should hold a reference for the abandoned component
-    assert_eq!(cat_obj["unrelated"]["head"].as_str().unwrap(), lane_scope_head,);
+    assert_eq!(cat_obj["unrelated"]["head"].as_str().unwrap(), lane_scope_head);
 
     // 13. should export the component successfully
     let export = helper.try_cmd("export");
@@ -149,7 +149,7 @@ fn multiple_scopes_when_a_component_in_the_origin_is_different_than_on_the_lane(
             .as_array()
             .unwrap()
             .len(),
-        0
+        0,
     );
 
     // 17. when main got another tag meanwhile: should be able to merge with no errors
@@ -176,13 +176,13 @@ fn multiple_scopes_when_a_component_in_the_origin_is_different_than_on_the_lane(
         arr[0]["localVersion"]
             .as_str()
             .unwrap()
-            .starts_with("0.0")
+            .starts_with("0.0"),
     );
     assert!(
         arr[0]["currentVersion"]
             .as_str()
             .unwrap()
-            .starts_with("0.0")
+            .starts_with("0.0"),
     );
 
     // 19. bit lane merge after soft-removed the unrelated component: should not throw
@@ -335,7 +335,7 @@ fn merge_lanes_when_local_lane_has_soft_removed_components() {
         .as_array()
         .unwrap()
         .iter()
-        .filter_map(|e| e["hash"].as_str())
+        .filter_map(|entry| entry["hash"].as_str())
         .collect();
     let unique: std::collections::HashSet<&&str> = hashes.iter().collect();
     assert_eq!(hashes.len(), unique.len());

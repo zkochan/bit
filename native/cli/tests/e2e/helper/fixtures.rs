@@ -15,7 +15,7 @@ pub struct BareScopeEnv {
     pub scope_path: PathBuf,
 }
 
-#[allow(dead_code)]
+#[expect(dead_code, reason = "shared E2E helper methods mirroring TypeScript Helper")]
 impl Helper {
     /// `createComponentBarFoo(impl)`.
     pub fn create_component_bar_foo(&self, implementation: &str) {
@@ -105,7 +105,10 @@ impl Helper {
         output
     }
 
-    #[allow(non_snake_case)]
+    #[expect(
+        non_snake_case,
+        reason = "mirrors TypeScript CommandHelper.tagWithoutBuild method name"
+    )]
     pub fn tag_Without_Build_id(&self, id: &str, flags: &str) -> String {
         self.tag_without_build(id, &format!("--skip-tests {flags}"))
     }
@@ -114,7 +117,10 @@ impl Helper {
         self.run(&format!("snap --skip-tests {flags}"))
     }
 
-    #[allow(non_snake_case)]
+    #[expect(
+        non_snake_case,
+        reason = "mirrors TypeScript CommandHelper.snapComponentWithoutBuild method name"
+    )]
     pub fn snap_Component_without_build(&self, id: &str, flags: &str) -> String {
         self.run(&format!("snap {id} --skip-tests {flags}"))
     }
@@ -422,21 +428,21 @@ impl Helper {
             .as_array()
             .unwrap()
             .iter()
-            .filter_map(|v| v.as_str().map(str::to_owned))
+            .filter_map(|val| val.as_str().map(str::to_owned))
             .collect()
     }
 
     pub fn comp1_impl(&self, label: &str) -> String {
         format!(
             "const comp2 = require('@{}/comp2');\n\nmodule.exports = () => `{label} and ${{comp2()}}`;",
-            self.scopes.remote
+            self.scopes.remote,
         )
     }
 
     pub fn comp2_impl(&self, label: &str) -> String {
         format!(
             "const comp3 = require('@{}/comp3');\n\nmodule.exports = () => `{label} and ${{comp3()}}`;",
-            self.scopes.remote
+            self.scopes.remote,
         )
     }
 

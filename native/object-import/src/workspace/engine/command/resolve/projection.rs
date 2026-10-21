@@ -122,31 +122,47 @@ fn bind_new_extensions(extensions: &mut Value, identities: &HashSet<String>) {
         .into_iter()
         .flatten()
     {
-        if let Some(id) = extension.get_mut("extensionId")
-            && id.get("version").is_none()
-            && let Ok(identity) = super::selection::identity(id)
-            && identities.contains(&identity)
-        {
-            id["version"] = json!(format!("__bit_pending_snapshot__:{identity}"));
-        }
+        bind_extension_id(extension, identities);
         if extension["name"] == "teambit.dependencies/dependency-resolver" {
             for dep in extension["data"]["dependencies"]
                 .as_array_mut()
                 .into_iter()
                 .flatten()
             {
-                if dep["__type"] == "component"
-                    && let Some(cid) = dep.get_mut("componentId")
-                    && cid.get("version").is_none()
-                    && let Ok(identity) = super::selection::identity(cid)
-                    && identities.contains(&identity)
-                {
-                    let marker = format!("__bit_pending_snapshot__:{identity}");
-                    cid["version"] = json!(marker);
-                    dep["id"] = json!(format!("{identity}@{marker}"));
-                    dep["version"] = json!(marker);
-                }
+                bind_resolver_dependency(dep, identities);
             }
         }
     }
+}
+
+fn bind_extension_id(extension: &mut Value, identities: &HashSet<String>) {
+    if let Some(id) = extension.get_mut("extensionId")
+        && id.get("version").is_none()
+        && let Ok(identity) = super::selection::identity(id)
+        && identities.contains(&identity)
+    {
+        id["version"] = json!(format!("__bit_pending_snapshot__:{identity}"));
+    }
+}
+
+fn bind_resolver_dependency(dep: &mut Value, identities: &HashSet<String>) {
+    if dep["__type"] != "component" {
+        return;
+    }
+    let Some(cid) = dep.get_mut("componentId") else {
+        return;
+    };
+    if cid.get("version").is_some() {
+        return;
+    }
+    let Ok(identity) = super::selection::identity(cid) else {
+        return;
+    };
+    if !identities.contains(&identity) {
+        return;
+    }
+    let marker = format!("__bit_pending_snapshot__:{identity}");
+    cid["version"] = json!(marker);
+    dep["id"] = json!(format!("{identity}@{marker}"));
+    dep["version"] = json!(marker);
 }

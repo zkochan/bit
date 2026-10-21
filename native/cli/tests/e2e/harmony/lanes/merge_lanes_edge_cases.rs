@@ -78,7 +78,7 @@ fn conflict_when_the_same_file_exist_in_base_deleted_on_the_lane_and_modified_on
     let helper = Helper::new();
     helper.set_workspace_with_remote_scope();
     helper.populate_components(1, false, "");
-    helper.write_file("comp1/foo.js", "console.log(\"v1\");");
+    helper.write_file("comp1/foo.js", r#"console.log("v1");"#);
     helper.tag_all_without_build("");
     helper.export("");
     helper.create_lane("dev", "");
@@ -86,7 +86,7 @@ fn conflict_when_the_same_file_exist_in_base_deleted_on_the_lane_and_modified_on
     helper.snap_all_components_without_build("");
     helper.export("");
     helper.switch_local_lane("main", "-x");
-    helper.write_file("comp1/foo.js", "console.log(\"v2\");");
+    helper.write_file("comp1/foo.js", r#"console.log("v2");"#);
     helper.tag_all_without_build("");
     helper.export("");
 
@@ -135,13 +135,13 @@ fn merging_from_a_lane_to_main_when_it_changed_version_object_with_squashed_prop
             .as_array()
             .unwrap()
             .len(),
-        2
+        2,
     );
     assert!(
         ver["squashed"]["previousParents"]
             .as_array()
             .unwrap()
-            .contains(&serde_json::json!(head_on_lane_b))
+            .contains(&serde_json::json!(head_on_lane_b)),
     );
 
     // 2. bit export should not throw
@@ -170,7 +170,7 @@ fn merging_from_a_lane_to_main_when_it_has_a_long_history_which_does_not_exist_l
     // 1. merging one component: should not throw
     let merge = helper.try_cmd(&format!(
         "lane merge {}/dev {}/comp1 --include-deps -x",
-        helper.scopes.remote, helper.scopes.remote
+        helper.scopes.remote, helper.scopes.remote,
     ));
     assert!(merge.status.success(), "{merge:?}");
 
@@ -198,14 +198,14 @@ fn merge_introduces_a_new_component_to_a_lane() {
 
     let lane = parse(&helper.run_cmd(&format!(
         "lane show {}/lane-a --remote --json",
-        helper.scopes.remote
+        helper.scopes.remote,
     )));
     assert_eq!(
         lane["components"]
             .as_array()
             .unwrap()
             .len(),
-        2
+        2,
     );
 }
 
@@ -270,7 +270,7 @@ fn merge_an_out_of_date_component_from_another_lane() {
             .as_array()
             .unwrap()
             .len(),
-        0
+        0,
     );
 }
 
@@ -344,7 +344,7 @@ fn merge_from_one_lane_to_another_with_squash_when_it_has_history_in_main() {
     let head_ver = parse(&helper.cat_object(&head_on_lane_b, false));
     assert_eq!(head_ver["parents"], serde_json::json!([head_on_main]));
     assert_eq!(head_ver["squashed"]["laneId"]["name"].as_str().unwrap(), "lane-b");
-    assert_eq!(head_ver["squashed"]["previousParents"], serde_json::json!([second_snap_on_lane_b]),);
+    assert_eq!(head_ver["squashed"]["previousParents"], serde_json::json!([second_snap_on_lane_b]));
     let _ = first_snap_on_lane_b;
 }
 

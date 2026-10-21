@@ -43,7 +43,7 @@ fn single_scope_two_diverged_lanes_squash_on_merge() {
             .unwrap()
             .iter()
             .filter_map(|v| v.as_str())
-            .any(|p| p == head_on_lane_b.as_str())
+            .any(|parent| parent == head_on_lane_b.as_str()),
     );
 
     // 3. bit log should show a clean history without lane-b intermediate snaps
@@ -52,7 +52,7 @@ fn single_scope_two_diverged_lanes_squash_on_merge() {
         .as_array()
         .unwrap()
         .iter()
-        .filter_map(|l| l["hash"].as_str())
+        .filter_map(|entry| entry["hash"].as_str())
         .collect();
     assert!(hashes.contains(&common_ancestor.as_str()));
     assert!(hashes.contains(&head_on_lane_a.as_str()));
@@ -107,7 +107,7 @@ fn multi_scope_lane_a_on_scope_a_lane_b_on_scope_b_diverged_squash() {
             .unwrap()
             .iter()
             .filter_map(|v| v.as_str())
-            .any(|p| p == head_on_lane_b.as_str())
+            .any(|parent| parent == head_on_lane_b.as_str()),
     );
 
     // 3. scope-a should NOT contain lane-b intermediate snaps after export
@@ -134,7 +134,7 @@ fn multi_scope_lane_a_on_scope_a_lane_b_on_scope_b_diverged_squash() {
         .as_array()
         .unwrap()
         .iter()
-        .filter_map(|l| l["hash"].as_str())
+        .filter_map(|entry| entry["hash"].as_str())
         .collect();
     assert!(hashes.contains(&merge_snap.as_str()));
     assert!(hashes.contains(&head_on_lane_a.as_str()));
@@ -179,7 +179,7 @@ fn multi_scope_lane_a_on_scope_a_lane_b_on_scope_b_diverged_squash() {
         .as_array()
         .unwrap()
         .iter()
-        .filter_map(|l| l["hash"].as_str())
+        .filter_map(|entry| entry["hash"].as_str())
         .collect();
     assert!(hashes.contains(&merge_snap.as_str()));
     assert!(hashes.contains(&second_merge_snap.as_str()));
@@ -228,7 +228,7 @@ fn lane_into_main_diverged_squash() {
             .unwrap()
             .iter()
             .filter_map(|v| v.as_str())
-            .any(|p| p == head_on_lane.as_str())
+            .any(|parent| parent == head_on_lane.as_str()),
     );
 
     // 3. bit log on main should show the main chain + merge snap, not the lane intermediates
@@ -237,7 +237,7 @@ fn lane_into_main_diverged_squash() {
         .as_array()
         .unwrap()
         .iter()
-        .filter_map(|l| l["hash"].as_str())
+        .filter_map(|entry| entry["hash"].as_str())
         .collect();
     assert!(hashes.contains(&common_ancestor.as_str()));
     assert!(hashes.contains(&head_on_main.as_str()));
@@ -295,7 +295,7 @@ fn lane_into_main_cross_scope_diverged_squash_with_fresh_consumer() {
             .unwrap()
             .iter()
             .filter_map(|v| v.as_str())
-            .any(|p| p == lane_head.as_str())
+            .any(|parent| parent == lane_head.as_str()),
     );
 
     // fresh consumer imports comp1 from scope-a (no scope-b in remotes)
@@ -313,7 +313,7 @@ fn lane_into_main_cross_scope_diverged_squash_with_fresh_consumer() {
         .as_array()
         .unwrap()
         .iter()
-        .filter_map(|l| l["hash"].as_str())
+        .filter_map(|entry| entry["hash"].as_str())
         .collect();
     assert!(hashes.contains(&merge_head.as_str()));
     assert!(hashes.contains(&main_head2.as_str()));

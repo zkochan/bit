@@ -38,7 +38,7 @@ fn ignoring_components_and_packages_dependencies() {
             .as_array()
             .unwrap()
             .len(),
-        1
+        1,
     );
     assert_ne!(show_bar["dependencies"][0]["id"].as_str().unwrap(), "foo1");
 
@@ -88,7 +88,7 @@ fn ignoring_components_and_packages_dependencies() {
         show_bar["manuallyRemovedDependencies"]["dependencies"]
             .as_array()
             .unwrap()
-            .contains(&serde_json::json!("existing-package"))
+            .contains(&serde_json::json!("existing-package")),
     );
 
     // 4. ignoring an existing devDependency package
@@ -119,7 +119,7 @@ fn ignoring_components_and_packages_dependencies() {
         show_bar["manuallyRemovedDependencies"]["devDependencies"]
             .as_array()
             .unwrap()
-            .contains(&serde_json::json!("existing-package"))
+            .contains(&serde_json::json!("existing-package")),
     );
     assert!(show_bar["manuallyRemovedDependencies"].get("dependencies").is_none());
 }
@@ -156,7 +156,7 @@ fn ignoring_dependencies_components_entire_flow() {
             .as_array()
             .unwrap()
             .len(),
-        1
+        1,
     );
 
     // 2. should save the overrides data into the model
@@ -231,12 +231,12 @@ fn manually_adding_dependencies() {
     );
     let show_bar = parse(&helper.show_component_parsed("bar/foo"));
     assert_eq!(show_bar["packageDependencies"], serde_json::json!({}));
-    assert_eq!(show_bar["peerPackageDependencies"], serde_json::json!({ "chai": "2.2.0" }),);
+    assert_eq!(show_bar["peerPackageDependencies"], serde_json::json!({ "chai": "2.2.0" }));
     assert!(
         show_bar["manuallyRemovedDependencies"]["dependencies"]
             .as_array()
             .unwrap()
-            .contains(&serde_json::json!("chai"))
+            .contains(&serde_json::json!("chai")),
     );
     assert_eq!(
         show_bar["manuallyAddedDependencies"]["peerDependencies"],
@@ -256,7 +256,7 @@ fn manually_adding_dependencies() {
         }),
     );
     let show_bar = parse(&helper2.show_component_parsed("bar/foo"));
-    assert_eq!(show_bar["peerPackageDependencies"], serde_json::json!({ "chai": "2.2.0" }),);
+    assert_eq!(show_bar["peerPackageDependencies"], serde_json::json!({ "chai": "2.2.0" }));
     assert_eq!(
         show_bar["manuallyAddedDependencies"]["peerDependencies"],
         serde_json::json!(["chai@2.2.0"]),
@@ -275,7 +275,7 @@ fn manually_adding_dependencies() {
         }),
     );
     let show_output = helper3.run_cmd("show bar/foo");
-    assert!(!show_output.contains("chai\""));
+    assert!(!show_output.contains(r#"chai""#));
     let status_out = strip_ansi(&helper3.status()).replace('\n', "");
     helper3.expect_status_to_have_issue("MissingPackagesDependenciesOnFs");
     assert!(status_out.contains("foo.js -> chai"), "{status_out}");
