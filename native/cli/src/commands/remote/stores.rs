@@ -171,6 +171,9 @@ fn load_scope_json(
     chalk: Chalk,
 ) -> Result<(PathBuf, Map<String, Value>), Failure> {
     let Some(scope_dir) = find_scope_path(from_path) else {
+        if crate::workspace::root(from_path).is_some() {
+            return Err(Failure::Declined("workspace scope not initialized yet".to_owned()));
+        }
         return Err(Failure::User(format!(
             "error: scope not found at {}",
             chalk.bold(&from_path.to_string_lossy()),
