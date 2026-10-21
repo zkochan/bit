@@ -208,11 +208,18 @@ impl Helper {
 
     /// `addRemoteScope(remoteScopePath, localScopePath)`: registers `remote_path` in `local_scope_dir/scope.json`.
     pub fn add_remote_to(remote_path: &Path, local_scope_dir: &Path) {
-        let name = remote_path
-            .file_name()
-            .unwrap()
-            .to_string_lossy()
-            .into_owned();
+        let name = config::read_jsonc(&remote_path.join("scope.json"))["name"]
+            .as_str()
+            .map_or_else(
+                || {
+                    remote_path
+                        .file_name()
+                        .unwrap()
+                        .to_string_lossy()
+                        .into_owned()
+                },
+                str::to_owned,
+            );
         let url = format!("file://{}", remote_path.display());
         config::update_scope_json(&local_scope_dir.join("scope.json"), |scope| {
             let remotes = scope

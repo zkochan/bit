@@ -90,6 +90,11 @@ impl BodyInput<'_> {
             .iter()
             .map(|side| harmony::project(side.value))
             .collect::<io::Result<Vec<_>>>()?;
+        let no_snap = self.options.no_snap
+            || self.options.lane.as_ref().is_some_and(|lane| lane.no_auto_snap);
+        if !no_snap && projected.iter().any(has_remove_extension) {
+            return Err(invalid("command unsupported non-policy metadata change"));
+        }
         metadata_guard(&projected)
     }
 
@@ -333,9 +338,6 @@ pub(super) fn metadata_guard(projected: &[Value]) -> io::Result<()> {
         {
             return Err(invalid("command unsupported non-policy metadata change"));
         }
-    }
-    if projected.iter().any(has_remove_extension) {
-        return Err(invalid("command unsupported non-policy metadata change"));
     }
     Ok(())
 }
