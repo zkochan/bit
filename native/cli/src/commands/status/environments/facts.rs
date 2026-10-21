@@ -145,3 +145,56 @@ fn own_policy(
         .collect::<serde_json::Map<_, _>>();
     Ok(json!({"dependencies":dependencies}))
 }
+
+pub(super) fn resolve_env_id(
+    config: &serde_json::Map<String, Value>,
+    context: &Value,
+    target: &Value,
+) -> String {
+    config
+        .get("teambit.envs/envs")
+        .and_then(|config| config["env"].as_str())
+        .map(str::to_owned)
+        .or_else(|| {
+            config
+                .keys()
+                .find(|key| bit_install::workspace::CORE_ENVS.contains(&key.as_str()))
+                .cloned()
+        })
+        .unwrap_or_else(|| stored_env(context, target))
+}
+
+fn stored_env(context: &Value, target: &Value) -> String {
+    stored_extensions(context, target)
+        .and_then(|extensions| {
+            extensions
+                .iter()
+                .find(|extension| extension["name"] == "teambit.envs/envs")
+        })
+        .and_then(|env| env["data"]["id"].as_str())
+        .unwrap_or("teambit.harmony/node")
+        .to_owned()
+}
+
+fn stored_extensions<'a>(context: &'a Value, target: &Value) -> Option<&'a Vec<Value>> {
+    let identity = target["identity"].as_str().unwrap_or_default();
+    let model = context["models"]
+        .as_array()?
+        .iter()
+        .find(|model| {
+            format!(
+                "{}/{}",
+                model["scope"].as_str().unwrap_or_default(),
+                model["name"].as_str().unwrap_or_default(),
+            ) == identity
+        });
+    let version = target["version"].as_str().unwrap_or_default();
+    let hash = model
+        .and_then(|model| model["versions"][version].as_str())
+        .unwrap_or(version);
+    context["versions"]
+        .as_array()?
+        .iter()
+        .find(|row| row[0] == hash)
+        .and_then(|row| row[1]["extensions"].as_array())
+}

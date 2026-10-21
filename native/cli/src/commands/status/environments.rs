@@ -172,11 +172,15 @@ impl Environments {
         targets: &[Value],
     ) -> io::Result<Value> {
         let mut enriched = context.clone();
-        let components = array(context.get("targets"), "environment targets")?
+        let mut components = array(context.get("targets"), "environment targets")?
             .iter()
             .map(|target| component(root, context, target))
             .collect::<io::Result<Vec<_>>>()?;
         let core = core_ids()?;
+        if let Some(scope) = Scope::find(root) {
+            let scope_objects = bit_install::workspace::ScopeObjects::new(scope.path());
+            bit_install::workspace::resolve_first_env(&mut components, &scope_objects, &core)?;
+        }
         let aspects = root_aspects(context, &core);
         let selected_components = components
             .iter()
@@ -263,14 +267,12 @@ fn component(root: &Path, context: &Value, target: &Value) -> io::Result<Workspa
         .as_object()
         .cloned()
         .unwrap_or_default();
-    let env_id = config
-        .get("teambit.envs/envs")
-        .and_then(|config| config["env"].as_str())
-        .map_or_else(|| stored_env(context, &target), str::to_owned);
+    let env_id = facts::resolve_env_id(&config, context, &target);
     let identity = text(target.get("identity"))?;
     let (scope, name) =
         identity.split_once('/').ok_or_else(|| decline("environment component identity"))?;
     let directory = text(target.get("directory"))?;
+    let dir = root.join(directory);
     Ok(WorkspaceComponent {
         id: ComponentId {
             scope: Some(scope.to_owned()),
@@ -279,7 +281,10 @@ fn component(root: &Path, context: &Value, target: &Value) -> io::Result<Workspa
             version: target["version"].as_str().map(str::to_owned),
         },
         root_dir: directory.to_owned(),
-        dir: root.join(directory),
+        is_env: bit_install::policy::split_version(&env_id).0 == "teambit.envs/env"
+            || dir.join("env.jsonc").exists()
+            || dir.join("env.json").exists(),
+        dir,
         files: Vec::new(),
         main_file: target["mainFile"]
             .as_str()
@@ -287,48 +292,9 @@ fn component(root: &Path, context: &Value, target: &Value) -> io::Result<Workspa
             .to_owned(),
         package_name: String::new(),
         env_id,
-        is_env: root
-            .join(directory)
-            .join("env.jsonc")
-            .exists(),
         has_package_json: false,
         config,
     })
-}
-
-fn stored_env(context: &Value, target: &Value) -> String {
-    stored_extensions(context, target)
-        .and_then(|extensions| {
-            extensions
-                .iter()
-                .find(|extension| extension["name"] == "teambit.envs/envs")
-        })
-        .and_then(|env| env["data"]["id"].as_str())
-        .unwrap_or("teambit.harmony/node")
-        .to_owned()
-}
-
-fn stored_extensions<'a>(context: &'a Value, target: &Value) -> Option<&'a Vec<Value>> {
-    let identity = target["identity"].as_str().unwrap_or_default();
-    let model = context["models"]
-        .as_array()?
-        .iter()
-        .find(|model| {
-            format!(
-                "{}/{}",
-                model["scope"].as_str().unwrap_or_default(),
-                model["name"].as_str().unwrap_or_default(),
-            ) == identity
-        });
-    let version = target["version"].as_str().unwrap_or_default();
-    let hash = model
-        .and_then(|model| model["versions"][version].as_str())
-        .unwrap_or(version);
-    context["versions"]
-        .as_array()?
-        .iter()
-        .find(|row| row[0] == hash)
-        .and_then(|row| row[1]["extensions"].as_array())
 }
 
 /// `DevFilesMain.computeDevPatterns` applied to the Rust inventory.
