@@ -281,15 +281,11 @@ pub(super) fn requires_canonical_history_check(
     hash: &str,
     version: &Value,
 ) -> bool {
-    if lane.is_some() && target.version != "latest" {
-        return true;
-    }
-    let unexported_lane = lane.is_some_and(|lane| lane["exported"] == false);
-    if lane.is_none() || unexported_lane {
-        return model["head"].as_str().is_none()
-            || (Some(hash) != model["head"].as_str() && version["origin"]["lane"].is_object());
-    }
-    false
+    lane.is_none()
+        && target.version.len() == 40
+        && target.version.bytes().all(|b| b.is_ascii_hexdigit())
+        && (model["head"].as_str().is_none()
+            || (Some(hash) != model["head"].as_str() && version["origin"]["lane"].is_object()))
 }
 
 fn new_directory(

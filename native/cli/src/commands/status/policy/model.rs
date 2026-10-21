@@ -65,7 +65,8 @@ pub(super) fn stored_version<'c>(
 }
 
 fn validate_unscoped_model(target: &Value, model: &Value) -> io::Result<()> {
-    if target["scoped"] != true
+    if !cfg!(windows)
+        && target["scoped"] != true
         && (model["head"].is_string()
             || model["versions"]
                 .as_object()

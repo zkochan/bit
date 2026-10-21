@@ -129,7 +129,12 @@ fn select(
             target.version.clone_from(head);
             selected.push(target);
         } else {
-            if !input.ids.is_empty() && target.version != "latest" {
+            if input.ids
+                .iter()
+                .any(|id| id.contains('@'))
+                && target.version.len() == 40
+                && target.version.bytes().all(|b| b.is_ascii_hexdigit())
+            {
                 return Err(invalid(
                     "inbound explicit version on lane requires canonical history check",
                 ));
