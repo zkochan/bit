@@ -54,13 +54,14 @@ fn existing_target(
     let Some(model) = super::super::details::local_object(root, &hash, "Component")? else {
         return Ok(());
     };
-    if model["state"]["versions"]
-        .as_object()
-        .is_some_and(|versions| {
-            versions
-                .values()
-                .any(|entry| entry["local"] == true)
-        })
+    if options.merge_strategy.is_some()
+        && model["state"]["versions"]
+            .as_object()
+            .is_some_and(|versions| {
+                versions
+                    .values()
+                    .any(|entry| entry["local"] == true)
+            })
     {
         return Err(invalid("inbound existing component has local versions"));
     }
