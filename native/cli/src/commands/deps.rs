@@ -56,7 +56,7 @@ pub(super) enum Subcommand {
     Eject { pattern: String },
     Get { id: String },
     Usage { dep_name: String, depth: Option<usize> },
-    Diagnose,
+    Diagnose { origins: bool },
     DiagnosePackage { package: String },
     Circular { json: bool, include_deps: bool },
     Write { target: WriteTarget },
@@ -81,7 +81,7 @@ impl Subcommand {
             Self::Eject { .. } => "eject",
             Self::Get { .. } => "get",
             Self::Usage { .. } => "usage",
-            Self::Diagnose => "diagnose",
+            Self::Diagnose { .. } => "diagnose",
             Self::DiagnosePackage { .. } => "diagnose",
             Self::Circular { .. } => "circular",
             Self::Write { .. } => "write",
@@ -110,8 +110,8 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
     if let Subcommand::DiagnosePackage { package } = &subcommand {
         return diagnose::run_package(&root, args, package, chalk);
     }
-    if matches!(&subcommand, Subcommand::Diagnose) {
-        return diagnose::report::run(&root, args, chalk);
+    if let Subcommand::Diagnose { origins } = &subcommand {
+        return diagnose::report::run(&root, args, chalk, *origins);
     }
     run_prepared(&root, args, &subcommand, chalk)
 }

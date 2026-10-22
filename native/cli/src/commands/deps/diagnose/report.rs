@@ -22,6 +22,13 @@ struct PackageInfo {
     versions: Vec<String>,
     peer: bool,
     copies: usize,
+    origins: Vec<VersionOrigin>,
+}
+
+struct VersionOrigin {
+    version: String,
+    component_id: String,
+    explicit: bool,
 }
 
 struct Diagnosis {
@@ -36,14 +43,15 @@ pub(in crate::commands::deps) fn run(
     root: &Path,
     args: &[OsString],
     chalk: Chalk,
+    origins: bool,
 ) -> io::Result<Outcome> {
-    let diagnosis = match inspect(root) {
+    let diagnosis = match inspect(root, origins) {
         Ok(diagnosis) => diagnosis,
         Err(Failure::Declined(reason) | Failure::User(reason)) => {
             return Ok(Outcome::Declined(format!("deps diagnose: {reason}")));
         }
     };
-    let data = render(&diagnosis, chalk);
+    let data = render(&diagnosis, chalk, origins);
     workspace_command::execute_then(root, args, "diagnose", |output| {
         if diagnosis.components > 0 {
             output.status(&format!("loading {} component(s)", diagnosis.components));
@@ -52,7 +60,7 @@ pub(in crate::commands::deps) fn run(
     })
 }
 
-fn inspect(root: &Path) -> Result<Diagnosis, Failure> {
+fn inspect(root: &Path, origins: bool) -> Result<Diagnosis, Failure> {
     let store = root.join("node_modules/.pnpm");
     if !store.is_dir() {
         return Err(Failure::Declined("pnpm virtual store is missing".into()));
@@ -68,6 +76,11 @@ fn inspect(root: &Path) -> Result<Diagnosis, Failure> {
             .copied()
             .unwrap_or_default();
     }
+    if origins && packages.iter().any(unsupported_origin) {
+        return Err(Failure::Declined(
+            "peer version origins require component policy provenance".into(),
+        ));
+    }
     Ok(Diagnosis {
         components: ctx.ws.components.len(),
         store_entries: entries.len(),
@@ -78,6 +91,12 @@ fn inspect(root: &Path) -> Result<Diagnosis, Failure> {
             .count(),
         packages,
     })
+}
+
+fn unsupported_origin(package: &PackageInfo) -> bool {
+    package.peer
+        && package.versions.len() > 1
+        && package.origins.iter().any(|origin| !origin.explicit)
 }
 
 fn count_copies(entries: &[String]) -> HashMap<String, usize> {
@@ -116,7 +135,13 @@ fn collect_component_packages(
                 .and_then(|value| value.get("policy")),
         );
         for dep in deps {
-            add_dependency(&mut packages, dep);
+            let explicit = explicit_policy(config.as_ref(), &dep);
+            let origin = VersionOrigin {
+                version: dep.version.clone(),
+                component_id: component.id.to_string_without_version(),
+                explicit,
+            };
+            add_dependency(&mut packages, dep, origin);
         }
     }
     for package in &mut packages {
@@ -125,7 +150,26 @@ fn collect_component_packages(
     Ok(packages)
 }
 
-fn add_dependency(packages: &mut Vec<PackageInfo>, dep: ResolvedDep) {
+fn explicit_policy(config: Option<&serde_json::Value>, dep: &ResolvedDep) -> bool {
+    let field = match dep.lifecycle {
+        "peer" => "peerDependencies",
+        "dev" => "devDependencies",
+        _ => "dependencies",
+    };
+    let Some(value) = config
+        .and_then(|cfg| cfg.get("policy"))
+        .and_then(|policy| policy.get(field))
+        .and_then(|map| map.get(&dep.package_name))
+    else {
+        return false;
+    };
+    value
+        .as_str()
+        .or_else(|| value["version"].as_str())
+        == Some(&dep.version)
+}
+
+fn add_dependency(packages: &mut Vec<PackageInfo>, dep: ResolvedDep, origin: VersionOrigin) {
     if let Some(info) = packages
         .iter_mut()
         .find(|info| info.name == dep.package_name)
@@ -134,17 +178,19 @@ fn add_dependency(packages: &mut Vec<PackageInfo>, dep: ResolvedDep) {
             info.versions.push(dep.version);
         }
         info.peer |= dep.lifecycle == "peer";
+        info.origins.push(origin);
     } else {
         packages.push(PackageInfo {
             name: dep.package_name,
             versions: vec![dep.version],
             peer: dep.lifecycle == "peer",
             copies: 0,
+            origins: vec![origin],
         });
     }
 }
 
-fn render(diagnosis: &Diagnosis, chalk: Chalk) -> String {
+fn render(diagnosis: &Diagnosis, chalk: Chalk, origins: bool) -> String {
     let formatter = Formatter::new(chalk);
     let factor = if diagnosis.unique == 0 {
         "N/A".to_owned()
@@ -164,7 +210,7 @@ fn render(diagnosis: &Diagnosis, chalk: Chalk) -> String {
         format!("  Packages with duplicates: {}", diagnosis.duplicated),
     ];
     append_spread(&mut sections, diagnosis, &formatter);
-    append_peers(&mut sections, diagnosis, &formatter);
+    append_peers(&mut sections, diagnosis, &formatter, origins);
     sections.join("\n")
 }
 
@@ -229,7 +275,12 @@ fn spread_copies(package: &PackageInfo) -> usize {
     if package.copies == 0 { package.versions.len() } else { package.copies }
 }
 
-fn append_peers(sections: &mut Vec<String>, diagnosis: &Diagnosis, formatter: &Formatter) {
+fn append_peers(
+    sections: &mut Vec<String>,
+    diagnosis: &Diagnosis,
+    formatter: &Formatter,
+    origins: bool,
+) {
     let mut peers = diagnosis.packages
         .iter()
         .filter(|pkg| pkg.peer && pkg.versions.len() > 1)
@@ -246,6 +297,23 @@ fn append_peers(sections: &mut Vec<String>, diagnosis: &Diagnosis, formatter: &F
     if peers.is_empty() {
         return;
     }
+    let rows = peer_rows(&peers);
+    sections.extend([
+        String::new(),
+        formatter.title("Peer dependencies causing permutations:"),
+        peer_table(&rows, formatter.chalk),
+    ]);
+    if origins {
+        append_origins(sections, &peers, formatter);
+    } else {
+        sections.extend([
+            String::new(),
+            formatter.hint("  Tip: use --origins to see which envs and components contribute each peer version"),
+        ]);
+    }
+}
+
+fn peer_rows(peers: &[&PackageInfo]) -> Vec<Vec<String>> {
     let mut rows =
         vec![vec!["Package".into(), "Declared versions".into(), "Installed copies".into()]];
     for package in peers {
@@ -260,15 +328,38 @@ fn append_peers(sections: &mut Vec<String>, diagnosis: &Diagnosis, formatter: &F
             copies,
         ]);
     }
-    sections.extend([
-        String::new(),
-        formatter.title("Peer dependencies causing permutations:"),
-        peer_table(&rows, formatter.chalk),
-        String::new(),
-        formatter.hint(
-            "  Tip: use --origins to see which envs and components contribute each peer version",
-        ),
-    ]);
+    rows
+}
+
+fn append_origins(sections: &mut Vec<String>, peers: &[&PackageInfo], formatter: &Formatter) {
+    let mut lines = Vec::new();
+    for package in peers {
+        lines.push(format!("  {}", formatter.chalk.bold(&package.name)));
+        for version in &package.versions {
+            let mut components = package.origins
+                .iter()
+                .filter(|origin| &origin.version == version)
+                .take(5)
+                .collect::<Vec<_>>();
+            components.sort_by(|left, right| left.component_id.cmp(&right.component_id));
+            if components.is_empty() {
+                continue;
+            }
+            lines.push(format!("    {}", formatter.chalk.cyan(version)));
+            lines.push(format!(
+                "      components: {}",
+                components
+                    .iter()
+                    .map(|origin| origin.component_id.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            ));
+        }
+    }
+    if !lines.is_empty() {
+        sections.extend([String::new(), formatter.title("  Peer version origins:")]);
+        sections.extend(lines);
+    }
 }
 
 fn peer_table(rows: &[Vec<String>], chalk: Chalk) -> String {

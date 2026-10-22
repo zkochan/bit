@@ -79,6 +79,29 @@ fn bit_deps_diagnose_report_matches_node() -> KnownResult<()> {
     assert!(native_color.status.success(), "{}", native_color.stderr);
     assert!(native_color.native, "{}", native_color.trace);
     assert_eq!(native_color.stdout, node_color.stdout);
+    let origins = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "deps diagnose --origins",
+        &[("BIT_NATIVE", OsStr::new("off"))],
+    );
+    let native_origins = helper.native_run("deps diagnose --origins");
+    assert!(origins.status.success(), "{}", origins.stderr);
+    assert!(native_origins.status.success(), "{}", native_origins.stderr);
+    assert_eq!(native_origins.stdout, origins.stdout);
+    let node_origins_color = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "deps diagnose --origins",
+        &[("BIT_NATIVE", OsStr::new("off")), ("FORCE_COLOR", OsStr::new("1"))],
+    );
+    let native_origins_color = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "deps diagnose --origins",
+        &[("BIT_NATIVE", OsStr::new("on")), ("FORCE_COLOR", OsStr::new("1"))],
+    );
+    assert!(node_origins_color.status.success(), "{}", node_origins_color.stderr);
+    assert!(native_origins_color.status.success(), "{}", native_origins_color.stderr);
+    assert!(native_origins_color.native, "{}", native_origins_color.trace);
+    assert_eq!(native_origins_color.stdout, node_origins_color.stdout);
     Ok(())
 }
 
@@ -87,16 +110,17 @@ fn bit_deps_diagnose_empty_workspace_matches_node() -> KnownResult<()> {
     let helper = Helper::new();
     helper.re_init_workspace();
     fs::create_dir_all(helper.scopes.local_path.join("node_modules/.pnpm")).unwrap();
-    let command = "deps diagnose";
-    let node = Helper::cmd_in_with(
-        &helper.scopes.local_path,
-        command,
-        &[("BIT_NATIVE", OsStr::new("off"))],
-    );
-    let native = helper.native_run(command);
-    assert!(node.status.success(), "{}", node.stderr);
-    assert!(native.status.success(), "{}", native.stderr);
-    assert_eq!(native.stdout, node.stdout);
+    for command in ["deps diagnose", "deps diagnose --origins"] {
+        let node = Helper::cmd_in_with(
+            &helper.scopes.local_path,
+            command,
+            &[("BIT_NATIVE", OsStr::new("off"))],
+        );
+        let native = helper.native_run(command);
+        assert!(node.status.success(), "{}", node.stderr);
+        assert!(native.status.success(), "{}", native.stderr);
+        assert_eq!(native.stdout, node.stdout);
+    }
     Ok(())
 }
 
