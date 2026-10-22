@@ -17,7 +17,6 @@ pub use files::{
     ALWAYS_IGNORE_LIST, BIT_GENERATED_IGNORE_LIST, FileRules, IGNORE_ROOT_ONLY_LIST,
     rebase_ignore_pattern, user_ignore_list,
 };
-pub use first_env::resolve as resolve_first_env;
 pub use ignore::Ignore;
 pub use package_name::{binding_prefix_by_default_scope, component_package_name};
 pub use scope_model::{ModelData, ScopeObjects, sha1_hex};
