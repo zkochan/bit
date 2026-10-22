@@ -1,12 +1,17 @@
 //! External target directory linking (`bit link --target <dir> [--peers]`).
 
 use super::runner::format_component_id;
+use crate::discovery::{self, Target};
 use bit_install::{
     config::{DEPENDENCY_RESOLVER_ASPECT, WorkspaceConfig, aspect_id_without_version},
     model::WorkspaceComponent,
+    workspace::Workspace,
 };
 use serde_json::Value;
-use std::{fs, io, path::Path};
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct LinkDetail {
@@ -161,17 +166,92 @@ fn push_unique(list: &mut Vec<String>, item: &str) {
     }
 }
 
-fn create_dir_symlink(from: &Path, to: &Path) -> io::Result<()> {
+pub(super) fn link_core_aspects(
+    root: &Path,
+    ws_config: &WorkspaceConfig,
+    ws: &Workspace,
+    core_ids: &[String],
+) -> io::Result<()> {
+    if !ws_config.dependency_resolver.link_core_aspects() {
+        return Ok(());
+    }
+    let Some(teambit_dir) = find_teambit_packages_dir(root) else {
+        return Ok(());
+    };
+    let authored: Vec<String> = ws
+        .active()
+        .map(|(_, comp)| comp.id.to_string_without_version())
+        .collect();
+    let names = collect_core_package_names(core_ids, &authored);
+    let hoisted = root.join("node_modules/.pnpm");
+    let has_hoisted = hoisted.is_dir();
+    for name in &names {
+        let src = teambit_dir.join(name);
+        if !src.exists() {
+            continue;
+        }
+        link_aspect_if_allowed(&src, &root.join("node_modules/@teambit").join(name))?;
+        if has_hoisted {
+            link_aspect_if_allowed(&src, &hoisted.join("node_modules/@teambit").join(name))?;
+        }
+    }
+    Ok(())
+}
+
+fn collect_core_package_names(core_ids: &[String], authored: &[String]) -> Vec<String> {
+    let mut names = vec!["bit".to_owned(), "legacy".to_owned(), "harmony".to_owned()];
+    for id in core_ids {
+        if authored
+            .iter()
+            .any(|existing| existing == id)
+        {
+            continue;
+        }
+        let sub_name = id
+            .split('/')
+            .skip(1)
+            .collect::<Vec<_>>()
+            .join(".");
+        push_unique(&mut names, &sub_name);
+    }
+    names
+}
+
+fn find_teambit_packages_dir(root: &Path) -> Option<PathBuf> {
+    let Ok(Target::Entry(cli)) = discovery::find() else {
+        return None;
+    };
+    let bit_dir = cli.bit_dir.as_ref()?;
+    if bit_dir.starts_with(root) {
+        return None;
+    }
+    if let Some(bvm) = &cli.bvm_link {
+        let candidate = bvm.join("node_modules/@teambit");
+        if candidate.is_dir() {
+            return Some(candidate);
+        }
+    }
+    let parent = bit_dir.parent()?;
+    parent.is_dir().then(|| parent.to_path_buf())
+}
+
+fn link_aspect_if_allowed(src: &Path, dest: &Path) -> io::Result<()> {
+    if let Ok(meta) = dest.symlink_metadata()
+        && !meta.file_type().is_symlink()
+    {
+        return Ok(());
+    }
+    create_dir_symlink(src, dest)
+}
+
+pub(super) fn create_dir_symlink(from: &Path, to: &Path) -> io::Result<()> {
+    if fs::read_link(to).is_ok_and(|existing| existing == from) && to.exists() {
+        return Ok(());
+    }
     if let Some(parent) = to.parent() {
         fs::create_dir_all(parent)?;
     }
-    if let Ok(meta) = to.symlink_metadata() {
-        if meta.is_dir() && !meta.file_type().is_symlink() {
-            fs::remove_dir_all(to)?;
-        } else {
-            fs::remove_file(to)?;
-        }
-    }
+    remove_existing_target(to)?;
     #[cfg(unix)]
     {
         std::os::unix::fs::symlink(from, to)
@@ -180,4 +260,14 @@ fn create_dir_symlink(from: &Path, to: &Path) -> io::Result<()> {
     {
         std::os::windows::fs::symlink_dir(from, to)
     }
+}
+
+fn remove_existing_target(to: &Path) -> io::Result<()> {
+    let Ok(meta) = to.symlink_metadata() else {
+        return Ok(());
+    };
+    if meta.is_dir() && !meta.file_type().is_symlink() {
+        return fs::remove_dir_all(to);
+    }
+    fs::remove_file(to).or_else(|err| if cfg!(windows) { fs::remove_dir(to) } else { Err(err) })
 }

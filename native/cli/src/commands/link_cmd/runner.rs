@@ -48,7 +48,7 @@ pub(super) fn try_run(
     if root.join("merge-conflict").exists() {
         return Ok(None);
     }
-    let Some((ws_config, ws)) = load_eligible_workspace(root) else {
+    let Some((ws_config, ws, core_ids)) = load_eligible_workspace(root) else {
         return Ok(None);
     };
     let Some(selected) = select_components(&ws, &options.ids) else {
@@ -61,12 +61,12 @@ pub(super) fn try_run(
     if pkg_changed || !codemod_results.is_empty() {
         invalidate_deps_cache(root, &selected)?;
     }
-    let target_links = match options.target.as_deref() {
-        Some(target_arg) => {
-            let target_dir = resolve_target_dir(cwd, target_arg);
-            target::link_to_target(root, &target_dir, &ws_config, &selected, options.peers)?
-        }
-        None => Vec::new(),
+    let target_links = if let Some(target_arg) = options.target.as_deref() {
+        let target_dir = resolve_target_dir(cwd, target_arg);
+        target::link_to_target(root, &target_dir, &ws_config, &selected, options.peers)?
+    } else {
+        target::link_core_aspects(root, &ws_config, &ws, &core_ids)?;
+        Vec::new()
     };
     let summary = LinkSummary {
         workspace_name: resolve_workspace_name(root, &ws_config),
@@ -99,28 +99,30 @@ fn finish_execution(
     Ok(Some(outcome))
 }
 
-fn load_eligible_workspace(root: &Path) -> Option<(WorkspaceConfig, Workspace)> {
+fn load_eligible_workspace(root: &Path) -> Option<(WorkspaceConfig, Workspace, Vec<String>)> {
     let ws_config = WorkspaceConfig::load(root).ok()?;
     if ws_config.workspace.bitmap_auto_sync == Some(true) {
         return None;
     }
     let core_ids: Vec<String> = serde_json::from_str(CORE_ASPECT_IDS).ok()?;
     let ws = Workspace::load(root, &ws_config, &core_ids).ok()?;
-    (!has_custom_package_hook(&ws)).then_some((ws_config, ws))
+    (!has_custom_package_hook(&ws, &core_ids)).then_some((ws_config, ws, core_ids))
 }
 
-fn has_custom_package_hook(ws: &Workspace) -> bool {
-    ws.active().any(|(_, component)| component_has_package_hook(component))
+fn has_custom_package_hook(ws: &Workspace, core_ids: &[String]) -> bool {
+    let uses_custom_env = ws
+        .active()
+        .any(|(_, comp)| {
+            let bare = aspect_id_without_version(&comp.env_id);
+            !core_ids.iter().any(|id| id == bare)
+        });
+    uses_custom_env && ws.active().any(|(_, component)| component_has_package_hook(component))
 }
 
 fn component_has_package_hook(component: &WorkspaceComponent) -> bool {
-    for rel_file in &component.files {
-        if is_env_or_runtime_file(rel_file) && file_has_package_hook(&component.dir.join(rel_file))
-        {
-            return true;
-        }
-    }
-    false
+    component.files
+        .iter()
+        .any(|rel_file| file_has_package_hook(&component.dir.join(rel_file)))
 }
 
 fn file_has_package_hook(path: &Path) -> bool {
@@ -131,15 +133,6 @@ fn file_has_package_hook(path: &Path) -> bool {
         || text.contains("getPackageJsonProps")
         || text.contains("modifyPackageJson")
         || text.contains("registerPackageJsonTransformer")
-}
-
-fn is_env_or_runtime_file(rel_file: &str) -> bool {
-    rel_file.ends_with(".bit-env.ts")
-        || rel_file.ends_with(".bit-env.js")
-        || rel_file.ends_with(".main.runtime.ts")
-        || rel_file.ends_with(".main.runtime.js")
-        || rel_file.ends_with(".extension.ts")
-        || rel_file.ends_with(".extension.js")
 }
 
 fn select_components<'a>(
