@@ -1,6 +1,22 @@
 //! `e2e/flows/cyclic-dependencies.e2e.ts`.
 
 use crate::helper::{Helper, parse};
+use std::ffi::OsStr;
+
+#[test]
+fn insights_circular_empty_workspace_matches_node() {
+    let helper = Helper::new();
+    helper.re_init_workspace();
+    let native = helper.native_run("insights circular --json");
+    assert!(native.native, "{}", native.trace);
+    let node = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "insights circular --json",
+        &[("BIT_NATIVE", OsStr::new("off"))],
+    );
+    assert_eq!(native.status.code(), node.status.code());
+    assert_eq!(parse(&native.stdout), parse(&node.stdout));
+}
 
 #[test]
 fn component_a_requires_b_component_b_requires_a() {
@@ -22,6 +38,16 @@ fn component_a_requires_b_component_b_requires_a() {
 
     // 1. should be able to tag both with no errors
     assert!(tag_output.contains("2 component(s) tagged"));
+
+    let native = helper.native_run("insights circular --json");
+    assert!(native.native, "{}", native.trace);
+    let node = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "insights circular --json",
+        &[("BIT_NATIVE", OsStr::new("off"))],
+    );
+    assert!(node.status.success(), "{node:?}");
+    assert_eq!(parse(&native.stdout), parse(&node.stdout));
 
     // 2. should save the dependencies and flattenedDependencies of A correctly
     let comp_a = parse(&helper.cat_component("comp/a@0.0.1"));
@@ -103,7 +129,16 @@ fn complex_case_with_a_long_chain_of_dependencies() {
     assert!(tag_output.contains("9 component(s) tagged"));
 
     // 2. bit insights should show the circular with the correct order: dependent -> dependency
-    let insights = parse(&helper.run_cmd("insights circular --json"));
+    let run = helper.native_run("insights circular --json");
+    assert!(run.native, "{}", run.trace);
+    let insights = parse(&run.stdout);
+    let node = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "insights circular --json",
+        &[("BIT_NATIVE", OsStr::new("off"))],
+    );
+    assert!(node.status.success(), "{node:?}");
+    assert_eq!(insights, parse(&node.stdout));
     let cycle = insights[0]["data"][0].as_array().unwrap();
     assert_eq!(
         cycle,
