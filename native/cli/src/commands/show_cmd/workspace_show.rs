@@ -103,7 +103,7 @@ pub(super) fn load_target(root: &Path, options: &Options) -> Option<LoadedCompon
         return None;
     }
     let (entry, component) = find_component(&ws, &options.id)?;
-    if !is_supported_component(entry, component, options) {
+    if !is_supported_component(entry, component) {
         return None;
     }
     let scope = entry.id
@@ -193,15 +193,11 @@ fn matches_entry(entry: &BitmapEntry, raw_id: &str) -> bool {
         || (!entry.root_dir.is_empty() && entry.root_dir == dir)
 }
 
-fn is_supported_component(
-    entry: &BitmapEntry,
-    component: &WorkspaceComponent,
-    options: &Options,
-) -> bool {
-    if (options.json || options.legacy) && entry.id.version.is_some() {
+fn is_supported_component(entry: &BitmapEntry, component: &WorkspaceComponent) -> bool {
+    if entry.id.version.is_some() {
         return false;
     }
-    if component.env_id == "teambit.harmony/aspect" {
+    if aspect_id_without_version(&component.env_id) != "teambit.harmony/node" {
         return false;
     }
     let has_special_files = component.files
