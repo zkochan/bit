@@ -4,6 +4,36 @@ use crate::helper::{Helper, parse};
 use std::ffi::OsStr;
 
 #[test]
+fn insights_circular_two_workspace_cycles_match_node() {
+    let helper = Helper::new();
+    helper.set_workspace_with_remote_scope();
+    let scope = &helper.scopes.remote;
+    for (id, dependency) in [("a", "b"), ("b", "a"), ("c", "d"), ("d", "c")] {
+        helper.write_file(
+            &format!("{id}/index.js"),
+            &format!("module.exports = require('@{scope}/{dependency}');"),
+        );
+        helper.add_component(id, "");
+    }
+    helper.link("");
+    for command in ["insights circular --json", "insights circular"] {
+        let native = helper.native_run(command);
+        let node = Helper::cmd_in_with(
+            &helper.scopes.local_path,
+            command,
+            &[("BIT_NATIVE", OsStr::new("off"))],
+        );
+        assert!(native.status.success(), "{native:?}");
+        assert!(node.status.success(), "{node:?}");
+        if command.ends_with("--json") {
+            assert_eq!(parse(&native.stdout), parse(&node.stdout));
+        } else {
+            assert_eq!(native.stdout, node.stdout);
+        }
+    }
+}
+
+#[test]
 fn insights_circular_empty_workspace_matches_node() {
     let helper = Helper::new();
     helper.re_init_workspace();
@@ -16,6 +46,27 @@ fn insights_circular_empty_workspace_matches_node() {
     );
     assert_eq!(native.status.code(), node.status.code());
     assert_eq!(parse(&native.stdout), parse(&node.stdout));
+
+    let native_text = helper.native_run("insights circular");
+    let node_text = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "insights circular",
+        &[("BIT_NATIVE", OsStr::new("off"))],
+    );
+    assert_eq!(native_text.stdout, node_text.stdout);
+
+    let colored = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "insights circular",
+        &[("FORCE_COLOR", OsStr::new("1"))],
+    );
+    let node_colored = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "insights circular",
+        &[("FORCE_COLOR", OsStr::new("1")), ("BIT_NATIVE", OsStr::new("off"))],
+    );
+    assert!(colored.native, "{}", colored.trace);
+    assert_eq!(colored.stdout, node_colored.stdout);
 }
 
 #[test]
@@ -48,6 +99,27 @@ fn component_a_requires_b_component_b_requires_a() {
     );
     assert!(node.status.success(), "{node:?}");
     assert_eq!(parse(&native.stdout), parse(&node.stdout));
+
+    let native_text = helper.native_run("insights circular");
+    let node_text = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "insights circular",
+        &[("BIT_NATIVE", OsStr::new("off"))],
+    );
+    assert_eq!(native_text.stdout, node_text.stdout);
+
+    let colored = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "insights circular",
+        &[("FORCE_COLOR", OsStr::new("1"))],
+    );
+    let node_colored = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "insights circular",
+        &[("FORCE_COLOR", OsStr::new("1")), ("BIT_NATIVE", OsStr::new("off"))],
+    );
+    assert!(colored.native, "{}", colored.trace);
+    assert_eq!(colored.stdout, node_colored.stdout);
 
     // 2. should save the dependencies and flattenedDependencies of A correctly
     let comp_a = parse(&helper.cat_component("comp/a@0.0.1"));
@@ -139,6 +211,20 @@ fn complex_case_with_a_long_chain_of_dependencies() {
     );
     assert!(node.status.success(), "{node:?}");
     assert_eq!(insights, parse(&node.stdout));
+    let native_text = helper.native_run("insights circular");
+    let node_text = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "insights circular",
+        &[("BIT_NATIVE", OsStr::new("off"))],
+    );
+    assert_eq!(native_text.stdout, node_text.stdout);
+    let native_deps = helper.native_run("insights circular --include-deps --json");
+    let node_deps = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "insights circular --include-deps --json",
+        &[("BIT_NATIVE", OsStr::new("off"))],
+    );
+    assert_eq!(parse(&native_deps.stdout), parse(&node_deps.stdout));
     let cycle = insights[0]["data"][0].as_array().unwrap();
     assert_eq!(
         cycle,
