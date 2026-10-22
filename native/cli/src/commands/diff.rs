@@ -233,7 +233,13 @@ fn render_selection(
     let pattern = options.pattern.as_deref();
     let from_version = options.versions.from.as_deref();
     let to_version = options.versions.to.as_deref();
-    validate_requested_versions(context, selected, options, chalk)?;
+    validate_requested_versions(
+        context,
+        selected,
+        options,
+        import_token(capture).is_some(),
+        chalk,
+    )?;
     let output = if options.versions.parent {
         parent::read(parent::Request {
             engine,

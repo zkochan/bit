@@ -91,6 +91,7 @@ pub(super) fn validate_requested_versions(
     context: &Value,
     selected: &[Value],
     options: &options::Options,
+    has_remote_import: bool,
     chalk: Chalk,
 ) -> io::Result<()> {
     let from_version = options.versions.from.as_deref();
@@ -104,8 +105,10 @@ pub(super) fn validate_requested_versions(
                 "{OWNED_ERROR_PREFIX}--parent flag expects to get only one version",
             )));
         }
-        let identity = text(target.get("identity"))?;
-        validate_target_versions(component_model, identity, from_version, to_version, chalk)?;
+        if !has_remote_import {
+            let identity = text(target.get("identity"))?;
+            validate_target_versions(component_model, identity, from_version, to_version, chalk)?;
+        }
     }
     Ok(())
 }
