@@ -23,6 +23,11 @@ fn parses_capsule_subcommands() {
         parse_subcommand(&["list", "--with-stats"]),
         Some(Subcommand::List { json: false, with_stats: true }),
     );
+    assert!(matches!(
+        parse_subcommand(&["prune", "--dry-run", "--with-sizes", "--json"]),
+        Some(Subcommand::Prune(_)),
+    ));
+    assert_eq!(parse_subcommand(&["prune", "--json"]), None);
     assert_eq!(
         parse_subcommand(&["create", "--seeders-only", "comp1", "-j"]),
         Some(Subcommand::Create(CreateArgs {

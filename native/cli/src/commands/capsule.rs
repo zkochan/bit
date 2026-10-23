@@ -2,6 +2,7 @@
 
 mod create;
 mod list_stats;
+mod prune;
 #[cfg(test)]
 mod tests;
 
@@ -39,6 +40,7 @@ const GLOBAL_SCOPE_ASPECTS_BASE_KEY: &str = "capsules_global_scope_aspects_base_
 pub(super) enum Subcommand {
     BareList,
     List { json: bool, with_stats: bool },
+    Prune(prune::PruneArgs),
     Delete { all: bool, scope_aspects: bool },
     Create(create::CreateArgs),
 }
@@ -55,6 +57,7 @@ impl Subcommand {
         match self {
             Self::BareList => "capsule",
             Self::List { .. } => "list",
+            Self::Prune(_) => "prune",
             Self::Delete { .. } => "delete",
             Self::Create(_) => "create",
         }
@@ -74,6 +77,7 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
     let cwd = env::current_dir()?;
     let chalk = Chalk::detect(args);
     match &subcommand {
+        Subcommand::Prune(prune_args) => prune::run(&cwd, &root, args, chalk, prune_args),
         Subcommand::List { json: true, with_stats } => {
             run_list_json(&cwd, &root, args, *with_stats)
         }
@@ -158,6 +162,7 @@ pub(super) fn parse_subcommand(args: &[&str]) -> Option<Subcommand> {
         [] => Some(Subcommand::BareList),
         ["list", rest @ ..] => parse_list_flags(rest),
         ["delete", rest @ ..] => parse_delete_flags(rest),
+        ["prune", rest @ ..] => prune::parse_flags(rest).map(Subcommand::Prune),
         ["create", rest @ ..] => create::parse_create_flags(rest),
         _ => None,
     }
@@ -216,7 +221,7 @@ fn build_list_report(
         lines.push(formatter.item(&format!("scope's capsules root-dir: {scope_dir}")));
     }
     if with_stats {
-        let stats = list_stats::collect(cwd)?;
+        let stats = list_stats::collect(cwd, true)?;
         let age_days = list_stats::max_age_days(&read_combined_config(root)?);
         lines.push(formatter.item(&list_stats::summary(&stats, age_days, chalk)));
         lines.push(formatter.hint("use --json to get the list of all capsules"));
@@ -243,7 +248,7 @@ fn build_list_json(cwd: &Path, root: &ScopeRoot, with_stats: bool) -> io::Result
     out.insert("capsules".into(), json!(capsules));
     out.insert("scopeCapsules".into(), json!(scope_capsules));
     if with_stats {
-        let stats = list_stats::collect(cwd)?;
+        let stats = list_stats::collect(cwd, true)?;
         out.insert("totalSizeBytes".into(), json!(list_stats::total_size(&stats)));
         out.insert("allRoots".into(), json!(stats));
     }

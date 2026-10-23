@@ -14,15 +14,15 @@ const VALID_KINDS: &[&str] = &["workspace", "scope-aspects-root", "scope-aspect"
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct RootEntry {
-    path: String,
-    kind: String,
+    pub(super) path: String,
+    pub(super) kind: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    origin_path: Option<String>,
-    last_used_ms: u64,
-    size_bytes: u64,
+    pub(super) origin_path: Option<String>,
+    pub(super) last_used_ms: u64,
+    pub(super) size_bytes: u64,
 }
 
-pub(super) fn collect(cwd: &Path) -> io::Result<Vec<RootEntry>> {
+pub(super) fn collect(cwd: &Path, with_sizes: bool) -> io::Result<Vec<RootEntry>> {
     let root = resolve_capsules_dir(cwd)?;
     let entries = match fs::read_dir(root) {
         Ok(entries) => entries,
@@ -45,11 +45,11 @@ pub(super) fn collect(cwd: &Path) -> io::Result<Vec<RootEntry>> {
     paths.sort();
     Ok(paths
         .iter()
-        .map(|path| inspect(path))
+        .map(|path| inspect(path, with_sizes))
         .collect())
 }
 
-fn inspect(path: &Path) -> RootEntry {
+pub(super) fn inspect(path: &Path, with_sizes: bool) -> RootEntry {
     let marker = path.join(ORIGIN_FILE);
     let origin = fs::read(&marker)
         .ok()
@@ -80,16 +80,22 @@ fn inspect(path: &Path) -> RootEntry {
             .and_then(|value| value["originPath"].as_str())
             .map(str::to_owned),
         last_used_ms: stamp.map_or(0, millis),
-        size_bytes: dir_size(path),
+        size_bytes: if with_sizes { dir_size(path) } else { 0 },
     }
 }
 
-fn millis(time: SystemTime) -> u64 {
+pub(super) fn millis(time: SystemTime) -> u64 {
     time.duration_since(UNIX_EPOCH)
         .map_or(0, |duration| ((duration.as_nanos() + 500_000) / 1_000_000) as u64)
 }
 
-fn dir_size(path: &Path) -> u64 {
+pub(super) fn now_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |duration| duration.as_millis() as u64)
+}
+
+pub(super) fn dir_size(path: &Path) -> u64 {
     let Ok(entries) = fs::read_dir(path) else { return 0 };
     entries
         .filter_map(Result::ok)
@@ -144,7 +150,7 @@ pub(super) fn summary(roots: &[RootEntry], age_days: f64, chalk: Chalk) -> Strin
                 .is_some_and(|path| !Path::new(path).exists())
         })
         .count();
-    let cutoff = age_days.mul_add(-86_400_000.0, millis(SystemTime::now()) as f64);
+    let cutoff = age_days.mul_add(-86_400_000.0, now_millis() as f64);
     let stale = roots
         .iter()
         .filter(|root| root.kind == "scope-aspects-root")
@@ -179,7 +185,7 @@ fn stale_children(path: &Path, cutoff: f64) -> usize {
         .count()
 }
 
-fn format_bytes(bytes: u64) -> String {
+pub(super) fn format_bytes(bytes: u64) -> String {
     if bytes == 0 {
         return "0 B".into();
     }
