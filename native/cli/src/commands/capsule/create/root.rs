@@ -21,11 +21,11 @@ pub(super) fn resolve_create_root(
     };
     if let Some(base_dir) = &create_args.base_dir {
         let relative = validate_base_dir(base_dir)?;
-        return Ok(root_base.join(if create_args.use_hash {
+        return Ok(normalize_lexical(&root_base.join(if create_args.use_hash {
             PathBuf::from(object_hash_short(base_dir))
         } else {
             relative
-        }));
+        })));
     }
     if create_args.use_hash {
         return Ok(root_base.join(object_hash_short(&root.path.to_string_lossy())));
@@ -50,7 +50,7 @@ fn validate_base_dir(value: &str) -> io::Result<PathBuf> {
         || path
             .components()
             .any(|part| {
-                !(matches!(part, Component::Normal(_))
+                !(matches!(part, Component::Normal(_) | Component::CurDir | Component::ParentDir)
                     || unix_absolute && matches!(part, Component::RootDir))
             })
     {
@@ -59,7 +59,7 @@ fn validate_base_dir(value: &str) -> io::Result<PathBuf> {
     let relative = path
         .components()
         .filter_map(|part| match part {
-            Component::Normal(segment) => Some(segment),
+            Component::Normal(_) | Component::ParentDir => Some(part.as_os_str()),
             _ => None,
         })
         .collect::<PathBuf>();
@@ -88,8 +88,12 @@ fn validate_root_base_dir(value: &str, cwd: &Path) -> io::Result<PathBuf> {
         return Err(io::Error::other("unsupported capsule root base dir"));
     }
     let joined = if path.is_absolute() { path.to_path_buf() } else { cwd.join(path) };
+    Ok(normalize_lexical(&joined))
+}
+
+fn normalize_lexical(path: &Path) -> PathBuf {
     let mut normalized = PathBuf::new();
-    for component in joined.components() {
+    for component in path.components() {
         match component {
             Component::CurDir => {}
             Component::ParentDir => {
@@ -98,5 +102,5 @@ fn validate_root_base_dir(value: &str, cwd: &Path) -> io::Result<PathBuf> {
             other => normalized.push(other.as_os_str()),
         }
     }
-    Ok(normalized)
+    normalized
 }
