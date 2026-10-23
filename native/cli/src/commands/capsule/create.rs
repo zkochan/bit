@@ -59,6 +59,9 @@ pub(super) fn parse_create_flags(rest: &[&str]) -> Option<Subcommand> {
             "-r" | "--root-base-dir" => {
                 root_base_dir = Some(next_option_value(&mut args)?.to_owned());
             }
+            "-p" | "--package-manager" => {
+                let _ = next_option_value(&mut args)?;
+            }
             val if !val.starts_with('-') => ids.push(val.to_owned()),
             _ => return None,
         }

@@ -387,6 +387,25 @@ fn capsule_create_hashed_base_dir_matches_node() {
     assert_eq!(hashed_root.file_name().unwrap().len(), 9);
 }
 
+#[test]
+fn capsule_create_package_manager_option_matches_node() {
+    let helper = Helper::new();
+    helper.set_workspace_with_remote_scope();
+    helper.populate_components(1, true, "");
+    for flag in ["-p", "--package-manager"] {
+        let command = format!("capsule create comp1 -b custom-capsules {flag} pnpm -j");
+        let node = Helper::cmd_in_with(
+            &helper.scopes.local_path,
+            &command,
+            &[("BIT_NATIVE", OsStr::new("off"))],
+        );
+        let native = helper.native_run(&command);
+        assert!(node.status.success(), "{node:?}");
+        assert!(native.status.success(), "{native:?}");
+        assert_eq!(native.stdout, node.stdout);
+    }
+}
+
 /// Covers:
 /// - `e2e/harmony/global-virtual-store.e2e.ts:37`
 ///   installing with the global virtual store › a workspace with a component › should not create the dependency directories inside the workspace
