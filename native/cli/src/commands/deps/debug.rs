@@ -177,9 +177,9 @@ fn parse_manual_fields(fields: &Map<String, Value>) -> Result<ManualPolicy, Fail
         manual.unresolved_plus.extend(unresolved_plus(field, values)?);
         target.extend(parse_manual_entries(values)?);
     }
+    manual.unresolved_plus.sort();
     if !manual.unresolved_plus.is_empty()
-        && (manual.unresolved_plus.len() != 1
-            || !manual.runtime.is_empty()
+        && (!manual.runtime.is_empty()
             || !manual.dev.is_empty()
             || !manual.peer.is_empty()
             || manual.has_ignored_policy)

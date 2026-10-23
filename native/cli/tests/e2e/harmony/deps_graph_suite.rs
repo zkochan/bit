@@ -11,6 +11,34 @@ use serde_json::{Value, json};
 use std::{ffi::OsStr, fs};
 
 #[test]
+fn deps_debug_multiple_unresolved_plus_policy_matches_node() {
+    let helper = Helper::new();
+    helper.set_workspace_with_remote_scope();
+    helper.populate_components(1, true, "");
+    let bitmap_path = helper.scopes.local_path.join(".bitmap");
+    let bitmap = fs::read_to_string(&bitmap_path).unwrap();
+    let marker = r#""rootDir": "comp1""#;
+    assert_eq!(bitmap.matches(marker).count(), 1);
+    fs::write(
+        bitmap_path,
+        bitmap.replace(
+            marker,
+            r#""rootDir": "comp1", "config": {"teambit.dependencies/dependency-resolver": {"policy": {"dependencies": {"zod": "+", "ansi-regex": "+"}}}}"#,
+        ),
+    )
+    .unwrap();
+    let node = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "deps debug comp1",
+        &[("BIT_NATIVE", OsStr::new("off"))],
+    );
+    let native = helper.native_run("deps debug comp1");
+    assert!(node.status.success(), "{node:?}");
+    assert!(native.status.success() && native.native, "{native:?}");
+    assert_eq!(native.stdout, node.stdout);
+}
+
+#[test]
 fn deps_debug_unresolved_plus_policy_matches_node() {
     let helper = Helper::new();
     helper.set_workspace_with_remote_scope();
