@@ -75,10 +75,28 @@ fn validate_root_base_dir(value: &str, cwd: &Path) -> io::Result<PathBuf> {
         || path
             .components()
             .any(|part| {
-                !matches!(part, Component::Prefix(_) | Component::RootDir | Component::Normal(_))
+                !matches!(
+                    part,
+                    Component::Prefix(_)
+                        | Component::RootDir
+                        | Component::CurDir
+                        | Component::ParentDir
+                        | Component::Normal(_),
+                )
             })
     {
         return Err(io::Error::other("unsupported capsule root base dir"));
     }
-    Ok(if path.is_absolute() { path.to_path_buf() } else { cwd.join(path) })
+    let joined = if path.is_absolute() { path.to_path_buf() } else { cwd.join(path) };
+    let mut normalized = PathBuf::new();
+    for component in joined.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            other => normalized.push(other.as_os_str()),
+        }
+    }
+    Ok(normalized)
 }
