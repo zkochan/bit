@@ -51,6 +51,7 @@ struct PackageOverrides {
     name: Option<String>,
     main: Option<String>,
     license: Option<String>,
+    types: Option<String>,
     metadata: Map<String, Value>,
 }
 
@@ -171,6 +172,7 @@ fn additional_package_metadata(package_json: Option<&Value>) -> Option<PackageOv
     let name = take_nonempty_string(&mut metadata, "name")?;
     let main = take_nonempty_string(&mut metadata, "main")?;
     let license = take_nonempty_string(&mut metadata, "license")?;
+    let types = take_nonempty_string(&mut metadata, "types")?;
     let _version = take_nonempty_string(&mut metadata, "version")?;
     let generated = [
         "componentId",
@@ -179,7 +181,6 @@ fn additional_package_metadata(package_json: Option<&Value>) -> Option<PackageOv
         "peerDependencies",
         "optionalDependencies",
         "peerDependenciesMeta",
-        "types",
         "exports",
     ];
     if metadata
@@ -188,7 +189,7 @@ fn additional_package_metadata(package_json: Option<&Value>) -> Option<PackageOv
     {
         return None;
     }
-    Some(PackageOverrides { name, main, license, metadata })
+    Some(PackageOverrides { name, main, license, types, metadata })
 }
 
 fn take_nonempty_string(metadata: &mut Map<String, Value>, key: &str) -> Option<Option<String>> {
@@ -305,7 +306,7 @@ pub(super) fn write_default_package_json(
             optional_dependencies: BTreeMap::new(),
             peer_dependencies_meta: BTreeMap::new(),
         },
-        entry_points: entry_point_metadata(manifest.env, &stem),
+        entry_points: configured_entry_points(manifest, &stem),
     };
     let pkg = ComponentPackage { generated, metadata: &manifest.overrides.metadata };
     fs::write(&pkg_json_path, serde_json::to_string_pretty(&pkg)?)
@@ -321,6 +322,14 @@ fn entry_point_metadata(env: BuiltinEnv, stem: &str) -> EntryPointMetadata {
         })
     });
     EntryPointMetadata { types, exports }
+}
+
+fn configured_entry_points(manifest: &ManifestConfig, stem: &str) -> EntryPointMetadata {
+    let mut entry_points = entry_point_metadata(manifest.env, stem);
+    if let Some(types) = &manifest.overrides.types {
+        entry_points.types = Some(types.clone());
+    }
+    entry_points
 }
 
 pub(super) fn copy_component_files(src: &Path, dst: &Path) -> io::Result<()> {
