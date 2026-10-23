@@ -53,6 +53,7 @@ struct PackageOverrides {
     license: Option<String>,
     types: Option<String>,
     exports: Option<Value>,
+    optional_dependencies: Option<BTreeMap<String, String>>,
     metadata: Map<String, Value>,
 }
 
@@ -175,13 +176,13 @@ fn additional_package_metadata(package_json: Option<&Value>) -> Option<PackageOv
     let license = take_nonempty_string(&mut metadata, "license")?;
     let types = take_nonempty_string(&mut metadata, "types")?;
     let exports = take_exports(&mut metadata)?;
+    let optional_dependencies = take_string_map(&mut metadata, "optionalDependencies")?;
     let _version = take_nonempty_string(&mut metadata, "version")?;
     let generated = [
         "componentId",
         "dependencies",
         "devDependencies",
         "peerDependencies",
-        "optionalDependencies",
         "peerDependenciesMeta",
     ];
     if metadata
@@ -190,7 +191,20 @@ fn additional_package_metadata(package_json: Option<&Value>) -> Option<PackageOv
     {
         return None;
     }
-    Some(PackageOverrides { name, main, license, types, exports, metadata })
+    Some(PackageOverrides { name, main, license, types, exports, optional_dependencies, metadata })
+}
+
+fn take_string_map(
+    metadata: &mut Map<String, Value>,
+    key: &str,
+) -> Option<Option<BTreeMap<String, String>>> {
+    let Some(value) = metadata.remove(key) else { return Some(None) };
+    let entries = value.as_object()?;
+    entries
+        .iter()
+        .map(|(name, version)| Some((name.clone(), version.as_str()?.to_owned())))
+        .collect::<Option<BTreeMap<_, _>>>()
+        .map(Some)
 }
 
 fn take_exports(metadata: &mut Map<String, Value>) -> Option<Option<Value>> {
@@ -313,7 +327,9 @@ pub(super) fn write_default_package_json(
             .clone()
             .unwrap_or_else(|| "SEE LICENSE IN UNLICENSED".into()),
         dependency_metadata: DependencyMetadata {
-            optional_dependencies: BTreeMap::new(),
+            optional_dependencies: manifest.overrides.optional_dependencies
+                .clone()
+                .unwrap_or_default(),
             peer_dependencies_meta: BTreeMap::new(),
         },
         entry_points: configured_entry_points(manifest, &stem),
