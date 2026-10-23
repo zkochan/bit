@@ -27,6 +27,7 @@ pub(in crate::commands) struct CreateArgs {
     pub json: bool,
     pub base_dir: Option<String>,
     pub always_new: bool,
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,12 +42,20 @@ pub(super) fn parse_create_flags(rest: &[&str]) -> Option<Subcommand> {
     let mut json = false;
     let mut base_dir = None;
     let mut always_new = false;
+    let mut name = None;
     let mut args = rest.iter().copied();
     while let Some(arg) = args.next() {
         match arg {
             "-j" | "--json" => json = true,
             "-s" | "--seeders-only" => seeders_only = true,
             "-a" | "--always-new" => always_new = true,
+            "-i" | "--id" => {
+                let value = args.next()?;
+                if value.starts_with('-') {
+                    return None;
+                }
+                name = Some(value.to_owned());
+            }
             "-b" | "--base-dir" => {
                 let value = args.next()?;
                 if value.starts_with('-') {
@@ -58,7 +67,7 @@ pub(super) fn parse_create_flags(rest: &[&str]) -> Option<Subcommand> {
             _ => return None,
         }
     }
-    Some(Subcommand::Create(CreateArgs { ids, seeders_only, json, base_dir, always_new }))
+    Some(Subcommand::Create(CreateArgs { ids, seeders_only, json, base_dir, always_new, name }))
 }
 
 pub(super) fn run_create(
@@ -140,12 +149,23 @@ fn build_capsules(
     let edges = build_dependency_edges(&root.path, &active);
     let selected =
         select_isolated_indices(active.len(), &seeders, &edges, create_args.seeders_only);
+    validate_custom_name(create_args.name.as_deref(), selected.len())?;
     selected
         .into_iter()
-        .map(|idx| {
-            materialize_capsule(&root.path, &ws_capsules_dir, active[idx], create_args.always_new)
-        })
+        .map(|idx| materialize_capsule(&root.path, &ws_capsules_dir, active[idx], create_args))
         .collect()
+}
+
+fn validate_custom_name(name: Option<&str>, selected_len: usize) -> io::Result<()> {
+    let Some(name) = name else { return Ok(()) };
+    if selected_len != 1 {
+        return Err(io::Error::other("capsule id requires one selected component"));
+    }
+    let mut components = Path::new(name).components();
+    if !matches!(components.next(), Some(Component::Normal(_))) || components.next().is_some() {
+        return Err(io::Error::other("unsupported capsule id"));
+    }
+    Ok(())
 }
 
 fn load_workspace_bitmap(ws_root: &Path) -> io::Result<Bitmap> {
@@ -289,11 +309,13 @@ fn materialize_capsule(
     ws_root: &Path,
     capsules_root: &Path,
     entry: &BitmapEntry,
-    always_new: bool,
+    create_args: &CreateArgs,
 ) -> io::Result<CreatedCapsule> {
     let full_id = selection::entry_full_id(entry);
-    let mut dir_name = full_id.replace('/', "_");
-    if always_new {
+    let mut dir_name = create_args.name
+        .clone()
+        .unwrap_or_else(|| full_id.replace('/', "_"));
+    if create_args.always_new {
         dir_name.push('_');
         dir_name.push_str(&uuid_v4()?);
     }
