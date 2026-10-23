@@ -54,6 +54,7 @@ struct PackageOverrides {
     types: Option<String>,
     exports: Option<Value>,
     optional_dependencies: Option<BTreeMap<String, String>>,
+    peer_dependencies_meta: Option<Map<String, Value>>,
     metadata: Map<String, Value>,
 }
 
@@ -77,7 +78,7 @@ struct PackageDependencies {
 #[serde(rename_all = "camelCase")]
 struct DependencyMetadata {
     optional_dependencies: BTreeMap<String, String>,
-    peer_dependencies_meta: BTreeMap<String, String>,
+    peer_dependencies_meta: Map<String, Value>,
 }
 
 #[derive(Clone, Copy)]
@@ -177,21 +178,33 @@ fn additional_package_metadata(package_json: Option<&Value>) -> Option<PackageOv
     let types = take_nonempty_string(&mut metadata, "types")?;
     let exports = take_exports(&mut metadata)?;
     let optional_dependencies = take_string_map(&mut metadata, "optionalDependencies")?;
+    let peer_dependencies_meta = take_peer_meta(&mut metadata)?;
     let _version = take_nonempty_string(&mut metadata, "version")?;
-    let generated = [
-        "componentId",
-        "dependencies",
-        "devDependencies",
-        "peerDependencies",
-        "peerDependenciesMeta",
-    ];
+    let generated = ["componentId", "dependencies", "devDependencies", "peerDependencies"];
     if metadata
         .keys()
         .any(|key| generated.contains(&key.as_str()))
     {
         return None;
     }
-    Some(PackageOverrides { name, main, license, types, exports, optional_dependencies, metadata })
+    Some(PackageOverrides {
+        name,
+        main,
+        license,
+        types,
+        exports,
+        optional_dependencies,
+        peer_dependencies_meta,
+        metadata,
+    })
+}
+
+fn take_peer_meta(metadata: &mut Map<String, Value>) -> Option<Option<Map<String, Value>>> {
+    match metadata.remove("peerDependenciesMeta") {
+        None => Some(None),
+        Some(Value::Object(meta)) if meta.values().all(Value::is_object) => Some(Some(meta)),
+        _ => None,
+    }
 }
 
 fn take_string_map(
@@ -330,7 +343,9 @@ pub(super) fn write_default_package_json(
             optional_dependencies: manifest.overrides.optional_dependencies
                 .clone()
                 .unwrap_or_default(),
-            peer_dependencies_meta: BTreeMap::new(),
+            peer_dependencies_meta: manifest.overrides.peer_dependencies_meta
+                .clone()
+                .unwrap_or_default(),
         },
         entry_points: configured_entry_points(manifest, &stem),
     };
