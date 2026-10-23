@@ -6,6 +6,7 @@ use super::{
         scope_set::selection,
     },
     Chalk, Formatter, ScopeRoot, Subcommand, compute_capsules_root_dirs, emit_report,
+    resolve_capsules_dir,
 };
 use crate::{history::History, native::Outcome};
 use bit_install::workspace::{Bitmap, BitmapEntry};
@@ -15,7 +16,7 @@ use std::{
     ffi::OsString,
     fs,
     io::{self, Write},
-    path::Path,
+    path::{Component, Path, PathBuf},
     process::ExitCode,
 };
 
@@ -24,6 +25,7 @@ pub(in crate::commands) struct CreateArgs {
     pub ids: Vec<String>,
     pub seeders_only: bool,
     pub json: bool,
+    pub base_dir: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,16 +38,25 @@ pub(super) fn parse_create_flags(rest: &[&str]) -> Option<Subcommand> {
     let mut ids = Vec::new();
     let mut seeders_only = false;
     let mut json = false;
-    for &arg in rest {
+    let mut base_dir = None;
+    let mut args = rest.iter().copied();
+    while let Some(arg) = args.next() {
         match arg {
             "-j" | "--json" => json = true,
             "-s" | "--seeders-only" => seeders_only = true,
             "-a" | "--always-new" => {}
+            "-b" | "--base-dir" => {
+                let value = args.next()?;
+                if value.starts_with('-') {
+                    return None;
+                }
+                base_dir = Some(value.to_owned());
+            }
             val if !val.starts_with('-') => ids.push(val.to_owned()),
             _ => return None,
         }
     }
-    Some(Subcommand::Create(CreateArgs { ids, seeders_only, json }))
+    Some(Subcommand::Create(CreateArgs { ids, seeders_only, json, base_dir }))
 }
 
 pub(super) fn run_create(
@@ -79,7 +90,7 @@ fn emit_create_json(
         .iter()
         .map(|cap| json!({ "id": cap.id, "path": cap.path }))
         .collect::<Vec<_>>();
-    let payload = json!({ "capsules": rows });
+    let payload = json!(rows);
     let mut stdout = io::stdout().lock();
     stdout.write_all(serde_json::to_string_pretty(&payload)?.as_bytes())?;
     stdout.flush()?;
@@ -103,8 +114,21 @@ fn build_capsules(
     create_args: &CreateArgs,
 ) -> io::Result<Vec<CreatedCapsule>> {
     let dirs = compute_capsules_root_dirs(cwd, root)?;
-    let ws_capsules_dir =
-        dirs.workspace.ok_or_else(|| io::Error::other("missing workspace capsules root dir"))?;
+    let ws_capsules_dir = if let Some(base_dir) = &create_args.base_dir {
+        let path = Path::new(base_dir);
+        if path.as_os_str().is_empty()
+            || path
+                .components()
+                .any(|part| !matches!(part, Component::Normal(_)))
+        {
+            return Err(io::Error::other("unsupported capsule base dir"));
+        }
+        PathBuf::from(resolve_capsules_dir(cwd)?).join(path)
+    } else {
+        PathBuf::from(dirs.workspace.ok_or_else(|| {
+            io::Error::other("missing workspace capsules root dir")
+        })?)
+    };
     let bitmap = load_workspace_bitmap(&root.path)?;
     let active = bitmap.entries
         .iter()
@@ -116,7 +140,7 @@ fn build_capsules(
         select_isolated_indices(active.len(), &seeders, &edges, create_args.seeders_only);
     selected
         .into_iter()
-        .map(|idx| materialize_capsule(&root.path, Path::new(&ws_capsules_dir), active[idx]))
+        .map(|idx| materialize_capsule(&root.path, &ws_capsules_dir, active[idx]))
         .collect()
 }
 
