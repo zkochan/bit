@@ -35,6 +35,7 @@ fn parses_capsule_subcommands() {
             seeders_only: true,
             json: true,
             base_dir: None,
+            always_new: false,
         })),
     );
     assert_eq!(
@@ -44,8 +45,13 @@ fn parses_capsule_subcommands() {
             seeders_only: false,
             json: false,
             base_dir: Some("custom".into()),
+            always_new: false,
         })),
     );
+    assert!(matches!(
+        parse_subcommand(&["create", "comp1", "-a"]),
+        Some(Subcommand::Create(CreateArgs { always_new: true, .. }))
+    ));
     assert_eq!(parse_subcommand(&["prune"]), None);
 }
 

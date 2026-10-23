@@ -8,7 +8,7 @@ use super::{
     Chalk, Formatter, ScopeRoot, Subcommand, compute_capsules_root_dirs, emit_report,
     resolve_capsules_dir,
 };
-use crate::{history::History, native::Outcome};
+use crate::{commands::workspace_command::uuid_v4, history::History, native::Outcome};
 use bit_install::workspace::{Bitmap, BitmapEntry};
 use serde_json::{Value, json};
 use std::{
@@ -26,6 +26,7 @@ pub(in crate::commands) struct CreateArgs {
     pub seeders_only: bool,
     pub json: bool,
     pub base_dir: Option<String>,
+    pub always_new: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,12 +40,13 @@ pub(super) fn parse_create_flags(rest: &[&str]) -> Option<Subcommand> {
     let mut seeders_only = false;
     let mut json = false;
     let mut base_dir = None;
+    let mut always_new = false;
     let mut args = rest.iter().copied();
     while let Some(arg) = args.next() {
         match arg {
             "-j" | "--json" => json = true,
             "-s" | "--seeders-only" => seeders_only = true,
-            "-a" | "--always-new" => {}
+            "-a" | "--always-new" => always_new = true,
             "-b" | "--base-dir" => {
                 let value = args.next()?;
                 if value.starts_with('-') {
@@ -56,7 +58,7 @@ pub(super) fn parse_create_flags(rest: &[&str]) -> Option<Subcommand> {
             _ => return None,
         }
     }
-    Some(Subcommand::Create(CreateArgs { ids, seeders_only, json, base_dir }))
+    Some(Subcommand::Create(CreateArgs { ids, seeders_only, json, base_dir, always_new }))
 }
 
 pub(super) fn run_create(
@@ -140,7 +142,9 @@ fn build_capsules(
         select_isolated_indices(active.len(), &seeders, &edges, create_args.seeders_only);
     selected
         .into_iter()
-        .map(|idx| materialize_capsule(&root.path, &ws_capsules_dir, active[idx]))
+        .map(|idx| {
+            materialize_capsule(&root.path, &ws_capsules_dir, active[idx], create_args.always_new)
+        })
         .collect()
 }
 
@@ -285,9 +289,14 @@ fn materialize_capsule(
     ws_root: &Path,
     capsules_root: &Path,
     entry: &BitmapEntry,
+    always_new: bool,
 ) -> io::Result<CreatedCapsule> {
     let full_id = selection::entry_full_id(entry);
-    let dir_name = full_id.replace('/', "_");
+    let mut dir_name = full_id.replace('/', "_");
+    if always_new {
+        dir_name.push('_');
+        dir_name.push_str(&uuid_v4()?);
+    }
     let capsule_dir = capsules_root.join(dir_name);
     fs::create_dir_all(&capsule_dir)?;
     let src_dir = ws_root.join(&entry.root_dir);

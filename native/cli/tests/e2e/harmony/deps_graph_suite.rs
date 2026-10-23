@@ -279,6 +279,37 @@ fn capsule_create_custom_base_dir_matches_node() {
     }
 }
 
+#[test]
+fn capsule_create_always_new_uses_unique_node_style_paths() {
+    let helper = Helper::new();
+    helper.set_workspace_with_remote_scope();
+    helper.populate_components(1, true, "");
+    let command = "capsule create comp1 --base-dir custom-capsules --always-new -j";
+    for native_mode in [false, true] {
+        let mut paths = Vec::new();
+        for _ in 0..2 {
+            let output = if native_mode {
+                helper.native_run(command)
+            } else {
+                Helper::cmd_in_with(
+                    &helper.scopes.local_path,
+                    command,
+                    &[("BIT_NATIVE", OsStr::new("off"))],
+                )
+            };
+            assert!(output.status.success(), "{output:?}");
+            let payload = parse(&output.stdout);
+            let path = payload[0]["path"].as_str().unwrap();
+            assert!(path.contains("/custom-capsules/"));
+            assert!(std::path::Path::new(path).is_dir());
+            let suffix = path.rsplit_once('_').unwrap().1;
+            assert_eq!(suffix.len(), 36);
+            paths.push(path.to_owned());
+        }
+        assert_ne!(paths[0], paths[1]);
+    }
+}
+
 /// Covers:
 /// - `e2e/harmony/global-virtual-store.e2e.ts:37`
 ///   installing with the global virtual store › a workspace with a component › should not create the dependency directories inside the workspace
