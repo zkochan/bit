@@ -1,6 +1,7 @@
 //! Native `bit capsule [list|delete|create]` (`scopes/workspace/workspace/capsule.cmd.ts`).
 
 mod create;
+mod list_stats;
 #[cfg(test)]
 mod tests;
 
@@ -37,7 +38,7 @@ const GLOBAL_SCOPE_ASPECTS_BASE_KEY: &str = "capsules_global_scope_aspects_base_
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Subcommand {
     BareList,
-    List { json: bool },
+    List { json: bool, with_stats: bool },
     Delete { all: bool, scope_aspects: bool },
     Create(create::CreateArgs),
 }
@@ -73,9 +74,12 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
     let cwd = env::current_dir()?;
     let chalk = Chalk::detect(args);
     match &subcommand {
-        Subcommand::List { json: true } => run_list_json(&cwd, &root, args),
-        Subcommand::BareList | Subcommand::List { json: false } => {
-            let Ok(data) = build_list_report(&cwd, &root, chalk) else {
+        Subcommand::List { json: true, with_stats } => {
+            run_list_json(&cwd, &root, args, *with_stats)
+        }
+        Subcommand::BareList | Subcommand::List { json: false, .. } => {
+            let with_stats = matches!(subcommand, Subcommand::List { with_stats: true, .. });
+            let Ok(data) = build_list_report(&cwd, &root, chalk, with_stats) else {
                 return Ok(Outcome::Declined("capsule list delegated".into()));
             };
             emit_report(&root, args, subcommand.loader_label(), data)
@@ -89,8 +93,13 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
     }
 }
 
-fn run_list_json(cwd: &Path, root: &ScopeRoot, args: &[OsString]) -> io::Result<Outcome> {
-    let Ok(payload) = build_list_json(cwd, root) else {
+fn run_list_json(
+    cwd: &Path,
+    root: &ScopeRoot,
+    args: &[OsString],
+    with_stats: bool,
+) -> io::Result<Outcome> {
+    let Ok(payload) = build_list_json(cwd, root, with_stats) else {
         return Ok(Outcome::Declined("capsule list --json delegated".into()));
     };
     let history = (!root.bare).then(|| History::start(&root.path, args));
@@ -156,13 +165,15 @@ pub(super) fn parse_subcommand(args: &[&str]) -> Option<Subcommand> {
 
 fn parse_list_flags(rest: &[&str]) -> Option<Subcommand> {
     let mut json = false;
+    let mut with_stats = false;
     for &arg in rest {
         match arg {
             "-j" | "--json" => json = true,
+            "--with-stats" => with_stats = true,
             _ => return None,
         }
     }
-    Some(Subcommand::List { json })
+    Some(Subcommand::List { json, with_stats })
 }
 
 fn parse_delete_flags(rest: &[&str]) -> Option<Subcommand> {
@@ -178,7 +189,12 @@ fn parse_delete_flags(rest: &[&str]) -> Option<Subcommand> {
     Some(Subcommand::Delete { all, scope_aspects })
 }
 
-fn build_list_report(cwd: &Path, root: &ScopeRoot, chalk: Chalk) -> io::Result<String> {
+fn build_list_report(
+    cwd: &Path,
+    root: &ScopeRoot,
+    chalk: Chalk,
+    with_stats: bool,
+) -> io::Result<String> {
     let dirs = compute_capsules_root_dirs(cwd, root)?;
     let list_ws = dirs.workspace.as_deref().map(list_capsules_in_dir);
     let list_scope = list_capsules_in_dir(&dirs.scope_aspects);
@@ -199,13 +215,20 @@ fn build_list_report(cwd: &Path, root: &ScopeRoot, chalk: Chalk) -> io::Result<S
     if let Some(scope_dir) = &dirs.scope {
         lines.push(formatter.item(&format!("scope's capsules root-dir: {scope_dir}")));
     }
-    lines.push(formatter.hint(
-        "use --json to get the list of all capsules, or --with-stats for size/orphan summary",
-    ));
+    if with_stats {
+        let stats = list_stats::collect(cwd)?;
+        let age_days = list_stats::max_age_days(&read_combined_config(root)?);
+        lines.push(formatter.item(&list_stats::summary(&stats, age_days, chalk)));
+        lines.push(formatter.hint("use --json to get the list of all capsules"));
+    } else {
+        lines.push(formatter.hint(
+            "use --json to get the list of all capsules, or --with-stats for size/orphan summary",
+        ));
+    }
     Ok(lines.join("\n"))
 }
 
-fn build_list_json(cwd: &Path, root: &ScopeRoot) -> io::Result<Value> {
+fn build_list_json(cwd: &Path, root: &ScopeRoot, with_stats: bool) -> io::Result<Value> {
     let dirs = compute_capsules_root_dirs(cwd, root)?;
     let capsules = dirs.workspace.as_deref().map_or_else(Vec::new, list_capsules_in_dir);
     let scope_capsules = list_capsules_in_dir(&dirs.scope_aspects);
@@ -219,6 +242,11 @@ fn build_list_json(cwd: &Path, root: &ScopeRoot) -> io::Result<Value> {
     }
     out.insert("capsules".into(), json!(capsules));
     out.insert("scopeCapsules".into(), json!(scope_capsules));
+    if with_stats {
+        let stats = list_stats::collect(cwd)?;
+        out.insert("totalSizeBytes".into(), json!(list_stats::total_size(&stats)));
+        out.insert("allRoots".into(), json!(stats));
+    }
     Ok(Value::Object(out))
 }
 
