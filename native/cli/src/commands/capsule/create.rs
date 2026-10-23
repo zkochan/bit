@@ -6,7 +6,7 @@ use super::{
         scope_set::selection,
     },
     Chalk, Formatter, ScopeRoot, Subcommand, compute_capsules_root_dirs, emit_report,
-    resolve_capsules_dir,
+    object_hash_short, resolve_capsules_dir,
 };
 use crate::{commands::workspace_command::uuid_v4, history::History, native::Outcome};
 use bit_install::workspace::{Bitmap, BitmapEntry};
@@ -29,6 +29,7 @@ pub(in crate::commands) struct CreateArgs {
     pub always_new: bool,
     pub name: Option<String>,
     pub root_base_dir: Option<String>,
+    pub use_hash: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,12 +46,14 @@ pub(super) fn parse_create_flags(rest: &[&str]) -> Option<Subcommand> {
     let mut always_new = false;
     let mut name = None;
     let mut root_base_dir = None;
+    let mut use_hash = false;
     let mut args = rest.iter().copied();
     while let Some(arg) = args.next() {
         match arg {
             "-j" | "--json" => json = true,
             "-s" | "--seeders-only" => seeders_only = true,
             "-a" | "--always-new" => always_new = true,
+            "--use-hash" => use_hash = true,
             "-i" | "--id" => name = Some(next_option_value(&mut args)?.to_owned()),
             "-b" | "--base-dir" => base_dir = Some(next_option_value(&mut args)?.to_owned()),
             "-r" | "--root-base-dir" => {
@@ -68,6 +71,7 @@ pub(super) fn parse_create_flags(rest: &[&str]) -> Option<Subcommand> {
         always_new,
         name,
         root_base_dir,
+        use_hash,
     }))
 }
 
@@ -166,7 +170,14 @@ fn resolve_create_root(
         {
             return Err(io::Error::other("unsupported capsule base dir"));
         }
-        return Ok(root_base.join(path));
+        return Ok(root_base.join(if create_args.use_hash {
+            PathBuf::from(object_hash_short(base_dir))
+        } else {
+            path.to_path_buf()
+        }));
+    }
+    if create_args.use_hash {
+        return Err(io::Error::other("capsule use-hash requires an explicit base dir"));
     }
     let dirs = compute_capsules_root_dirs(cwd, root)?;
     let ws_dir = PathBuf::from(dirs.workspace.ok_or_else(|| {

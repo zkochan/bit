@@ -38,6 +38,7 @@ fn parses_capsule_subcommands() {
             always_new: false,
             name: None,
             root_base_dir: None,
+            use_hash: false,
         })),
     );
     assert_eq!(
@@ -50,6 +51,7 @@ fn parses_capsule_subcommands() {
             always_new: false,
             name: None,
             root_base_dir: None,
+            use_hash: false,
         })),
     );
     assert!(matches!(
