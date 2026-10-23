@@ -36,11 +36,16 @@ struct ManualPolicy {
     runtime: Vec<(String, String)>,
     dev: Vec<(String, String)>,
     peer: Vec<(String, String)>,
+    has_ignored_policy: bool,
+    ignores_env_dependency: bool,
 }
 
 impl ManualPolicy {
     fn is_empty(&self) -> bool {
-        self.runtime.is_empty() && self.dev.is_empty() && self.peer.is_empty()
+        self.runtime.is_empty()
+            && self.dev.is_empty()
+            && self.peer.is_empty()
+            && !self.has_ignored_policy
     }
 }
 
@@ -80,7 +85,7 @@ fn validate_simple_component(
     }
     let manual = manual_policy(entry)?;
     if !manual.is_empty() {
-        validate_manual_component(root, ctx, entry, component)?;
+        validate_manual_component(root, ctx, entry, component, &manual)?;
         return Ok(manual);
     }
     if !ctx.ws_config.variants.is_empty()
@@ -149,9 +154,31 @@ fn parse_manual_fields(fields: &Map<String, Value>) -> Result<ManualPolicy, Fail
             "peerDependencies" => &mut manual.peer,
             _ => return Err(Failure::Declined("unsupported component deps debug field".into())),
         };
+        manual.has_ignored_policy |= values
+            .as_object()
+            .is_some_and(|entries| {
+                entries
+                    .values()
+                    .any(|value| value == "-")
+            });
+        manual.ignores_env_dependency |= ignored_env_policy(field, values);
         target.extend(parse_manual_entries(values)?);
     }
     Ok(manual)
+}
+
+fn ignored_env_policy(field: &str, values: &Value) -> bool {
+    if field != "devDependencies" {
+        return false;
+    }
+    let Some(entries) = values.as_object() else { return false };
+    NODE_DEV
+        .iter()
+        .any(|(name, _)| {
+            entries
+                .get(*name)
+                .is_some_and(|value| value == "-")
+        })
 }
 
 fn parse_manual_entries(values: &Value) -> Result<Vec<(String, String)>, Failure> {
@@ -165,12 +192,15 @@ fn parse_manual_entries(values: &Value) -> Result<Vec<(String, String)>, Failure
                 .ok_or_else(|| {
                     Failure::Declined("unsupported component deps debug version".into())
                 })?;
-            if name.is_empty() || version.is_empty() || version == "-" {
+            if name.is_empty() || version.is_empty() {
                 return Err(Failure::Declined("unsupported component deps debug entry".into()));
             }
-            Ok((name.clone(), version.to_owned()))
+            Ok((version != "-").then(|| (name.clone(), version.to_owned())))
         })
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
     rows.sort_by(|left, right| left.0.cmp(&right.0));
     Ok(rows)
 }
@@ -190,7 +220,11 @@ fn validate_manual_component(
     ctx: &WorkspaceDepsContext,
     entry: &BitmapEntry,
     component: &bit_install::model::WorkspaceComponent,
+    manual: &ManualPolicy,
 ) -> Result<(), Failure> {
+    if manual.ignores_env_dependency {
+        return Err(Failure::Declined("ignored env debug dependency delegated".into()));
+    }
     let unsupported_context = component.env_id != "teambit.harmony/node"
         || !ctx.ws_config.variants.is_empty()
         || !empty_policy(&ctx.ws_config.dependency_resolver.policy)
