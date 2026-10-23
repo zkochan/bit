@@ -448,14 +448,40 @@ fn capsule_create_peer_dependency_metadata_matches_node() {
 }
 
 #[test]
-fn capsule_create_package_dependency_override_delegates() {
+fn capsule_create_ignores_configured_dependency_maps_like_node() {
     let helper = Helper::new();
     helper.set_workspace_with_remote_scope();
     helper.populate_components(1, true, "");
-    set_capsule_package_metadata(&helper, &json!({"dependencies": {"is-positive": "1.0.0"}}));
-    let run = helper.cmd("capsule create comp1 -b package-dependency-override -j");
-    assert!(run.status.success() && !run.native, "{run:?}");
-    assert!(run.trace.contains("capsule create delegated"), "{run:?}");
+    set_capsule_package_metadata(
+        &helper,
+        &json!({
+            "dependencies": {"is-positive": "1.0.0"},
+            "devDependencies": {"left-pad": "1.3.0"},
+            "peerDependencies": {"react": "18.0.0"}
+        }),
+    );
+    let command = "capsule create comp1 -b package-dependency-override -j";
+    let node = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        command,
+        &[("BIT_NATIVE", OsStr::new("off"))],
+    );
+    assert!(node.status.success(), "{node:?}");
+    let capsule = parse(&node.stdout)[0]["path"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let capsule_path = std::path::Path::new(&capsule);
+    let node_manifest = fs::read(capsule_path.join("package.json")).unwrap();
+    let node_package: Value = serde_json::from_slice(&node_manifest).unwrap();
+    assert!(node_package["dependencies"]["is-positive"].is_null());
+    assert!(node_package["devDependencies"]["left-pad"].is_null());
+    assert!(node_package["peerDependencies"]["react"].is_null());
+    fs::remove_dir_all(capsule_path.parent().unwrap()).unwrap();
+    let native = helper.native_run(command);
+    assert!(native.status.success() && native.native, "{native:?}");
+    assert_eq!(native.stdout, node.stdout);
+    assert_eq!(fs::read(capsule_path.join("package.json")).unwrap(), node_manifest);
 }
 
 #[test]

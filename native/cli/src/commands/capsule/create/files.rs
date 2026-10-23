@@ -179,8 +179,11 @@ fn additional_package_metadata(package_json: Option<&Value>) -> Option<PackageOv
     let exports = take_exports(&mut metadata)?;
     let optional_dependencies = take_string_map(&mut metadata, "optionalDependencies")?;
     let peer_dependencies_meta = take_peer_meta(&mut metadata)?;
+    let _runtime_dependencies = take_string_map(&mut metadata, "dependencies")?;
+    let _dev_dependencies = take_string_map(&mut metadata, "devDependencies")?;
+    let _peer_dependencies = take_string_map(&mut metadata, "peerDependencies")?;
     let _version = take_nonempty_string(&mut metadata, "version")?;
-    let generated = ["componentId", "dependencies", "devDependencies", "peerDependencies"];
+    let generated = ["componentId"];
     if metadata
         .keys()
         .any(|key| generated.contains(&key.as_str()))
