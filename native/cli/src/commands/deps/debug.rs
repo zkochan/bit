@@ -4,6 +4,7 @@ use super::{
     mutation::format_json_indent_4,
     resolve::{WorkspaceDepsContext, scanned_specifiers},
 };
+mod policy;
 use crate::commands::{
     color::Chalk,
     scope_set::{Failure, selection},
@@ -12,6 +13,7 @@ use bit_install::{
     config::DEPENDENCY_RESOLVER_ASPECT,
     workspace::{Bitmap, BitmapEntry},
 };
+use policy::{empty_policy, supported_policy, unresolved_plus};
 use serde_json::{Map, Value, json};
 use std::{collections::HashSet, path::Path};
 
@@ -36,6 +38,7 @@ struct ManualPolicy {
     runtime: Vec<(String, String)>,
     dev: Vec<(String, String)>,
     peer: Vec<(String, String)>,
+    unresolved_plus: Vec<String>,
     has_ignored_policy: bool,
     ignored_env_dependencies: Vec<String>,
 }
@@ -45,6 +48,7 @@ impl ManualPolicy {
         self.runtime.is_empty()
             && self.dev.is_empty()
             && self.peer.is_empty()
+            && self.unresolved_plus.is_empty()
             && !self.has_ignored_policy
     }
 }
@@ -170,7 +174,19 @@ fn parse_manual_fields(fields: &Map<String, Value>) -> Result<ManualPolicy, Fail
                 })
                 .map(|(name, _)| (*name).to_owned()),
         );
+        manual.unresolved_plus.extend(unresolved_plus(field, values)?);
         target.extend(parse_manual_entries(values)?);
+    }
+    if !manual.unresolved_plus.is_empty()
+        && (manual.unresolved_plus.len() != 1
+            || !manual.runtime.is_empty()
+            || !manual.dev.is_empty()
+            || !manual.peer.is_empty()
+            || manual.has_ignored_policy)
+    {
+        return Err(
+            Failure::Declined("combined component deps debug plus policy delegated".into()),
+        );
     }
     Ok(manual)
 }
@@ -189,7 +205,7 @@ fn parse_manual_entries(values: &Value) -> Result<Vec<(String, String)>, Failure
             if name.is_empty() || version.is_empty() {
                 return Err(Failure::Declined("unsupported component deps debug entry".into()));
             }
-            Ok((version != "-").then(|| (name.clone(), version.to_owned())))
+            Ok((version != "-" && version != "+").then(|| (name.clone(), version.to_owned())))
         })
         .collect::<Result<Vec<_>, _>>()?
         .into_iter()
@@ -302,7 +318,7 @@ fn render_manual(root: &Path, manual: &ManualPolicy) -> Result<String, Failure> 
         .chain(&groups.peer)
         .collect::<Vec<_>>();
     validate_manual_rows(root, &all)?;
-    format_json_indent_4(&manual_value(&groups, &all)).map_err(Failure::from)
+    format_json_indent_4(&manual_value(manual, &groups, &all)).map_err(Failure::from)
 }
 
 fn manual_groups(manual: &ManualPolicy) -> ManualGroups<'_> {
@@ -348,7 +364,11 @@ fn validate_manual_rows(root: &Path, all: &[&SourcedDep<'_>]) -> Result<(), Fail
     Ok(())
 }
 
-fn manual_value(groups: &ManualGroups<'_>, all: &[&SourcedDep<'_>]) -> Value {
+fn manual_value(
+    manual: &ManualPolicy,
+    groups: &ManualGroups<'_>,
+    all: &[&SourcedDep<'_>],
+) -> Value {
     let mut added = Map::new();
     if !groups.runtime.is_empty() {
         added.insert("dependencies".into(), manual_versions(&groups.runtime));
@@ -359,9 +379,10 @@ fn manual_value(groups: &ManualGroups<'_>, all: &[&SourcedDep<'_>]) -> Value {
     if !groups.peer.is_empty() {
         added.insert("peerDependencies".into(), manual_versions(&groups.peer));
     }
-    let missing = all
+    let missing = manual.unresolved_plus
         .iter()
-        .map(|(name, _, _)| *name)
+        .map(String::as_str)
+        .chain(all.iter().map(|(name, _, _)| *name))
         .collect::<Vec<_>>();
     let sources = all
         .iter()
@@ -391,32 +412,4 @@ fn versions(deps: &[(&str, &str)]) -> Value {
             .map(|(name, version)| Value::String(format!("{name}@{version}")))
             .collect(),
     )
-}
-
-fn supported_policy(policy: &Value) -> bool {
-    policy.is_null()
-        || policy
-            .as_object()
-            .is_some_and(|map| {
-                map.iter()
-                    .all(|(key, value)| {
-                        matches!(
-                            key.as_str(),
-                            "dependencies" | "devDependencies" | "peerDependencies",
-                        ) && value
-                            .as_object()
-                            .is_some_and(|entries| entries.values().all(Value::is_string))
-                    })
-            })
-}
-
-fn empty_policy(policy: &Value) -> bool {
-    policy.is_null()
-        || policy
-            .as_object()
-            .is_some_and(|fields| {
-                fields
-                    .values()
-                    .all(|entries| entries.as_object().is_some_and(Map::is_empty))
-            })
 }
