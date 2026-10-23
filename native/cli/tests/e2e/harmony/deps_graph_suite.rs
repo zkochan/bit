@@ -1168,6 +1168,33 @@ fn capsule_create_dotted_base_dir_matches_node() {
     }
 }
 
+#[cfg(unix)]
+#[test]
+fn capsule_create_base_dir_selects_root_like_node() {
+    let helper = Helper::new();
+    helper.set_workspace_with_remote_scope();
+    helper.populate_components(1, true, "");
+    for command in [
+        "capsule create comp1 --root-base-dir ./dot-root --base-dir . -j",
+        "capsule create comp1 --root-base-dir ./slash-root --base-dir / -j",
+    ] {
+        let node = Helper::cmd_in_with(
+            &helper.scopes.local_path,
+            command,
+            &[("BIT_NATIVE", OsStr::new("off"))],
+        );
+        assert!(node.status.success(), "{node:?}");
+        let capsule = parse(&node.stdout)[0]["path"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        fs::remove_dir_all(std::path::Path::new(&capsule).parent().unwrap()).unwrap();
+        let native = helper.native_run(command);
+        assert!(native.status.success() && native.native, "{native:?}");
+        assert_eq!(native.stdout, node.stdout);
+    }
+}
+
 #[test]
 fn capsule_create_hashed_base_dir_matches_node() {
     let helper = Helper::new();
