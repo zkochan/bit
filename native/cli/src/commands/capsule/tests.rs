@@ -37,6 +37,7 @@ fn parses_capsule_subcommands() {
             base_dir: None,
             always_new: false,
             name: None,
+            root_base_dir: None,
         })),
     );
     assert_eq!(
@@ -48,6 +49,7 @@ fn parses_capsule_subcommands() {
             base_dir: Some("custom".into()),
             always_new: false,
             name: None,
+            root_base_dir: None,
         })),
     );
     assert!(matches!(
