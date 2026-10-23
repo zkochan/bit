@@ -11,31 +11,31 @@ use serde_json::{Value, json};
 use std::{ffi::OsStr, fs};
 
 #[test]
-fn deps_debug_ignored_env_dependency_delegates() {
-    let helper = Helper::new();
-    helper.set_workspace_with_remote_scope();
-    helper.populate_components(1, true, "");
-    let bitmap_path = helper.scopes.local_path.join(".bitmap");
-    let bitmap = fs::read_to_string(&bitmap_path).unwrap();
-    let marker = r#""rootDir": "comp1""#;
-    assert_eq!(bitmap.matches(marker).count(), 1);
-    fs::write(
-        bitmap_path,
-        bitmap.replace(
-            marker,
-            r#""rootDir": "comp1", "config": {"teambit.dependencies/dependency-resolver": {"policy": {"devDependencies": {"@types/jest": "-"}}}}"#,
-        ),
-    )
-    .unwrap();
-    let node = Helper::cmd_in_with(
-        &helper.scopes.local_path,
-        "deps debug comp1",
-        &[("BIT_NATIVE", OsStr::new("off"))],
-    );
-    let native = helper.cmd("deps debug comp1");
-    assert!(!native.native, "{}", native.trace);
-    assert_eq!(native.status.code(), node.status.code());
-    assert_eq!(native.stdout, node.stdout);
+fn deps_debug_ignored_env_dependencies_match_node() {
+    let replacements = [
+        r#""rootDir": "comp1", "config": {"teambit.dependencies/dependency-resolver": {"policy": {"devDependencies": {"@types/jest": "-"}}}}"#,
+        r#""rootDir": "comp1", "config": {"teambit.dependencies/dependency-resolver": {"policy": {"devDependencies": {"@types/node": "-"}}}}"#,
+        r#""rootDir": "comp1", "config": {"teambit.dependencies/dependency-resolver": {"policy": {"devDependencies": {"@types/jest": "-", "@types/node": "-"}}}}"#,
+    ];
+    for replacement in replacements {
+        let helper = Helper::new();
+        helper.set_workspace_with_remote_scope();
+        helper.populate_components(1, true, "");
+        let bitmap_path = helper.scopes.local_path.join(".bitmap");
+        let bitmap = fs::read_to_string(&bitmap_path).unwrap();
+        let marker = r#""rootDir": "comp1""#;
+        assert_eq!(bitmap.matches(marker).count(), 1);
+        fs::write(bitmap_path, bitmap.replace(marker, replacement)).unwrap();
+        let node = Helper::cmd_in_with(
+            &helper.scopes.local_path,
+            "deps debug comp1",
+            &[("BIT_NATIVE", OsStr::new("off"))],
+        );
+        let native = helper.native_run("deps debug comp1");
+        assert!(node.status.success(), "{node:?}");
+        assert!(native.status.success() && native.native, "{native:?}");
+        assert_eq!(native.stdout, node.stdout);
+    }
 }
 
 #[test]

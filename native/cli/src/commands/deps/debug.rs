@@ -37,7 +37,7 @@ struct ManualPolicy {
     dev: Vec<(String, String)>,
     peer: Vec<(String, String)>,
     has_ignored_policy: bool,
-    ignores_env_dependency: bool,
+    ignored_env_dependencies: Vec<String>,
 }
 
 impl ManualPolicy {
@@ -85,7 +85,7 @@ fn validate_simple_component(
     }
     let manual = manual_policy(entry)?;
     if !manual.is_empty() {
-        validate_manual_component(root, ctx, entry, component, &manual)?;
+        validate_manual_component(root, ctx, entry, component)?;
         return Ok(manual);
     }
     if !ctx.ws_config.variants.is_empty()
@@ -161,24 +161,18 @@ fn parse_manual_fields(fields: &Map<String, Value>) -> Result<ManualPolicy, Fail
                     .values()
                     .any(|value| value == "-")
             });
-        manual.ignores_env_dependency |= ignored_env_policy(field, values);
+        manual.ignored_env_dependencies.extend(
+            NODE_DEV
+                .iter()
+                .filter(|(name, _)| {
+                    field == "devDependencies"
+                        && values.get(*name).and_then(Value::as_str) == Some("-")
+                })
+                .map(|(name, _)| (*name).to_owned()),
+        );
         target.extend(parse_manual_entries(values)?);
     }
     Ok(manual)
-}
-
-fn ignored_env_policy(field: &str, values: &Value) -> bool {
-    if field != "devDependencies" {
-        return false;
-    }
-    let Some(entries) = values.as_object() else { return false };
-    NODE_DEV
-        .iter()
-        .any(|(name, _)| {
-            entries
-                .get(*name)
-                .is_some_and(|value| value == "-")
-        })
 }
 
 fn parse_manual_entries(values: &Value) -> Result<Vec<(String, String)>, Failure> {
@@ -220,11 +214,7 @@ fn validate_manual_component(
     ctx: &WorkspaceDepsContext,
     entry: &BitmapEntry,
     component: &bit_install::model::WorkspaceComponent,
-    manual: &ManualPolicy,
 ) -> Result<(), Failure> {
-    if manual.ignores_env_dependency {
-        return Err(Failure::Declined("ignored env debug dependency delegated".into()));
-    }
     let unsupported_context = component.env_id != "teambit.harmony/node"
         || !ctx.ws_config.variants.is_empty()
         || !empty_policy(&ctx.ws_config.dependency_resolver.policy)
@@ -327,6 +317,11 @@ fn manual_groups(manual: &ManualPolicy) -> ManualGroups<'_> {
     dev.extend(
         NODE_DEV
             .iter()
+            .filter(|(name, _)| {
+                !manual.ignored_env_dependencies
+                    .iter()
+                    .any(|ignored| ignored.as_str() == *name)
+            })
             .map(|(name, version)| (*name, *version, "env")),
     );
     let peer = manual.peer
@@ -358,7 +353,9 @@ fn manual_value(groups: &ManualGroups<'_>, all: &[&SourcedDep<'_>]) -> Value {
     if !groups.runtime.is_empty() {
         added.insert("dependencies".into(), manual_versions(&groups.runtime));
     }
-    added.insert("devDependencies".into(), manual_versions(&groups.dev));
+    if !groups.dev.is_empty() {
+        added.insert("devDependencies".into(), manual_versions(&groups.dev));
+    }
     if !groups.peer.is_empty() {
         added.insert("peerDependencies".into(), manual_versions(&groups.peer));
     }
