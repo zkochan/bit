@@ -179,10 +179,7 @@ fn parse_manual_fields(fields: &Map<String, Value>) -> Result<ManualPolicy, Fail
     }
     manual.unresolved_plus.sort();
     if !manual.unresolved_plus.is_empty()
-        && (!manual.runtime.is_empty()
-            || !manual.dev.is_empty()
-            || !manual.peer.is_empty()
-            || manual.has_ignored_policy)
+        && (!manual.dev.is_empty() || !manual.peer.is_empty() || manual.has_ignored_policy)
     {
         return Err(
             Failure::Declined("combined component deps debug plus policy delegated".into()),
@@ -379,10 +376,20 @@ fn manual_value(
     if !groups.peer.is_empty() {
         added.insert("peerDependencies".into(), manual_versions(&groups.peer));
     }
-    let missing = manual.unresolved_plus
+    let mut runtime_missing = manual.unresolved_plus
         .iter()
         .map(String::as_str)
-        .chain(all.iter().map(|(name, _, _)| *name))
+        .chain(groups.runtime.iter().map(|(name, _, _)| *name))
+        .collect::<Vec<_>>();
+    runtime_missing.sort_unstable();
+    let missing = runtime_missing
+        .into_iter()
+        .chain(
+            groups.dev
+                .iter()
+                .chain(&groups.peer)
+                .map(|(name, _, _)| *name),
+        )
         .collect::<Vec<_>>();
     let sources = all
         .iter()
