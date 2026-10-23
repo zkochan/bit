@@ -52,6 +52,7 @@ struct PackageOverrides {
     main: Option<String>,
     license: Option<String>,
     types: Option<String>,
+    exports: Option<Value>,
     metadata: Map<String, Value>,
 }
 
@@ -173,6 +174,7 @@ fn additional_package_metadata(package_json: Option<&Value>) -> Option<PackageOv
     let main = take_nonempty_string(&mut metadata, "main")?;
     let license = take_nonempty_string(&mut metadata, "license")?;
     let types = take_nonempty_string(&mut metadata, "types")?;
+    let exports = take_exports(&mut metadata)?;
     let _version = take_nonempty_string(&mut metadata, "version")?;
     let generated = [
         "componentId",
@@ -181,7 +183,6 @@ fn additional_package_metadata(package_json: Option<&Value>) -> Option<PackageOv
         "peerDependencies",
         "optionalDependencies",
         "peerDependenciesMeta",
-        "exports",
     ];
     if metadata
         .keys()
@@ -189,7 +190,16 @@ fn additional_package_metadata(package_json: Option<&Value>) -> Option<PackageOv
     {
         return None;
     }
-    Some(PackageOverrides { name, main, license, types, metadata })
+    Some(PackageOverrides { name, main, license, types, exports, metadata })
+}
+
+fn take_exports(metadata: &mut Map<String, Value>) -> Option<Option<Value>> {
+    match metadata.remove("exports") {
+        None => Some(None),
+        Some(value @ Value::Object(_)) => Some(Some(value)),
+        Some(Value::String(value)) if !value.is_empty() => Some(Some(Value::String(value))),
+        _ => None,
+    }
 }
 
 fn take_nonempty_string(metadata: &mut Map<String, Value>, key: &str) -> Option<Option<String>> {
@@ -328,6 +338,9 @@ fn configured_entry_points(manifest: &ManifestConfig, stem: &str) -> EntryPointM
     let mut entry_points = entry_point_metadata(manifest.env, stem);
     if let Some(types) = &manifest.overrides.types {
         entry_points.types = Some(types.clone());
+    }
+    if let Some(exports) = &manifest.overrides.exports {
+        entry_points.exports = Some(exports.clone());
     }
     entry_points
 }
