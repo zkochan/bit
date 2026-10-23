@@ -178,8 +178,7 @@ fn parse_manual_fields(fields: &Map<String, Value>) -> Result<ManualPolicy, Fail
         target.extend(parse_manual_entries(values)?);
     }
     manual.unresolved_plus.sort();
-    if !manual.unresolved_plus.is_empty() && (!manual.peer.is_empty() || manual.has_ignored_policy)
-    {
+    if !manual.unresolved_plus.is_empty() && manual.has_ignored_policy {
         return Err(
             Failure::Declined("combined component deps debug plus policy delegated".into()),
         );
