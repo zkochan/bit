@@ -16,7 +16,7 @@ pub(super) fn resolve_create_root(
 ) -> io::Result<PathBuf> {
     let default_root = PathBuf::from(resolve_capsules_dir(cwd)?);
     let root_base = match &create_args.root_base_dir {
-        Some(value) => validate_root_base_dir(value)?,
+        Some(value) => validate_root_base_dir(value, cwd)?,
         None => default_root.clone(),
     };
     if let Some(base_dir) = &create_args.base_dir {
@@ -69,9 +69,9 @@ fn validate_base_dir(value: &str) -> io::Result<PathBuf> {
     Ok(relative)
 }
 
-fn validate_root_base_dir(value: &str) -> io::Result<PathBuf> {
+fn validate_root_base_dir(value: &str, cwd: &Path) -> io::Result<PathBuf> {
     let path = Path::new(value);
-    if !path.is_absolute()
+    if path.as_os_str().is_empty()
         || path
             .components()
             .any(|part| {
@@ -80,5 +80,5 @@ fn validate_root_base_dir(value: &str) -> io::Result<PathBuf> {
     {
         return Err(io::Error::other("unsupported capsule root base dir"));
     }
-    Ok(path.to_path_buf())
+    Ok(if path.is_absolute() { path.to_path_buf() } else { cwd.join(path) })
 }
