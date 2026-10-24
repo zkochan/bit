@@ -106,7 +106,7 @@ fn supported_entries(policy: &serde_json::Map<String, Value>) -> bool {
 
 fn valid_entry<'a>(field: &str, name: &'a str, value: &Value, seen: &mut HashSet<&'a str>) -> bool {
     let Some(version) = super::manual_version(value) else { return false };
-    if !seen.insert(name) || version.is_empty() || version == "+" {
+    if !seen.insert(name) || version.is_empty() || (version == "+" && field != "dependencies") {
         return false;
     }
     if NODE_DEV
