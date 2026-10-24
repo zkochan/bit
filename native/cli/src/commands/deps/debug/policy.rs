@@ -36,7 +36,7 @@ fn unsupported_peer_plus_mix(manual: &ManualPolicy) -> bool {
                         .any(|(entry, _)| entry == name)
                 })
         });
-    populated > 1 || !manual.unresolved_plus.is_empty() || duplicate
+    populated > 1 && !manual.peer.is_empty() || !manual.unresolved_plus.is_empty() || duplicate
 }
 
 fn append_manual_field(
