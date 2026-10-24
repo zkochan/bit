@@ -1,7 +1,8 @@
 //! Plain built-in environment versions are rendered from verified model dependencies.
 
 use super::{
-    Failure, ManualPolicy, NODE_DEV, REACT_DEV, REACT_PEER, REACT_RUNTIME, WorkspaceDepsContext,
+    Deps, Failure, ManualPolicy, NODE_DEV, REACT_DEV, REACT_PEER, REACT_RUNTIME,
+    WorkspaceDepsContext,
 };
 use bit_install::{
     model::WorkspaceComponent,
@@ -89,13 +90,13 @@ fn supported_fields(policy: &serde_json::Map<String, Value>) -> bool {
 
 fn supported_entries(policy: &serde_json::Map<String, Value>) -> bool {
     let mut seen = HashSet::new();
-    for group in policy.values() {
+    for (field, group) in policy {
         let Some(entries) = group.as_object() else { return false };
         if entries.is_empty() {
             return false;
         }
         for (name, value) in entries {
-            if !valid_entry(name, value, &mut seen) {
+            if !valid_entry(field, name, value, &mut seen) {
                 return false;
             }
         }
@@ -103,13 +104,18 @@ fn supported_entries(policy: &serde_json::Map<String, Value>) -> bool {
     true
 }
 
-fn valid_entry<'a>(name: &'a str, value: &Value, seen: &mut HashSet<&'a str>) -> bool {
-    seen.insert(name)
-        && !NODE_DEV
-            .iter()
-            .any(|(builtin, _)| name == *builtin)
-        && super::manual_version(value)
-            .is_some_and(|version| !version.is_empty() && version != "-" && version != "+")
+fn valid_entry<'a>(field: &str, name: &'a str, value: &Value, seen: &mut HashSet<&'a str>) -> bool {
+    let Some(version) = super::manual_version(value) else { return false };
+    if !seen.insert(name) || version.is_empty() || version == "+" {
+        return false;
+    }
+    if NODE_DEV
+        .iter()
+        .any(|(builtin, _)| name == *builtin)
+    {
+        return field == "devDependencies" && version == "-";
+    }
+    version != "-"
 }
 
 fn model_env(model: &ModelData) -> Option<&'static str> {
@@ -176,21 +182,33 @@ fn plain_dependencies(deps: &[Value], env_id: &str, manual: Option<&ManualPolicy
     } else {
         vec![("runtime", REACT_RUNTIME), ("dev", REACT_DEV), ("peer", REACT_PEER)]
     };
+    let ignored =
+        manual.map_or(&[][..], |manual| manual.ignored_env_dependencies.as_slice());
     let expected_count: usize = expected
         .iter()
         .map(|(_, group)| group.len())
         .sum::<usize>()
+        - ignored.len()
         + manual.map_or(0, |manual| {
             manual.runtime.len() + manual.dev.len() + manual.peer.len()
         });
     deps.len() == expected_count
-        && expected
-            .iter()
-            .all(|(lifecycle, group)| {
-                group
-                    .iter()
-                    .all(|(name, version)| {
-                        deps.iter()
+        && env_rows_match(deps, &expected, ignored)
+        && manual.is_none_or(|manual| manual_rows_match(deps, manual))
+}
+
+fn env_rows_match(deps: &[Value], expected: &[(&str, Deps)], ignored: &[String]) -> bool {
+    expected
+        .iter()
+        .all(|(lifecycle, group)| {
+            group
+                .iter()
+                .all(|(name, version)| {
+                    ignored
+                        .iter()
+                        .any(|ignored_name| ignored_name.as_str() == *name)
+                        || deps
+                            .iter()
                             .any(|dep| {
                                 dep.get("id").and_then(Value::as_str) == Some(*name)
                                     && dep.get("version").and_then(Value::as_str) == Some(*version)
@@ -200,9 +218,8 @@ fn plain_dependencies(deps: &[Value], env_id: &str, manual: Option<&ManualPolicy
                                     && dep.get("source").and_then(Value::as_str) == Some("env")
                                     && dep.get("hidden").and_then(Value::as_bool) == Some(false)
                             })
-                    })
-            })
-        && manual.is_none_or(|manual| manual_rows_match(deps, manual))
+                })
+        })
 }
 
 fn manual_rows_match(deps: &[Value], manual: &ManualPolicy) -> bool {
