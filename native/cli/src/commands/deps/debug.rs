@@ -14,7 +14,7 @@ use bit_install::{
     config::DEPENDENCY_RESOLVER_ASPECT,
     workspace::{Bitmap, BitmapEntry},
 };
-use policy::{apply_lifecycle_precedence, empty_policy, supported_policy, unresolved_plus};
+use policy::{empty_policy, parse_manual_fields, supported_policy};
 use serde_json::{Map, Value, json};
 use std::{collections::HashSet, path::Path};
 
@@ -40,6 +40,7 @@ struct ManualPolicy {
     dev: Vec<(String, String)>,
     peer: Vec<(String, String)>,
     unresolved_plus: Vec<String>,
+    unresolved_peer_plus: Vec<String>,
     has_ignored_policy: bool,
     ignored_env_dependencies: Vec<String>,
 }
@@ -50,6 +51,7 @@ impl ManualPolicy {
             && self.dev.is_empty()
             && self.peer.is_empty()
             && self.unresolved_plus.is_empty()
+            && self.unresolved_peer_plus.is_empty()
             && !self.has_ignored_policy
     }
 }
@@ -149,63 +151,6 @@ fn parse_manual_config(config: &Value) -> Result<ManualPolicy, Failure> {
         return Err(Failure::Declined("unsupported component deps debug policy".into()));
     };
     parse_manual_fields(fields)
-}
-
-fn parse_manual_fields(fields: &Map<String, Value>) -> Result<ManualPolicy, Failure> {
-    let mut manual = ManualPolicy::default();
-    for (field, values) in fields {
-        let target = match field.as_str() {
-            "dependencies" => &mut manual.runtime,
-            "devDependencies" => &mut manual.dev,
-            "peerDependencies" => &mut manual.peer,
-            _ => return Err(Failure::Declined("unsupported component deps debug field".into())),
-        };
-        manual.has_ignored_policy |= values
-            .as_object()
-            .is_some_and(|entries| {
-                entries
-                    .values()
-                    .any(|value| value == "-")
-            });
-        manual.ignored_env_dependencies.extend(
-            NODE_DEV
-                .iter()
-                .filter(|(name, _)| {
-                    field == "devDependencies"
-                        && values.get(*name).and_then(Value::as_str) == Some("-")
-                })
-                .map(|(name, _)| (*name).to_owned()),
-        );
-        manual.unresolved_plus.extend(unresolved_plus(field, values)?);
-        target.extend(parse_manual_entries(values)?);
-    }
-    manual.unresolved_plus.sort();
-    apply_lifecycle_precedence(&mut manual);
-    Ok(manual)
-}
-
-fn parse_manual_entries(values: &Value) -> Result<Vec<(String, String)>, Failure> {
-    let Some(entries) = values.as_object() else {
-        return Err(Failure::Declined("unsupported component deps debug policy".into()));
-    };
-    let mut rows = entries
-        .iter()
-        .map(|(name, value)| {
-            let version = manual_version(value)
-                .ok_or_else(|| {
-                    Failure::Declined("unsupported component deps debug version".into())
-                })?;
-            if name.is_empty() || version.is_empty() {
-                return Err(Failure::Declined("unsupported component deps debug entry".into()));
-            }
-            Ok((version != "-" && version != "+").then(|| (name.clone(), version.to_owned())))
-        })
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>();
-    rows.sort_by(|left, right| left.0.cmp(&right.0));
-    Ok(rows)
 }
 
 fn manual_version(value: &Value) -> Option<&str> {
@@ -386,6 +331,7 @@ fn manual_value(
                 .chain(&groups.peer)
                 .map(|(name, _, _)| *name),
         )
+        .chain(manual.unresolved_peer_plus.iter().map(String::as_str))
         .collect::<Vec<_>>();
     let sources = all
         .iter()
