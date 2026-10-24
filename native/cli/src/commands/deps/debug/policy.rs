@@ -119,11 +119,17 @@ pub(super) fn apply_lifecycle_precedence(manual: &mut ManualPolicy) {
         .iter()
         .map(|(name, _)| name.as_str())
         .collect::<HashSet<_>>();
+    let dev_plus_names = manual.unresolved_dev_plus
+        .iter()
+        .map(String::as_str)
+        .collect::<HashSet<_>>();
     manual.runtime.retain(|(name, _)| {
         !dev_names.contains(name.as_str()) && !peer_names.contains(name.as_str())
     });
     manual.unresolved_runtime_plus.retain(|name| {
-        !dev_names.contains(name.as_str()) && !peer_names.contains(name.as_str())
+        !dev_names.contains(name.as_str())
+            && !peer_names.contains(name.as_str())
+            && !dev_plus_names.contains(name.as_str())
     });
     manual.unresolved_dev_plus.retain(|name| !peer_names.contains(name.as_str()));
 }

@@ -11,6 +11,19 @@ use serde_json::{Value, json};
 use std::{ffi::OsStr, fs};
 
 #[test]
+fn deps_debug_duplicate_runtime_dev_plus_matches_node() {
+    let helper = Helper::new();
+    helper.set_workspace_with_remote_scope();
+    helper.populate_components(1, true, "");
+    let bitmap_path = helper.scopes.local_path.join(".bitmap");
+    let bitmap = fs::read_to_string(&bitmap_path).unwrap();
+    let marker = r#""rootDir": "comp1""#;
+    let replacement = r#""rootDir": "comp1", "config": {"teambit.dependencies/dependency-resolver": {"policy": {"dependencies": {"is-positive": "+"}, "devDependencies": {"is-positive": "+"}}}}"#;
+    fs::write(bitmap_path, bitmap.replace(marker, replacement)).unwrap();
+    compare_debug_with_node(&helper);
+}
+
+#[test]
 fn deps_debug_multiple_plus_with_peer_plus_matches_node() {
     let helper = Helper::new();
     helper.set_workspace_with_remote_scope();
