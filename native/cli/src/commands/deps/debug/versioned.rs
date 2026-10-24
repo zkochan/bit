@@ -1,23 +1,17 @@
-//! Only the plain tagged Node shape is currently safe to render from workspace state.
+//! Plain built-in environment versions are rendered from verified model dependencies.
 
-use super::{Failure, NODE_DEV, WorkspaceDepsContext};
-use bit_install::{
-    config::DEPENDENCY_RESOLVER_ASPECT,
-    model::WorkspaceComponent,
-    workspace::{BitmapEntry, ModelData},
-};
-use serde_json::Value;
+use super::{Failure, NODE_DEV, REACT_DEV, REACT_PEER, REACT_RUNTIME, WorkspaceDepsContext};
+use bit_install::workspace::{BitmapEntry, ModelData};
+use serde_json::{Value, json};
 
 pub(super) fn validate(
     ctx: &WorkspaceDepsContext,
     entry: &BitmapEntry,
-    component: &WorkspaceComponent,
-) -> Result<(), Failure> {
+) -> Result<&'static str, Failure> {
     let decline = || Failure::Declined("configured versioned deps debug delegated".into());
-    if component.env_id != "teambit.harmony/node"
-        || entry.config
-            .as_ref()
-            .is_some_and(|config| config.contains_key(DEPENDENCY_RESOLVER_ASPECT))
+    if entry.config
+        .as_ref()
+        .is_some_and(|config| !config.is_empty())
     {
         return Err(decline());
     }
@@ -29,21 +23,35 @@ pub(super) fn validate(
         .component(&id)
         .map_err(|_| decline())?
         .ok_or_else(decline)?;
-    if !plain_model(&model) {
+    let env_id = model_env(&model).ok_or_else(decline)?;
+    if !plain_model(&model, env_id) {
         return Err(decline());
     }
-    Ok(())
+    Ok(env_id)
 }
 
-fn plain_model(model: &ModelData) -> bool {
+fn model_env(model: &ModelData) -> Option<&'static str> {
+    let mut envs = model.extensions
+        .iter()
+        .filter(|extension| extension["name"] == "teambit.envs/envs");
+    let id = envs
+        .next()?
+        .pointer("/data/id")?
+        .as_str()?;
+    if envs.next().is_some() {
+        return None;
+    }
+    match id {
+        "teambit.harmony/node" => Some("teambit.harmony/node"),
+        "teambit.react/react" => Some("teambit.react/react"),
+        _ => None,
+    }
+}
+
+fn plain_model(model: &ModelData, env_id: &str) -> bool {
     if model.extensions
         .iter()
-        .any(|extension| {
-            extension
-                .get("config")
-                .and_then(Value::as_object)
-                .is_none_or(|config| !config.is_empty())
-        })
+        .any(|extension| !allowed_config(extension, env_id))
     {
         return false;
     }
@@ -60,21 +68,50 @@ fn plain_model(model: &ModelData) -> bool {
     else {
         return false;
     };
-    resolver.next().is_none() && plain_node_dependencies(deps)
+    resolver.next().is_none() && plain_dependencies(deps, env_id)
 }
 
-fn plain_node_dependencies(deps: &[Value]) -> bool {
-    deps.len() == NODE_DEV.len()
-        && NODE_DEV
+fn allowed_config(extension: &Value, env_id: &str) -> bool {
+    let config = &extension["config"];
+    if env_id == "teambit.react/react" {
+        match extension["name"].as_str() {
+            Some("teambit.react/react") => return config == &json!({"__specific": true}),
+            Some("teambit.envs/envs") => {
+                return config == &json!({"env": env_id, "__specific": true});
+            }
+            _ => {}
+        }
+    }
+    config.as_object().is_some_and(serde_json::Map::is_empty)
+}
+
+fn plain_dependencies(deps: &[Value], env_id: &str) -> bool {
+    let expected = if env_id == "teambit.harmony/node" {
+        vec![("dev", NODE_DEV)]
+    } else {
+        vec![("runtime", REACT_RUNTIME), ("dev", REACT_DEV), ("peer", REACT_PEER)]
+    };
+    let expected_count: usize = expected
+        .iter()
+        .map(|(_, group)| group.len())
+        .sum();
+    deps.len() == expected_count
+        && expected
             .iter()
-            .all(|(name, version)| {
-                deps.iter()
-                    .any(|dep| {
-                        dep.get("id").and_then(Value::as_str) == Some(*name)
-                            && dep.get("version").and_then(Value::as_str) == Some(*version)
-                            && dep.get("__type").and_then(Value::as_str) == Some("package")
-                            && dep.get("lifecycle").and_then(Value::as_str) == Some("dev")
-                            && dep.get("source").and_then(Value::as_str) == Some("env")
+            .all(|(lifecycle, group)| {
+                group
+                    .iter()
+                    .all(|(name, version)| {
+                        deps.iter()
+                            .any(|dep| {
+                                dep.get("id").and_then(Value::as_str) == Some(*name)
+                                    && dep.get("version").and_then(Value::as_str) == Some(*version)
+                                    && dep.get("__type").and_then(Value::as_str) == Some("package")
+                                    && dep.get("lifecycle").and_then(Value::as_str)
+                                        == Some(*lifecycle)
+                                    && dep.get("source").and_then(Value::as_str) == Some("env")
+                                    && dep.get("hidden").and_then(Value::as_bool) == Some(false)
+                            })
                     })
             })
 }

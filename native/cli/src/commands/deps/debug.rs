@@ -74,8 +74,13 @@ pub(super) fn prepare(
     let component = ctx
         .find_workspace_component(entry)
         .ok_or_else(|| Failure::Declined("missing workspace component".into()))?;
+    let env_id = if entry.id.version.is_some() {
+        versioned::validate(&ctx, entry)?
+    } else {
+        component.env_id.as_str()
+    };
     let manual = validate_simple_component(root, &ctx, entry, component)?;
-    let env_deps = builtin_env_deps(&component.env_id)?;
+    let env_deps = builtin_env_deps(env_id)?;
     if manual.is_empty() { render_debug(root, env_deps) } else { render_manual(root, &manual) }
 }
 
@@ -85,9 +90,6 @@ fn validate_simple_component(
     entry: &BitmapEntry,
     component: &bit_install::model::WorkspaceComponent,
 ) -> Result<ManualPolicy, Failure> {
-    if entry.id.version.is_some() {
-        versioned::validate(ctx, entry, component)?;
-    }
     let manual = manual_policy(entry)?;
     if !manual.is_empty() {
         validate_manual_component(root, ctx, entry, component)?;
