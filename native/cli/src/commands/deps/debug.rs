@@ -39,7 +39,8 @@ struct ManualPolicy {
     runtime: Vec<(String, String)>,
     dev: Vec<(String, String)>,
     peer: Vec<(String, String)>,
-    unresolved_plus: Vec<String>,
+    unresolved_runtime_plus: Vec<String>,
+    unresolved_dev_plus: Vec<String>,
     unresolved_peer_plus: Vec<String>,
     has_ignored_policy: bool,
     ignored_env_dependencies: Vec<String>,
@@ -50,7 +51,8 @@ impl ManualPolicy {
         self.runtime.is_empty()
             && self.dev.is_empty()
             && self.peer.is_empty()
-            && self.unresolved_plus.is_empty()
+            && self.unresolved_runtime_plus.is_empty()
+            && self.unresolved_dev_plus.is_empty()
             && self.unresolved_peer_plus.is_empty()
             && !self.has_ignored_policy
     }
@@ -333,7 +335,7 @@ fn manual_value(
 }
 
 fn missing_names<'a>(manual: &'a ManualPolicy, groups: &'a ManualGroups<'_>) -> Vec<&'a str> {
-    let mut runtime_missing = manual.unresolved_plus
+    let mut runtime_missing = manual.unresolved_runtime_plus
         .iter()
         .map(String::as_str)
         .chain(groups.runtime.iter().map(|(name, _, _)| *name))
@@ -346,6 +348,7 @@ fn missing_names<'a>(manual: &'a ManualPolicy, groups: &'a ManualGroups<'_>) -> 
         .collect::<Vec<_>>();
     runtime_missing
         .into_iter()
+        .chain(manual.unresolved_dev_plus.iter().map(String::as_str))
         .chain(groups.dev.iter().map(|(name, _, _)| *name))
         .chain(peer_missing)
         .collect()

@@ -10,7 +10,8 @@ pub(super) fn parse_manual_fields(fields: &Map<String, Value>) -> Result<ManualP
     for (field, values) in fields {
         append_manual_field(&mut manual, field, values)?;
     }
-    manual.unresolved_plus.sort();
+    manual.unresolved_runtime_plus.sort();
+    manual.unresolved_dev_plus.sort();
     manual.unresolved_peer_plus.sort();
     if !manual.unresolved_peer_plus.is_empty() && unsupported_peer_plus_mix(&manual) {
         return Err(Failure::Declined("mixed peer plus deps debug policy delegated".into()));
@@ -36,15 +37,15 @@ fn unsupported_peer_plus_mix(manual: &ManualPolicy) -> bool {
                         .any(|(entry, _)| entry == name)
                 })
         });
-    let duplicate_plus = manual.unresolved_peer_plus
+    let mut seen = HashSet::new();
+    let duplicate_plus = manual.unresolved_runtime_plus
         .iter()
-        .any(|name| {
-            manual.unresolved_plus
-                .iter()
-                .any(|entry| entry == name)
-        });
-    let unsupported_plus_mix = !manual.unresolved_plus.is_empty()
-        && (populated > 0 || manual.unresolved_plus.len() > 1);
+        .chain(&manual.unresolved_dev_plus)
+        .chain(&manual.unresolved_peer_plus)
+        .any(|name| !seen.insert(name));
+    let has_runtime_or_dev_plus = !manual.unresolved_runtime_plus.is_empty()
+        || !manual.unresolved_dev_plus.is_empty();
+    let unsupported_plus_mix = has_runtime_or_dev_plus && populated > 0;
     populated > 1 && !manual.peer.is_empty() || unsupported_plus_mix || duplicate || duplicate_plus
 }
 
@@ -75,10 +76,10 @@ fn append_manual_field(
             .map(|(name, _)| (*name).to_owned()),
     );
     let plus = unresolved_plus(values);
-    if field == "peerDependencies" {
-        manual.unresolved_peer_plus.extend(plus);
-    } else {
-        manual.unresolved_plus.extend(plus);
+    match field {
+        "dependencies" => manual.unresolved_runtime_plus.extend(plus),
+        "devDependencies" => manual.unresolved_dev_plus.extend(plus),
+        _ => manual.unresolved_peer_plus.extend(plus),
     }
     target.extend(parse_manual_entries(values)?);
     Ok(())
@@ -121,9 +122,10 @@ pub(super) fn apply_lifecycle_precedence(manual: &mut ManualPolicy) {
     manual.runtime.retain(|(name, _)| {
         !dev_names.contains(name.as_str()) && !peer_names.contains(name.as_str())
     });
-    manual.unresolved_plus.retain(|name| {
+    manual.unresolved_runtime_plus.retain(|name| {
         !dev_names.contains(name.as_str()) && !peer_names.contains(name.as_str())
     });
+    manual.unresolved_dev_plus.retain(|name| !peer_names.contains(name.as_str()));
 }
 
 fn unresolved_plus(values: &Value) -> Vec<String> {
