@@ -18,6 +18,9 @@ pub(super) fn apply_lifecycle_precedence(manual: &mut ManualPolicy) {
     manual.runtime.retain(|(name, _)| {
         !dev_names.contains(name.as_str()) && !peer_names.contains(name.as_str())
     });
+    manual.unresolved_plus.retain(|name| {
+        !dev_names.contains(name.as_str()) && !peer_names.contains(name.as_str())
+    });
 }
 
 pub(super) fn unresolved_plus(field: &str, values: &Value) -> Result<Vec<String>, Failure> {
