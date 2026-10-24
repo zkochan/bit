@@ -115,7 +115,7 @@ fn valid_entry<'a>(field: &str, name: &'a str, value: &Value, seen: &mut HashSet
     {
         return field == "devDependencies" && version == "-";
     }
-    version != "-"
+    true
 }
 
 fn model_env(model: &ModelData) -> Option<&'static str> {
