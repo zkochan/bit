@@ -13,14 +13,15 @@ pub(super) fn parse_manual_fields(fields: &Map<String, Value>) -> Result<ManualP
     manual.unresolved_plus.sort();
     manual.unresolved_peer_plus.sort();
     if !manual.unresolved_peer_plus.is_empty()
-        && (!manual.dev.is_empty()
-            || !manual.peer.is_empty()
+        && (!manual.peer.is_empty()
             || !manual.unresolved_plus.is_empty()
+            || !manual.runtime.is_empty() && !manual.dev.is_empty()
             || manual.unresolved_peer_plus
                 .iter()
                 .any(|name| {
                     manual.runtime
                         .iter()
+                        .chain(&manual.dev)
                         .any(|(runtime, _)| runtime == name)
                 }))
     {
