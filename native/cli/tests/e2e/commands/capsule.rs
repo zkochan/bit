@@ -196,6 +196,35 @@ fn capsule_prune_outside_workspace_matches_node() -> KnownResult<()> {
 }
 
 #[test]
+fn capsule_list_outside_workspace_matches_node() -> KnownResult<()> {
+    let helper = Helper::new();
+    let outside = helper.scopes.e2e_dir.join("outside-list");
+    let cache = helper.scopes.e2e_dir.join("outside-list-cache");
+    fs::create_dir_all(&outside).unwrap();
+    fs::create_dir_all(cache.join("workspace")).unwrap();
+    fs::write(cache.join("workspace/payload"), "capsule").unwrap();
+    let globals = helper.own_global_config("capsules_root_base_dir", cache.to_str().unwrap());
+    let node_env = [("BIT_GLOBALS_DIR", globals.as_os_str()), ("BIT_NATIVE", OsStr::new("off"))];
+    let native_env = [("BIT_GLOBALS_DIR", globals.as_os_str())];
+    for command in [
+        "capsule",
+        "capsule list",
+        "capsule list --with-stats",
+        "capsule list --json",
+        "capsule list --with-stats --json",
+    ] {
+        let node = Helper::cmd_in_with(&outside, command, &node_env);
+        assert_eq!(node.status.code(), Some(1), "{command}: {node:?}");
+        let native = Helper::cmd_in_with(&outside, command, &native_env);
+        assert_eq!(native.status.code(), node.status.code(), "{command}: {native:?}");
+        assert!(native.native, "{command}: {native:?}");
+        assert_eq!(native.stdout, node.stdout, "{command}");
+        assert_eq!(native.stderr, node.stderr, "{command}");
+    }
+    Ok(())
+}
+
+#[test]
 fn capsule_delete_all_outside_workspace_matches_node() -> KnownResult<()> {
     let helper = Helper::new();
     let root = helper.scopes.e2e_dir.join("delete-all-cache");
