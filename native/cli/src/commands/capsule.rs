@@ -108,6 +108,9 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
 }
 
 fn run_list_outside_scope(chalk: Chalk, subcommand: &Subcommand) -> io::Result<Outcome> {
+    if env::var_os("CI").is_some_and(|value| !value.is_empty()) {
+        return Ok(Outcome::Declined("capsule list CI error stack delegated".into()));
+    }
     let json = matches!(subcommand, Subcommand::List { json: true, .. });
     let output = workspace_command::loader_output(chalk, json);
     output.restart(&format!(r#"running command "{}"..."#, subcommand.loader_label()));

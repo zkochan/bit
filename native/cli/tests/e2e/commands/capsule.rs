@@ -221,6 +221,20 @@ fn capsule_list_outside_workspace_matches_node() -> KnownResult<()> {
         assert_eq!(native.stdout, node.stdout, "{command}");
         assert_eq!(native.stderr, node.stderr, "{command}");
     }
+    for command in ["capsule", "capsule list --json"] {
+        let node_env = [
+            ("BIT_GLOBALS_DIR", globals.as_os_str()),
+            ("BIT_NATIVE", OsStr::new("off")),
+            ("CI", OsStr::new("1")),
+        ];
+        let native_env = [("BIT_GLOBALS_DIR", globals.as_os_str()), ("CI", OsStr::new("1"))];
+        let node = Helper::cmd_in_with(&outside, command, &node_env);
+        let native = Helper::cmd_in_with(&outside, command, &native_env);
+        assert!(!native.native, "{command}: {native:?}");
+        assert_eq!(native.status.code(), node.status.code(), "{command}");
+        assert_eq!(native.stdout, node.stdout, "{command}");
+        assert_eq!(native.stderr, node.stderr, "{command}");
+    }
     Ok(())
 }
 
