@@ -1062,6 +1062,64 @@ fn capsule_create_custom_id_matches_node() {
 }
 
 #[test]
+fn capsule_create_multi_component_id_always_new_matches_node() {
+    let helper = Helper::new();
+    helper.set_workspace_with_remote_scope();
+    helper.populate_components(2, true, "");
+    let command = "capsule create comp1 comp2 -i custom-capsule --always-new -j";
+    let node = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        command,
+        &[("BIT_NATIVE", OsStr::new("off"))],
+    );
+    assert!(node.status.success(), "{node:?}");
+    let node_rows = parse(&node.stdout);
+    let node_rows = node_rows.as_array().unwrap();
+    assert_eq!(node_rows.len(), 2);
+    let node_files = node_rows
+        .iter()
+        .map(|row| {
+            crate::commands::move_paths::support::tree(std::path::Path::new(
+                row["path"].as_str().unwrap(),
+            ))
+        })
+        .collect::<Vec<_>>();
+    let root = std::path::Path::new(node_rows[0]["path"].as_str().unwrap()).parent().unwrap();
+    fs::remove_dir_all(root).unwrap();
+    let native = helper.native_run(command);
+    assert!(native.status.success() && native.native, "{native:?}");
+    let native_rows = parse(&native.stdout);
+    let native_rows = native_rows.as_array().unwrap();
+    assert_eq!(native_rows.len(), 2);
+    for (index, row) in native_rows.iter().enumerate() {
+        assert_eq!(row["id"], node_rows[index]["id"]);
+        let path = std::path::Path::new(row["path"].as_str().unwrap());
+        let name = path
+            .file_name()
+            .unwrap()
+            .to_string_lossy();
+        assert_eq!(
+            name.strip_prefix("custom-capsule_")
+                .unwrap()
+                .len(),
+            36,
+        );
+        assert_eq!(crate::commands::move_paths::support::tree(path), node_files[index]);
+    }
+    assert_ne!(native_rows[0]["path"], native_rows[1]["path"]);
+}
+
+#[test]
+fn capsule_create_multi_component_shared_id_delegates() {
+    let helper = Helper::new();
+    helper.set_workspace_with_remote_scope();
+    helper.populate_components(2, true, "");
+    let run = helper.cmd("capsule create comp1 comp2 -i shared-capsule -j");
+    assert!(run.status.success() && !run.native, "{run:?}");
+    assert!(run.trace.contains("delegating:"), "{}", run.trace);
+}
+
+#[test]
 fn capsule_create_root_base_dir_matches_node() {
     let helper = Helper::new();
     helper.set_workspace_with_remote_scope();
