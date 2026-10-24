@@ -1,7 +1,24 @@
 //! Supported workspace policy shapes for dependency debug output.
 
+use super::ManualPolicy;
 use crate::commands::scope_set::Failure;
 use serde_json::{Map, Value};
+use std::collections::HashSet;
+
+pub(super) fn apply_lifecycle_precedence(manual: &mut ManualPolicy) {
+    let peer_names = manual.peer
+        .iter()
+        .map(|(name, _)| name.as_str())
+        .collect::<HashSet<_>>();
+    manual.dev.retain(|(name, _)| !peer_names.contains(name.as_str()));
+    let dev_names = manual.dev
+        .iter()
+        .map(|(name, _)| name.as_str())
+        .collect::<HashSet<_>>();
+    manual.runtime.retain(|(name, _)| {
+        !dev_names.contains(name.as_str()) && !peer_names.contains(name.as_str())
+    });
+}
 
 pub(super) fn unresolved_plus(field: &str, values: &Value) -> Result<Vec<String>, Failure> {
     let names = values

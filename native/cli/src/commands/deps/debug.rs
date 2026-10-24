@@ -13,7 +13,7 @@ use bit_install::{
     config::DEPENDENCY_RESOLVER_ASPECT,
     workspace::{Bitmap, BitmapEntry},
 };
-use policy::{empty_policy, supported_policy, unresolved_plus};
+use policy::{apply_lifecycle_precedence, empty_policy, supported_policy, unresolved_plus};
 use serde_json::{Map, Value, json};
 use std::{collections::HashSet, path::Path};
 
@@ -178,6 +178,7 @@ fn parse_manual_fields(fields: &Map<String, Value>) -> Result<ManualPolicy, Fail
         target.extend(parse_manual_entries(values)?);
     }
     manual.unresolved_plus.sort();
+    apply_lifecycle_precedence(&mut manual);
     Ok(manual)
 }
 
