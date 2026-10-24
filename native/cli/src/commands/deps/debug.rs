@@ -74,12 +74,11 @@ pub(super) fn prepare(
     let component = ctx
         .find_workspace_component(entry)
         .ok_or_else(|| Failure::Declined("missing workspace component".into()))?;
-    let env_id = if entry.id.version.is_some() {
-        versioned::validate(&ctx, entry)?
+    let (env_id, manual) = if entry.id.version.is_some() {
+        versioned::plan(root, &ctx, entry, component)?
     } else {
-        component.env_id.as_str()
+        (component.env_id.as_str(), validate_simple_component(root, &ctx, entry, component)?)
     };
-    let manual = validate_simple_component(root, &ctx, entry, component)?;
     let env_deps = builtin_env_deps(env_id)?;
     if manual.is_empty() { render_debug(root, env_deps) } else { render_manual(root, &manual) }
 }

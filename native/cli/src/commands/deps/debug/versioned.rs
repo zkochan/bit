@@ -1,13 +1,34 @@
 //! Plain built-in environment versions are rendered from verified model dependencies.
 
-use super::{Failure, NODE_DEV, REACT_DEV, REACT_PEER, REACT_RUNTIME, WorkspaceDepsContext};
-use bit_install::workspace::{BitmapEntry, ModelData};
+use super::{
+    Failure, ManualPolicy, NODE_DEV, REACT_DEV, REACT_PEER, REACT_RUNTIME, WorkspaceDepsContext,
+};
+use bit_install::{
+    model::WorkspaceComponent,
+    workspace::{BitmapEntry, ModelData},
+};
 use serde_json::{Value, json};
+use std::path::Path;
 
-pub(super) fn validate(
+pub(super) fn plan(
+    root: &Path,
     ctx: &WorkspaceDepsContext,
     entry: &BitmapEntry,
-) -> Result<&'static str, Failure> {
+    component: &WorkspaceComponent,
+) -> Result<(&'static str, ManualPolicy), Failure> {
+    let (env_id, model_manual) = validate(ctx, entry)?;
+    let mut manual = super::validate_simple_component(root, ctx, entry, component)?;
+    if let Some(saved) = model_manual {
+        super::validate_manual_component(root, ctx, entry, component)?;
+        manual = saved;
+    }
+    Ok((env_id, manual))
+}
+
+fn validate(
+    ctx: &WorkspaceDepsContext,
+    entry: &BitmapEntry,
+) -> Result<(&'static str, Option<ManualPolicy>), Failure> {
     let decline = || Failure::Declined("configured versioned deps debug delegated".into());
     if entry.config
         .as_ref()
@@ -24,10 +45,64 @@ pub(super) fn validate(
         .map_err(|_| decline())?
         .ok_or_else(decline)?;
     let env_id = model_env(&model).ok_or_else(decline)?;
-    if !plain_model(&model, env_id) {
+    let manual = model_dev_policy(&model, env_id)?;
+    if !plain_model(&model, env_id, manual.as_ref()) {
         return Err(decline());
     }
-    Ok(env_id)
+    Ok((env_id, manual))
+}
+
+fn model_dev_policy(model: &ModelData, env_id: &str) -> Result<Option<ManualPolicy>, Failure> {
+    let decline = || Failure::Declined("configured versioned deps debug delegated".into());
+    let resolver = model.extensions
+        .iter()
+        .find(|extension| extension["name"] == "teambit.dependencies/dependency-resolver")
+        .ok_or_else(decline)?;
+    let config = &resolver["config"];
+    if config.as_object().is_some_and(serde_json::Map::is_empty) {
+        return Ok(None);
+    }
+    if env_id != "teambit.harmony/node"
+        || config.as_object().map(serde_json::Map::len) != Some(2)
+        || config["__specific"] != true
+    {
+        return Err(decline());
+    }
+    let policy = config["policy"].as_object().ok_or_else(decline)?;
+    if policy.len() != 1 {
+        return Err(decline());
+    }
+    let dev = dev_entries(policy)?;
+    Ok(Some(ManualPolicy { dev, ..ManualPolicy::default() }))
+}
+
+fn dev_entries(policy: &serde_json::Map<String, Value>) -> Result<Vec<(String, String)>, Failure> {
+    let decline = || Failure::Declined("configured versioned deps debug delegated".into());
+    let dev_policy = policy.get("devDependencies").ok_or_else(decline)?;
+    let entries = dev_policy.as_object().ok_or_else(decline)?;
+    if entries.is_empty()
+        || entries
+            .values()
+            .any(|value| {
+                value
+                    .as_str()
+                    .is_none_or(|version| version.is_empty() || version == "-" || version == "+")
+            })
+    {
+        return Err(decline());
+    }
+    let dev = super::parse_manual_entries(dev_policy)?;
+    if dev
+        .iter()
+        .any(|(name, _)| {
+            NODE_DEV
+                .iter()
+                .any(|(builtin, _)| name == builtin)
+        })
+    {
+        return Err(decline());
+    }
+    Ok(dev)
 }
 
 fn model_env(model: &ModelData) -> Option<&'static str> {
@@ -48,10 +123,10 @@ fn model_env(model: &ModelData) -> Option<&'static str> {
     }
 }
 
-fn plain_model(model: &ModelData, env_id: &str) -> bool {
+fn plain_model(model: &ModelData, env_id: &str, manual: Option<&ManualPolicy>) -> bool {
     if model.extensions
         .iter()
-        .any(|extension| !allowed_config(extension, env_id))
+        .any(|extension| !allowed_config(extension, env_id, manual))
     {
         return false;
     }
@@ -68,11 +143,14 @@ fn plain_model(model: &ModelData, env_id: &str) -> bool {
     else {
         return false;
     };
-    resolver.next().is_none() && plain_dependencies(deps, env_id)
+    resolver.next().is_none() && plain_dependencies(deps, env_id, manual)
 }
 
-fn allowed_config(extension: &Value, env_id: &str) -> bool {
+fn allowed_config(extension: &Value, env_id: &str, manual: Option<&ManualPolicy>) -> bool {
     let config = &extension["config"];
+    if extension["name"] == "teambit.dependencies/dependency-resolver" && manual.is_some() {
+        return true;
+    }
     if env_id == "teambit.react/react" {
         match extension["name"].as_str() {
             Some("teambit.react/react") => return config == &json!({"__specific": true}),
@@ -85,7 +163,7 @@ fn allowed_config(extension: &Value, env_id: &str) -> bool {
     config.as_object().is_some_and(serde_json::Map::is_empty)
 }
 
-fn plain_dependencies(deps: &[Value], env_id: &str) -> bool {
+fn plain_dependencies(deps: &[Value], env_id: &str, manual: Option<&ManualPolicy>) -> bool {
     let expected = if env_id == "teambit.harmony/node" {
         vec![("dev", NODE_DEV)]
     } else {
@@ -94,7 +172,8 @@ fn plain_dependencies(deps: &[Value], env_id: &str) -> bool {
     let expected_count: usize = expected
         .iter()
         .map(|(_, group)| group.len())
-        .sum();
+        .sum::<usize>()
+        + manual.map_or(0, |manual| manual.dev.len());
     deps.len() == expected_count
         && expected
             .iter()
@@ -114,4 +193,20 @@ fn plain_dependencies(deps: &[Value], env_id: &str) -> bool {
                             })
                     })
             })
+        && manual.is_none_or(|manual| manual_rows_match(deps, manual))
+}
+
+fn manual_rows_match(deps: &[Value], manual: &ManualPolicy) -> bool {
+    manual.dev
+        .iter()
+        .all(|(name, version)| {
+            deps.iter()
+                .any(|dep| {
+                    dep.get("id").and_then(Value::as_str) == Some(name.as_str())
+                        && dep.get("version").and_then(Value::as_str) == Some(version.as_str())
+                        && dep.get("__type").and_then(Value::as_str) == Some("package")
+                        && dep.get("lifecycle").and_then(Value::as_str) == Some("dev")
+                        && dep.get("source").and_then(Value::as_str) == Some("auto")
+                })
+        })
 }
