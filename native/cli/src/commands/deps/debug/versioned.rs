@@ -8,7 +8,7 @@ use bit_install::{
     workspace::{BitmapEntry, ModelData},
 };
 use serde_json::{Value, json};
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
 pub(super) fn plan(
     root: &Path,
@@ -45,14 +45,14 @@ fn validate(
         .map_err(|_| decline())?
         .ok_or_else(decline)?;
     let env_id = model_env(&model).ok_or_else(decline)?;
-    let manual = model_dev_policy(&model, env_id)?;
+    let manual = model_manual_policy(&model, env_id)?;
     if !plain_model(&model, env_id, manual.as_ref()) {
         return Err(decline());
     }
     Ok((env_id, manual))
 }
 
-fn model_dev_policy(model: &ModelData, env_id: &str) -> Result<Option<ManualPolicy>, Failure> {
+fn model_manual_policy(model: &ModelData, env_id: &str) -> Result<Option<ManualPolicy>, Failure> {
     let decline = || Failure::Declined("configured versioned deps debug delegated".into());
     let resolver = model.extensions
         .iter()
@@ -69,40 +69,48 @@ fn model_dev_policy(model: &ModelData, env_id: &str) -> Result<Option<ManualPoli
         return Err(decline());
     }
     let policy = config["policy"].as_object().ok_or_else(decline)?;
-    if policy.len() != 1 {
-        return Err(decline());
-    }
-    let dev = dev_entries(policy)?;
-    Ok(Some(ManualPolicy { dev, ..ManualPolicy::default() }))
+    Ok(Some(manual_entries(policy)?))
 }
 
-fn dev_entries(policy: &serde_json::Map<String, Value>) -> Result<Vec<(String, String)>, Failure> {
-    let decline = || Failure::Declined("configured versioned deps debug delegated".into());
-    let dev_policy = policy.get("devDependencies").ok_or_else(decline)?;
-    let entries = dev_policy.as_object().ok_or_else(decline)?;
-    if entries.is_empty()
-        || entries
-            .values()
-            .any(|value| {
-                value
-                    .as_str()
-                    .is_none_or(|version| version.is_empty() || version == "-" || version == "+")
-            })
-    {
-        return Err(decline());
+fn manual_entries(policy: &serde_json::Map<String, Value>) -> Result<ManualPolicy, Failure> {
+    if policy.is_empty() || !supported_fields(policy) || !supported_entries(policy) {
+        return Err(Failure::Declined("configured versioned deps debug delegated".into()));
     }
-    let dev = super::parse_manual_entries(dev_policy)?;
-    if dev
-        .iter()
-        .any(|(name, _)| {
-            NODE_DEV
-                .iter()
-                .any(|(builtin, _)| name == builtin)
+    super::parse_manual_fields(policy)
+}
+
+fn supported_fields(policy: &serde_json::Map<String, Value>) -> bool {
+    policy
+        .keys()
+        .all(|field| {
+            matches!(field.as_str(), "dependencies" | "devDependencies" | "peerDependencies")
         })
-    {
-        return Err(decline());
+}
+
+fn supported_entries(policy: &serde_json::Map<String, Value>) -> bool {
+    let mut seen = HashSet::new();
+    for group in policy.values() {
+        let Some(entries) = group.as_object() else { return false };
+        if entries.is_empty() {
+            return false;
+        }
+        for (name, value) in entries {
+            if !valid_entry(name, value, &mut seen) {
+                return false;
+            }
+        }
     }
-    Ok(dev)
+    true
+}
+
+fn valid_entry<'a>(name: &'a str, value: &Value, seen: &mut HashSet<&'a str>) -> bool {
+    seen.insert(name)
+        && !NODE_DEV
+            .iter()
+            .any(|(builtin, _)| name == *builtin)
+        && value
+            .as_str()
+            .is_some_and(|version| !version.is_empty() && version != "-" && version != "+")
 }
 
 fn model_env(model: &ModelData) -> Option<&'static str> {
@@ -173,7 +181,9 @@ fn plain_dependencies(deps: &[Value], env_id: &str, manual: Option<&ManualPolicy
         .iter()
         .map(|(_, group)| group.len())
         .sum::<usize>()
-        + manual.map_or(0, |manual| manual.dev.len());
+        + manual.map_or(0, |manual| {
+            manual.runtime.len() + manual.dev.len() + manual.peer.len()
+        });
     deps.len() == expected_count
         && expected
             .iter()
@@ -197,16 +207,25 @@ fn plain_dependencies(deps: &[Value], env_id: &str, manual: Option<&ManualPolicy
 }
 
 fn manual_rows_match(deps: &[Value], manual: &ManualPolicy) -> bool {
-    manual.dev
+    [("runtime", &manual.runtime), ("dev", &manual.dev), ("peer", &manual.peer)]
         .iter()
-        .all(|(name, version)| {
-            deps.iter()
-                .any(|dep| {
-                    dep.get("id").and_then(Value::as_str) == Some(name.as_str())
-                        && dep.get("version").and_then(Value::as_str) == Some(version.as_str())
-                        && dep.get("__type").and_then(Value::as_str) == Some("package")
-                        && dep.get("lifecycle").and_then(Value::as_str) == Some("dev")
-                        && dep.get("source").and_then(Value::as_str) == Some("auto")
+        .all(|(lifecycle, group)| {
+            group
+                .iter()
+                .all(|(name, version)| {
+                    deps.iter()
+                        .any(|dep| {
+                            dep.get("id").and_then(Value::as_str) == Some(name.as_str())
+                                && dep.get("version").and_then(Value::as_str)
+                                    == Some(version.as_str())
+                                && dep.get("__type").and_then(Value::as_str) == Some("package")
+                                && dep.get("lifecycle").and_then(Value::as_str) == Some(*lifecycle)
+                                && (dep.get("source").and_then(Value::as_str) == Some("auto")
+                                    || *lifecycle == "peer"
+                                        && dep.get("source").and_then(Value::as_str) == Some("env")
+                                        && dep.get("optional").and_then(Value::as_bool)
+                                            == Some(false))
+                        })
                 })
         })
 }
