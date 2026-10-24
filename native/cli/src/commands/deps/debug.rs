@@ -317,22 +317,7 @@ fn manual_value(
     if !groups.peer.is_empty() {
         added.insert("peerDependencies".into(), manual_versions(&groups.peer));
     }
-    let mut runtime_missing = manual.unresolved_plus
-        .iter()
-        .map(String::as_str)
-        .chain(groups.runtime.iter().map(|(name, _, _)| *name))
-        .collect::<Vec<_>>();
-    runtime_missing.sort_unstable();
-    let missing = runtime_missing
-        .into_iter()
-        .chain(
-            groups.dev
-                .iter()
-                .chain(&groups.peer)
-                .map(|(name, _, _)| *name),
-        )
-        .chain(manual.unresolved_peer_plus.iter().map(String::as_str))
-        .collect::<Vec<_>>();
+    let missing = missing_names(manual, groups);
     let sources = all
         .iter()
         .map(|(name, _, source)| json!({ "id": name, "source": source }))
@@ -345,6 +330,25 @@ fn manual_value(
         "coreAspects": [],
         "sources": sources,
     })
+}
+
+fn missing_names<'a>(manual: &'a ManualPolicy, groups: &'a ManualGroups<'_>) -> Vec<&'a str> {
+    let mut runtime_missing = manual.unresolved_plus
+        .iter()
+        .map(String::as_str)
+        .chain(groups.runtime.iter().map(|(name, _, _)| *name))
+        .collect::<Vec<_>>();
+    runtime_missing.sort_unstable();
+    let peer_missing = manual.unresolved_peer_plus
+        .iter()
+        .map(String::as_str)
+        .chain(groups.peer.iter().map(|(name, _, _)| *name))
+        .collect::<Vec<_>>();
+    runtime_missing
+        .into_iter()
+        .chain(groups.dev.iter().map(|(name, _, _)| *name))
+        .chain(peer_missing)
+        .collect()
 }
 
 fn manual_versions(deps: &[SourcedDep<'_>]) -> Value {

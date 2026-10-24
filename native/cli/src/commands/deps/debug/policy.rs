@@ -12,23 +12,31 @@ pub(super) fn parse_manual_fields(fields: &Map<String, Value>) -> Result<ManualP
     }
     manual.unresolved_plus.sort();
     manual.unresolved_peer_plus.sort();
-    if !manual.unresolved_peer_plus.is_empty()
-        && (!manual.peer.is_empty()
-            || !manual.unresolved_plus.is_empty()
-            || !manual.runtime.is_empty() && !manual.dev.is_empty()
-            || manual.unresolved_peer_plus
-                .iter()
-                .any(|name| {
-                    manual.runtime
-                        .iter()
-                        .chain(&manual.dev)
-                        .any(|(runtime, _)| runtime == name)
-                }))
-    {
+    if !manual.unresolved_peer_plus.is_empty() && unsupported_peer_plus_mix(&manual) {
         return Err(Failure::Declined("mixed peer plus deps debug policy delegated".into()));
     }
     apply_lifecycle_precedence(&mut manual);
     Ok(manual)
+}
+
+fn unsupported_peer_plus_mix(manual: &ManualPolicy) -> bool {
+    let groups = [&manual.runtime, &manual.dev, &manual.peer];
+    let populated = groups
+        .iter()
+        .filter(|group| !group.is_empty())
+        .count();
+    let duplicate = manual.unresolved_peer_plus
+        .iter()
+        .any(|name| {
+            groups
+                .iter()
+                .any(|group| {
+                    group
+                        .iter()
+                        .any(|(entry, _)| entry == name)
+                })
+        });
+    populated > 1 || !manual.unresolved_plus.is_empty() || duplicate
 }
 
 fn append_manual_field(
