@@ -108,8 +108,7 @@ fn valid_entry<'a>(name: &'a str, value: &Value, seen: &mut HashSet<&'a str>) ->
         && !NODE_DEV
             .iter()
             .any(|(builtin, _)| name == *builtin)
-        && value
-            .as_str()
+        && super::manual_version(value)
             .is_some_and(|version| !version.is_empty() && version != "-" && version != "+")
 }
 
