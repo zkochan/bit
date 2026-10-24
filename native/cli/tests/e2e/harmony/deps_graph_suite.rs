@@ -11,6 +11,59 @@ use serde_json::{Value, json};
 use std::{ffi::OsStr, fs};
 
 #[test]
+fn deps_debug_plain_tagged_node_matches_node() {
+    let helper = Helper::new();
+    helper.set_workspace_with_remote_scope();
+    helper.populate_components(1, true, "");
+    helper.native("tag --skip-tests");
+    let node = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "deps debug comp1",
+        &[("BIT_NATIVE", OsStr::new("off"))],
+    );
+    let native = helper.native_run("deps debug comp1");
+    assert!(node.status.success(), "{node:?}");
+    assert!(native.status.success() && native.native, "{native:?}");
+    assert_eq!(native.stdout, node.stdout);
+}
+
+#[test]
+fn deps_debug_tagged_manual_policy_delegates() {
+    let helper = Helper::new();
+    helper.set_workspace_with_remote_scope();
+    helper.populate_components(1, true, "");
+    helper.native("deps set comp1 --dev yargs-parser@21.1.1");
+    helper.native("tag --skip-tests");
+    let node = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "deps debug comp1",
+        &[("BIT_NATIVE", OsStr::new("off"))],
+    );
+    let native = helper.cmd("deps debug comp1");
+    assert!(node.status.success());
+    assert!(native.status.success() && !native.native, "{native:?}");
+    assert_eq!(native.stdout, node.stdout);
+}
+
+#[test]
+fn deps_debug_policy_added_after_tag_delegates() {
+    let helper = Helper::new();
+    helper.set_workspace_with_remote_scope();
+    helper.populate_components(1, true, "");
+    helper.native("tag --skip-tests");
+    helper.native("deps set comp1 --dev yargs-parser@21.1.1");
+    let node = Helper::cmd_in_with(
+        &helper.scopes.local_path,
+        "deps debug comp1",
+        &[("BIT_NATIVE", OsStr::new("off"))],
+    );
+    let native = helper.cmd("deps debug comp1");
+    assert!(node.status.success(), "{node:?}");
+    assert!(native.status.success() && !native.native, "{native:?}");
+    assert_eq!(native.stdout, node.stdout);
+}
+
+#[test]
 fn deps_debug_plus_duplicate_dev_policy_matches_node() {
     compare_plus_duplicate_policy("devDependencies");
 }

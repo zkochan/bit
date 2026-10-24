@@ -5,6 +5,7 @@ use super::{
     resolve::{WorkspaceDepsContext, scanned_specifiers},
 };
 mod policy;
+mod versioned;
 use crate::commands::{
     color::Chalk,
     scope_set::{Failure, selection},
@@ -85,7 +86,7 @@ fn validate_simple_component(
     component: &bit_install::model::WorkspaceComponent,
 ) -> Result<ManualPolicy, Failure> {
     if entry.id.version.is_some() {
-        return Err(Failure::Declined("versioned deps debug delegated".into()));
+        versioned::validate(ctx, entry, component)?;
     }
     let manual = manual_policy(entry)?;
     if !manual.is_empty() {
