@@ -96,32 +96,51 @@ fn unsupported_flag_help(argv: &[&str]) -> Option<String> {
     let name = *argv.first()?;
     match &argv[1..] {
         ["run" | "c", flag @ ("--ssr" | "--json" | "--no-color")] => {
-            Some(run_flag_help(name, flag))
+            return Some(run_flag_help(name, flag));
         }
         ["run" | "c", app_name, flag @ ("--ssr" | "--json" | "--no-color")]
             if !app_name.is_empty() && !app_name.starts_with('-') =>
         {
-            Some(run_flag_help(name, flag))
+            return Some(run_flag_help(name, flag));
         }
-        [flag @ ("--json" | "--no-color" | "--ssr" | "--dev" | "--verbose" | "--no-browser")] => {
-            Some(format!("{}\n{}\n", app_command_help(name), unknown_app_flag(flag)))
-        }
-        ["list", flag @ ("--no-color" | "--ssr" | "--dev" | "--verbose" | "--no-browser")] => {
-            Some(format!("{}\n{}\n", list_command_help(name), unknown_app_flag(flag)))
-        }
-        _ => None,
+        _ => {}
     }
+    let (list, args) = match &argv[1..] {
+        ["list", rest @ ..] => (true, rest),
+        rest => (false, rest),
+    };
+    let unknown = rejected_app_option(args, list)?;
+    let help = if list { list_command_help(name) } else { app_command_help(name) };
+    Some(format!("{help}\n{unknown}\n"))
 }
 
-fn unknown_app_flag(flag: &str) -> &'static str {
+fn rejected_app_option(args: &[&str], list: bool) -> Option<&'static str> {
+    let flag = match args {
+        [flag] => *flag,
+        [flag @ ("--port" | "--args"), value] if !value.starts_with('-') => *flag,
+        _ => return None,
+    };
+    if list && flag == "--json" {
+        return None;
+    }
+    let flag = if flag.starts_with("--port=") {
+        "--port"
+    } else if flag.starts_with("--args=") {
+        "--args"
+    } else {
+        flag
+    };
     match flag {
-        "--json" => "Unknown argument: json",
-        "--ssr" => "Unknown argument: ssr",
-        "--dev" => "Unknown argument: dev",
-        "--verbose" => "Unknown argument: verbose",
-        "--no-color" => "Unknown arguments: no-color, noColor",
-        "--no-browser" => "Unknown arguments: no-browser, noBrowser",
-        _ => unreachable!("only rejected app flags call unknown_app_flag"),
+        "--json" => Some("Unknown argument: json"),
+        "--ssr" => Some("Unknown argument: ssr"),
+        "--dev" => Some("Unknown argument: dev"),
+        "--verbose" => Some("Unknown argument: verbose"),
+        "--watch" => Some("Unknown argument: watch"),
+        "--port" => Some("Unknown argument: port"),
+        "--args" => Some("Unknown argument: args"),
+        "--no-color" => Some("Unknown arguments: no-color, noColor"),
+        "--no-browser" => Some("Unknown arguments: no-browser, noBrowser"),
+        _ => None,
     }
 }
 
