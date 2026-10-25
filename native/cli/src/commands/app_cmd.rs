@@ -165,7 +165,7 @@ pub(super) fn standard_nonapp_component_count(root: &Path) -> Option<usize> {
 }
 
 fn is_supported_run(args: &[&str]) -> bool {
-    let ["run", rest @ ..] = args else {
+    let ["run" | "c", rest @ ..] = args else {
         return false;
     };
     let Some(options) = run_cmd::parse_options(rest) else {
