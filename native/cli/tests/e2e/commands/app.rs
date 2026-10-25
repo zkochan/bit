@@ -223,6 +223,56 @@ fn app_rejected_run_only_options_match_node() -> KnownResult<()> {
 }
 
 #[test]
+fn app_rejected_option_aliases_and_inline_values_match_node() -> KnownResult<()> {
+    let helper = Helper::new();
+    let outside = helper.scopes.e2e_dir.join("outside-app-rejected-option-aliases");
+    fs::create_dir_all(&outside).unwrap();
+    let (_, bare_scope) = helper.new_bare_scope();
+    helper.re_init_workspace();
+    let ci_env = [("CI", OsStr::new("1"))];
+    for directory in [&outside, &bare_scope, &helper.scopes.local_path] {
+        for command in [
+            "app -d",
+            "apps -v",
+            "app -n",
+            "apps -w",
+            "app -p 4000",
+            "apps -p=4000",
+            "app -a value",
+            "apps -a=value",
+            "app --json=true",
+            "apps --no-color=true",
+            "app --watch=true",
+            "apps --no-browser=false",
+            "app list -d",
+            "apps list -v",
+            "app list -n",
+            "apps list -w",
+            "app list -p 4000",
+            "apps list -p=4000",
+            "app list -a value",
+            "apps list -a=value",
+            "app list --no-color=true",
+            "apps list --dev=true",
+            "app list --watch=true",
+            "apps list --no-browser=false",
+        ] {
+            for native_env in [&[][..], &ci_env[..]] {
+                let mut node_env = vec![("BIT_NATIVE", OsStr::new("off"))];
+                node_env.extend_from_slice(native_env);
+                let node = Helper::cmd_in_with(directory, command, &node_env);
+                let native = Helper::cmd_in_with(directory, command, native_env);
+                assert!(native.native, "{command}: node={node:?}; native={native:?}");
+                assert_eq!(native.status.code(), node.status.code(), "{command}");
+                assert_eq!(native.stdout, node.stdout, "{command}");
+                assert_eq!(native.stderr, node.stderr, "{command}");
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn app_list_with_apps_in_ci_matches_node() -> KnownResult<()> {
     let helper = Helper::new();
     helper.re_init_workspace();

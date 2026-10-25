@@ -117,19 +117,13 @@ fn unsupported_flag_help(argv: &[&str]) -> Option<String> {
 fn rejected_app_option(args: &[&str], list: bool) -> Option<&'static str> {
     let flag = match args {
         [flag] => *flag,
-        [flag @ ("--port" | "--args"), value] if !value.starts_with('-') => *flag,
+        [flag @ ("--port" | "--args" | "-p" | "-a"), value] if !value.starts_with('-') => *flag,
         _ => return None,
     };
+    let flag = flag.split_once('=').map_or(flag, |(name, _)| name);
     if list && flag == "--json" {
         return None;
     }
-    let flag = if flag.starts_with("--port=") {
-        "--port"
-    } else if flag.starts_with("--args=") {
-        "--args"
-    } else {
-        flag
-    };
     match flag {
         "--json" => Some("Unknown argument: json"),
         "--ssr" => Some("Unknown argument: ssr"),
@@ -140,6 +134,12 @@ fn rejected_app_option(args: &[&str], list: bool) -> Option<&'static str> {
         "--args" => Some("Unknown argument: args"),
         "--no-color" => Some("Unknown arguments: no-color, noColor"),
         "--no-browser" => Some("Unknown arguments: no-browser, noBrowser"),
+        "-d" => Some("Unknown argument: d"),
+        "-v" => Some("Unknown argument: v"),
+        "-n" => Some("Unknown argument: n"),
+        "-w" => Some("Unknown argument: w"),
+        "-p" => Some("Unknown argument: p"),
+        "-a" => Some("Unknown argument: a"),
         _ => None,
     }
 }
