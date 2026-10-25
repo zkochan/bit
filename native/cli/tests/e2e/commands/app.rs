@@ -313,6 +313,10 @@ fn app_list_inline_json_values_match_node() -> KnownResult<()> {
         "apps list -j=false",
         "app list --json=1",
         "apps list -j=0",
+        "app list --json=foo",
+        "apps list --json=",
+        "app list --json=TRUE",
+        "apps list -j=yes",
     ];
     for directory in [&outside, &bare_scope, &helper.scopes.local_path] {
         for command in commands {

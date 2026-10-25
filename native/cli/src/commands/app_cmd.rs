@@ -220,13 +220,17 @@ pub(super) fn run_missing_app(args: &[OsString], component_count: usize) -> io::
 
 fn run_outside_workspace(args: &[OsString], argv: &[&str]) -> io::Result<Outcome> {
     match &argv[1..] {
-        ["list", "-j" | "--json" | "-j=true" | "--json=true"] => {
+        ["list", "-j" | "--json"] => {
             io::stdout().lock().write_all(b"[]")?;
         }
-        ["list", "-j=false" | "--json=false" | "-j=0" | "--json=0" | "-j=1" | "--json=1"] => {
-            let chalk = Chalk::detect(args);
-            writeln!(io::stdout().lock(), r#"- running command "list"..."#)?;
-            writeln!(io::stdout().lock(), "{}", chalk.yellow("no apps found"))?;
+        ["list", flag] if inline_json_value(flag).is_some() => {
+            if inline_json_value(flag) == Some("true") {
+                io::stdout().lock().write_all(b"[]")?;
+            } else {
+                let chalk = Chalk::detect(args);
+                writeln!(io::stdout().lock(), r#"- running command "list"..."#)?;
+                writeln!(io::stdout().lock(), "{}", chalk.yellow("no apps found"))?;
+            }
         }
         [] | ["list"] => {
             let chalk = Chalk::detect(args);
@@ -271,10 +275,9 @@ fn emit_apps_outcome(
         || args
             .iter()
             .any(|arg| {
-                matches!(
-                    arg.to_str(),
-                    Some("-j=false" | "--json=false" | "-j=0" | "--json=0" | "-j=1" | "--json=1"),
-                )
+                arg.to_str()
+                    .and_then(inline_json_value)
+                    .is_some_and(|value| value != "true")
             })
     {
         let label = if args.len() == 1 { "app" } else { "list" };
@@ -406,13 +409,20 @@ pub(super) fn parse_options(args: &[&str]) -> Option<Options> {
         match arg {
             "--no-color" => {}
             "-j" | "--json" => json = true,
-            "-j=true" | "--json=true" if saw_list => json = true,
-            "-j=false" | "--json=false" | "-j=0" | "--json=0" | "-j=1" | "--json=1" if saw_list => {
-                json = false;
+            arg if saw_list && inline_json_value(arg).is_some() => {
+                json = inline_json_value(arg) == Some("true");
             }
             "list" if !saw_list => saw_list = true,
             _ => return None,
         }
     }
     Some(Options { json })
+}
+
+fn inline_json_value(flag: &str) -> Option<&str> {
+    flag.strip_prefix("--json=")
+        .or_else(|| {
+            flag.strip_prefix("-j=")
+                .filter(|value| !value.is_empty())
+        })
 }
