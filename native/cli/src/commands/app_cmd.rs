@@ -69,11 +69,13 @@ fn unsupported_flag_help(argv: &[&str]) -> Option<String> {
     let name = *argv.first()?;
     let global = GLOBAL_HELP;
     match &argv[1..] {
-        ["run" | "c", "--ssr"] => {
-            Some(run_cmd::unsupported_help(&format!("{name} run"), "Unknown argument: ssr"))
+        ["run" | "c", flag @ ("--ssr" | "--json" | "--no-color")] => {
+            Some(run_flag_help(name, flag))
         }
-        ["run" | "c", app_name, "--ssr"] if !app_name.is_empty() && !app_name.starts_with('-') => {
-            Some(run_cmd::unsupported_help(&format!("{name} run"), "Unknown argument: ssr"))
+        ["run" | "c", app_name, flag @ ("--ssr" | "--json" | "--no-color")]
+            if !app_name.is_empty() && !app_name.starts_with('-') =>
+        {
+            Some(run_flag_help(name, flag))
         }
         [flag @ ("--json" | "--no-color")] => {
             let unknown = if *flag == "--json" {
@@ -90,6 +92,16 @@ fn unsupported_flag_help(argv: &[&str]) -> Option<String> {
         )),
         _ => None,
     }
+}
+
+fn run_flag_help(name: &str, flag: &str) -> String {
+    let unknown = match flag {
+        "--ssr" => "Unknown argument: ssr",
+        "--json" => "Unknown argument: json",
+        "--no-color" => "Unknown arguments: no-color, noColor",
+        _ => unreachable!("only supported rejected flags call run_flag_help"),
+    };
+    run_cmd::unsupported_help(&format!("{name} run"), unknown)
 }
 
 fn run_supported_run(args: &[OsString]) -> io::Result<Outcome> {

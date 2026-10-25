@@ -23,6 +23,14 @@ fn app_rejected_flags_help_matches_node() -> KnownResult<()> {
             "apps c --ssr",
             "app run missing-app --ssr",
             "apps c missing-app --ssr",
+            "app run --json",
+            "apps c --json",
+            "app run missing-app --json",
+            "apps run missing-app --json",
+            "app run --no-color",
+            "apps c --no-color",
+            "app run missing-app --no-color",
+            "apps run missing-app --no-color",
         ] {
             for native_env in [&[][..], &ci_env[..]] {
                 let mut node_env = vec![("BIT_NATIVE", OsStr::new("off"))];
@@ -181,7 +189,7 @@ fn app_run_outside_workspace_and_in_bare_scope_matches_node() -> KnownResult<()>
             let node =
                 Helper::cmd_in_with(directory, command, &[("BIT_NATIVE", OsStr::new("off"))]);
             let native = Helper::cmd_in(directory, command);
-            assert!(!native.native, "{command}: {native:?}");
+            assert!(native.native, "{command}: {native:?}");
             assert_eq!(native.status.code(), node.status.code(), "{command}");
             assert_eq!(native.stdout, node.stdout, "{command}");
             assert_eq!(native.stderr, node.stderr, "{command}");
@@ -252,7 +260,7 @@ fn app_run_in_empty_workspace_matches_node() -> KnownResult<()> {
     let command = "app run --json";
     let node = Helper::cmd_in_with(workspace, command, &[("BIT_NATIVE", OsStr::new("off"))]);
     let native = Helper::cmd_in(workspace, command);
-    assert!(!native.native, "{native:?}");
+    assert!(native.native, "{native:?}");
     assert_eq!(native.status.code(), node.status.code());
     assert_eq!(native.stdout, node.stdout);
     assert_eq!(native.stderr, node.stderr);
