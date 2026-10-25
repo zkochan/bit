@@ -43,6 +43,11 @@ pub(super) fn unsupported_flag_help(argv: &[&str]) -> Option<String> {
 
 fn rejected_app_option(args: &[&str], list: bool) -> Option<&'static str> {
     let flag = match args {
+        [json, "true" | "false", "--no-color"] | ["--no-color", json, "true" | "false"]
+            if list && matches!(*json, "-j" | "--json") =>
+        {
+            return Some("Unknown arguments: no-color, noColor");
+        }
         [json, "--no-color"] | ["--no-color", json] if list && is_json_flag(json) => {
             return Some("Unknown arguments: no-color, noColor");
         }
