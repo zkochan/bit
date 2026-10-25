@@ -45,6 +45,12 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
     let Some(argv) = workspace_command::utf8_args(args) else {
         return Ok(Outcome::Declined("app arguments are not UTF-8".into()));
     };
+    if let Some(name) = app_run_help_name(&argv) {
+        io::stdout()
+            .lock()
+            .write_all(run_cmd::command_help(&format!("{name} run")).as_bytes())?;
+        return Ok(Outcome::Exit(ExitCode::SUCCESS));
+    }
     if let Some(help) = unsupported_flag_help(&argv) {
         io::stdout().lock().write_all(help.as_bytes())?;
         return Ok(Outcome::Exit(ExitCode::FAILURE));
@@ -63,6 +69,14 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
         return emit_apps_outcome(&root, args, &options, &apps);
     }
     Ok(Outcome::Declined("app list delegated".into()))
+}
+
+fn app_run_help_name<'a>(argv: &[&'a str]) -> Option<&'a str> {
+    let name = *argv.first()?;
+    let ["run" | "c", rest @ ..] = &argv[1..] else {
+        return None;
+    };
+    run_cmd::is_help_form(rest).then_some(name)
 }
 
 fn unsupported_flag_help(argv: &[&str]) -> Option<String> {
