@@ -239,6 +239,35 @@ fn capsule_list_outside_workspace_matches_node() -> KnownResult<()> {
 }
 
 #[test]
+fn capsule_no_color_flag_delegates_to_released_help() -> KnownResult<()> {
+    let helper = Helper::new();
+    let outside = helper.scopes.e2e_dir.join("outside-no-color");
+    fs::create_dir_all(&outside).unwrap();
+    let globals = helper.scopes.e2e_dir.join("no-color-globals");
+    for command in [
+        "capsule --no-color",
+        "capsule list --no-color",
+        "capsule list --json --no-color",
+        "capsule prune --no-color",
+        "capsule create comp1 --no-color",
+        "capsule delete --all --no-color",
+    ] {
+        let node = Helper::cmd_in_with(
+            &outside,
+            command,
+            &[("BIT_GLOBALS_DIR", globals.as_os_str()), ("BIT_NATIVE", OsStr::new("off"))],
+        );
+        let native =
+            Helper::cmd_in_with(&outside, command, &[("BIT_GLOBALS_DIR", globals.as_os_str())]);
+        assert!(!native.native, "{command}: {native:?}");
+        assert_eq!(native.status.code(), node.status.code(), "{command}");
+        assert_eq!(native.stdout, node.stdout, "{command}");
+        assert_eq!(native.stderr, node.stderr, "{command}");
+    }
+    Ok(())
+}
+
+#[test]
 fn capsule_delete_all_outside_workspace_matches_node() -> KnownResult<()> {
     let helper = Helper::new();
     let root = helper.scopes.e2e_dir.join("delete-all-cache");

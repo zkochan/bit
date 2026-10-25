@@ -190,12 +190,7 @@ fn emit_report(
 }
 
 pub(super) fn parse_subcommand(args: &[&str]) -> Option<Subcommand> {
-    let filtered = args
-        .iter()
-        .copied()
-        .filter(|arg| *arg != "--no-color")
-        .collect::<Vec<_>>();
-    match filtered.as_slice() {
+    match args {
         [] => Some(Subcommand::BareList),
         ["list", rest @ ..] => parse_list_flags(rest),
         ["delete", rest @ ..] => parse_delete_flags(rest),
