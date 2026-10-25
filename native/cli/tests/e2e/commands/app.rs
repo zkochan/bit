@@ -299,6 +299,58 @@ fn app_list_with_apps_in_ci_matches_node() -> KnownResult<()> {
 }
 
 #[test]
+fn app_list_inline_json_values_match_node() -> KnownResult<()> {
+    let helper = Helper::new();
+    let outside = helper.scopes.e2e_dir.join("outside-app-list-inline-json");
+    fs::create_dir_all(&outside).unwrap();
+    let (_, bare_scope) = helper.new_bare_scope();
+    helper.re_init_workspace();
+    let ci_env = [("CI", OsStr::new("1"))];
+    let commands = [
+        "app list --json=true",
+        "apps list -j=true",
+        "app list --json=false",
+        "apps list -j=false",
+        "app list --json=1",
+        "apps list -j=0",
+    ];
+    for directory in [&outside, &bare_scope, &helper.scopes.local_path] {
+        for command in commands {
+            for native_env in [&[][..], &ci_env[..]] {
+                let mut node_env = vec![("BIT_NATIVE", OsStr::new("off"))];
+                node_env.extend_from_slice(native_env);
+                let node = Helper::cmd_in_with(directory, command, &node_env);
+                let native = Helper::cmd_in_with(directory, command, native_env);
+                assert!(native.native, "{command}: node={node:?}; native={native:?}");
+                assert_eq!(native.status.code(), node.status.code(), "{command}");
+                assert_eq!(native.stdout, node.stdout, "{command}");
+                assert_eq!(native.stderr, node.stderr, "{command}");
+            }
+        }
+    }
+    helper.populate_components(1, true, "");
+    helper.output_file(
+        "comp1/comp1.node-app.js",
+        "module.exports.default = { name: 'sample-app', entry: require.resolve('./index.js') };\n",
+    );
+    helper.run("add comp1");
+    for command in commands {
+        let node = Helper::cmd_in_with(
+            &helper.scopes.local_path,
+            command,
+            &[("BIT_NATIVE", OsStr::new("off")), ("CI", OsStr::new("1"))],
+        );
+        let native =
+            Helper::cmd_in_with(&helper.scopes.local_path, command, &[("CI", OsStr::new("1"))]);
+        assert!(native.native, "{command}: node={node:?}; native={native:?}");
+        assert_eq!(native.status.code(), node.status.code(), "{command}");
+        assert_eq!(native.stdout, node.stdout, "{command}");
+        assert_eq!(native.stderr, node.stderr, "{command}");
+    }
+    Ok(())
+}
+
+#[test]
 fn app_list_without_apps_in_ci_matches_node() -> KnownResult<()> {
     let helper = Helper::new();
     let outside = helper.scopes.e2e_dir.join("outside-app-list-ci");

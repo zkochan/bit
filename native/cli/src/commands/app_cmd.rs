@@ -220,8 +220,13 @@ pub(super) fn run_missing_app(args: &[OsString], component_count: usize) -> io::
 
 fn run_outside_workspace(args: &[OsString], argv: &[&str]) -> io::Result<Outcome> {
     match &argv[1..] {
-        ["list", "-j" | "--json"] => {
+        ["list", "-j" | "--json" | "-j=true" | "--json=true"] => {
             io::stdout().lock().write_all(b"[]")?;
+        }
+        ["list", "-j=false" | "--json=false" | "-j=0" | "--json=0" | "-j=1" | "--json=1"] => {
+            let chalk = Chalk::detect(args);
+            writeln!(io::stdout().lock(), r#"- running command "list"..."#)?;
+            writeln!(io::stdout().lock(), "{}", chalk.yellow("no apps found"))?;
         }
         [] | ["list"] => {
             let chalk = Chalk::detect(args);
@@ -262,7 +267,16 @@ fn emit_apps_outcome(
             .collect();
         table::render(&["id", "name"], &rows, table::colors(args))
     };
-    if env::var_os("CI").is_some_and(|value| !value.is_empty()) {
+    if env::var_os("CI").is_some_and(|value| !value.is_empty())
+        || args
+            .iter()
+            .any(|arg| {
+                matches!(
+                    arg.to_str(),
+                    Some("-j=false" | "--json=false" | "-j=0" | "--json=0" | "-j=1" | "--json=1"),
+                )
+            })
+    {
         let label = if args.len() == 1 { "app" } else { "list" };
         writeln!(io::stdout().lock(), r#"- running command "{label}"..."#)?;
     }
@@ -392,6 +406,10 @@ pub(super) fn parse_options(args: &[&str]) -> Option<Options> {
         match arg {
             "--no-color" => {}
             "-j" | "--json" => json = true,
+            "-j=true" | "--json=true" if saw_list => json = true,
+            "-j=false" | "--json=false" | "-j=0" | "--json=0" | "-j=1" | "--json=1" if saw_list => {
+                json = false;
+            }
             "list" if !saw_list => saw_list = true,
             _ => return None,
         }
