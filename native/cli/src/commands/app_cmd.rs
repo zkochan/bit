@@ -103,18 +103,25 @@ fn unsupported_flag_help(argv: &[&str]) -> Option<String> {
         {
             Some(run_flag_help(name, flag))
         }
-        [flag @ ("--json" | "--no-color")] => {
-            let unknown = if *flag == "--json" {
-                "Unknown argument: json"
-            } else {
-                "Unknown arguments: no-color, noColor"
-            };
-            Some(format!("{}\n{unknown}\n", app_command_help(name)))
+        [flag @ ("--json" | "--no-color" | "--ssr" | "--dev" | "--verbose" | "--no-browser")] => {
+            Some(format!("{}\n{}\n", app_command_help(name), unknown_app_flag(flag)))
         }
-        ["list", "--no-color"] => {
-            Some(format!("{}\nUnknown arguments: no-color, noColor\n", list_command_help(name)))
+        ["list", flag @ ("--no-color" | "--ssr" | "--dev" | "--verbose" | "--no-browser")] => {
+            Some(format!("{}\n{}\n", list_command_help(name), unknown_app_flag(flag)))
         }
         _ => None,
+    }
+}
+
+fn unknown_app_flag(flag: &str) -> &'static str {
+    match flag {
+        "--json" => "Unknown argument: json",
+        "--ssr" => "Unknown argument: ssr",
+        "--dev" => "Unknown argument: dev",
+        "--verbose" => "Unknown argument: verbose",
+        "--no-color" => "Unknown arguments: no-color, noColor",
+        "--no-browser" => "Unknown arguments: no-browser, noBrowser",
+        _ => unreachable!("only rejected app flags call unknown_app_flag"),
     }
 }
 

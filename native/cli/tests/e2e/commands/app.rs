@@ -149,6 +149,40 @@ fn app_rejected_flags_help_matches_node() -> KnownResult<()> {
 }
 
 #[test]
+fn app_rejected_options_match_node() -> KnownResult<()> {
+    let helper = Helper::new();
+    let outside = helper.scopes.e2e_dir.join("outside-app-rejected-options");
+    fs::create_dir_all(&outside).unwrap();
+    let (_, bare_scope) = helper.new_bare_scope();
+    helper.re_init_workspace();
+    let ci_env = [("CI", OsStr::new("1"))];
+    for directory in [&outside, &bare_scope, &helper.scopes.local_path] {
+        for command in [
+            "app --ssr",
+            "apps --dev",
+            "app --verbose",
+            "apps --no-browser",
+            "app list --ssr",
+            "apps list --dev",
+            "app list --verbose",
+            "apps list --no-browser",
+        ] {
+            for native_env in [&[][..], &ci_env[..]] {
+                let mut node_env = vec![("BIT_NATIVE", OsStr::new("off"))];
+                node_env.extend_from_slice(native_env);
+                let node = Helper::cmd_in_with(directory, command, &node_env);
+                let native = Helper::cmd_in_with(directory, command, native_env);
+                assert!(native.native, "{command}: node={node:?}; native={native:?}");
+                assert_eq!(native.status.code(), node.status.code(), "{command}");
+                assert_eq!(native.stdout, node.stdout, "{command}");
+                assert_eq!(native.stderr, node.stderr, "{command}");
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn app_list_with_apps_in_ci_matches_node() -> KnownResult<()> {
     let helper = Helper::new();
     helper.re_init_workspace();
