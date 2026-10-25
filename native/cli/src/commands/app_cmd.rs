@@ -51,6 +51,10 @@ fn run(args: &[OsString]) -> io::Result<Outcome> {
             .write_all(run_cmd::command_help(&format!("{name} run")).as_bytes())?;
         return Ok(Outcome::Exit(ExitCode::SUCCESS));
     }
+    if let Some(help) = app_help_output(&argv) {
+        io::stdout().lock().write_all(help.as_bytes())?;
+        return Ok(Outcome::Exit(ExitCode::SUCCESS));
+    }
     if let Some(help) = unsupported_flag_help(&argv) {
         io::stdout().lock().write_all(help.as_bytes())?;
         return Ok(Outcome::Exit(ExitCode::FAILURE));
@@ -79,9 +83,17 @@ fn app_run_help_name<'a>(argv: &[&'a str]) -> Option<&'a str> {
     run_cmd::is_help_form(rest).then_some(name)
 }
 
+fn app_help_output(argv: &[&str]) -> Option<String> {
+    let name = *argv.first()?;
+    match &argv[1..] {
+        ["--help" | "-h"] => Some(app_command_help(name)),
+        ["list", "--help" | "-h"] => Some(list_command_help(name)),
+        _ => None,
+    }
+}
+
 fn unsupported_flag_help(argv: &[&str]) -> Option<String> {
     let name = *argv.first()?;
-    let global = GLOBAL_HELP;
     match &argv[1..] {
         ["run" | "c", flag @ ("--ssr" | "--json" | "--no-color")] => {
             Some(run_flag_help(name, flag))
@@ -97,15 +109,27 @@ fn unsupported_flag_help(argv: &[&str]) -> Option<String> {
             } else {
                 "Unknown arguments: no-color, noColor"
             };
-            Some(format!(
-                "bit {name} [sub-command]\n\nmanage application components\napplications are components that create deployable, runnable applications like React apps or Node.js servers.\nlist available apps in the workspace and inspect their configurations.\nuse \"bit run\" to start an application locally.\nfor more info, visit: https://bit.dev/docs/getting-started/composing/create-apps\n\nCommands:\n  bit {name} list            list all registered apps\n  bit {name} run [app-name]  start an application component locally  [aliases: c]\n\n{global}\n\n{unknown}\n",
-            ))
+            Some(format!("{}\n{unknown}\n", app_command_help(name)))
         }
-        ["list", "--no-color"] => Some(format!(
-            "bit {name} list\n\nlist all registered apps\nfor more info, visit: https://bit.dev/reference/reference/cli-reference\n\nOptions\n  -j, --json  return the component data in json format  [boolean]\n\n{global}\n\nUnknown arguments: no-color, noColor\n",
-        )),
+        ["list", "--no-color"] => {
+            Some(format!("{}\nUnknown arguments: no-color, noColor\n", list_command_help(name)))
+        }
         _ => None,
     }
+}
+
+fn app_command_help(name: &str) -> String {
+    let global = GLOBAL_HELP;
+    format!(
+        "bit {name} [sub-command]\n\nmanage application components\napplications are components that create deployable, runnable applications like React apps or Node.js servers.\nlist available apps in the workspace and inspect their configurations.\nuse \"bit run\" to start an application locally.\nfor more info, visit: https://bit.dev/docs/getting-started/composing/create-apps\n\nCommands:\n  bit {name} list            list all registered apps\n  bit {name} run [app-name]  start an application component locally  [aliases: c]\n\n{global}\n",
+    )
+}
+
+fn list_command_help(name: &str) -> String {
+    let global = GLOBAL_HELP;
+    format!(
+        "bit {name} list\n\nlist all registered apps\nfor more info, visit: https://bit.dev/reference/reference/cli-reference\n\nOptions\n  -j, --json  return the component data in json format  [boolean]\n\n{global}\n",
+    )
 }
 
 fn run_flag_help(name: &str, flag: &str) -> String {
