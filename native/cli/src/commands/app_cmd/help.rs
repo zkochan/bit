@@ -1,6 +1,6 @@
 //! Released app command help and rejected-option output.
 
-use super::{GLOBAL_HELP, run_cmd};
+use super::{GLOBAL_HELP, inline_json_value, run_cmd};
 
 pub(super) fn app_run_help_name<'a>(argv: &[&'a str]) -> Option<&'a str> {
     let name = *argv.first()?;
@@ -43,6 +43,9 @@ pub(super) fn unsupported_flag_help(argv: &[&str]) -> Option<String> {
 
 fn rejected_app_option(args: &[&str], list: bool) -> Option<&'static str> {
     let flag = match args {
+        [json, "--no-color"] | ["--no-color", json] if list && is_json_flag(json) => {
+            return Some("Unknown arguments: no-color, noColor");
+        }
         [flag] => *flag,
         [flag @ ("--port" | "--args" | "-p" | "-a"), value] if !value.starts_with('-') => *flag,
         _ => return None,
@@ -69,6 +72,10 @@ fn rejected_app_option(args: &[&str], list: bool) -> Option<&'static str> {
         "-a" => Some("Unknown argument: a"),
         _ => None,
     }
+}
+
+fn is_json_flag(flag: &str) -> bool {
+    matches!(flag, "-j" | "--json") || inline_json_value(flag).is_some()
 }
 
 fn app_command_help(name: &str) -> String {
