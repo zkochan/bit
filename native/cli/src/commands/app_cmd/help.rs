@@ -42,15 +42,10 @@ pub(super) fn unsupported_flag_help(argv: &[&str]) -> Option<String> {
 }
 
 fn rejected_app_option(args: &[&str], list: bool) -> Option<&'static str> {
+    if list && list_json_no_color(args) {
+        return Some("Unknown arguments: no-color, noColor");
+    }
     let flag = match args {
-        [json, "true" | "false", "--no-color"] | ["--no-color", json, "true" | "false"]
-            if list && matches!(*json, "-j" | "--json") =>
-        {
-            return Some("Unknown arguments: no-color, noColor");
-        }
-        [json, "--no-color"] | ["--no-color", json] if list && is_json_flag(json) => {
-            return Some("Unknown arguments: no-color, noColor");
-        }
         [flag] => *flag,
         [flag @ ("--port" | "--args" | "-p" | "-a"), value] if !value.starts_with('-') => *flag,
         _ => return None,
@@ -76,6 +71,17 @@ fn rejected_app_option(args: &[&str], list: bool) -> Option<&'static str> {
         "-p" => Some("Unknown argument: p"),
         "-a" => Some("Unknown argument: a"),
         _ => None,
+    }
+}
+
+fn list_json_no_color(args: &[&str]) -> bool {
+    match args {
+        [json, "--no-color"] | ["--no-color", json] => is_json_flag(json),
+        [json, "true" | "false", "--no-color"]
+        | ["--no-color", json, "true" | "false"]
+        | [json, "--no-color", "true" | "false"]
+        | ["--no-color", "true" | "false", json] => matches!(*json, "-j" | "--json"),
+        _ => false,
     }
 }
 
