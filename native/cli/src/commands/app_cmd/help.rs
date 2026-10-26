@@ -36,7 +36,8 @@ pub(super) fn unsupported_flag_help(argv: &[&str]) -> Option<String> {
         ["list", rest @ ..] => (true, rest),
         rest => (false, rest),
     };
-    let unknown = rejected_app_option(args, list)?;
+    let leading_value = if list { list_leading_json_value_error(args) } else { None };
+    let unknown = leading_value.or_else(|| rejected_app_option(args, list))?;
     let help = if list { list_command_help(name) } else { app_command_help(name) };
     Some(format!("{help}\n{unknown}\n"))
 }
@@ -82,6 +83,21 @@ fn list_json_no_color(args: &[&str]) -> bool {
         | [json, "--no-color", "true" | "false"]
         | ["--no-color", "true" | "false", json] => matches!(*json, "-j" | "--json"),
         _ => false,
+    }
+}
+
+fn list_leading_json_value_error(args: &[&str]) -> Option<&'static str> {
+    match args {
+        [value, json, "--no-color"] | [value, "--no-color", json]
+            if matches!(*json, "-j" | "--json") =>
+        {
+            match *value {
+                "true" => Some("Unknown arguments: no-color, noColor, true"),
+                "false" => Some("Unknown arguments: no-color, noColor, false"),
+                _ => None,
+            }
+        }
+        _ => None,
     }
 }
 
