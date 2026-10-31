@@ -10,8 +10,16 @@ pub(crate) struct CallbackError {
 
 impl CallbackError {
     pub(crate) fn wrap(cause: io::Error, mut startup: String, mut output: String) -> io::Error {
-        startup.truncate(startup.trim_end_matches('\0').len());
-        output.truncate(output.trim_end_matches('\0').len());
+        startup.truncate(
+            startup
+                .trim_end_matches(['\0', '\r'])
+                .len(),
+        );
+        output.truncate(
+            output
+                .trim_end_matches(['\0', '\r'])
+                .len(),
+        );
         io::Error::other(Self { startup, output, cause })
     }
 }

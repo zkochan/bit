@@ -96,6 +96,8 @@ fn root_dependencies(
     };
     let version = lockfile["importers"][root_dir]["dependencies"][package]["version"]
         .as_str()
+        .map(str::trim)
+        .filter(|version| !version.is_empty())
         .ok_or_else(|| decline("dependency graph locked component"))?
         .to_string();
     let locked = format!("{package}@{version}");
@@ -352,7 +354,8 @@ fn package_name(dep_path: &str) -> Option<&str> {
 /// `refToRelative(reference, pkgName)` of `@pnpm/deps.path`.
 pub fn ref_to_relative(reference: &str, name: &str) -> Option<String> {
     let reference = reference.trim();
-    if reference.is_empty() || reference.starts_with("link:") {
+    let name = name.trim();
+    if reference.is_empty() || name.is_empty() || reference.starts_with("link:") {
         return None;
     }
     if reference.starts_with('@') {

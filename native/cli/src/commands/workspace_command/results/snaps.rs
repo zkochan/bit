@@ -78,8 +78,13 @@ pub fn snaps(value: Option<&Value>) -> io::Result<Option<Snaps>> {
 }
 
 pub fn snap_error(value: Option<&Value>) -> io::Result<Option<SnapError>> {
-    let Some(value) = value else { return Ok(None) };
-    if value.get("kind").and_then(Value::as_str) == Some("message") {
+    let Some(value) = value.filter(|value| !value.is_null()) else { return Ok(None) };
+    if value
+        .get("kind")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        == Some("message")
+    {
         let map = record(value, &["kind", "message"])?;
         return Ok(Some(SnapError {
             components: Vec::new(),
@@ -87,7 +92,12 @@ pub fn snap_error(value: Option<&Value>) -> io::Result<Option<SnapError>> {
         }));
     }
     let map = record(value, &["kind", "components"])?;
-    if map.get("kind").and_then(Value::as_str) != Some("componentsHaveIssues") {
+    if map
+        .get("kind")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        != Some("componentsHaveIssues")
+    {
         return Err(decline("native command snap error kind"));
     }
     let components: Vec<(Id, Vec<Vec<String>>)> = rows(map.get("components"))?

@@ -34,7 +34,7 @@ pub fn validate(
         &[][..]
     };
     for component in &found {
-        let id = text(component.get("id"))?;
+        let id = text(component.get("id"))?.trim();
         if selected.contains(id) && !predicted(component, id, errors)? {
             return Err(decline("command unsupported snapshot issue"));
         }
@@ -103,7 +103,7 @@ fn selected<'p>(plan: &'p Value, policy: Option<&'p Value>) -> io::Result<HashSe
 fn merged(components: &[Component], projected: &[Value]) -> io::Result<Vec<Component>> {
     let mut replacements: Vec<(String, Component)> = Vec::new();
     for row in projected {
-        let identity = text(row.get("identity"))?;
+        let identity = text(row.get("identity"))?.trim();
         let base = without_version(identity).to_string();
         let known = components
             .iter()

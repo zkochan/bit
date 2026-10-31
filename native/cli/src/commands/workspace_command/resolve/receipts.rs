@@ -23,7 +23,12 @@ use std::{
 };
 
 pub(super) fn check_token(receipt: &Value, token: &str) -> io::Result<()> {
-    if receipt.get("token").and_then(Value::as_str) == Some(token) {
+    if receipt
+        .get("token")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        == Some(token.trim())
+    {
         Ok(())
     } else {
         Err(decline("resolve token"))
@@ -191,10 +196,10 @@ pub(in crate::commands::workspace_command) fn component_receipts(
         .captured
         .iter()
         .map(|component| {
-            let identity = text(component.get("identity"))?;
+            let identity = text(component.get("identity"))?.trim();
             let target = targets
                 .iter()
-                .find(|target| target["identity"] == identity)
+                .find(|target| target["identity"].as_str().map(str::trim) == Some(identity))
                 .ok_or_else(|| decline("resolve component metadata"))?;
             let state = capture
                 .dependency_states
@@ -203,7 +208,7 @@ pub(in crate::commands::workspace_command) fn component_receipts(
             let policy = status_policy::status_policy(context, target)?;
             let files: Vec<String> = array(component.get("files"), "files")?
                 .iter()
-                .map(|file| text(Some(file)).map(str::to_string))
+                .map(|file| text(Some(file)).map(|path| path.trim().to_string()))
                 .collect::<io::Result<_>>()?;
             let callback = capture::snapshot_data(capture, identity);
             let default_node = if callback.is_some() {
@@ -212,20 +217,15 @@ pub(in crate::commands::workspace_command) fn component_receipts(
                 defaults::receipt(target, &policy, &files)?
             };
             Ok(json!({
-                "identity": identity,
-                "extensions": policy.extensions,
-                "packageName": policy.package_name,
-                "defaultNode": default_node,
-                "dependencyState": state,
-                "callbackExtensions": capture::snapshot_data(capture, identity).map(|data| &data["extensions"]),
+                "identity": identity, "extensions": policy.extensions,
+                "packageName": policy.package_name, "defaultNode": default_node,
+                "dependencyState": state, "callbackExtensions": callback.map(|data| &data["extensions"]),
             }))
         })
         .collect()
 }
 
 /// `resolvePatternIds`: the targets the pattern matches (`multimatch`).
-/// The engine keeps the matching snap candidates, or for a single id, the
-/// id itself (`resolveComponentId`).
 pub(super) fn pattern_ids(
     context: &Value,
     pattern: Option<&str>,
@@ -238,7 +238,7 @@ pub(super) fn pattern_ids(
             .as_array()
             .ok_or_else(|| decline("snapshot literal selection rows"))?
             .iter()
-            .map(|row| text(row.get("identity")).map(str::to_owned))
+            .map(|row| text(row.get("identity")).map(|id| id.trim().to_owned()))
             .collect::<io::Result<Vec<_>>>()
             .map(Some);
     }
@@ -251,7 +251,7 @@ pub(super) fn pattern_ids(
     }
     let identities: Vec<&str> = array(context.get("targets"), "targets")?
         .iter()
-        .map(|target| text(target.get("identity")))
+        .map(|target| text(target.get("identity")).map(str::trim))
         .collect::<io::Result<_>>()?;
     let selected = patterns::extended::matching(&identities, &patterns)?;
     if selected.is_empty() {
@@ -269,7 +269,7 @@ pub(super) fn pattern_ids(
 pub(super) fn identities(rows: &[Value]) -> io::Result<Vec<String>> {
     let identities: Vec<String> = rows
         .iter()
-        .map(|row| text(Some(row)).map(str::to_string))
+        .map(|row| text(Some(row)).map(|id| id.trim().to_string()))
         .collect::<io::Result<_>>()?;
     let distinct: HashSet<&String> = identities.iter().collect();
     if identities.is_empty()

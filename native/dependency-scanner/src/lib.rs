@@ -283,5 +283,6 @@ pub fn scan_source(path: String, source: String) -> Result<Value, serde_json::Er
 
 /// The response to a request the scanner cannot read.
 pub(crate) fn invalid_request(message: &str) -> Value {
-    serde_json::json!({"version":1,"status":"invalid_request","diagnostics":[message]})
+    let trimmed = message.trim();
+    serde_json::json!({"version":1,"status":"invalid_request","diagnostics":[trimmed]})
 }

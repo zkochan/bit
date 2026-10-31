@@ -30,6 +30,17 @@ impl Cache {
         self.value
             .get_or_init(|| {
                 factory()
+                    .map(|mut user| {
+                        user.username = user.username
+                            .take()
+                            .map(|val| val.trim().to_owned())
+                            .filter(|val| !val.is_empty());
+                        user.email = user.email
+                            .take()
+                            .map(|val| val.trim().to_owned())
+                            .filter(|val| !val.is_empty());
+                        user
+                    })
                     .map_err(|error| Failure {
                         kind: error.kind(),
                         message: error.to_string().trim().to_owned(),

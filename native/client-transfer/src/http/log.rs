@@ -79,8 +79,12 @@ fn validate_row(row: &Value) -> io::Result<Value> {
         return Err(invalid("remote log row"));
     }
     let mut normalized = row.clone();
-    if let Some(number) = normalized["date"].as_i64() {
-        normalized["date"] = Value::String(number.to_string());
+    if let Some(number) = normalized["date"]
+        .as_i64()
+        .map(|val| val.to_string())
+        .or_else(|| normalized["date"].as_u64().map(|val| val.to_string()))
+    {
+        normalized["date"] = Value::String(number);
     }
     Ok(normalized)
 }

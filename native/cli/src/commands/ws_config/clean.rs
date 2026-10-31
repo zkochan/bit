@@ -161,7 +161,7 @@ pub(in crate::commands::ws_config) fn writer_matches(
 pub(in crate::commands) fn collect_standard_env_ids(ws: &Workspace) -> Option<Vec<String>> {
     let mut env_ids = Vec::new();
     for (_, comp) in ws.active() {
-        let bare = aspect_id_without_version(&comp.env_id);
+        let bare = aspect_id_without_version(comp.env_id.trim()).trim();
         if !STANDARD_WRITER_ENVS.contains(&bare) {
             return None;
         }

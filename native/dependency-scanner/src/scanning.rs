@@ -130,7 +130,10 @@ fn normalized_kind(file: &File) -> String {
         .map(str::trim)
         .filter(|kind| !kind.is_empty())
         .or_else(|| {
-            std::path::Path::new(file.path.trim()).extension().and_then(std::ffi::OsStr::to_str)
+            let path = file.path
+                .trim()
+                .trim_end_matches(['/', '\\']);
+            std::path::Path::new(path).extension().and_then(std::ffi::OsStr::to_str)
         })
         .unwrap_or("")
         .trim_start_matches('.')

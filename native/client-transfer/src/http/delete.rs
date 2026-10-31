@@ -79,7 +79,7 @@ impl Network {
         force: bool,
         lanes: bool,
     ) -> io::Result<Value> {
-        let endpoint = format!("{}/api/delete", url.trim_end_matches('/'));
+        let endpoint = format!("{}/api/delete", url.trim().trim_end_matches('/'));
         let ids = serde_json::to_string(ids).map_err(io::Error::other)?;
         let body = if lanes {
             format!(r#"{{"laneIds":{ids}}}"#)

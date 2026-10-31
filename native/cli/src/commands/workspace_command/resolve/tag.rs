@@ -25,7 +25,7 @@ pub fn selections(context: &Value, patterns: &[String]) -> io::Result<Option<Val
     }
     let identities: Vec<&str> = array(context.get("targets"), "targets")?
         .iter()
-        .map(|target| text(target.get("identity")))
+        .map(|target| text(target.get("identity")).map(str::trim))
         .collect::<io::Result<_>>()?;
     let mut rows = Vec::new();
     for (index, pattern) in patterns.iter().enumerate() {
@@ -126,9 +126,9 @@ fn literal_match<'i>(identities: &[&'i str], pattern: &str) -> io::Result<&'i st
     let suffix = format!("/{pattern}");
     let mut matches = identities
         .iter()
-        .filter(|id| **id == pattern || id.ends_with(&suffix));
+        .filter(|id| id.trim() == pattern || id.trim().ends_with(&suffix));
     match (matches.next(), matches.next()) {
-        (Some(identity), None) => Ok(identity),
+        (Some(identity), None) => Ok(identity.trim()),
         _ => Err(decline("tag unresolved literal identity")),
     }
 }

@@ -54,13 +54,11 @@ pub(crate) fn accepted(node: &CallExpression<'_>, ts: bool) -> bool {
                 matches!(
                     member.expression.without_parentheses(),
                     Expression::Identifier(id) if id.name == "resolve",
-                ) && matches!(
-                    member.object.without_parentheses(),
-                    Expression::Identifier(id) if id.name == "require",
-                ) || (matches!(
-                    member.expression.without_parentheses(),
-                    Expression::Identifier(id) if id.name == "resolve",
-                ) && matches!(member.object.without_parentheses(), Expression::ImportMeta(_)))
+                ) && match member.object.without_parentheses() {
+                    Expression::Identifier(id) => id.name == "require",
+                    Expression::ImportMeta(_) => true,
+                    _ => false,
+                }
             }
             _ => false,
         }

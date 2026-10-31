@@ -24,7 +24,7 @@ pub fn parse<'a>(args: &[&'a str], tag: bool) -> Option<(Policy, Vec<&'a str>)> 
     while index < args.len() {
         let raw = args[index];
         index += 1;
-        if raw == "--" {
+        if raw.trim() == "--" {
             remaining.push(raw);
             remaining.extend_from_slice(&args[index..]);
             break;
@@ -59,7 +59,7 @@ impl Policy {
         seen: &mut HashSet<&'a str>,
     ) -> Option<Option<usize>> {
         if let Some((raw_name, val)) = raw.split_once('=') {
-            let name = policy_alias(raw_name);
+            let name = policy_alias(raw_name.trim());
             if !is_policy_flag(name, tag) {
                 return Some(None);
             }
@@ -69,7 +69,7 @@ impl Policy {
             self.inline_flag(name, val)?;
             return Some(Some(0));
         }
-        let flag = policy_alias(raw);
+        let flag = policy_alias(raw.trim());
         if !is_policy_flag(flag, tag) {
             return Some(None);
         }

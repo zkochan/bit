@@ -3,7 +3,7 @@ use oxc_ast::ast::{AssignmentTarget, Expression};
 // Match ast-module-types' Babel shapes, including computed identifier properties.
 // A string property named "exports" intentionally does not match that classifier.
 fn peel<'a>(expression: &'a Expression<'a>) -> &'a Expression<'a> {
-    expression.without_parentheses()
+    expression.without_parentheses().get_inner_expression()
 }
 fn identifier(expression: &Expression<'_>, name: &str) -> bool {
     matches!(peel(expression), Expression::Identifier(value) if value.name == name)
@@ -35,6 +35,8 @@ pub(crate) fn is_exports(target: &AssignmentTarget<'_>) -> bool {
                     && identifier(&member.expression, "exports"))
         }
         AssignmentTarget::PrivateFieldExpression(member) => attached(&member.object),
-        _ => false,
+        _ => target
+            .get_expression()
+            .is_some_and(|expr| identifier(expr, "exports") || module_exports(expr)),
     }
 }

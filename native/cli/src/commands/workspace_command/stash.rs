@@ -101,6 +101,7 @@ impl super::Planned {
         let mut environment =
             self.take_environment().unwrap_or_else(environments::Environments::for_stash_callbacks);
         io::stdout().write_all(environment.stash_added(root, &ids)?.as_bytes())?;
+        io::stdout().flush()?;
         Ok(Some(environment))
     }
 }
@@ -126,7 +127,7 @@ impl Captured {
         let (_, environments) =
             environments::read_snapshot_context(&mut engine, root, &home, false, startup)?;
         let prepared:Value=engine.request(&json!({"kind":"commandStashPrepare","root":root,"home":home,"globalRemotesFile":crate::commands::status::cache::cache_root().join("config/global-remotes.json")}))?;
-        let token = text(prepared.get("token"))?.to_owned();
+        let token = text(prepared.get("token"))?.trim().to_owned();
         let context = prepared["context"].clone();
         let targets = array(context.get("targets"), "stash targets")?;
         startup.build_progress = Some(json!({"stash":{"loaded":targets.len(),"importing":false}}));
@@ -169,7 +170,9 @@ impl Captured {
             .filter_map(|row| {
                 let id = row["identity"]
                     .as_str()
-                    .or_else(|| row["id"].as_str())?;
+                    .or_else(|| row["id"].as_str())
+                    .map(str::trim)
+                    .filter(|id| !id.is_empty())?;
                 let data = capture::snapshot_data(&self.capture, id)?;
                 Some((id.to_owned(), data["consumerMetadata"].clone()))
             })

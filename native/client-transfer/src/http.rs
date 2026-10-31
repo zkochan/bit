@@ -140,8 +140,8 @@ impl Network {
     /// Run a canonical scope server action. Unlike fetch, Bit's `Http.action`
     /// makes a single request; export persistence retries at the caller level.
     pub async fn action(&self, url: &str, name: &str, options: &Value) -> io::Result<Value> {
-        let endpoint = format!("{url}/api/scope/action");
-        let body = json!({"name": name, "options": options});
+        let endpoint = format!("{}/api/scope/action", url.trim().trim_end_matches('/'));
+        let body = json!({"name": name.trim(), "options": options});
         let response = self.cancellation
             .run(
                 self.headers(self.client.post(&endpoint), "write")?
@@ -166,8 +166,8 @@ impl Network {
         client_id: &str,
         archive: Vec<u8>,
     ) -> io::Result<Vec<String>> {
-        let endpoint = format!("{url}/api/scope/put");
-        let options = json!({"clientId":client_id}).to_string();
+        let endpoint = format!("{}/api/scope/put", url.trim().trim_end_matches('/'));
+        let options = json!({"clientId":client_id.trim()}).to_string();
         let response = self.cancellation
             .run(
                 self.headers(self.client.post(&endpoint), "write")?
@@ -232,7 +232,9 @@ impl Network {
             None => request,
         };
         let request = match std::env::var("__CUSTOM_ORIGIN") {
-            Ok(origin) if !origin.is_empty() => request.header("x-custom-origin", origin),
+            Ok(origin) if !origin.trim().is_empty() => {
+                request.header("x-custom-origin", origin.trim())
+            }
             _ => request,
         };
         Ok(match &self.local_scope {
@@ -270,7 +272,7 @@ impl Network {
         options: &FetchOptions,
         max_bytes: usize,
     ) -> io::Result<Vec<ObjectItem>> {
-        let endpoint = format!("{url}/api/scope/fetch");
+        let endpoint = format!("{}/api/scope/fetch", url.trim().trim_end_matches('/'));
         let body = json!({ "ids": ids, "fetchOptions": options });
         let mut bytes = [0; 4];
         getrandom::fill(&mut bytes).map_err(|error| io::Error::other(error.to_string()))?;

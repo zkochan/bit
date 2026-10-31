@@ -103,7 +103,7 @@ pub(crate) fn classification_outcome(
 
 pub(crate) fn legacy_object_key(name: &str) -> bool {
     matches!(
-        name,
+        name.trim(),
         "constructor"
             | "__defineGetter__"
             | "__defineSetter__"

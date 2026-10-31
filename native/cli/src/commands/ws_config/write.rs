@@ -107,7 +107,11 @@ fn target_extending_dirs(comp_dirs: &[String], no_dedupe: bool) -> Vec<String> {
     }
     let mut dirs = Vec::new();
     for dir in comp_dirs {
-        let trimmed = dir.trim_matches('/');
+        let cleaned = dir.replace('\\', "/");
+        let trimmed = cleaned
+            .trim()
+            .trim_start_matches("./")
+            .trim_matches('/');
         let normalized = if trimmed.is_empty() { "." } else { trimmed };
         if !dirs
             .iter()

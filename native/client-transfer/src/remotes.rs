@@ -80,8 +80,14 @@ impl Remotes {
         let mut hosts = global_remotes(global_config_dir)?;
         if let Some(remotes) = scope_json["remotes"].as_object() {
             for (name, host) in remotes {
-                if let Some(host) = host.as_str() {
-                    hosts.insert(name.clone(), host.to_string());
+                let name = name.trim();
+                if let Some(host) = host
+                    .as_str()
+                    .map(str::trim)
+                    .filter(|host| !host.is_empty())
+                    && !name.is_empty()
+                {
+                    hosts.insert(name.to_string(), host.to_string());
                 }
             }
         }
@@ -167,7 +173,11 @@ pub fn global_remotes(dir: &Path) -> io::Result<IndexMap<String, String>> {
             .and_then(|value| serde_json::from_value::<IndexMap<String, Value>>(value).ok())
             .ok_or_else(|| invalid("invalid global-remotes.json"))?
             .into_iter()
-            .filter_map(|(name, host)| Some((name, host.as_str()?.to_string())))
+            .filter_map(|(name, host)| {
+                let name = name.trim();
+                let host = host.as_str()?.trim();
+                (!name.is_empty() && !host.is_empty()).then(|| (name.to_string(), host.to_string()))
+            })
             .collect()),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(IndexMap::new()),
         Err(error) => Err(error),

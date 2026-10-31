@@ -37,7 +37,7 @@ impl Network {
         let mut stream = response.bytes_stream();
         let mut bytes = Vec::new();
         while let Some(chunk) = self.cancellation.run(stream.next()).await? {
-            let chunk = chunk.map_err(io::Error::other)?;
+            let chunk = chunk.map_err(|error| super::network_error(&error))?;
             if chunk.len() > MAX_BYTES - bytes.len() {
                 return Err(invalid("remote doctor response limit"));
             }

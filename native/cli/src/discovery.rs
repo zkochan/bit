@@ -92,9 +92,14 @@ pub fn find_in(environment: &Environment) -> io::Result<Target> {
 
 impl Environment {
     pub fn from_process() -> Self {
+        let non_empty_path = |key: &str| {
+            env::var_os(key)
+                .filter(|val| !val.to_string_lossy().trim().is_empty())
+                .map(PathBuf::from)
+        };
         Self {
-            node_cli: env::var_os("BIT_NODE_CLI").map(PathBuf::from),
-            node_binary: env::var_os("BIT_NODE_BINARY").map(PathBuf::from),
+            node_cli: non_empty_path("BIT_NODE_CLI"),
+            node_binary: non_empty_path("BIT_NODE_BINARY"),
             executable: env::current_exe().and_then(fs::canonicalize).ok(),
             bvm_dir: bvm_dir(),
             path: env::var_os("PATH"),
@@ -103,7 +108,9 @@ impl Environment {
 }
 
 fn bvm_dir() -> Option<PathBuf> {
-    if let Some(dir) = env::var_os("BVM_GLOBALS_DIR").filter(|dir| !dir.is_empty()) {
+    if let Some(dir) =
+        env::var_os("BVM_GLOBALS_DIR").filter(|dir| !dir.to_string_lossy().trim().is_empty())
+    {
         return Some(PathBuf::from(dir));
     }
     let home = if cfg!(windows) {
@@ -111,7 +118,8 @@ fn bvm_dir() -> Option<PathBuf> {
     } else {
         env::var_os("HOME")
     };
-    home.map(|home| PathBuf::from(home).join(".bvm"))
+    home.filter(|home| !home.to_string_lossy().trim().is_empty())
+        .map(|home| PathBuf::from(home).join(".bvm"))
 }
 
 fn from_env(environment: &Environment) -> Option<NodeCli> {

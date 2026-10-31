@@ -102,7 +102,9 @@ pub fn read_from(reader: impl Read, max_bytes: usize) -> io::Result<Vec<ObjectIt
         let mut entry = entry?;
         let (name, data) = read_entry(&mut entry, max_bytes, &mut total_bytes)?;
         match name.as_str() {
-            ERROR => return Err(io::Error::other(String::from_utf8_lossy(&data).into_owned())),
+            ERROR => {
+                return Err(io::Error::other(String::from_utf8_lossy(&data).trim().to_owned()));
+            }
             START => start = Some(serde_json::from_slice(&data).map_err(io::Error::other)?),
             END => {
                 let value: Value = serde_json::from_slice(&data).map_err(io::Error::other)?;
@@ -143,7 +145,7 @@ fn read_entry<Reader: Read>(
 fn require_end(start: Option<Value>, ended: bool) -> io::Result<()> {
     if start
         .as_ref()
-        .is_some_and(|start| start["schema"] == SCHEMA)
+        .is_some_and(|start| start["schema"].as_str().map(str::trim) == Some(SCHEMA))
         && !ended
     {
         let metadata = start.unwrap_or_default();

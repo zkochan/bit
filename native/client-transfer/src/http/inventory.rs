@@ -165,22 +165,25 @@ fn inventory_rows(response: &Value, include_deleted: bool) -> io::Result<Vec<Val
         .map(|component| {
             let listed = Listed::parse(component)?;
             let mut row = json!({"id": listed.id(), "deprecated": listed.deprecated});
-            if include_deleted
-                && let Some(removed) = component["aspects"]
-                    .as_array()
-                    .and_then(|aspects| {
-                        aspects
-                            .iter()
-                            .find(|aspect| {
-                                aspect["id"].as_str().map(str::trim)
-                                    == Some("teambit.component/remove")
-                            })
-                    })
-                    .and_then(|aspect| aspect["config"].get("removed"))
-            {
+            if include_deleted && let Some(removed) = removed_config(component) {
                 row["removed"] = removed.clone();
             }
             Ok(row)
         })
         .collect()
+}
+
+fn removed_config(component: &Value) -> Option<&Value> {
+    component["aspects"]
+        .as_array()?
+        .iter()
+        .find(|aspect| {
+            aspect["id"]
+                .as_str()
+                .map(str::trim)
+                .is_some_and(|id| {
+                    id == "teambit.component/remove" || id.starts_with("teambit.component/remove@")
+                })
+        })?["config"]
+        .get("removed")
 }

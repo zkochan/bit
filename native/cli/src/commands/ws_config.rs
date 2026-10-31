@@ -236,7 +236,7 @@ pub(super) fn parse_subcommand(args: &[&str]) -> Option<Subcommand> {
     if rest.contains(&"--") {
         return None;
     }
-    match *filtered.first()? {
+    match filtered.first()?.trim() {
         "list" => parse_list(rest),
         "clean" => parse_clean(rest),
         "write" => parse_write(rest),
@@ -251,13 +251,15 @@ pub(super) fn parse_unrecognized<'a>(args: &[&'a str]) -> Option<&'a str> {
         .filter(|&arg| !matches!(arg, "--no-color" | "--no-color=true" | "--no-color=false"))
         .collect();
     let [sub] = filtered.as_slice() else { return None };
-    (!sub.starts_with('-') && !matches!(*sub, "write" | "clean" | "list")).then_some(*sub)
+    let sub = sub.trim();
+    (!sub.is_empty() && !sub.starts_with('-') && !matches!(sub, "write" | "clean" | "list"))
+        .then_some(sub)
 }
 
 fn parse_list(rest: &[&str]) -> Option<Subcommand> {
     let mut json = false;
     for &arg in rest {
-        match arg {
+        match arg.trim() {
             "-j" | "--json" | "--json=true" => json = true,
             "--json=false" => json = false,
             _ => return None,

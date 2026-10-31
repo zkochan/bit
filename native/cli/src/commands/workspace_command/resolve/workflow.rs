@@ -121,7 +121,9 @@ impl Workflow {
         match flag {
             "--build" => self.build = true,
             "--editor" => {
-                let value = next.filter(|value| !value.starts_with('-'));
+                let value = next
+                    .map(str::trim)
+                    .filter(|value| !value.starts_with('-'));
                 let editor = value.unwrap_or("vim");
                 self.editor = (!editor.is_empty()).then(|| editor.to_owned());
                 return Some(usize::from(value.is_some()));
@@ -149,6 +151,7 @@ impl Workflow {
     fn inline_flag(&mut self, flag: &str, val: &str) -> Option<()> {
         match flag {
             "--editor" => {
+                let val = val.trim();
                 if val.starts_with('-') {
                     return None;
                 }

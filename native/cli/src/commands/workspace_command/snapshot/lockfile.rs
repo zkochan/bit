@@ -87,11 +87,12 @@ fn visible_graphs(
     let snapped = needs_snap
         .iter()
         .map(|identity| {
+            let identity = identity.trim();
             let target = targets
                 .iter()
                 .find(|target| target_identity(target) == Some(identity))
                 .ok_or_else(|| decline("command snapshot target"))?;
-            let directory = text(target.get("directory"))?;
+            let directory = text(target.get("directory"))?.trim();
             Ok(graph::Snapped {
                 directory,
                 package_name: package_name(capture, identity)?,
@@ -145,9 +146,10 @@ fn workspace_components<'c>(
 
 /// The package name of a captured component.
 fn package_name<'c>(capture: &'c Capture, identity: &str) -> io::Result<&'c str> {
+    let target = without_version(identity.trim());
     capture.components
         .iter()
-        .find(|component| without_version(&component.identity) == identity)
+        .find(|component| without_version(component.identity.trim()) == target)
         .map(|component| component.package_name.trim())
         .filter(|name| !name.is_empty())
         .ok_or_else(|| decline("command snapshot component"))

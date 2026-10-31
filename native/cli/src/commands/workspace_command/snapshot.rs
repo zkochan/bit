@@ -97,7 +97,12 @@ impl Steps<'_> {
             "snapReceipt": receipt,
             "dependencyReadSet": capture.dependency_read_set(),
         }))?;
-        if finalized.get("token").and_then(Value::as_str) != Some(self.token) {
+        if finalized
+            .get("token")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            != Some(self.token.trim())
+        {
             return Err(decline("command finalize receipt"));
         }
         Ok(finalized)
@@ -175,7 +180,7 @@ fn hidden_only(context: &Value, needs_snap: &[String]) -> bool {
                     targets
                         .iter()
                         .any(|target| {
-                            target["identity"] == identity.as_str()
+                            target["identity"].as_str().map(str::trim) == Some(identity.trim())
                                 && target["hidden"] == true
                                 && target["bitmapPresent"] == false
                         })

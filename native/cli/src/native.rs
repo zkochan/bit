@@ -37,7 +37,11 @@ pub fn run(args: &[OsString]) -> io::Result<Option<ExitCode>> {
         trace::log("BIT_NATIVE=off: delegating every command");
         return Ok(None);
     }
-    let Some(name) = args.first().and_then(|name| name.to_str()) else {
+    let Some(name) = args
+        .first()
+        .and_then(|name| name.to_str())
+        .map(str::trim)
+    else {
         return Ok(None);
     };
     let Some(command) = commands::find(name) else {
@@ -59,12 +63,16 @@ pub fn run(args: &[OsString]) -> io::Result<Option<ExitCode>> {
 /// `BIT_NATIVE_TRACE`, which already prints the reason, nor for `--help`, nor
 /// with `BIT_NATIVE_QUIET=1`.
 fn warn_fallback(name: &str, reason: &str, args: &[OsString]) {
-    let quiet =
-        env::var_os("BIT_NATIVE_QUIET").is_some_and(|value| !value.is_empty() && value != "0");
+    let quiet = env::var_os("BIT_NATIVE_QUIET")
+        .is_some_and(|value| {
+            let text = value.to_string_lossy();
+            let trimmed = text.trim();
+            !trimmed.is_empty() && trimmed != "0" && !trimmed.eq_ignore_ascii_case("false")
+        });
     let help = args
         .iter()
         .skip(1)
-        .any(|arg| arg == "--help" || arg == "-h");
+        .any(|arg| matches!(arg.to_str().map(str::trim), Some("--help" | "-h")));
     if quiet || help || trace::enabled() {
         return;
     }

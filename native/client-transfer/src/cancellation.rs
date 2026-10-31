@@ -52,8 +52,9 @@ impl Cancellation {
         Self::default()
     }
     pub fn cancel(&self) {
-        self.0.cancelled.store(true, Ordering::Release);
-        self.0.changed.notify_waiters();
+        if !self.0.cancelled.swap(true, Ordering::AcqRel) {
+            self.0.changed.notify_waiters();
+        }
     }
     #[must_use]
     pub fn is_cancelled(&self) -> bool {

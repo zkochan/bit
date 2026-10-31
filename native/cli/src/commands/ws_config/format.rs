@@ -251,7 +251,10 @@ fn rel_display(ws_dir: &Path, full_path: &str) -> String {
     let full_path = full_path.trim();
     Path::new(full_path)
         .strip_prefix(ws_dir)
-        .map_or_else(|_| full_path.to_owned(), |rel| rel.to_string_lossy().replace('\\', "/"))
+        .map_or_else(
+            |_| full_path.replace('\\', "/"),
+            |rel| rel.to_string_lossy().replace('\\', "/"),
+        )
 }
 
 pub(super) fn strip_dry_run_contents(write_results: &mut WriteResults) {

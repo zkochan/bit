@@ -169,7 +169,11 @@ fn registry(config: &Value) -> Option<String> {
             .next()
             .map(str::to_string);
     }
-    config["packageJson"]["publishConfig"]["registry"].as_str().map(str::to_string)
+    config["packageJson"]["publishConfig"]["registry"]
+        .as_str()
+        .map(str::trim)
+        .filter(|url| !url.is_empty())
+        .map(str::to_string)
 }
 
 fn lookup(
@@ -212,9 +216,9 @@ fn round(
 ) -> io::Result<Vec<Value>> {
     let mut next = Vec::new();
     for (mut candidate, published) in pending.into_iter().zip(published) {
-        let identity = text(candidate.get("id"))?.to_string();
+        let identity = text(candidate.get("id"))?.trim().to_string();
         if published == true {
-            let current = text(candidate.get("version"))?;
+            let current = text(candidate.get("version"))?.trim();
             let parts =
                 grammar::snapshot([current]).ok_or_else(|| decline("registry version limits"))?;
             let version = bit_object_import::next_published_version(&parts[current]["version"])?;
@@ -222,10 +226,10 @@ fn round(
             next.push(candidate);
         } else if originals
             .iter()
-            .find(|row| row["id"] == identity)
+            .find(|row| row["id"].as_str().map(str::trim) == Some(identity.as_str()))
             .is_some_and(|original| original["version"] != candidate["version"])
         {
-            versions.insert(identity, text(candidate.get("version"))?.to_string());
+            versions.insert(identity, text(candidate.get("version"))?.trim().to_string());
         }
     }
     Ok(next)

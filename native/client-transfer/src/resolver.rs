@@ -101,11 +101,14 @@ impl Resolver {
             .stdin(Stdio::null())
             .output()?;
         if !output.status.success() {
-            return Err(io::Error::other(
-                String::from_utf8_lossy(&output.stderr).trim().to_string(),
-            ));
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let message = stderr.trim();
+            let fallback = String::from_utf8_lossy(&output.stdout);
+            let detail = if message.is_empty() { fallback.trim() } else { message };
+            return Err(io::Error::other(detail.to_string()));
         }
         String::from_utf8(output.stdout)
+            .map(|url| url.trim().to_string())
             .map_err(|_| invalid("the remote resolver returned a non UTF-8 URL"))
     }
 }

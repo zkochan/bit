@@ -40,7 +40,13 @@ pub const SNAP: Labels = Labels {
 pub const TAG: Labels = Labels {
     versioned: "taggedComponents",
     automatic: "autoTaggedResults",
-    others: &["newComponents", "dependentsWithPinnedDeps", "warnings", "totalComponentsCount"],
+    others: &[
+        "newComponents",
+        "dependentsWithPinnedDeps",
+        "warnings",
+        "laneName",
+        "totalComponentsCount",
+    ],
     nothing: "nothing to tag",
     dependents: "auto-tagged dependents",
     verb: "tagged",
@@ -51,7 +57,13 @@ pub const TAG: Labels = Labels {
 pub const SOFT_TAG: Labels = Labels {
     versioned: "taggedComponents",
     automatic: "autoTaggedResults",
-    others: &["newComponents", "dependentsWithPinnedDeps", "warnings", "totalComponentsCount"],
+    others: &[
+        "newComponents",
+        "dependentsWithPinnedDeps",
+        "warnings",
+        "laneName",
+        "totalComponentsCount",
+    ],
     nothing: "nothing to tag",
     dependents: "auto-tagged dependents",
     verb: "soft-tagged",

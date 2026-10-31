@@ -17,8 +17,17 @@ pub(super) async fn throw_for_action_status(response: Response) -> io::Result<Re
         .or_else(|| non_empty_str(&parsed["message"]))
         .unwrap_or("unknown error")
         .to_owned();
-    let code = error["code"].as_u64();
-    Err(action_error(code, error, &url, message))
+    Err(action_error(error_code(error), error, &url, message))
+}
+
+fn error_code(error: &Value) -> Option<u64> {
+    error["code"]
+        .as_u64()
+        .or_else(|| {
+            error["code"]
+                .as_str()
+                .and_then(|raw| raw.trim().parse().ok())
+        })
 }
 
 fn non_empty_str(value: &Value) -> Option<&str> {
@@ -121,7 +130,7 @@ pub(super) async fn throw_for_status(response: Response) -> io::Result<Response>
     let message = message.unwrap_or_else(|| {
         if crate::tar::truthy(&error) { "unknown error".to_owned() } else { fallback }
     });
-    Err(remote_error(error["code"].as_u64(), &error, &url, message))
+    Err(remote_error(error_code(&error), &error, &url, message))
 }
 
 pub(super) fn remote_error(

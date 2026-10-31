@@ -56,18 +56,20 @@ pub(super) fn tls(
     builder: reqwest::ClientBuilder,
     global: &GlobalConfig,
 ) -> io::Result<reqwest::ClientBuilder> {
-    let strict = ["network.strict-ssl", "network.strict_ssl", "proxy.strict_ssl"]
-        .iter()
-        .find_map(|key| global.get(*key))
-        .map(|value| {
-            value
-                .as_bool()
-                .unwrap_or_else(|| {
-                    value
-                        .as_str()
-                        .is_some_and(|raw| raw.trim().eq_ignore_ascii_case("true"))
-                })
-        });
+    let strict =
+        ["network.strict-ssl", "network.strict_ssl", "proxy.strict_ssl", "proxy.strict-ssl"]
+            .iter()
+            .find_map(|key| global.get(*key))
+            .map(|value| {
+                value
+                    .as_bool()
+                    .unwrap_or_else(|| {
+                        value
+                            .as_str()
+                            .map(str::trim)
+                            .is_some_and(|raw| raw.eq_ignore_ascii_case("true") || raw == "1")
+                    })
+            });
     let mut pem = config_str(global, "network.ca")
         .or_else(|| config_str(global, "proxy.ca"))
         .map(|ca| ca.as_bytes().to_vec());

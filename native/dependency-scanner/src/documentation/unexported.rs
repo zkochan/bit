@@ -69,7 +69,7 @@ impl<'a> Visit<'a> for Proof {
         }
     }
     fn visit_identifier_reference(&mut self, node: &IdentifierReference<'a>) {
-        if matches!(node.name.as_str(), "module" | "exports" | "eval" | "globalThis") {
+        if matches!(node.name.as_str(), "module" | "exports" | "eval" | "globalThis" | "global") {
             self.accepted = false;
         }
     }

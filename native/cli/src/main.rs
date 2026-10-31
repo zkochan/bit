@@ -27,6 +27,7 @@ fn main() -> ExitCode {
         Ok(code) => code,
         Err(error) => {
             eprintln!("bit: {}", error.to_string().trim());
+            let _ = std::io::Write::flush(&mut std::io::stderr());
             ExitCode::FAILURE
         }
     }

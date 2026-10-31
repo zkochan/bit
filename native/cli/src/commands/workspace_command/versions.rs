@@ -39,7 +39,7 @@ pub fn format(result: &Value, chalk: Chalk, labels: &Labels) -> io::Result<Repor
     let root = result
         .get("autoAddedWorkspaceRoot")
         .filter(|root| !root.is_null())
-        .map(|root| Id::parse(text(Some(root))?))
+        .map(|root| Id::parse(text(Some(root))?.trim()))
         .transpose()?;
     Ok(versioned.report(&Formatter::new(chalk), root.as_ref()))
 }
@@ -88,7 +88,7 @@ fn lane_name(map: &serde_json::Map<String, Value>) -> Option<String> {
 }
 
 fn pinned_dependents(value: Option<&Value>) -> io::Result<Vec<(Id, Vec<String>)>> {
-    let Some(value) = value else { return Ok(Vec::new()) };
+    let Some(value) = value.filter(|value| !value.is_null()) else { return Ok(Vec::new()) };
     array(Some(value), "dependents with pinned dependencies")?
         .iter()
         .map(|row| {
@@ -208,10 +208,9 @@ impl Versioned<'_> {
             let name = id.without_version();
             let overlap = self.selected
                 .iter()
-                .find(|component| component.without_version() == name);
-            if overlap.is_some_and(|overlap| {
-                !added.contains(&name) || overlap.display() != id.display()
-            }) {
+                .find(|comp| comp.without_version() == name);
+            if overlap.is_some_and(|comp| !added.contains(&name) || comp.display() != id.display())
+            {
                 return Err(decline("native snap overlapping automatic identity"));
             }
             persisted.insert(name);

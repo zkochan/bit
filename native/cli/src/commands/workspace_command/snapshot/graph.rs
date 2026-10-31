@@ -94,10 +94,11 @@ fn graph(
     }
     let has_root = importers.get(environment).is_some();
     if has_root
-        && component.directory == "."
-        && importers[environment]["dependencies"][component.package_name]["version"]
+        && importer == "."
+        && importers[environment]["dependencies"][component.package_name.trim()]["version"]
             .as_str()
-            .is_none()
+            .map(str::trim)
+            .is_none_or(str::is_empty)
     {
         return Ok(None);
     }

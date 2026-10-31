@@ -32,7 +32,11 @@ impl Network {
             bytes.extend_from_slice(&chunk);
         }
         let parsed: Value = serde_json::from_slice(&bytes).map_err(io::Error::other)?;
-        if let Some(message) = parsed["errors"][0]["message"].as_str() {
+        if let Some(message) = parsed["errors"][0]["message"]
+            .as_str()
+            .map(str::trim)
+            .filter(|msg| !msg.is_empty())
+        {
             return Err(io::Error::other(message.to_owned()));
         }
         let lanes = parsed["data"]["lanes"]["list"]

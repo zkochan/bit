@@ -39,21 +39,22 @@ impl Replacer {
         let mut ids = HashMap::new();
         let mut escaped = Vec::new();
         for component in components {
+            let package_name = component.package_name.trim();
+            if package_name.is_empty() {
+                return Err(decline("dependency graph package name"));
+            }
             // `snapToSemver(undefined)` is `undefined`: a new component is
             // named `<package>@undefined`, as in Node.
             let version = component.version.map_or_else(|| "undefined".to_string(), snap_to_semver);
-            replacements.insert(
-                component.package_name.to_string(),
-                format!("{}@{version}", component.package_name),
-            );
+            replacements.insert(package_name.to_string(), format!("{package_name}@{version}"));
             let (scope, name) = component.identity
                 .trim()
                 .split_once('/')
                 .map(|(scope, name)| (scope.trim(), name.trim()))
                 .filter(|(scope, name)| !scope.is_empty() && !name.is_empty())
                 .ok_or_else(|| decline("dependency graph component id"))?;
-            ids.insert(component.package_name.to_string(), (name.to_string(), scope.to_string()));
-            escaped.push(escape(component.package_name));
+            ids.insert(package_name.to_string(), (name.to_string(), scope.to_string()));
+            escaped.push(escape(package_name));
         }
         let pattern = if escaped.is_empty() {
             None
@@ -89,7 +90,7 @@ impl Replacer {
 
     /// The `{ name, scope }` a workspace component's package is marked with.
     pub fn component(&self, package_name: &str) -> Option<&(String, String)> {
-        self.components.get(package_name)
+        self.components.get(package_name.trim())
     }
 
     pub fn package_names(&self) -> impl Iterator<Item = &str> {

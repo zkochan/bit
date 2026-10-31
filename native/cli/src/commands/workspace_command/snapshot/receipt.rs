@@ -127,6 +127,10 @@ impl User {
 /// `getBitCloudUser()?.username`: `GET https://api.<domain>/user` with the
 /// token, read without a proxy like Node's `fetch`. Any failure is `None`.
 fn cloud_username(domain: &str, token: &str) -> Option<String> {
+    let (domain, token) = (domain.trim(), token.trim());
+    if domain.is_empty() || token.is_empty() {
+        return None;
+    }
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -145,7 +149,11 @@ fn cloud_username(domain: &str, token: &str) -> Option<String> {
             .await
             .ok()?;
         let body: Value = response.json().await.ok()?;
-        body["payload"]["username"].as_str().map(str::to_string)
+        body["payload"]["username"]
+            .as_str()
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .map(str::to_string)
     })
 }
 
@@ -169,8 +177,8 @@ fn git_config() -> HashMap<String, String> {
 fn parse_git_config(text: &str) -> HashMap<String, String> {
     text.split('\n')
         .filter_map(|line| {
-            let mut parts = line.split('=');
-            Some((parts.next()?.to_string(), parts.next()?.to_string()))
+            let mut parts = line.trim_end_matches('\r').split('=');
+            Some((parts.next()?.trim().to_string(), parts.next()?.to_string()))
         })
         .collect()
 }

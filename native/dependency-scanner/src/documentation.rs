@@ -30,7 +30,8 @@ pub fn proves_empty_docs(source: &[u8], relative_path: &str) -> bool {
         return false;
     }
     let Some(source_type) = source_type(relative_path) else { return false };
-    let Ok(source) = std::str::from_utf8(source) else { return false };
+    let Ok(raw_source) = std::str::from_utf8(source) else { return false };
+    let source = raw_source.strip_prefix('\u{feff}').unwrap_or(raw_source);
     if source.contains("/**") {
         return false;
     }

@@ -228,7 +228,7 @@ impl Session {
 impl Response {
     fn into_result(self) -> io::Result<Value> {
         match self.error {
-            Some(error) => Err(io::Error::other(error)),
+            Some(error) => Err(io::Error::other(error.trim().to_owned())),
             None => Ok(self.result.unwrap_or(Value::Null)),
         }
     }
@@ -277,7 +277,9 @@ fn forward_stderr(child: &mut Child) -> io::Result<std::sync::mpsc::Receiver<()>
             .read_until(b'\n', &mut line)
             .is_ok_and(|length| length > 0)
         {
-            let _ = io::stderr().lock().write_all(&line);
+            let mut lock = io::stderr().lock();
+            let _ = lock.write_all(&line);
+            let _ = lock.flush();
             line.clear();
         }
         let _ = finished.send(());

@@ -189,7 +189,9 @@ fn changed(row: &Value) -> io::Result<Changed> {
     let files =
         object(map.get("filesStatus").ok_or_else(|| decline("native command report files"))?)?
             .iter()
-            .map(|(file, status)| Ok((file.clone(), Status::parse(text(Some(status))?)?)))
+            .map(|(file, status)| {
+                Ok((file.trim().to_string(), Status::parse(text(Some(status))?)?))
+            })
             .collect::<io::Result<_>>()?;
     let raw_id = map.get("id").ok_or_else(|| decline("native command report id"))?;
     Ok(Changed { id: Id::from_object(raw_id)?, files })
@@ -313,7 +315,7 @@ pub fn listed(format: &Formatter, label: &str, ids: &[Id]) -> String {
 pub fn join_lines(parts: &[String]) -> String {
     parts
         .iter()
-        .filter(|part| !part.is_empty())
+        .filter(|part| !part.trim().is_empty())
         .cloned()
         .collect::<Vec<_>>()
         .join("\n")

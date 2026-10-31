@@ -46,7 +46,10 @@ impl History {
 
     fn format_command(args: &[OsString]) -> String {
         args.iter()
-            .map(|arg| arg.to_string_lossy())
+            .map(|arg| {
+                arg.to_string_lossy()
+                    .replace(['\r', '\n'], " ")
+            })
             .collect::<Vec<_>>()
             .join(" ")
     }
