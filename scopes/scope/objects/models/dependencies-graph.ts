@@ -260,8 +260,31 @@ export class DependenciesGraph {
     const index = this.edges.findIndex(({ id }) => id === dependentPkgId);
     if (index === -1) return;
     const edge = this.edges[index];
-    if (edge.neighbours.some(({ id }) => id === pkgId)) return;
-    this.edges[index] = { ...edge, neighbours: [...edge.neighbours, { id: pkgId }] };
+    const nodeId = this.dependencyNodeIdFor(pkgId, edge);
+    if (edge.neighbours.some(({ id }) => id === nodeId)) return;
+    this.edges[index] = { ...edge, neighbours: [...edge.neighbours, { id: nodeId }] };
+  }
+
+  /**
+   * The node a dependency on `pkgId` from `dependent` points at: the edge
+   * recorded under the package id itself, else a peer variant of it,
+   * preferring one whose peers the dependent provides, so that the restored
+   * snapshot carries the package's dependencies and peers. A package recorded
+   * without an edge (a resolved leaf) is pointed at by its id.
+   */
+  private dependencyNodeIdFor(pkgId: string, dependent: DependencyEdge): string {
+    if (this.edges.some(({ id }) => id === pkgId)) return pkgId;
+    const variants = this.edges
+      .filter(({ id, attr }) => id !== DependenciesGraph.ROOT_EDGE_ID && attr?.pkgId === pkgId)
+      .map(({ id }) => id)
+      .sort();
+    if (variants.length === 0) return pkgId;
+    const provided = new Set(dependent.neighbours.map(({ id }) => id));
+    const peersProvided = (variantId: string) =>
+      splitPeerIds(variantId)
+        .filter((peerId) => !isPatchHashSegment(peerId))
+        .every((peerId) => provided.has(peerId));
+    return variants.find(peersProvided) ?? variants[0];
   }
 
   isEmpty(): boolean {

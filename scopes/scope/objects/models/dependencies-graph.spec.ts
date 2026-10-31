@@ -404,6 +404,30 @@ describe('DependenciesGraph.attachDependencyGraph', () => {
     expect(graph.edges.find(({ id }) => id === nestedPkgId)?.neighbours).to.eql([{ id: 'foo@1.0.0' }]);
   });
 
+  it('links a nested extension the graph resolved only as a peer variant to the variant whose peers the dependent provides', () => {
+    const nestedPkgId = '@org/my-aspect@1.0.0';
+    const graph = createGraph(
+      [
+        rootEdge([]),
+        { id: `${nestedPkgId}(react@17.0.2)`, attr: { pkgId: nestedPkgId }, neighbours: [{ id: 'react@17.0.2' }] },
+        { id: `${nestedPkgId}(react@18.3.1)`, attr: { pkgId: nestedPkgId }, neighbours: [{ id: 'react@18.3.1' }] },
+      ],
+      [nestedPkgId, 'react@17.0.2', 'react@18.3.1']
+    );
+    const env = createGraph(
+      [rootEdge([{ id: 'react@18.3.1', name: 'react', specifier: '18.3.1', lifecycle: 'runtime' }])],
+      ['react@18.3.1']
+    );
+    graph.attachDependencyGraph(envPkgId, env);
+
+    graph.attachDependencyGraph(nestedPkgId, envGraph(), {}, { dependentPkgId: envPkgId });
+
+    expect(graph.edges.find(({ id }) => id === envPkgId)?.neighbours.map(({ id }) => id)).to.eql([
+      'react@18.3.1',
+      `${nestedPkgId}(react@18.3.1)`,
+    ]);
+  });
+
   it('leaves the edges of the graphs it took them from unchanged when linking a nested extension', () => {
     const graph = createGraph([rootEdge([])], []);
     const shared = envGraph();
