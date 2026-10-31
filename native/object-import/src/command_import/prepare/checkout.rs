@@ -147,13 +147,20 @@ fn lane_targets(value: &serde_json::Value) -> io::Result<Vec<Target>> {
 
 fn seeds(remote: &[Target], bitmap: &[Target]) -> Vec<Target> {
     let mut targets = remote.to_vec();
-    for target in bitmap.iter().filter(|target| target.scope.is_some()) {
+    for target in bitmap
+        .iter()
+        .filter(|target| {
+            target.scope
+                .as_deref()
+                .is_some_and(|scope| !scope.trim().is_empty())
+        })
+    {
         if !targets
             .iter()
             .any(|row| {
-                row.scope == target.scope
-                    && row.name == target.name
-                    && row.version == target.version
+                row.scope.as_deref().map(str::trim) == target.scope.as_deref().map(str::trim)
+                    && row.name.trim() == target.name.trim()
+                    && row.version.trim() == target.version.trim()
             })
         {
             targets.push(target.clone());

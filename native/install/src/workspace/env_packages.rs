@@ -35,7 +35,7 @@ pub fn external_env_packages(
         }
         let id = bare_id(env);
         let package = objects
-            .aspect(&component.env_id)?
+            .aspect(component.env_id.trim())?
             .map_or_else(|| default_package_name(&id), |model| model.package_name(&id));
         packages.insert(env.to_owned(), package);
     }
@@ -44,13 +44,13 @@ pub fn external_env_packages(
 
 /// `scope/name` (the scope may contain dots, the name slashes).
 fn bare_id(id: &str) -> ComponentId {
-    let id = id.trim();
+    let id = id.trim().trim_matches('/');
     let (scope, name) = id.split_once('/').unwrap_or(("", id));
-    let scope = scope.trim();
+    let scope = scope.trim().trim_matches('/');
     ComponentId {
         scope: (!scope.is_empty()).then(|| scope.to_owned()),
         default_scope: None,
-        name: name.trim().to_owned(),
+        name: name.trim().trim_matches('/').to_owned(),
         version: None,
     }
 }

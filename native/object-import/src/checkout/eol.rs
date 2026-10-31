@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 /// Mirror isbinaryfile 4.0.6's 512-byte classifier, including BOM early returns
 /// and the deliberately limited two/three-byte UTF-8 detection.
 pub(crate) fn binary(bytes: &[u8]) -> bool {
@@ -102,6 +105,3 @@ fn replace_newlines(text: &str, windows: bool) -> String {
     }
     output
 }
-
-#[cfg(test)]
-mod tests;

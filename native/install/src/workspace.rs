@@ -209,7 +209,7 @@ impl Workspace {
         self.entries
             .iter()
             .zip(&self.components)
-            .find(|(entry, _)| entry.root_dir == WORKSPACE_ROOT_DIR && entry.owns_its_dir())
+            .find(|(entry, _)| entry.root_dir.trim() == WORKSPACE_ROOT_DIR && entry.owns_its_dir())
             .map(|(_, component)| component)
     }
 
@@ -245,7 +245,7 @@ impl Loader<'_> {
             is_env: aspect_id_without_version(&env_id) == ENV_OF_ENVS
                 || files
                     .iter()
-                    .any(|file| file == "env.jsonc"),
+                    .any(|file| matches!(file.as_str(), "env.jsonc" | "env.json")),
             has_package_json: files
                 .iter()
                 .any(|file| file == "package.json"),
@@ -260,12 +260,13 @@ impl Loader<'_> {
     }
 
     fn files(&mut self, entry: &BitmapEntry) -> io::Result<Vec<String>> {
-        if entry.root_dir.is_empty() {
+        let root_dir = entry.root_dir.trim();
+        if root_dir.is_empty() {
             return Ok(Vec::new());
         }
         let excluded: &[String] =
-            if entry.root_dir == WORKSPACE_ROOT_DIR { &self.owning_dirs } else { &[] };
-        self.rules.component_files(&entry.root_dir, excluded)
+            if root_dir == WORKSPACE_ROOT_DIR { &self.owning_dirs } else { &[] };
+        self.rules.component_files(root_dir, excluded)
     }
 
     fn aspects(

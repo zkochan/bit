@@ -54,8 +54,10 @@ pub fn deps(policy: &[PolicyEntry]) -> FieldMaps {
         if used.contains(&name) && version != REMOVE {
             continue;
         }
-        result[field_index(entry.lifecycle)].insert(name.to_owned(), version.to_owned());
-        if version != REMOVE {
+        result[field_index(entry.lifecycle)]
+            .entry(name.to_owned())
+            .or_insert_with(|| version.to_owned());
+        if version != REMOVE && !used.contains(&name) {
             used.push(name);
         }
     }

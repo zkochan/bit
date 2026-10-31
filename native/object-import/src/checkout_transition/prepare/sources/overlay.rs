@@ -80,6 +80,7 @@ pub(in crate::checkout_transition::prepare) fn body(
     compressed: &mut usize,
     overlay: Option<&Overlay>,
 ) -> io::Result<Vec<u8>> {
+    let hash = hash.trim();
     let identity = crate::merge_history::hash(hash)?;
     let remaining =
         MAX_BYTES.checked_sub(*total).ok_or_else(|| invalid("checkout overlay raw limit"))?;
@@ -95,7 +96,7 @@ pub(in crate::checkout_transition::prepare) fn body(
     } else {
         crate::checkout::repository::source(directory, identity, remaining, compressed)?
     };
-    *total += bytes.len();
+    *total = total.saturating_add(bytes.len());
     Ok(bytes)
 }
 

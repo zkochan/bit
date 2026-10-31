@@ -40,14 +40,16 @@ fn effect(
     files: &mut Vec<File>,
     status: &mut Map<String, Value>,
 ) -> io::Result<Option<String>> {
-    match kind.trim() {
+    let kind = kind.trim();
+    let path = path.trim();
+    match kind {
         "modifiedFiles" => modified(plan, row, path, files, status),
         "addFiles" | "deletedConflictFiles" => {
             add(plan, row, path, files, status)?;
             Ok(None)
         }
         "removeFiles" | "remainDeletedFiles" => {
-            files.retain(|file| file.path != path);
+            files.retain(|file| file.path.trim() != path);
             status.insert(
                 path.into(),
                 json!(if kind == "removeFiles" { "removed" } else { "remainDeleted" }),

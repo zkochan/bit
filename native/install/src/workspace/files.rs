@@ -91,17 +91,14 @@ impl FileRules {
         dir: &str,
         exclude_dirs: &[String],
     ) -> io::Result<Vec<String>> {
-        let dir = dir.trim();
+        let trimmed = dir.trim().trim_end_matches('/');
+        let dir = if trimmed.is_empty() { WORKSPACE_ROOT_DIR } else { trimmed };
         let scanned = scan(&self.root, dir, exclude_dirs)?;
         if scanned.is_empty() {
             return Ok(Vec::new());
         }
         let filtered = self.filter_by_ignore_files(dir, &scanned)?;
-        let prefix = if dir == WORKSPACE_ROOT_DIR {
-            String::new()
-        } else {
-            format!("{}/", dir.trim_end_matches('/'))
-        };
+        let prefix = if dir == WORKSPACE_ROOT_DIR { String::new() } else { format!("{dir}/") };
         let mut relative: Vec<String> = filtered
             .iter()
             .map(|path| {

@@ -53,7 +53,7 @@ fn initial(
             alias_index: index,
             index,
             plan_index: plan.target_indices[index],
-            path: file.relative_path.clone(),
+            path: file.relative_path.trim().to_owned(),
         })
         .collect::<Vec<_>>();
     let mut status = serde_json::Map::new();

@@ -1,9 +1,9 @@
 //! Refresh main heads and optional parent closure before dependency transfer.
 use super::{
-    PreparedImport, Target, ancestors, identity, invalid, object_hash, read_model, refresh, remote,
+    PreparedImport, Target, ancestors, identity, invalid, object_hash, read_model, receive, remote,
 };
 use crate::command_import::Progress;
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::{collections::HashMap, io, path::Path};
 
 pub(super) fn refresh_all<'a>(
@@ -84,4 +84,86 @@ fn refresh_with_history(
         ancestors::collect(plan, directory, target)?;
     }
     Ok(present)
+}
+
+fn refresh(
+    plan: &mut PreparedImport,
+    target: &Target,
+    directory: &Path,
+    ignore_missing: bool,
+) -> io::Result<bool> {
+    let local = plan.environment.local_directory.clone();
+    let scope = target.scope
+        .as_deref()
+        .map(str::trim)
+        .ok_or_else(|| invalid("import scope"))?;
+    let model = match read_model(plan, directory, target)? {
+        Some(model) => model,
+        None if ignore_missing => return Ok(false),
+        None => return Err(invalid("import remote component missing")),
+    };
+    let Some(head) = model["head"]
+        .as_str()
+        .map(str::trim)
+        .filter(|head| !head.is_empty())
+    else {
+        return Ok(!ignore_missing);
+    };
+    let path = remote_main_refs_path(&local, scope)?;
+    let rows = plan.capture
+        .json(&path)?
+        .unwrap_or_else(|| json!([]));
+    let entries = rows.as_array().ok_or_else(|| invalid("import remote refs"))?;
+    let stop = entries
+        .iter()
+        .find(|row| ref_row_matches(row, scope, target.name.trim()))
+        .and_then(|row| row["head"].as_str().map(str::trim));
+    if let Some(stop) = stop
+        && read_model(plan, &local, target)?.is_some()
+        && plan.capture.object(&local, stop, "Version")?.is_some()
+        && stop == head
+    {
+        return Ok(true);
+    }
+    receive(plan, directory, target, &model, head, true)?;
+    update_main_ref(plan, target, scope, head, rows)?;
+    Ok(true)
+}
+
+fn remote_main_refs_path(local: &Path, scope: &str) -> io::Result<std::path::PathBuf> {
+    Ok(local
+        .parent()
+        .ok_or_else(|| invalid("import scope directory"))?
+        .join("refs/remotes")
+        .join(scope)
+        .join("main"))
+}
+
+fn update_main_ref(
+    plan: &mut PreparedImport,
+    target: &Target,
+    scope: &str,
+    head: &str,
+    rows: Value,
+) -> io::Result<()> {
+    let name = target.name.trim();
+    let rows = plan.overlay.remote_refs.entry(scope.to_owned()).or_insert(rows);
+    let entries = rows.as_array_mut().ok_or_else(|| invalid("import refs rows"))?;
+    if let Some(row) = entries.iter_mut().find(|row| ref_row_matches(row, scope, name)) {
+        row["head"] = json!(head);
+    } else {
+        entries.push(json!({"id":{"scope":scope,"name":name},"head":head}));
+    }
+    Ok(())
+}
+
+fn ref_row_matches(row: &Value, scope: &str, name: &str) -> bool {
+    let (scope, name) = (scope.trim(), name.trim());
+    if let Some(raw) = row["id"].as_str().map(str::trim) {
+        let bare = raw.rsplit_once('@').map_or(raw, |(prefix, _)| prefix.trim());
+        return bare == name || bare == format!("{scope}/{name}");
+    }
+    let row_scope = row["id"]["scope"].as_str().map_or("", str::trim);
+    row["id"]["name"].as_str().map(str::trim) == Some(name)
+        && (row_scope.is_empty() || row_scope == scope)
 }

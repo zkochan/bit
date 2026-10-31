@@ -142,18 +142,14 @@ fn sequential_preflight(
     let mut compressed = 0;
     let mut files = Vec::with_capacity(request.files.len());
     for input in &request.files {
-        let body = if let Some(body) = input.cached(request, state, use_cache) {
-            body.clone()
-        } else {
-            let body = repository::source(
-                &request.directory,
-                input.hash,
-                MAX_BYTES.saturating_sub(inflated),
-                &mut compressed,
-            )?;
-            state.insert(&request.directory, input.hash, body.clone());
-            body
-        };
+        let body = load_source_body(
+            request,
+            input,
+            state,
+            use_cache,
+            MAX_BYTES.saturating_sub(inflated),
+            &mut compressed,
+        )?;
         let contents = if input.normalize { eol::auto(body) } else { body };
         inflated = inflated.saturating_add(contents.len());
         if inflated > MAX_BYTES {
@@ -162,6 +158,24 @@ fn sequential_preflight(
         files.push(contents);
     }
     Ok(files)
+}
+
+fn load_source_body(
+    request: &Request,
+    input: &Input,
+    state: &mut cache::State,
+    use_cache: bool,
+    remaining: usize,
+    compressed: &mut usize,
+) -> io::Result<Vec<u8>> {
+    if let Some(body) = input.cached(request, state, use_cache) {
+        return Ok(body.clone());
+    }
+    let body = repository::source(&request.directory, input.hash, remaining, compressed)?;
+    if state.get(&request.directory, input.hash).is_none() {
+        state.insert(&request.directory, input.hash, body.clone());
+    }
+    Ok(body)
 }
 
 fn materialize(

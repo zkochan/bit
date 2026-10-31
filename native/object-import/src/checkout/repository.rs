@@ -119,13 +119,14 @@ fn packed(directory: &Path, hash: [u8; 20], compressed_total: &mut usize) -> io:
         .join(&identity[2..]);
     let file = File::open(path)?;
     let metadata = file.metadata()?;
-    if !metadata.is_file() || metadata.len() > (MAX_BYTES - *compressed_total) as u64 {
+    let remaining = MAX_BYTES.saturating_sub(*compressed_total);
+    if !metadata.is_file() || metadata.len() > remaining as u64 {
         return Err(invalid("checkout compressed bytes out of bounds"));
     }
     let mut compressed = Vec::with_capacity(metadata.len() as usize);
-    file.take((MAX_BYTES - *compressed_total + 1) as u64)
+    file.take(remaining.saturating_add(1) as u64)
         .read_to_end(&mut compressed)?;
-    *compressed_total += compressed.len();
+    *compressed_total = compressed_total.saturating_add(compressed.len());
     if *compressed_total > MAX_BYTES {
         return Err(invalid("checkout compressed bytes out of bounds"));
     }

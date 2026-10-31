@@ -17,29 +17,32 @@ pub(crate) struct State {
     bytes: usize,
     key_bytes: usize,
 }
+const MAX_KEY_BYTES: usize = 4 * 1024 * 1024;
+const MAX_ENTRIES: usize = 4096;
+
+fn canonical_dir(directory: &Path) -> PathBuf {
+    directory.components().collect()
+}
+
 impl State {
     pub(crate) fn get(&self, directory: &Path, hash: [u8; 20]) -> Option<&Vec<u8>> {
-        let canonical_dir: PathBuf = directory.components().collect();
-        self.sources.get(&(canonical_dir, hash))
+        self.sources.get(&(canonical_dir(directory), hash))
     }
     pub(crate) fn insert(&mut self, directory: &Path, hash: [u8; 20], body: Vec<u8>) {
-        let canonical_dir: PathBuf = directory.components().collect();
+        let dir = canonical_dir(directory);
         let weight = body.len();
-        let key_weight = canonical_dir
-            .as_os_str()
-            .len()
-            .saturating_add(20);
-        if weight > MAX_BYTES || key_weight > 4 * 1024 * 1024 {
+        let key_weight = dir.as_os_str().len().saturating_add(20);
+        if weight > MAX_BYTES || key_weight > MAX_KEY_BYTES {
             return;
         }
-        let key = (canonical_dir, hash);
+        let key = (dir, hash);
         if let Some(previous) = self.sources.remove(&key) {
             self.bytes = self.bytes.saturating_sub(previous.len());
             self.key_bytes = self.key_bytes.saturating_sub(key_weight);
         }
         if self.bytes.saturating_add(weight) > MAX_BYTES
-            || self.key_bytes.saturating_add(key_weight) > 4 * 1024 * 1024
-            || self.sources.len() >= 4096
+            || self.key_bytes.saturating_add(key_weight) > MAX_KEY_BYTES
+            || self.sources.len() >= MAX_ENTRIES
         {
             self.sources.clear();
             self.bytes = 0;

@@ -51,9 +51,10 @@ pub fn merge(policies: Vec<Vec<PolicyEntry>>) -> Vec<PolicyEntry> {
 pub fn uniq(entries: Vec<PolicyEntry>) -> Vec<PolicyEntry> {
     let mut result: Vec<PolicyEntry> = Vec::with_capacity(entries.len());
     for entry in entries {
+        let name = entry.name.trim();
         if !result
             .iter()
-            .any(|kept| kept.name == entry.name && kept.lifecycle == entry.lifecycle)
+            .any(|kept| kept.name.trim() == name && kept.lifecycle == entry.lifecycle)
         {
             result.push(entry);
         }
@@ -71,14 +72,18 @@ pub fn from_workspace_config(config: &Value) -> Vec<PolicyEntry> {
         [("dependencies", Lifecycle::Runtime), ("peerDependencies", Lifecycle::Peer)]
     {
         for (name, value) in field_values(config.get(key)) {
+            let name = name.trim();
+            if name.is_empty() {
+                continue;
+            }
             let (version, preserve) = match &value {
                 Value::Object(object) => {
                     (string(object.get("version")), object.get("preserve").and_then(Value::as_bool))
                 }
-                other => (other.as_str().map(str::to_owned), None),
+                other => (string(Some(other)), None),
             };
             let Some(version) = version else { continue };
-            entries.push(PolicyEntry { preserve, ..entry(&name, &version, lifecycle) });
+            entries.push(PolicyEntry { preserve, ..entry(name, &version, lifecycle) });
         }
     }
     uniq(entries)

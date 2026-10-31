@@ -47,11 +47,18 @@ fn retain_version(
     crate::history_query::validate_version(value)?;
     transfer::retain_sources(plan, directory, value, false)?;
     plan.overlay.objects.insert(hash, version);
-    let hash = object_hash(&super::identity(target)?);
-    let model = plan.capture
-        .object(directory, &hash, "Component")?
-        .ok_or_else(|| invalid("recovery local Component"))?;
-    plan.overlay.objects.insert(hash, model);
+    let scoped_hash = object_hash(&super::identity(target)?);
+    let (comp_hash, comp_obj) =
+        if let Some(obj) = plan.capture.object(directory, &scoped_hash, "Component")? {
+            (scoped_hash, obj)
+        } else {
+            let unscoped = object_hash(target.name.trim());
+            let obj = plan.capture
+                .object(directory, &unscoped, "Component")?
+                .ok_or_else(|| invalid("recovery local Component"))?;
+            (unscoped, obj)
+        };
+    plan.overlay.objects.insert(comp_hash, comp_obj);
     Ok(())
 }
 

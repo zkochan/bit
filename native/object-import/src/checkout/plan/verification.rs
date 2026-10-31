@@ -32,9 +32,12 @@ pub(super) fn plain_tag(tag: &str) -> bool {
     let (version, prerelease) = base
         .split_once('-')
         .map_or((base, None), |(version, prerelease)| (version, Some(prerelease)));
-    let segments: Vec<_> = version.split('.').collect();
-    segments.len() == 3
-        && segments.iter().all(|segment| numeric_segment(segment))
+    let mut segments = version.split('.');
+    let valid_core = segments.next().is_some_and(numeric_segment)
+        && segments.next().is_some_and(numeric_segment)
+        && segments.next().is_some_and(numeric_segment)
+        && segments.next().is_none();
+    valid_core
         && prerelease.is_none_or(|value| identifiers(value, true))
         && build.is_none_or(|value| identifiers(value, false))
 }

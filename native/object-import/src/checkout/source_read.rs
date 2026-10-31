@@ -111,7 +111,7 @@ fn prepare(request: &Request, state: &mut cache::State, pool: &ThreadPool) -> io
     if request.files.iter().any(|input| input.normalize) {
         return Err(invalid("Source reads require original bytes"));
     }
-    let records = records(request, state, pool).or_else(|_| serial_records(request, state))?;
+    let records = load_records(request, state, pool)?;
     let metadata = response(request, &records);
     let mut output = serde_json::to_vec(&metadata)?;
     output.push(b'\n');
@@ -130,6 +130,18 @@ fn prepare(request: &Request, state: &mut cache::State, pool: &ThreadPool) -> io
         }
     }
     Ok(output)
+}
+
+fn load_records(
+    request: &Request,
+    state: &cache::State,
+    pool: &ThreadPool,
+) -> io::Result<Vec<Option<Record>>> {
+    if request.files.len() >= 32 && pool.current_num_threads() > 1 {
+        records(request, state, pool).or_else(|_| serial_records(request, state))
+    } else {
+        serial_records(request, state)
+    }
 }
 /// Prepare the complete bounded response before ACK; this operation never writes workspace files.
 pub(crate) fn serve(

@@ -71,8 +71,8 @@ impl Plan {
                 let plan_index = self.target_indices[index];
                 let mut row = self.bodies[plan_index].manifest(plan_index);
                 row["index"] = json!(index);
-                row["relativePath"] = json!(file.relative_path);
-                row["hash"] = json!(file.hash);
+                row["relativePath"] = json!(file.relative_path.trim());
+                row["hash"] = json!(file.hash.trim());
                 row
             })
             .collect::<Vec<_>>();

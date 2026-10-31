@@ -177,7 +177,7 @@ fn throw_for_duplicate_root_dirs(path: &Path, json: &Map<String, Value>) -> io::
         let Some(root_dir) = value
             .get("rootDir")
             .and_then(Value::as_str)
-            .map(str::trim)
+            .map(|dir| dir.trim().trim_end_matches('/'))
             .filter(|root_dir| !root_dir.is_empty())
         else {
             continue;

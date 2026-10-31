@@ -62,12 +62,12 @@ fn read(file: &wire::Current, total: &mut usize) -> io::Result<Loaded> {
     }
     let mut raw = Vec::with_capacity(length as usize);
     input
-        .take((maximum + 1) as u64)
+        .take(maximum.saturating_add(1) as u64)
         .read_to_end(&mut raw)?;
     if raw.len() > maximum || digest(&raw) != raw_hash {
         return Err(invalid("checkout current disk snapshot differs"));
     }
-    *total += raw.len();
+    *total = total.saturating_add(raw.len());
     canonical(file, raw)
 }
 

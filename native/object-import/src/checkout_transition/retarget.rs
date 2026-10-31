@@ -44,10 +44,10 @@ pub(super) fn apply_with_overlay(
     {
         return Err(invalid("merge template spool directory"));
     }
-    let (indices, mut added) = additions(plan, contents, &directory, &request.token);
+    let (indices, mut added) = additions(plan, contents, &directory, token);
     check_budget(body_count, retained, &added)?;
     if plan.bodies.first().is_some_and(|body| body.offset.is_some()) {
-        super::spool::assign(&mut added, &directory, &request.token, plan.bodies.len());
+        super::spool::assign(&mut added, &directory, token, plan.bodies.len());
     }
     super::spool::write(&added)?;
     plan.bodies.extend(added);
@@ -57,7 +57,7 @@ pub(super) fn apply_with_overlay(
     plan.statuses = statuses(plan, &request.target.files);
     plan.target = request.target.files;
     plan.target_indices = indices;
-    Ok(manifest(plan, &request.token, request.known_bodies))
+    Ok(manifest(plan, token, request.known_bodies))
 }
 
 fn manifest(plan: &plan::Plan, token: &str, known: Option<usize>) -> Value {

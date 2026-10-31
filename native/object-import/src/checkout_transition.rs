@@ -25,9 +25,11 @@ pub(crate) fn apply(kind: &str, input: Value, state: &mut State) -> io::Result<V
         "checkoutRemovals" => removals::apply(input, &state.plans),
         "checkoutFinish" => {
             let request: wire::Token = serde_json::from_value(input).map_err(io::Error::other)?;
-            state.plans.plans
-                .remove(request.token.trim())
-                .ok_or_else(|| invalid("stale checkout plan"))?;
+            let token = request.token.trim();
+            if token.is_empty() {
+                return Err(invalid("stale checkout plan"));
+            }
+            state.plans.plans.remove(token).ok_or_else(|| invalid("stale checkout plan"))?;
             Ok(json!({"finished":true}))
         }
         "checkoutSelectBegin" => state.select.begin(&input),
@@ -64,9 +66,10 @@ fn decision(input: &Value) -> io::Result<Value> {
     let conflicts = input["hasConflicts"]
         .as_bool()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "checkout conflict flag"))?;
-    Ok(
-        json!({"keepOurs":current && (force || (conflicts && input["strategy"].as_str().map(str::trim)==Some("ours")))}),
-    )
+    let ours = input["strategy"]
+        .as_str()
+        .is_some_and(|strategy| strategy.trim().eq_ignore_ascii_case("ours"));
+    Ok(json!({"keepOurs":current && (force || (conflicts && ours))}))
 }
 
 fn invalid(message: &str) -> io::Error {

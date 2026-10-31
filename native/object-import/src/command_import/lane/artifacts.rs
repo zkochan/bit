@@ -40,8 +40,13 @@ impl PreparedImport {
     }
 }
 fn artifact_refs(version: &Value) -> io::Result<Vec<String>> {
-    let rows =
-        version["extensions"].as_array().ok_or_else(|| invalid("lane artifact extensions"))?;
+    let Some(extensions) = version
+        .get("extensions")
+        .filter(|value| !value.is_null())
+    else {
+        return Ok(Vec::new());
+    };
+    let rows = extensions.as_array().ok_or_else(|| invalid("lane artifact extensions"))?;
     let Some(builder) = rows
         .iter()
         .find(|row| {
@@ -65,7 +70,13 @@ fn artifact_refs(version: &Value) -> io::Result<Vec<String>> {
 fn collect_builder_references(artifacts: &Value) -> io::Result<Vec<String>> {
     let mut references = Vec::new();
     for artifact in artifacts.as_array().ok_or_else(|| invalid("lane builder artifacts"))? {
-        for file in artifact["files"].as_array().ok_or_else(|| invalid("lane artifact files"))? {
+        let Some(files) = artifact
+            .get("files")
+            .filter(|value| !value.is_null())
+        else {
+            continue;
+        };
+        for file in files.as_array().ok_or_else(|| invalid("lane artifact files"))? {
             let reference = file["file"]
                 .as_str()
                 .map(str::trim)

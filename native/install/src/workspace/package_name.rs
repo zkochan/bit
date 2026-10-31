@@ -51,21 +51,12 @@ pub fn component_package_name(
     aspects: &Map<String, Value>,
 ) -> String {
     let scope = id.effective_scope();
-    let configured = aspects
-        .iter()
-        .find(|(key, _)| crate::config::aspect_id_without_version(key) == PKG_ASPECT)
-        .and_then(|(_, config)| {
-            config
-                .get("packageJson")?
-                .get("name")?
-                .as_str()
-                .map(str::trim)
-        });
-    if let Some(template) = configured.filter(|template| !template.is_empty()) {
+    let clean_name = id.name.trim().trim_matches('/');
+    if let Some(template) = configured_package_name(aspects) {
         let (owner, scope_name) = parse_scope(scope);
-        return fill_placeholders(template, &id.name, scope_name, scope, owner);
+        return fill_placeholders(template, clean_name, scope_name, scope, owner);
     }
-    let name = id.name.trim().replace('/', ".");
+    let name = clean_name.replace('/', ".");
     let mut without_prefix = format!("{}.{name}", scope.unwrap_or("undefined"));
     let prefix = binding_prefix
         .map(str::trim)
@@ -81,6 +72,20 @@ pub fn component_package_name(
         without_prefix = rest.to_owned();
     }
     format!("{prefix}/{without_prefix}")
+}
+
+fn configured_package_name(aspects: &Map<String, Value>) -> Option<&str> {
+    aspects
+        .iter()
+        .find(|(key, _)| crate::config::aspect_id_without_version(key.trim()) == PKG_ASPECT)
+        .and_then(|(_, config)| {
+            config
+                .get("packageJson")?
+                .get("name")?
+                .as_str()
+                .map(str::trim)
+        })
+        .filter(|template| !template.is_empty())
 }
 
 /// `replacePlaceHolderForPackageValue` (string-format): `{{`/`}}` escape braces;

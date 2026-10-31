@@ -64,11 +64,11 @@ fn first_env(
 fn has_configured_env(component: &WorkspaceComponent) -> bool {
     component.config
         .keys()
-        .any(|key| aspect_id_without_version(key) == DEFAULT_ENV)
+        .any(|key| aspect_id_without_version(key.trim()) == DEFAULT_ENV)
         || component.config
             .iter()
             .find_map(|(key, value)| {
-                (aspect_id_without_version(key) == ENVS_ASPECT).then_some(value)
+                (aspect_id_without_version(key.trim()) == ENVS_ASPECT).then_some(value)
             })
             .and_then(|config| config.get("env"))
             .and_then(serde_json::Value::as_str)
@@ -76,6 +76,7 @@ fn has_configured_env(component: &WorkspaceComponent) -> bool {
 }
 
 fn is_env_component(id: &str, envs: &[(String, bool)], objects: &ScopeObjects) -> io::Result<bool> {
+    let id = id.trim();
     let without = aspect_id_without_version(id);
     if let Some((_, is_env)) = envs
         .iter()

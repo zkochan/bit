@@ -45,11 +45,13 @@ fn collect_target(
 }
 
 fn append_parents(version: &Value, pending: &mut Vec<String>) -> io::Result<()> {
-    for parent in version["parents"]
-        .as_array()
-        .into_iter()
-        .flatten()
-    {
+    let Some(parents) = version
+        .get("parents")
+        .filter(|value| !value.is_null())
+    else {
+        return Ok(());
+    };
+    for parent in parents.as_array().ok_or_else(|| invalid("import history parents"))? {
         let hash = ref_str(parent).ok_or_else(|| invalid("import history parent"))?;
         crate::merge_history::hash(hash)?;
         pending.push(hash.to_owned());

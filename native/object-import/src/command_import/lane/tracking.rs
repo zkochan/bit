@@ -146,10 +146,13 @@ pub(crate) fn lane_index_id(row: &Value) -> io::Result<Id> {
 
 pub(super) fn hidden_entry(row: &Value, default_scope: Option<&str>) -> io::Result<Entry> {
     if let Some(raw) = row.as_str() {
-        let (identity, head) =
-            raw.rsplit_once('@').ok_or_else(|| invalid("command hidden lane identity"))?;
+        let (identity, head) = raw
+            .trim()
+            .rsplit_once('@')
+            .ok_or_else(|| invalid("command hidden lane identity"))?;
+        let head = head.trim();
         let identity =
-            component_identity_with_scope(&Value::String(identity.into()), default_scope)?;
+            component_identity_with_scope(&Value::String(identity.trim().into()), default_scope)?;
         crate::merge_history::hash(head)?;
         return Ok(Entry { identity, head: head.to_owned(), hidden: true });
     }
@@ -158,6 +161,7 @@ pub(super) fn hidden_entry(row: &Value, default_scope: Option<&str>) -> io::Resu
     let head = row["head"]
         .as_str()
         .or_else(|| row["version"].as_str())
+        .map(str::trim)
         .ok_or_else(|| invalid("command hidden lane identity"))?;
     crate::merge_history::hash(head)?;
     Ok(Entry { identity, head: head.to_owned(), hidden: true })

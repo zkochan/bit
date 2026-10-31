@@ -1,5 +1,8 @@
 //! Read-only import capture. Every mutable remote and local input is revalidated
 //! before the owner publishes any part of the prepared refresh.
+#[cfg(test)]
+mod tests;
+
 use super::invalid;
 use crate::checkout::repository;
 use serde_json::Value;
@@ -250,13 +253,10 @@ fn read(path: &Path, maximum: usize) -> io::Result<Option<Vec<u8>>> {
         return Err(invalid("import nonordinary input"));
     }
     let mut bytes = Vec::new();
-    file.take(maximum as u64 + 1)
+    file.take((maximum as u64).saturating_add(1))
         .read_to_end(&mut bytes)?;
     if bytes.len() > maximum {
         return Err(invalid("import capture byte limit"));
     }
     Ok(Some(bytes))
 }
-
-#[cfg(test)]
-mod tests;

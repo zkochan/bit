@@ -90,16 +90,20 @@ fn load(
         .map(|hash| read_version(plan, &hash))
         .transpose()?
         .flatten();
-    let local_scope = target.scope.as_deref() == Some(scope);
+    let local_scope = target.scope.as_deref().map(str::trim) == Some(scope.trim());
     let built = version
         .as_ref()
         .is_some_and(|version| {
-            matches!(version["buildStatus"].as_str(), Some("succeed" | "skipped"))
+            matches!(version["buildStatus"].as_str().map(str::trim), Some("succeed" | "skipped"))
         });
     let staged_version = model
         .as_ref()
         .and_then(|model| version_ref(model, &target.version).ok())
-        .is_some_and(|hash| staged.lines().any(|line| line == hash));
+        .is_some_and(|hash| {
+            staged
+                .lines()
+                .any(|line| line.trim() == hash)
+        });
     let first_unbuilt = !built
         && !staged_version
         && plan.cache.unbuilt.insert(format!("{}@{}", identity(target)?, target.version));

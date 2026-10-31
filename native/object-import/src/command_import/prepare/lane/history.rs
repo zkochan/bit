@@ -19,10 +19,13 @@ impl PreparedImport {
             .map(str::trim)
             .filter(|hash| !hash.is_empty())
         {
-            Some(hash) => hash.to_owned(),
+            Some(hash) => {
+                crate::merge_history::hash(hash)?;
+                hash.to_owned()
+            }
             None => remote_lane_hash(self, &directory, id)?,
         };
-        if hash != local.hash {
+        if hash != local.hash.trim() {
             return Err(invalid("remote lane history stable identity changed"));
         }
         let incoming = self.capture

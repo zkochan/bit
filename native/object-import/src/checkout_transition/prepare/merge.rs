@@ -43,10 +43,10 @@ pub(super) fn rows(
     };
     let merged = crate::merge_history::merge::verified(input, &prepared)?;
     let rows = merged["files"].as_array().ok_or_else(|| invalid("checkout merge rows missing"))?;
-    let mut output = Vec::new();
+    let mut output = Vec::with_capacity(rows.len());
     for row in rows {
         let mut row = row.clone();
-        retain(&mut row, bodies, target.len() + current.len())?;
+        retain(&mut row, bodies, target.len().saturating_add(current.len()))?;
         output.push(row);
     }
     Ok(output)

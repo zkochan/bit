@@ -154,12 +154,18 @@ pub fn component_slots(
     let mut slots: Vec<PolicyEntry> = Vec::new();
     for id in component.config.keys() {
         let trimmed = id.trim();
-        if trimmed.is_empty() {
+        let bare = super::split_version(trimmed).0;
+        if bare.is_empty() {
             continue;
         }
         let registered = registry
             .iter()
-            .find(|(registrar, _)| registrar == trimmed || registrar.contains(trimmed));
+            .find(|(registrar, _)| {
+                registrar == trimmed
+                    || super::split_version(registrar).0 == bare
+                    || registrar.contains(trimmed)
+                    || registrar.contains(bare)
+            });
         if let Some((_, policy)) = registered.filter(|(_, policy)| entries::truthy(policy)) {
             slots = merge(vec![slots, entries::from_variant_config(policy, &options)]);
         }

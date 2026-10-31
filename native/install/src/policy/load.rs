@@ -43,7 +43,7 @@ pub fn is_core_env(id: &str) -> bool {
 pub fn split_version(id: &str) -> (&str, Option<&str>) {
     let id = id.trim();
     match id.rfind('@') {
-        Some(index) if index > 0 => {
+        Some(index) if index > 0 && !id[index + 1..].contains('/') => {
             (id[..index].trim(), Some(id[index + 1..].trim()).filter(|version| !version.is_empty()))
         }
         _ => (id, None),
@@ -60,11 +60,12 @@ pub async fn load_env_policies(
     let reader = EnvJsoncReader { components, scope: Scope::find(root) };
     let mut policies = IndexMap::new();
     for component in components {
-        if policies.contains_key(&component.env_id) {
+        let env_id = component.env_id.trim();
+        if env_id.is_empty() || policies.contains_key(env_id) {
             continue;
         }
-        let policy = env_policy(&reader, &component.env_id, host).await?;
-        policies.insert(component.env_id.clone(), policy);
+        let policy = env_policy(&reader, env_id, host).await?;
+        policies.insert(env_id.to_owned(), policy);
     }
     Ok(policies)
 }

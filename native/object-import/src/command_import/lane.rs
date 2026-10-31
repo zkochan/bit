@@ -49,7 +49,7 @@ impl Id {
         Ok(())
     }
     pub(crate) fn is_main(&self) -> bool {
-        self.name == "main"
+        self.name.trim() == "main"
     }
 }
 

@@ -189,7 +189,8 @@ impl Output {
         }
         let generation = {
             let mut spinner = lock();
-            spinner.generation += 1;
+            spinner.frame = 0;
+            spinner.generation = spinner.generation.wrapping_add(1);
             spinner.spinning = true;
             spinner.color = self.color;
             spinner.sink = Some(Arc::clone(&self.sink));

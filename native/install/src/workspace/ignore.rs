@@ -75,7 +75,10 @@ impl Ignore {
     /// `_filter`: a path is kept when its parent directories are kept and its
     /// own test passes. Parents are tested with a trailing slash.
     fn keep(&mut self, path: &str) -> bool {
-        let path = path.strip_prefix("./").unwrap_or(path);
+        let mut path = path;
+        while let Some(stripped) = path.strip_prefix("./") {
+            path = stripped;
+        }
         if path.is_empty() {
             return false;
         }

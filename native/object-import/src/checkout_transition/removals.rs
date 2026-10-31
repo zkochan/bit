@@ -22,7 +22,9 @@ pub(super) fn apply(input: Value, state: &plan::State) -> io::Result<Value> {
                 .iter()
                 .any(|target| normalize_rel(&target.relative_path) == current_norm);
             if !(targeted || request.workspace_root && current_norm == ".bitmap") {
-                statuses.push(json!({"relativePath":current.relative_path,"status":"removed"}));
+                statuses.push(
+                    json!({"relativePath":current.relative_path.trim(),"status":"removed"}),
+                );
                 removals.push(current.path.clone());
             }
         }
@@ -32,9 +34,9 @@ pub(super) fn apply(input: Value, state: &plan::State) -> io::Result<Value> {
 
 fn normalize_rel(path: &str) -> String {
     let replaced = path.trim().replace('\\', "/");
-    replaced
-        .strip_prefix("./")
-        .unwrap_or(&replaced)
-        .trim_matches('/')
-        .to_owned()
+    let mut rest = replaced.as_str();
+    while let Some(stripped) = rest.strip_prefix("./") {
+        rest = stripped;
+    }
+    rest.trim_matches('/').to_owned()
 }

@@ -134,10 +134,11 @@ fn statuses(
         .iter()
         .enumerate()
         .map(|(index, file)| {
+            let path = file.relative_path.trim();
             let equal = positions
-                .get(file.relative_path.trim())
+                .get(path)
                 .is_some_and(|&position| current[position].raw == target[index]);
-            json!({"relativePath":file.relative_path,"status":if equal{"unchanged"}else{"updated"}})
+            json!({"relativePath":path,"status":if equal{"unchanged"}else{"updated"}})
         })
         .collect()
 }

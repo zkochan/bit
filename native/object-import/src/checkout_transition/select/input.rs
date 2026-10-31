@@ -77,20 +77,8 @@ pub(super) fn validate(request: &Begin) -> io::Result<()> {
     if invalid_id(&request.component.id)
         || invalid_id(&request.component.id_without_version)
         || request.options.ancestor.is_some_and(|count| count > 4096)
-        || request.component.version
-            .as_ref()
-            .is_some_and(|value| {
-                value.len() > 32768
-                    || value.contains('\0')
-                    || (!value.is_empty() && value.trim().is_empty())
-            })
-        || request.options.version
-            .as_ref()
-            .is_some_and(|value| {
-                value.len() > 32768
-                    || value.contains('\0')
-                    || (!value.is_empty() && value.trim().is_empty())
-            })
+        || invalid_version(request.component.version.as_ref())
+        || invalid_version(request.options.version.as_ref())
         || request.options.version_per_id
             .as_ref()
             .is_some_and(|value| {
@@ -109,6 +97,14 @@ pub(super) fn validate(request: &Begin) -> io::Result<()> {
         request.component.is_removed,
     );
     Ok(())
+}
+
+fn invalid_version(version: Option<&String>) -> bool {
+    version.is_some_and(|value| {
+        value.len() > 32768
+            || value.contains('\0')
+            || (!value.is_empty() && value.trim().is_empty())
+    })
 }
 
 fn invalid_id(value: &str) -> bool {

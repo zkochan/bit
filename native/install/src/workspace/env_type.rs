@@ -17,23 +17,14 @@ pub fn aspect_env_ids(
     objects: &ScopeObjects,
     core: &[&str],
 ) -> io::Result<Vec<String>> {
-    let mut ids: Vec<String> = Vec::new();
-    for raw_id in core {
-        let trimmed = raw_id.trim();
-        if !trimmed.is_empty()
-            && !ids
-                .iter()
-                .any(|existing| existing == trimmed)
-        {
-            ids.push(trimmed.to_owned());
-        }
-    }
+    let mut ids = seed_core_ids(core);
     for component in components {
         let env_id = component.env_id.trim();
-        if env_id.is_empty()
+        let bare = crate::config::aspect_id_without_version(env_id);
+        if bare.is_empty()
             || ids
                 .iter()
-                .any(|existing| existing == env_id)
+                .any(|existing| existing == env_id || existing == bare)
         {
             continue;
         }
@@ -44,4 +35,19 @@ pub fn aspect_env_ids(
         }
     }
     Ok(ids)
+}
+
+fn seed_core_ids(core: &[&str]) -> Vec<String> {
+    let mut ids = Vec::new();
+    for raw_id in core {
+        let trimmed = raw_id.trim();
+        if !trimmed.is_empty()
+            && !ids
+                .iter()
+                .any(|existing| existing == trimmed)
+        {
+            ids.push(trimmed.to_owned());
+        }
+    }
+    ids
 }

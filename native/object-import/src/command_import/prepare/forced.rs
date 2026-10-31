@@ -30,14 +30,8 @@ fn collect_forced_dependencies(
     let mut seen = HashSet::new();
     for target in roots {
         let version = plan.policy_version(target)?;
-        let flattened = version["flattenedDependencies"]
-            .as_array()
-            .ok_or_else(|| invalid("import forced dependencies"))?;
-        let dev_flattened = version["flattenedDevDependencies"].as_array();
-        for row in flattened
-            .iter()
-            .chain(dev_flattened.into_iter().flatten())
-        {
+        let rows = super::dependencies::flattened_dependencies(plan, &version)?;
+        for row in &rows {
             let dependency = dependency_target(row)?;
             let id = identity(&dependency)?;
             let key = format!("{id}@{}", dependency.version.trim());

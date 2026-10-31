@@ -132,7 +132,8 @@ pub fn parse(argv: &[String]) -> io::Result<Parsed> {
     let Some((command, rest)) = argv.split_first() else {
         return Err(invalid("missing command"));
     };
-    if !COMMANDS.contains(&command.as_str()) {
+    let command = command.trim();
+    if !COMMANDS.contains(&command) {
         return Err(invalid(&format!("not an install command: {command}")));
     }
     // `install.cmd.tsx` always asks before leaving external package manager mode.

@@ -69,17 +69,20 @@ pub enum Origin {
 pub fn from_config_object(config: &Map<String, Value>, core_ids: &[String]) -> Vec<AspectEntry> {
     config
         .iter()
-        .filter(|(id, _)| !id.starts_with("file:"))
-        .map(|(id, config)| {
+        .filter_map(|(id, config)| {
+            let id = id.trim();
+            if id.is_empty() || id.starts_with("file:") {
+                return None;
+            }
             let bare = aspect_id_without_version(id);
-            AspectEntry {
-                id: id.clone(),
+            Some(AspectEntry {
+                id: id.to_owned(),
                 core: core_ids
                     .iter()
-                    .any(|core| core == id || core == bare),
+                    .any(|core| core.trim() == id || core.trim() == bare),
                 config: config.clone(),
                 data: Value::Object(Map::new()),
-            }
+            })
         })
         .collect()
 }
@@ -91,19 +94,15 @@ pub fn from_model(extensions: &[Value]) -> Vec<AspectEntry> {
         .iter()
         .filter_map(|extension| {
             let (id, core) = match extension.get("extensionId") {
-                Some(Value::String(id)) => (
-                    id.strip_suffix("@latest")
-                        .or_else(|| id.strip_suffix("@head"))
-                        .unwrap_or(id)
-                        .to_owned(),
-                    false,
-                ),
+                Some(Value::String(id)) => (strip_head_or_latest(id)?, false),
                 Some(Value::Object(id)) => (serialized_id(id)?, false),
                 _ => (
                     extension
                         .get("name")
                         .or_else(|| extension.get("legacyId"))?
-                        .as_str()?
+                        .as_str()
+                        .map(str::trim)
+                        .filter(|name| !name.is_empty())?
                         .to_owned(),
                     true,
                 ),
@@ -119,6 +118,16 @@ pub fn from_model(extensions: &[Value]) -> Vec<AspectEntry> {
             Some(AspectEntry { id, core, config, data })
         })
         .collect()
+}
+
+fn strip_head_or_latest(id: &str) -> Option<String> {
+    let trimmed = id.trim();
+    let stripped = trimmed
+        .strip_suffix("@latest")
+        .or_else(|| trimmed.strip_suffix("@head"))
+        .unwrap_or(trimmed)
+        .trim();
+    (!stripped.is_empty()).then(|| stripped.to_owned())
 }
 
 /// A serialized `ComponentID` (`{ scope, name, version }`) as `toString()` prints it.

@@ -85,7 +85,7 @@ fn component_resolver_config(component: &WorkspaceComponent) -> Option<&Value> {
             component.config
                 .iter()
                 .find_map(|(key, value)| {
-                    (crate::config::aspect_id_without_version(key) == DEPENDENCY_RESOLVER)
+                    (crate::config::aspect_id_without_version(key.trim()) == DEPENDENCY_RESOLVER)
                         .then_some(value)
                 })
         })

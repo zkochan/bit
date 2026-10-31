@@ -99,7 +99,14 @@ pub(crate) fn prepare_recovery_with_virtual(
     fetch: impl FnOnce(&[Target]) -> io::Result<Vec<VirtualRemote>>,
 ) -> io::Result<PreparedImport> {
     let mut plan = super::prepare_lane(root, global_remotes_file)?;
-    let scoped = targets.iter().collect::<Vec<_>>();
+    let scoped = targets
+        .iter()
+        .filter(|target| {
+            target.scope
+                .as_deref()
+                .is_some_and(|scope| !scope.trim().is_empty())
+        })
+        .collect::<Vec<_>>();
     let (local, remote) = super::recovery::retain(&mut plan, &scoped)?;
     let mut available = local.clone();
     let requested = remote
@@ -109,7 +116,7 @@ pub(crate) fn prepare_recovery_with_virtual(
     for incoming in fetch(&requested)? {
         plan.virtual_remote(&incoming.scope, incoming.path, &incoming.objects)?;
     }
-    plan.bitmap_count = targets.len();
+    plan.bitmap_count = scoped.len();
     let remotes = plan.environment.remotes.clone();
     available.extend(super::refresh_all(&mut plan, &remote, &remotes, false, false)?);
     super::recovery::record_local_main(&mut plan, &local, &remotes)?;

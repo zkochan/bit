@@ -116,12 +116,13 @@ fn locally_at_remote_head(
 ) -> io::Result<bool> {
     let (scope, name) =
         entry.identity.split_once('/').ok_or_else(|| invalid("lane component scope"))?;
+    let (scope, name, head) = (scope.trim(), name.trim(), entry.head.trim());
     let refs = plan.environment.local_directory
         .parent()
         .ok_or_else(|| invalid("lane local scope"))?
         .join("refs/remotes")
         .join(scope)
-        .join(&lane.name);
+        .join(lane.name.trim());
     let rows = plan.capture
         .json(&refs)?
         .unwrap_or_else(|| serde_json::json!([]));
@@ -131,7 +132,7 @@ fn locally_at_remote_head(
         .any(|row| {
             crate::workspace::engine::command::inbound::remote::file_list::row_lane_matches(
                 row, scope, name,
-            ) && row["head"] == entry.head
+            ) && row["head"].as_str().map(str::trim) == Some(head)
         });
-    Ok(unchanged && super::super::read_version(plan, &entry.head)?.is_some())
+    Ok(unchanged && super::super::read_version(plan, head)?.is_some())
 }

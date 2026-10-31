@@ -83,7 +83,7 @@ fn read_batch(
     batch
         .par_iter()
         .map(|file| {
-            let hash = crate::merge_history::hash(&file.hash)?;
+            let hash = crate::merge_history::hash(file.hash.trim())?;
             repository::read_source_shared(directory, hash, &raw, &packed)
                 .map(|record| (hash, record))
         })
@@ -98,13 +98,13 @@ fn serial_batch(
     batch
         .iter()
         .map(|file| {
-            let hash = crate::merge_history::hash(&file.hash)?;
+            let hash = crate::merge_history::hash(file.hash.trim())?;
             let remaining = MAX_BYTES
                 .checked_sub(total)
                 .ok_or_else(|| invalid("checkout prepared raw limit"))?;
             let record =
                 repository::read_source_record(directory, hash, remaining, &mut compressed)?;
-            total += record.body.len();
+            total = total.saturating_add(record.body.len());
             Ok((hash, record))
         })
         .collect()

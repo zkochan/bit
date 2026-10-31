@@ -1,10 +1,10 @@
+#[cfg(test)]
+mod tests;
+
 use super::{Entry, PreparedImport, Record, entries, invalid};
 use crate::command_import::{history, publish};
 use serde_json::{Value, json};
 use std::io;
-
-#[cfg(test)]
-mod tests;
 
 pub(super) fn merge(
     plan: &mut PreparedImport,

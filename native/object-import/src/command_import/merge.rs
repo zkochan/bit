@@ -164,9 +164,14 @@ fn canonical(value: &Value) -> io::Result<Value> {
 }
 fn parsed_model(value: &Value) -> io::Result<Value> {
     let mut result = value.clone();
-    if (result["schema"].is_null() || result["schema"] == "")
+    let schema_missing = result["schema"].is_null()
+        || result["schema"]
+            .as_str()
+            .is_some_and(|schema| schema.trim().is_empty());
+    if schema_missing
         && let Some(head) = result["head"]
             .as_str()
+            .map(str::trim)
             .filter(|head| !head.is_empty())
     {
         crate::merge_history::hash(head)?;
@@ -177,9 +182,12 @@ fn parsed_model(value: &Value) -> io::Result<Value> {
 }
 
 fn validate_model(value: &Value) -> io::Result<()> {
-    if value["name"].as_str().is_none()
+    let has_name = value["name"]
+        .as_str()
+        .is_some_and(|name| !name.trim().is_empty());
+    if !has_name
         || value["scope"].as_str().is_none()
-        || !matches!(value["schema"].as_str(), Some("1.0.0" | "2.0.0"))
+        || !matches!(value["schema"].as_str().map(str::trim), Some("1.0.0" | "2.0.0"))
         || !value["versions"].is_object()
     {
         return Err(invalid("import unsupported model identity"));

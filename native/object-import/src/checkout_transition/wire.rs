@@ -52,6 +52,7 @@ pub(super) struct Labels {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Apply {
+    #[serde(deserialize_with = "deserialize_token")]
     pub(super) token: String,
     pub(super) strategy: Option<String>,
     pub(super) force_ours: bool,
@@ -62,6 +63,7 @@ pub(super) struct Apply {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Materialize {
+    #[serde(deserialize_with = "deserialize_token")]
     pub(super) token: String,
     pub(super) files: Vec<Destination>,
 }

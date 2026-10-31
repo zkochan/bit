@@ -285,90 +285,28 @@ fn read_model(
     let mut value =
         plan.capture.object(directory, &scoped_hash, "Component")?.and_then(|record| record.value);
     if value.is_none() && is_local {
-        let unscoped_hash = object_hash(&target.name);
+        let unscoped_hash = object_hash(target.name.trim());
         if let Some(overlay_val) = plan.overlay.read(&unscoped_hash, "Component")? {
             return Ok(Some(overlay_val.clone()));
         }
-        value = plan.capture
-            .object(directory, &unscoped_hash, "Component")?
-            .and_then(|record| record.value);
+        value =
+            plan.capture.object(directory, &unscoped_hash, "Component")?.and_then(|rec| rec.value);
     }
     if value
         .as_ref()
         .is_some_and(|val| {
             let val_scope = val["scope"]
                 .as_str()
+                .map(str::trim)
                 .filter(|scope| !scope.is_empty());
-            val["name"] != target.name
-                || (val_scope != target.scope.as_deref() && !(is_local && val_scope.is_none()))
+            val["name"].as_str().map(str::trim) != Some(target.name.trim())
+                || (val_scope != target.scope.as_deref().map(str::trim)
+                    && !(is_local && val_scope.is_none()))
         })
     {
         return Err(invalid("import model identity"));
     }
     Ok(value)
-}
-fn refresh(
-    plan: &mut PreparedImport,
-    target: &Target,
-    directory: &Path,
-    ignore_missing: bool,
-) -> io::Result<bool> {
-    let local = plan.environment.local_directory.clone();
-    let scope = target.scope.as_deref().ok_or_else(|| invalid("import scope"))?;
-    let model = match read_model(plan, directory, target)? {
-        Some(model) => model,
-        None if ignore_missing => return Ok(false),
-        None => return Err(invalid("import remote component missing")),
-    };
-    let Some(head) = model["head"].as_str() else { return Ok(!ignore_missing) };
-    let path = local
-        .parent()
-        .ok_or_else(|| invalid("import scope directory"))?
-        .join("refs/remotes")
-        .join(scope)
-        .join("main");
-    let rows = plan.capture
-        .json(&path)?
-        .unwrap_or_else(|| json!([]));
-    let entries = rows.as_array().ok_or_else(|| invalid("import remote refs"))?;
-    let stop = entries
-        .iter()
-        .find(|row| ref_row_matches(row, scope, &target.name))
-        .and_then(|row| row["head"].as_str());
-    if let Some(stop) = stop
-        && read_model(plan, &local, target)?.is_some()
-        && plan.capture.object(&local, stop, "Version")?.is_some()
-        && stop == head
-    {
-        return Ok(true);
-    }
-    receive(plan, directory, target, &model, head, true)?;
-    update_main_ref(plan, target, scope, head, rows)?;
-    Ok(true)
-}
-fn update_main_ref(
-    plan: &mut PreparedImport,
-    target: &Target,
-    scope: &str,
-    head: &str,
-    rows: Value,
-) -> io::Result<()> {
-    let rows = plan.overlay.remote_refs.entry(scope.to_owned()).or_insert(rows);
-    let entries = rows.as_array_mut().ok_or_else(|| invalid("import refs rows"))?;
-    if let Some(row) = entries.iter_mut().find(|row| ref_row_matches(row, scope, &target.name)) {
-        row["head"] = json!(head);
-    } else {
-        entries.push(json!({"id":{"scope":scope,"name":target.name},"head":head}));
-    }
-    Ok(())
-}
-fn ref_row_matches(row: &Value, scope: &str, name: &str) -> bool {
-    if let Some(raw) = row["id"].as_str() {
-        let bare = raw.rsplit_once('@').map_or(raw, |(prefix, _)| prefix);
-        return bare == name || bare == format!("{scope}/{name}");
-    }
-    let row_scope = row["id"]["scope"].as_str().unwrap_or_default();
-    row["id"]["name"] == name && (row_scope.is_empty() || row_scope == scope)
 }
 fn version_ref(model: &Value, version: &str) -> io::Result<String> {
     let version = version.trim();

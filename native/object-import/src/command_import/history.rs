@@ -30,7 +30,7 @@ pub(super) fn populate(
     let existing = history["versions"].as_array().ok_or_else(|| invalid("import history rows"))?;
     if existing
         .iter()
-        .any(|row| row["hash"] == head)
+        .any(|row| row["hash"].as_str().map(str::trim) == Some(head))
     {
         return Ok((hash, history, false));
     }

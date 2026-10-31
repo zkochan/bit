@@ -331,10 +331,15 @@ fn preflight(
 ) -> io::Result<()> {
     let mut total = 0;
     for file in files {
-        let bytes =
-            repository::source(directory, hash(&file.hash)?, MAX_BYTES - total, compressed_total)?;
-        total += bytes.len();
-        state.insert(directory, hash(&file.hash)?, bytes);
+        let file_hash = hash(&file.hash)?;
+        let bytes = repository::source(
+            directory,
+            file_hash,
+            MAX_BYTES.saturating_sub(total),
+            compressed_total,
+        )?;
+        total = total.saturating_add(bytes.len());
+        state.insert(directory, file_hash, bytes);
     }
     Ok(())
 }

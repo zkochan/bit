@@ -81,18 +81,18 @@ impl Overlay {
     }
     pub(crate) fn refs(&self, scope: &str) -> Option<&[Value]> {
         self.remote_refs
-            .get(scope)
+            .get(scope.trim())
             .and_then(Value::as_array)
             .map(Vec::as_slice)
     }
     pub(crate) fn lane_refs(&self, scope: &str, name: &str) -> Option<&[Value]> {
         self.lane_refs
-            .get(&(scope.to_owned(), name.to_owned()))
+            .get(&(scope.trim().to_owned(), name.trim().to_owned()))
             .and_then(Value::as_array)
             .map(Vec::as_slice)
     }
     pub(crate) fn compressed(&self, hash: &str) -> Option<&[u8]> {
-        self.objects.get(hash).map(|record| record.bytes.as_slice())
+        self.objects.get(hash.trim()).map(|record| record.bytes.as_slice())
     }
 }
 #[derive(Default)]

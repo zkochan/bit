@@ -58,7 +58,7 @@ impl ModelData {
     pub fn has_env_manifest(&self) -> bool {
         self.files
             .iter()
-            .any(|file| file == "env.jsonc" || file == "env.json")
+            .any(|file| matches!(file.trim().trim_start_matches("./"), "env.jsonc" | "env.json"))
     }
 
     /// The component's own env is `teambit.envs/env`: an env loaded as an env plugin

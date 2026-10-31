@@ -12,7 +12,7 @@ pub(super) fn apply(input: Value, state: &plan::State) -> io::Result<Value> {
         .get(request.token.trim())
         .ok_or_else(|| invalid("stale checkout materialize token"))?;
     let contents = prepare(&request, plan)?;
-    let mut completed = 0;
+    let mut completed = 0_usize;
     let mut skipped = Vec::new();
     let mut directories = HashSet::new();
     for (index, (file, body)) in request.files
@@ -21,14 +21,14 @@ pub(super) fn apply(input: Value, state: &plan::State) -> io::Result<Value> {
         .enumerate()
     {
         if !file.overwrite && fs::metadata(&file.path).is_ok() {
-            completed += 1;
+            completed = completed.saturating_add(1);
             skipped.push(index);
             continue;
         }
         if write(file, body, &mut directories).is_err() {
             break;
         }
-        completed += 1;
+        completed = completed.saturating_add(1);
     }
     Ok(json!({"completed":completed,"skipped":skipped,"failed":completed!=request.files.len()}))
 }
@@ -36,7 +36,7 @@ fn prepare(request: &wire::Materialize, plan: &plan::Plan) -> io::Result<Vec<Vec
     if request.files.len() > 4096 {
         return Err(invalid("checkout materialize file limit"));
     }
-    let mut contents = Vec::new();
+    let mut contents = Vec::with_capacity(request.files.len());
     let mut total = 0_usize;
     let mut paths = HashSet::new();
     for file in &request.files {

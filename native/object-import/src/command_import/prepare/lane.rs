@@ -250,12 +250,8 @@ fn referenced_sources(version: &serde_json::Value) -> io::Result<Vec<String>> {
         .filter(|files| !files.is_null())
     {
         for file in files.as_array().ok_or_else(|| invalid("lane referenced files"))? {
-            references.push(
-                file["file"]
-                    .as_str()
-                    .ok_or_else(|| invalid("lane referenced Source"))?
-                    .to_owned(),
-            );
+            let hash = file["file"].as_str().ok_or_else(|| invalid("lane referenced Source"))?;
+            references.push(hash.trim().to_owned());
         }
     }
     for field in ["flattenedEdgesRef", "dependenciesGraphRef", "flattenedDependenciesRef"] {
@@ -263,12 +259,8 @@ fn referenced_sources(version: &serde_json::Value) -> io::Result<Vec<String>> {
             .get(field)
             .filter(|reference| !reference.is_null())
         {
-            references.push(
-                reference
-                    .as_str()
-                    .ok_or_else(|| invalid("lane referenced graph"))?
-                    .to_owned(),
-            );
+            let hash = reference.as_str().ok_or_else(|| invalid("lane referenced graph"))?;
+            references.push(hash.trim().to_owned());
         }
     }
     for reference in &references {

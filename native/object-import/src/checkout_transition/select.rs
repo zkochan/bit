@@ -59,13 +59,15 @@ impl State {
             current: CurrentState::default(),
         };
         let directive = record.initial(has_model, main_missing);
-        if self.records.len() >= 4096 || self.bytes + record.bytes() > 32 * 1024 * 1024 {
+        if self.records.len() >= 4096
+            || self.bytes.saturating_add(record.bytes()) > 32 * 1024 * 1024
+        {
             return Err(invalid("checkout active select limit"));
         }
         let output = json!({"token":token,"revision":0,"directive":directive});
         self.sequence = sequence;
         if !matches!(record.stage, Stage::Terminal) {
-            self.bytes += record.bytes();
+            self.bytes = self.bytes.saturating_add(record.bytes());
             self.records.insert(token, record);
         }
         Ok(output)

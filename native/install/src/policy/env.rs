@@ -139,10 +139,10 @@ pub fn merge_manifests(parent: &Value, child: &Value) -> Value {
         let mut merged: Vec<Value> = policy_items(parent, key)
             .into_iter()
             .filter(|entry| {
-                let entry_name = trimmed_field(entry, "name");
+                let Some(name) = entry_name(entry) else { return true };
                 !children
                     .iter()
-                    .any(|child| trimmed_field(child, "name") == entry_name)
+                    .any(|child| entry_name(child) == Some(name))
             })
             .collect();
         merged.extend(children);
@@ -159,11 +159,16 @@ pub fn merge_manifests(parent: &Value, child: &Value) -> Value {
     result
 }
 
+fn entry_name(entry: &Value) -> Option<&str> {
+    trimmed_field(entry, "name").or_else(|| trimmed_field(entry, "packageName"))
+}
+
 fn trimmed_field<'a>(entry: &'a Value, field: &str) -> Option<&'a str> {
     entry
         .get(field)
         .and_then(Value::as_str)
         .map(str::trim)
+        .filter(|text| !text.is_empty())
 }
 
 /// The dev-files customizer: `{ ...parent.patterns, ...child.patterns }`.
