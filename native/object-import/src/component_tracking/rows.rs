@@ -59,8 +59,10 @@ fn matches(row: &Value, key: &str, name: &str, selected_scope: Option<&str>) -> 
     let Some(actual_name) = row_name(key, row) else {
         return false;
     };
+    let key_trimmed = key.trim();
+    let key_id = key_trimmed.rsplit_once('@').map_or(key_trimmed, |(bare, _)| bare.trim());
     let full = scope(row).map(|scope| format!("{scope}/{actual_name}"));
-    (name == actual_name || name == key.trim() || full.as_deref() == Some(name))
+    (name == actual_name || name == key_trimmed || name == key_id || full.as_deref() == Some(name))
         && selected_scope
             .map(str::trim)
             .filter(|selected| !selected.is_empty())

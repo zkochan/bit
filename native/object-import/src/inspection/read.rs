@@ -138,7 +138,11 @@ fn raw(path: &PathBuf, maximum: usize) -> io::Result<Vec<u8>> {
         return Err(invalid("inspection unsupported path"));
     }
     let input = DiskFile::open(path)?;
-    let length = input.metadata()?.len();
+    let metadata = input.metadata()?;
+    if !metadata.is_file() {
+        return Err(invalid("inspection unsupported path"));
+    }
+    let length = metadata.len();
     if length > maximum as u64 {
         return Err(invalid("inspection byte budget"));
     }
@@ -156,7 +160,11 @@ fn raw_shared(path: &PathBuf, budget: &Budget) -> io::Result<Vec<u8>> {
     if !path.is_absolute() || !fs::symlink_metadata(path)?.is_file() {
         return Err(invalid("inspection unsupported path"));
     }
-    budget.read(DiskFile::open(path)?)
+    let input = DiskFile::open(path)?;
+    if !input.metadata()?.is_file() {
+        return Err(invalid("inspection unsupported path"));
+    }
+    budget.read(input)
 }
 fn strip_bom(mut bytes: Vec<u8>) -> Vec<u8> {
     if bytes.starts_with(b"\xef\xbb\xbf") {

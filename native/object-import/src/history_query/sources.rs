@@ -117,15 +117,7 @@ impl Sources<'_> {
     ) -> io::Result<Value> {
         let mut descriptor = json!({"hash":hash,"compressedSize":record.compressed.len(),"inflatedSize":record.inflated_size});
         if let Some(directory) = &self.snapshot_directory {
-            let path = directory.join(format!(
-                "source-{}-{}-{hash}.object",
-                std::process::id(),
-                NEXT.fetch_add(1, Ordering::Relaxed),
-            ));
-            let mut file = OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&path)?;
+            let (path, mut file) = create_snapshot_file(directory, hash)?;
             file.write_all(&record.compressed)?;
             file.flush()?;
             descriptor["privatePath"] = json!(path);
@@ -150,4 +142,26 @@ impl Sources<'_> {
             0,
         );
     }
+}
+fn create_snapshot_file(
+    directory: &std::path::Path,
+    hash: &str,
+) -> io::Result<(PathBuf, fs::File)> {
+    for _ in 0..64 {
+        let path = directory.join(format!(
+            "source-{}-{}-{hash}.object",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed),
+        ));
+        match OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+        {
+            Ok(file) => return Ok((path, file)),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(invalid("history Source snapshot path collision"))
 }

@@ -12,17 +12,7 @@ pub(super) fn merge(state: &mut State<'_, '_>) -> io::Result<()> {
         .chain(state.data[1].iter())
         .filter(|dep| dep["source"] == "auto")
     {
-        let id = dep["id"]
-            .as_str()
-            .map(str::trim)
-            .filter(|val| !val.is_empty())
-            .or_else(|| {
-                dep["componentId"]
-                    .as_str()
-                    .map(str::trim)
-                    .filter(|val| !val.is_empty())
-            })
-            .ok_or_else(|| super::super::super::invalid("data id"))?;
+        let id = dep_id(dep).ok_or_else(|| super::super::super::invalid("data id"))?;
         if !ids
             .iter()
             .any(|existing| existing == id)
@@ -36,6 +26,19 @@ pub(super) fn merge(state: &mut State<'_, '_>) -> io::Result<()> {
     Ok(())
 }
 
+fn dep_id(dep: &Value) -> Option<&str> {
+    dep["id"]
+        .as_str()
+        .map(str::trim)
+        .filter(|val| !val.is_empty())
+        .or_else(|| {
+            dep["componentId"]
+                .as_str()
+                .map(str::trim)
+                .filter(|val| !val.is_empty())
+        })
+}
+
 fn log_side_data(state: &mut State<'_, '_>, index: usize, side: &str) {
     let entries = state.data[index]
         .iter()
@@ -47,7 +50,7 @@ fn log_side_data(state: &mut State<'_, '_>, index: usize, side: &str) {
             format!(
                 "{} {} {}",
                 dep["__type"].as_str().unwrap_or("undefined"),
-                dep["id"].as_str().unwrap_or("undefined"),
+                dep_id(dep).unwrap_or("undefined"),
                 dep["version"].as_str().unwrap_or("undefined"),
             )
         })
@@ -65,15 +68,15 @@ fn one(state: &mut State<'_, '_>, id: &str) -> io::Result<()> {
     }
     let current = state.data[0]
         .iter()
-        .find(|dep| dep["id"].as_str().map(str::trim) == Some(id))
+        .find(|dep| dep_id(dep) == Some(id))
         .cloned();
     let other = state.data[1]
         .iter()
-        .find(|dep| dep["id"].as_str().map(str::trim) == Some(id) && dep["source"] == "auto")
+        .find(|dep| dep_id(dep) == Some(id) && dep["source"] == "auto")
         .cloned();
     let base = state.data[2]
         .iter()
-        .find(|dep| dep["id"].as_str().map(str::trim) == Some(id) && dep["source"] == "auto")
+        .find(|dep| dep_id(dep) == Some(id) && dep["source"] == "auto")
         .cloned();
     state.engine.meta("trace", "currentDep", current.as_ref());
     state.engine.meta("trace", "otherDep", other.as_ref());

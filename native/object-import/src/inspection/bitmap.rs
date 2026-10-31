@@ -14,7 +14,9 @@ pub(crate) fn normalize(bytes: &[u8]) -> io::Result<Vec<u8>> {
     map.shift_remove("$schema-version");
     let keys = map.keys().cloned().collect::<Vec<_>>();
     for key in keys {
-        if normalize_entry(map.get_mut(&key).expect("collected existing key"))? {
+        if let Some(entry) = map.get_mut(&key)
+            && normalize_entry(entry)?
+        {
             map.shift_remove(&key);
         }
     }

@@ -35,15 +35,18 @@ fn incoming<'a>(input: &'a Value, row: &Value) -> io::Result<Option<&'a Value>> 
     }
     Ok(array(input, "other")?
         .iter()
-        .find(|entry| entry["name"].as_str().is_some_and(is_envs_aspect_id)))
+        .find(|entry| {
+            entry["name"]
+                .as_str()
+                .or_else(|| entry["stringId"].as_str())
+                .is_some_and(is_envs_aspect_id)
+        }))
 }
 
 fn is_envs_aspect_id(id: &str) -> bool {
-    id.trim()
-        .split('@')
-        .next()
-        .map(str::trim)
-        == Some("teambit.envs/envs")
+    let trimmed = id.trim();
+    let bare = trimmed.rsplit_once('@').map_or(trimmed, |(prefix, _)| prefix.trim());
+    bare == "teambit.envs/envs"
 }
 
 fn preserve(merged: &mut Value, entry: &Value) {

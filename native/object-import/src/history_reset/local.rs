@@ -118,12 +118,15 @@ pub(super) fn read(input: Value) -> io::Result<Value> {
     let request: Read = serde_json::from_value(input).map_err(io::Error::other)?;
     refs(&request.source_only)?;
     if let Some(hash) = &request.lane_head {
-        crate::merge_history::hash(hash)?;
+        crate::merge_history::hash(hash.trim())?;
     }
+    let lane_head = request.lane_head.as_deref().map(str::trim);
     let load: Vec<_> = request.source_only
         .iter()
         .enumerate()
-        .filter_map(|(index, hash)| (request.lane_head.as_ref() != Some(hash)).then_some(index))
+        .filter_map(|(index, hash)| {
+            (!lane_head.is_some_and(|head| head.eq_ignore_ascii_case(hash.trim()))).then_some(index)
+        })
         .collect();
     Ok(json!({"load":load}))
 }

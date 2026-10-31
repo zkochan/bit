@@ -23,7 +23,8 @@ pub(super) fn merge(
     );
     for (side, index) in [("current", Some(current)), ("other", Some(other)), ("base", base)] {
         let pretty = index
-            .and_then(|index| engine.input[side][index]["configPretty"].as_str())
+            .and_then(|index| engine.input[side].get(index))
+            .and_then(|entry| entry["configPretty"].as_str())
             .unwrap_or("undefined");
         engine.log("debug", format!("{side}Config, {pretty}"));
     }

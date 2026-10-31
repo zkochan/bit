@@ -82,9 +82,7 @@ impl Plan {
     pub fn commit(&self, file_id: &str) -> io::Result<()> {
         self.validate()?;
         let trimmed_id = file_id.trim();
-        if trimmed_id.is_empty()
-            || matches!(trimmed_id, "." | "..")
-            || trimmed_id.contains(['/', '\\'])
+        if crate::component_remove::validate_file_id(trimmed_id).is_err()
             || trimmed_id.chars().any(char::is_control)
         {
             return Err(unsupported("tracking bitmap history identifier"));

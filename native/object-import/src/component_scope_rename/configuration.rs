@@ -21,7 +21,12 @@ pub(super) fn publish(
     let _ = backup(root, before, scope, file_id);
     let bytes =
         crate::checkout::eol::normalize(format!("{document}\n").into_bytes(), cfg!(windows));
-    fs::write(root.join("workspace.jsonc"), bytes)
+    let path = root.join("workspace.jsonc");
+    let metadata = fs::symlink_metadata(&path)?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() {
+        return Err(io::Error::other("scope rename workspace.jsonc target is not a regular file"));
+    }
+    fs::write(path, bytes)
 }
 fn backup(root: &Path, before: &[u8], scope: &str, file_id: &str) -> io::Result<()> {
     let directory = crate::scope_path(root).join("workspace-config-history");

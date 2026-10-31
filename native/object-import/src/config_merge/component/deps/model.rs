@@ -107,30 +107,46 @@ impl<'a, 'b> State<'a, 'b> {
         Ok(false)
     }
     pub(super) fn add_data(&mut self, dep: &Value) -> io::Result<()> {
-        let id = dep["id"].as_str().ok_or_else(|| invalid("data id"))?;
+        let id = dep["id"]
+            .as_str()
+            .map(str::trim)
+            .ok_or_else(|| invalid("data id"))?;
         if dep["__type"] == "component" && self.engine.local(id, dep["version"].as_str())? {
             return Ok(());
         }
         let lifecycle = dep["lifecycle"].as_str().ok_or_else(|| invalid("data lifecycle"))?;
         let field = field(lifecycle)?;
-        if self.has(field, id) {
-            return Ok(());
-        }
         let name = if dep["__type"] == "component" {
-            dep["packageName"].as_str().ok_or_else(|| invalid("component packageName"))?
+            dep["packageName"]
+                .as_str()
+                .map(str::trim)
+                .ok_or_else(|| invalid("component packageName"))?
         } else {
             id
         };
+        if self.has(field, id) || self.has(field, name) {
+            return Ok(());
+        }
         append(&mut self.merged, field, json!({"name":name,"version":version(dep),"force":false}));
         Ok(())
     }
     pub(super) fn has(&self, field: &str, name: &str) -> bool {
+        let name = name.trim();
         self.merged[field]
             .as_array()
             .is_some_and(|entries| {
                 entries
                     .iter()
-                    .any(|entry| entry["name"] == name)
+                    .any(|entry| {
+                        let Some(pkg) = entry["name"].as_str().map(str::trim) else {
+                            return false;
+                        };
+                        pkg == name
+                            || self
+                                .component_for_package(pkg)
+                                .and_then(|comp| comp["id"].as_str().map(str::trim))
+                                == Some(name)
+                    })
             })
     }
     pub(super) fn component_for_package(&self, name: &str) -> Option<&Value> {

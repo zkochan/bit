@@ -50,7 +50,7 @@ fn extension_id(row: &Js) -> io::Result<Vec<u16>> {
         }
         return fields::id(id, true);
     }
-    for name in ["name", "legacyId"] {
+    for name in ["name", "legacyId", "stringId"] {
         if fields::get(row, name).truthy()? {
             return fields::text(fields::get(row, name));
         }

@@ -11,6 +11,9 @@ pub(super) fn validate(
         return Err(error("invalid component bitmap"));
     };
     for (owner, row) in rows {
+        if !super::super::active(row) {
+            continue;
+        }
         let Some(parent) = row["rootDir"]
             .as_str()
             .map(str::trim)

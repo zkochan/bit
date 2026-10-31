@@ -46,13 +46,19 @@ fn other_changed(state: &mut State<'_, '_>) -> io::Result<()> {
         state.add_policy(&dep)?;
     }
     for dep in &state.policies[0] {
-        let name = &dep["dependencyId"];
+        let Some(name) = dep["dependencyId"]
+            .as_str()
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+        else {
+            continue;
+        };
         if state.policies[2]
             .iter()
-            .any(|base| base["dependencyId"] == *name)
+            .any(|base| base["dependencyId"].as_str().map(str::trim) == Some(name))
             && !state.policies[1]
                 .iter()
-                .any(|other| other["dependencyId"] == *name)
+                .any(|other| other["dependencyId"].as_str().map(str::trim) == Some(name))
         {
             let lifecycle = dep["lifecycleType"]
                 .as_str()
@@ -65,11 +71,11 @@ fn other_changed(state: &mut State<'_, '_>) -> io::Result<()> {
 fn one(state: &mut State<'_, '_>, name: &str) -> io::Result<()> {
     let current = state.policies[0]
         .iter()
-        .find(|dep| dep["dependencyId"] == name)
+        .find(|dep| dep["dependencyId"].as_str().map(str::trim) == Some(name))
         .cloned();
     let Some(other) = state.policies[1]
         .iter()
-        .find(|dep| dep["dependencyId"] == name)
+        .find(|dep| dep["dependencyId"].as_str().map(str::trim) == Some(name))
         .cloned()
     else {
         return Ok(());
@@ -81,7 +87,7 @@ fn one(state: &mut State<'_, '_>, name: &str) -> io::Result<()> {
     let other_version = &other["value"]["version"];
     let base = state.policies[2]
         .iter()
-        .find(|dep| dep["dependencyId"] == name);
+        .find(|dep| dep["dependencyId"].as_str().map(str::trim) == Some(name));
     let base_version = base.map(|dep| &dep["value"]["version"]);
     if current_version == other_version || base_version == Some(other_version) {
         return Ok(());

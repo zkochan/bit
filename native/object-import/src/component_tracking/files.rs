@@ -160,11 +160,12 @@ fn generated(
         .read(&plan.root.join(path))?
         .ok_or_else(|| unsupported("tracking source disappeared"))?;
     let first = bytes
-        .split(|byte| *byte == b'\n')
+        .split(|byte| matches!(*byte, b'\n' | b'\r'))
         .next()
         .unwrap_or_default();
+    let head = &first[..first.len().min(1024)];
     Ok(!(track_all || workspace_root && path == ".bitmap")
-        && String::from_utf8_lossy(first).contains("BIT-AUTO-GENERATED"))
+        && String::from_utf8_lossy(head).contains("BIT-AUTO-GENERATED"))
 }
 fn excluded(plan: &Plan, directory: &str, batch: &[String]) -> Vec<std::path::PathBuf> {
     let mut directories = batch.to_vec();

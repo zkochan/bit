@@ -16,9 +16,8 @@ pub(super) fn merge(engine: &mut Engine<'_>) -> io::Result<()> {
     for (index, current) in array(engine.input, "current")?.iter().enumerate() {
         let id = non_empty_str(&current["stringId"], "data id")?;
         let bare = id
-            .split('@')
-            .next()
-            .unwrap_or(id)
+            .rsplit_once('@')
+            .map_or(id, |(prefix, _)| prefix)
             .trim();
         if ["teambit.dependencies/dependency-resolver", "teambit.pipelines/builder"].contains(&bare)
         {

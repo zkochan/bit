@@ -30,22 +30,22 @@ impl Observed {
             Ok(_) => return Err(unsupported("tracking requires bounded regular files")),
             Err(error) => return Err(error),
         };
+        let hash = bytes
+            .as_ref()
+            .map(|bytes| Sha256::digest(bytes).to_vec());
+        if let Some(original) = self.files.get(path) {
+            if original != &hash {
+                return Err(unsupported("tracking source changed during planning"));
+            }
+            return Ok(bytes);
+        }
         self.bytes = self.bytes
             .checked_add(bytes.as_ref().map_or(0, Vec::len))
             .ok_or_else(|| unsupported("tracking retained input limit"))?;
         if self.bytes > 128 * 1024 * 1024 || self.files.len() >= 65536 {
             return Err(unsupported("tracking retained input limit"));
         }
-        let hash = bytes
-            .as_ref()
-            .map(|bytes| Sha256::digest(bytes).to_vec());
-        if self.files
-            .get(path)
-            .is_some_and(|original| original != &hash)
-        {
-            return Err(unsupported("tracking source changed during planning"));
-        }
-        self.files.entry(path.to_owned()).or_insert(hash);
+        self.files.insert(path.to_owned(), hash);
         Ok(bytes)
     }
     pub(crate) fn directory(&mut self, path: &Path) -> io::Result<Vec<String>> {

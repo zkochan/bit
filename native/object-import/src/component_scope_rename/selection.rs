@@ -58,15 +58,16 @@ fn row_scope_and_name<'a>(key: &'a str, row: &'a Value) -> (&'a str, &'a str) {
         let stripped = key_id
             .strip_prefix(scope_name)
             .and_then(|rest| rest.strip_prefix('/'))
-            .unwrap_or(key_id);
+            .map_or(key_id, str::trim);
         (scope_name, stripped)
     } else {
         key_id
             .split_once('/')
-            .unwrap_or(("", key_id))
+            .map_or(("", key_id), |(sc, rest)| (sc.trim(), rest.trim()))
     };
     let name = row["name"]
         .as_str()
+        .map(str::trim)
         .filter(|value| !value.is_empty())
         .unwrap_or(fallback_name);
     (current, name)

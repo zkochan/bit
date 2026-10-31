@@ -170,7 +170,7 @@ impl Plan {
         component: &str,
         peer: bool,
     ) {
-        if input["strategy"] == "theirs" {
+        if input["strategy"].as_str().map(str::trim) == Some("theirs") {
             self.update(name, workspace, component);
             return;
         }

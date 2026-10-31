@@ -14,17 +14,19 @@ pub(super) fn plan(input: &Value) -> io::Result<Value> {
     fields(scope)?;
     let mut output = Vec::new();
     for field in merged {
+        let field_name = field["field"].as_str().map(str::trim);
         output.push(one(
             field,
             scope
                 .iter()
-                .find(|entry| entry["field"] == field["field"]),
+                .find(|entry| entry["field"].as_str().map(str::trim) == field_name),
         )?);
     }
     for field in scope {
+        let field_name = field["field"].as_str().map(str::trim);
         if !merged
             .iter()
-            .any(|entry| entry["field"] == field["field"])
+            .any(|entry| entry["field"].as_str().map(str::trim) == field_name)
         {
             output.push(one(&json!({"field":field["field"],"entries":[]}), Some(field))?);
         }

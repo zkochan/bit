@@ -31,21 +31,21 @@ impl State {
         self.insert(populate::begin(input)?, directory)
     }
     fn insert(&mut self, mut plan: Value, directory: PathBuf) -> io::Result<Value> {
+        let sequence =
+            self.sequence.checked_add(1).ok_or_else(|| invalid("history query token overflow"))?;
+        let token = crate::validate::hexadecimal(&Sha1::digest(sequence.to_be_bytes()));
+        plan["token"] = json!(token);
         let bytes = serde_json::to_vec(&plan).map_err(io::Error::other)?.len();
         let source_bytes = self.plans
             .values()
             .map(|plan| plan.sources.bytes)
             .fold(0_usize, usize::saturating_add);
         if self.plans.len() >= 4096
-            || bytes > 4 * 1024 * 1024 - 256
+            || bytes > 4 * 1024 * 1024 - 200
             || self.bytes.saturating_add(bytes).saturating_add(source_bytes) > 32 * 1024 * 1024
         {
             return Err(invalid("history query owner limit"));
         }
-        let sequence =
-            self.sequence.checked_add(1).ok_or_else(|| invalid("history query token overflow"))?;
-        let token = crate::validate::hexadecimal(&Sha1::digest(sequence.to_be_bytes()));
-        plan["token"] = json!(token);
         self.sequence = sequence;
         self.bytes = self.bytes.saturating_add(bytes);
         self.plans.insert(

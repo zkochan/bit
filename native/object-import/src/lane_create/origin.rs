@@ -59,7 +59,11 @@ impl Origin {
             .iter()
             .find(|row| matches_lane_row(row, parent_id, parent_scope, parent_name))
             .ok_or_else(invalid)?;
-        let hash = row["hash"].as_str().ok_or_else(invalid)?;
+        let hash = row["hash"]
+            .as_str()
+            .map(str::trim)
+            .filter(|hash| !hash.is_empty())
+            .ok_or_else(invalid)?;
         let objects_dir = bit_workspace_config::scope_path(root).join("objects");
         let lane = outbound::read_object(&objects_dir, hash, "Lane")?;
         Self::from_lane_object(root, bitmap, parent, &lane, scope, new_scope)
@@ -159,6 +163,9 @@ fn matches_lane_row(row: &Value, parent_id: &Value, scope: &str, name: &str) -> 
 }
 
 fn decode_backup_lane(backup_bytes: &[u8], expected_hash: &str) -> io::Result<Value> {
+    if !valid_hash(expected_hash) {
+        return Err(invalid());
+    }
     let mut raw = Vec::new();
     ZlibDecoder::new(backup_bytes)
         .take(8 * 1024 * 1024 + 1)
@@ -171,11 +178,16 @@ fn decode_backup_lane(backup_bytes: &[u8], expected_hash: &str) -> io::Result<Va
         .position(|byte| *byte == 0)
         .ok_or_else(invalid)?;
     let header = std::str::from_utf8(&raw[..nul]).map_err(|_| invalid())?;
+    let body = std::str::from_utf8(&raw[nul + 1..]).map_err(|_| invalid())?;
     let fields = header.split(' ').collect::<Vec<_>>();
-    if fields.len() != 3 || fields[0] != "Lane" || fields[1] != expected_hash {
+    if fields.len() != 3
+        || fields[0] != "Lane"
+        || fields[1] != expected_hash
+        || fields[2].parse::<usize>().ok() != Some(body.encode_utf16().count())
+    {
         return Err(invalid());
     }
-    crate::parse_jsonc(&raw[nul + 1..]).map_err(|_| invalid())
+    crate::parse_jsonc(body.as_bytes()).map_err(|_| invalid())
 }
 
 fn active_lane_components(
@@ -185,7 +197,11 @@ fn active_lane_components(
 ) -> io::Result<Vec<Value>> {
     let mut components = Vec::new();
     for entry in lane["components"].as_array().ok_or_else(invalid)? {
-        let head = entry["head"].as_str().ok_or_else(invalid)?;
+        let head = entry["head"]
+            .as_str()
+            .map(str::trim)
+            .filter(|head| !head.is_empty())
+            .ok_or_else(invalid)?;
         let version = outbound::read_object(objects_dir, head, "Version")?;
         let removed = version["extensions"]
             .as_array()

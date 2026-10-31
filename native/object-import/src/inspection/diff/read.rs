@@ -71,7 +71,7 @@ fn one(directory: &Path, model: &wire::Model, budget: (usize, usize)) -> io::Res
     let mut compressed = super::super::MAX_BYTES.saturating_sub(budget.1);
     read_source_record(
         directory,
-        crate::merge_history::hash(&model.hash)?,
+        crate::merge_history::hash(model.normalized_hash())?,
         budget.0,
         &mut compressed,
     )

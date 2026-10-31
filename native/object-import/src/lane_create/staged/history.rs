@@ -54,33 +54,47 @@ fn populate(
     let rows = history["versions"].as_array_mut().ok_or_else(invalid)?;
     if rows
         .iter()
-        .any(|row| row["hash"].as_str().map(str::trim) == Some(head))
+        .any(|row| {
+            row["hash"]
+                .as_str()
+                .map(str::trim)
+                .is_some_and(|existing| existing.eq_ignore_ascii_case(head))
+        })
     {
         return Ok(());
     }
     let mut version = moved.object(directory, head, "Version")?;
     version["hash"] = json!(head);
+    let existing = rows
+        .iter()
+        .filter_map(|row| row["hash"].as_str().map(str::trim))
+        .filter(|existing| !existing.is_empty())
+        .collect::<Vec<_>>();
     let result = crate::history_query::populate::begin(json!({
         "objectsDirectory":directory,"head":head,"headExists":false,"exitWhenFind":true,
-        "existing":rows.iter().map(|row| row["hash"].clone()).collect::<Vec<_>>(),"headData":version,
+        "existing":existing,"headData":version,
     }))?;
     if result["complete"] != true {
         return Err(invalid());
     }
     for row in result["added"].as_array().ok_or_else(invalid)? {
-        let reference = row["hash"]
-            .as_str()
-            .map(str::trim)
-            .filter(|val| !val.is_empty())
-            .ok_or_else(invalid)?;
-        moved.object(directory, reference, "Version")?;
-        let mut record = json!({"hash":reference,"parents":row["parents"]});
-        for key in ["unrelated", "squashed"] {
-            if let Some(value) = row.get(key) {
-                record[key] = value.clone();
-            }
-        }
-        rows.push(record);
+        rows.push(added_record(moved, directory, row)?);
     }
     Ok(())
+}
+
+fn added_record(moved: &mut Moved, directory: &Path, row: &Value) -> io::Result<Value> {
+    let reference = row["hash"]
+        .as_str()
+        .map(str::trim)
+        .filter(|val| !val.is_empty())
+        .ok_or_else(invalid)?;
+    moved.object(directory, reference, "Version")?;
+    let mut record = json!({"hash":reference,"parents":row["parents"]});
+    for key in ["unrelated", "squashed"] {
+        if let Some(value) = row.get(key) {
+            record[key] = value.clone();
+        }
+    }
+    Ok(record)
 }

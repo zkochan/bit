@@ -240,6 +240,7 @@ impl Trace<'_> {
                 parent
                     .as_str()
                     .ok_or_else(|| invalid("history population parent"))?
+                    .trim()
                     .to_owned(),
                 json!({"parentOf":hash}),
                 false,
@@ -274,11 +275,10 @@ pub(crate) fn begin(input: Value) -> io::Result<Value> {
     let (request, labels) = parse(input)?;
     let head = request.head.trim();
     crate::merge_history::hash(head)?;
-    if request.head_data
+    if !request.head_data
         .get("hash")
         .and_then(Value::as_str)
-        .map(str::trim)
-        != Some(head)
+        .is_some_and(|candidate| candidate.trim().eq_ignore_ascii_case(head))
     {
         return Err(invalid("history population head identity"));
     }

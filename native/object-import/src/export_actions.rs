@@ -19,7 +19,12 @@ impl Handler {
     }
     pub(crate) fn call(&self, path: &Path, name: &str, options: &Value) -> io::Result<Value> {
         let name = name.trim();
-        if path.as_os_str().is_empty() || name.is_empty() {
+        let path_bytes = path.as_os_str().as_encoded_bytes();
+        if path_bytes.is_empty()
+            || path_bytes.contains(&0)
+            || name.is_empty()
+            || name.chars().any(char::is_control)
+        {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "export action requires a non-empty scope path and action name",

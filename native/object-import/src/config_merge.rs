@@ -67,6 +67,10 @@ fn truthy(value: &Value) -> bool {
 }
 pub(crate) fn conflict_plan(input: &Value) -> io::Result<(Value, Conflict)> {
     validate::fields(input, &["path", "fallbackPath", "conflicts"])?;
+    validate::fields(
+        &input["conflicts"],
+        &["dependencies", "devDependencies", "peerDependencies"],
+    )?;
     conflict::plan(input)
 }
 pub(crate) fn conflict_commit(input: &Value, state: &mut Option<Conflict>) -> io::Result<Value> {
@@ -74,6 +78,7 @@ pub(crate) fn conflict_commit(input: &Value, state: &mut Option<Conflict>) -> io
     conflict::commit(input, state)
 }
 pub(crate) fn render_workspace_conflict(contents: &str, conflicts: &Value) -> io::Result<String> {
+    validate::fields(conflicts, &["dependencies", "devDependencies", "peerDependencies"])?;
     conflict::render(contents, conflicts)
 }
 fn text<'a>(input: &'a Value, field: &str) -> io::Result<&'a str> {

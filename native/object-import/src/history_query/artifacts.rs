@@ -51,9 +51,13 @@ fn validate_file(file: &Value) -> io::Result<()> {
         .get("relativePath")
         .and_then(Value::as_str)
         .ok_or_else(|| invalid("history query artifact path"))?;
-    if path.trim().is_empty()
+    let trimmed = path.trim();
+    if trimmed.is_empty()
         || path.len() > 32768
         || path.contains('\0')
+        || std::path::Path::new(trimmed)
+            .components()
+            .any(|part| matches!(part, std::path::Component::ParentDir))
         || file
             .get("url")
             .is_some_and(|value| {

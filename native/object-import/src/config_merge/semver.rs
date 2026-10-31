@@ -37,11 +37,8 @@ fn identifier(left: &Value, right: &Value) -> io::Result<Ordering> {
     if numeric(right).is_some() && left.is_string() {
         return Ok(Ordering::Greater);
     }
-    match (left.as_u64(), right.as_u64(), left.as_str(), right.as_str()) {
-        (Some(left_number), Some(right_number), _, _) => Ok(left_number.cmp(&right_number)),
-        (Some(_), None, _, Some(_)) => Ok(Ordering::Less),
-        (None, Some(_), Some(_), _) => Ok(Ordering::Greater),
-        (_, _, Some(left_text), Some(right_text)) => Ok(left_text.cmp(right_text)),
+    match (left.as_str(), right.as_str()) {
+        (Some(left_text), Some(right_text)) => Ok(left_text.cmp(right_text)),
         _ => Err(invalid("semver identifier")),
     }
 }

@@ -71,6 +71,7 @@ impl Selection {
             let metadata = fs::symlink_metadata(&path)?;
             if !metadata.is_file()
                 || metadata.file_type().is_symlink()
+                || metadata.len() != expected.len() as u64
                 || fs::read(&path)? != *expected
             {
                 return Err(io::Error::other("scope rename inputs changed"));
@@ -92,7 +93,12 @@ fn workspace_aspect_key(workspace: &Value) -> String {
         .as_object()
         .and_then(|rows| {
             rows.keys()
-                .find(|key| key.split('@').next() == Some("teambit.workspace/workspace"))
+                .find(|key| {
+                    let trimmed = key.trim();
+                    let bare =
+                        trimmed.rsplit_once('@').map_or(trimmed, |(prefix, _)| prefix.trim());
+                    bare == "teambit.workspace/workspace"
+                })
         })
         .cloned()
         .unwrap_or_else(|| "teambit.workspace/workspace".into())

@@ -49,8 +49,9 @@ fn current(engine: &mut Engine<'_>) -> io::Result<()> {
         engine.handled.push(id.into());
         let base = engine.find("base", id)?;
         let other = engine.find("other", id)?;
+        let bare = id.rsplit_once('@').map_or(id, |(prefix, _)| prefix.trim());
         match (base, other) {
-            (_, Some(other)) if id.split('@').next().map(str::trim) == Some("teambit.dependencies/dependency-resolver") => deps::merge(engine,index,other,base)?,
+            (_, Some(other)) if bare == "teambit.dependencies/dependency-resolver" => deps::merge(engine,index,other,base)?,
             (_, Some(other)) => engine.basic(id,&Engine::source("current",index),&Engine::source("other",other),base.map(|base|Engine::source("base",base)).as_ref())?,
             (Some(_),None) if engine.strategy() == "theirs" => engine.rows.push(json!({"id":id,"merged":{"value":"-"}})),
             (Some(_),None) if engine.strategy() != "ours" => engine.rows.push(json!({"id":id,"conflict":{"kind":"basic","current":Engine::source("current",index),"other":{"value":"-"}}})),

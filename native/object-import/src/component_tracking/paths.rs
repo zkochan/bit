@@ -47,7 +47,7 @@ fn candidates(
     let absolute = normalize(&cwd.join(pattern));
     if magic(pattern) {
         expand(root, &absolute, observed)
-    } else if absolute.exists() {
+    } else if fs::symlink_metadata(&absolute).is_ok() {
         Ok(vec![absolute])
     } else {
         Ok(Vec::new())

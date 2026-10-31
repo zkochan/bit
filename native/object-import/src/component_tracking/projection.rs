@@ -123,7 +123,7 @@ fn shorten(
 fn duplicates(candidates: &[Candidate]) -> io::Result<()> {
     let mut seen = HashSet::new();
     for candidate in candidates {
-        if !seen.insert(&candidate.name) {
+        if !seen.insert((&candidate.scope, &candidate.name)) {
             return Err(error(format!(
                 "unable to add {} components with the same ID: {}/{} : {}\n",
                 candidate.files.len(),

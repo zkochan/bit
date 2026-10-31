@@ -21,9 +21,13 @@ pub(super) struct Request {
 }
 pub(super) fn diff(request: Request, cache: &mut Cache) -> io::Result<Value> {
     crate::merge_history::path(&request.objects_directory)?;
-    if request.relative_path.trim().is_empty()
+    let trimmed_path = request.relative_path.trim();
+    if trimmed_path.is_empty()
         || request.relative_path.len() > 32768
         || request.relative_path.contains('\0')
+        || std::path::Path::new(trimmed_path)
+            .components()
+            .any(|part| matches!(part, std::path::Component::ParentDir))
     {
         return Err(invalid("history diff path"));
     }

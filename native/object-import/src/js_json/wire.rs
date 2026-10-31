@@ -79,6 +79,9 @@ impl<'de> Visitor<'de> for TextVisitor {
         formatter.write_str("a Unicode string or UTF-16 code-unit array")
     }
     fn visit_str<Error: serde::de::Error>(self, value: &str) -> Result<Utf16, Error> {
+        if value.len() > 32 * 1024 * 1024 {
+            return Err(serde::de::Error::custom("JavaScript string length limit"));
+        }
         Ok(Utf16(value.encode_utf16().collect()))
     }
     fn visit_seq<Sequence: SeqAccess<'de>>(
@@ -92,6 +95,9 @@ impl<'de> Visitor<'de> for TextVisitor {
                 .min(4096),
         );
         while let Some(unit) = sequence.next_element::<u16>()? {
+            if units.len() >= 32 * 1024 * 1024 {
+                return Err(serde::de::Error::custom("JavaScript string length limit"));
+            }
             units.push(unit);
         }
         Ok(Utf16(units))

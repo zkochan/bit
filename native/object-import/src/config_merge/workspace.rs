@@ -90,6 +90,7 @@ fn ordinary_package(
     for field in FIELDS {
         let Some(current) = policy[field][name]
             .as_str()
+            .map(str::trim)
             .filter(|value| !value.is_empty())
             .map(str::to_owned)
         else {

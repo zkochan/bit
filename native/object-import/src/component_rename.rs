@@ -184,12 +184,19 @@ impl Plan {
     /// Paths written by native materialization; source bodies stay on the filesystem.
     #[must_use]
     pub fn materialized(&self) -> Value {
+        let main_file = self.controls.bitmap
+            .get(&self.identity.target)
+            .or_else(|| self.controls.bitmap.get(&self.identity.target_name))
+            .or_else(|| {
+                identity::selected(&self.controls.bitmap, &self.identity.target)
+                    .ok()
+                    .map(|(_, row)| row)
+            })
+            .map_or(Value::Null, |row| row["mainFile"].clone());
         serde_json::json!({
             "identity":self.identity.target,
             "directory":self.identity.target_directory,
-            "mainFile":self.controls.bitmap.get(&self.identity.target)
-                .or_else(||self.controls.bitmap.get(&self.identity.target_name))
-                .map_or(Value::Null, |row|row["mainFile"].clone()),
+            "mainFile":main_file,
             "files":self.files.iter().map(|file| serde_json::json!({
                 "from":file.source,"to":file.destination
             })).collect::<Vec<_>>()

@@ -90,6 +90,7 @@ fn file_hash(version: &Value, relative: &str) -> io::Result<Option<String>> {
         .iter()
         .find(|file| {
             file.get("relativePath")
+                .or_else(|| file.get("path"))
                 .and_then(Value::as_str)
                 .is_some_and(|cand| {
                     cand.trim()
@@ -105,7 +106,7 @@ fn file_hash(version: &Value, relative: &str) -> io::Result<Option<String>> {
         .get("file")
         .and_then(Value::as_str)
         .ok_or_else(|| invalid("history file Source ref"))?;
-    let digest = crate::merge_history::hash(hash)?;
+    let digest = crate::merge_history::hash(hash.trim())?;
     Ok(Some(crate::validate::hexadecimal(&digest)))
 }
 fn parent_hash(

@@ -11,10 +11,11 @@ pub(super) fn choose(
     if let Some(id) = &options.id {
         return explicit(id, bitmap, options.scope.as_deref());
     }
+    let directory = directory.trim();
     if let Some(rows) = bitmap.as_object()
         && let Some((key, row)) = rows
             .iter()
-            .find(|(_, row)| row["rootDir"] == directory)
+            .find(|(_, row)| row["rootDir"].as_str().map(str::trim) == Some(directory))
     {
         return Ok((
             rows::row_name(key, row).unwrap_or(key).into(),

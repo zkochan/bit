@@ -13,11 +13,8 @@ pub(super) fn write(writer: &mut Writer, units: &[u16]) -> io::Result<()> {
     let mut units = units.iter().copied().peekable();
     while let Some(unit) = units.next() {
         if (0xd800..=0xdbff).contains(&unit)
-            && units
-                .peek()
-                .is_some_and(|next| (0xdc00..=0xdfff).contains(next))
+            && let Some(low) = units.next_if(|next| (0xdc00..=0xdfff).contains(next))
         {
-            let low = units.next().expect("peeked low surrogate");
             let scalar = 0x10000 + ((u32::from(unit) - 0xd800) << 10) + u32::from(low) - 0xdc00;
             unicode(writer, scalar)?;
         } else {

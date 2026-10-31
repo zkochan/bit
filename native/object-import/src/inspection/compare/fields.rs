@@ -73,7 +73,11 @@ pub(super) fn align(left: &Js, right: &mut Js) -> io::Result<Value> {
     let mut versions = Vec::new();
     for field in ["dependencies", "devDependencies"] {
         let model = array(get(left, field))?;
-        let mut current = array(get(right, field))?.to_vec();
+        let current_slice = array(get(right, field))?;
+        if model.len() > 4096 || current_slice.len() > 4096 {
+            return Err(invalid("inspection compare row budget"));
+        }
+        let mut current = current_slice.to_vec();
         for (index, row) in current.iter_mut().enumerate() {
             if let Some(model_index) = align_dependency(row, model)? {
                 versions.push(json!({"field":field,"index":index,"modelIndex":model_index}));

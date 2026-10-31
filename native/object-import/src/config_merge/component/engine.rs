@@ -66,12 +66,14 @@ impl<'a> Engine<'a> {
             .iter()
             .position(|entry| {
                 if core {
-                    entry["name"] == id
+                    entry["name"].as_str().map(str::trim) == Some(id)
                 } else {
-                    entry["componentId"]["base"] == id
-                        || entry["componentId"]["base"] == base_id
-                        || entry["componentId"] == id
-                        || entry["componentId"] == base_id
+                    let comp_base = entry["componentId"]["base"].as_str().map(str::trim);
+                    let comp_id = entry["componentId"].as_str().map(str::trim);
+                    comp_base == Some(id)
+                        || comp_base == Some(base_id)
+                        || comp_id == Some(id)
+                        || comp_id == Some(base_id)
                 }
             }))
     }

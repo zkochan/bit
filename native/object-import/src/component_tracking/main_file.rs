@@ -64,7 +64,7 @@ fn inferred(directory: &str, files: &[String]) -> Option<String> {
 }
 fn find(name: &str, directory: &str, files: &[String]) -> Option<String> {
     let normalized = name.trim().replace('\\', "/");
-    let name = normalized.strip_prefix("./").unwrap_or(&normalized);
+    let name = normalized.trim_start_matches("./");
     if name.is_empty() {
         return None;
     }

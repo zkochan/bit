@@ -24,11 +24,11 @@ pub(super) fn index(input: Value) -> io::Result<Value> {
     bound(request.rows.len())?;
     bound(request.queries.len())?;
     bound(request.exclude.len())?;
-    let incoming = incoming(&request.rows)?;
-    output_budget(&request.queries, &incoming)?;
     for id in request.queries.iter().chain(&request.exclude) {
         text(id)?;
     }
+    let incoming = incoming(&request.rows)?;
+    output_budget(&request.queries, &incoming)?;
     let excluded: HashSet<_> = request.exclude
         .iter()
         .map(|id| id.trim())

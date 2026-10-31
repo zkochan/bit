@@ -98,6 +98,8 @@ impl State {
     }
     pub(super) fn receipt(&mut self, input: Value) -> io::Result<Value> {
         let request: Receipt = serde_json::from_value(input).map_err(io::Error::other)?;
+        super::text(&request.token)?;
+        super::text(&request.phase)?;
         let token = request.token.trim().to_owned();
         let mut record = self.records
             .get(&token)

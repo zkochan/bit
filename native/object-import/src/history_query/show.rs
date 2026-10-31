@@ -191,15 +191,20 @@ pub(super) fn toposort(input: Value) -> io::Result<Value> {
     }
     let mut seen = HashSet::new();
     let mut nodes = Vec::new();
-    for (index, id) in request.nodes.into_iter().enumerate() {
-        if id.len() > 32768 || !seen.insert(id.clone()) {
+    for (index, raw_id) in request.nodes.into_iter().enumerate() {
+        let id = raw_id.trim().to_owned();
+        if id.is_empty() || raw_id.len() > 32768 || !seen.insert(id.clone()) {
             return Err(invalid("history graph node identity"));
         }
         nodes.push(Node { id, index });
     }
     let edges = request.edges
         .into_iter()
-        .map(|edge| Edge { source: edge.source, target: edge.target, kind: "parent" })
+        .map(|edge| Edge {
+            source: edge.source.trim().to_owned(),
+            target: edge.target.trim().to_owned(),
+            kind: "parent",
+        })
         .collect::<Vec<_>>();
     Ok(json!({"order":order(&nodes, &edges)?}))
 }

@@ -44,9 +44,11 @@ pub(super) fn plan(input: &Value) -> io::Result<(Value, Conflict)> {
     let fallback = PathBuf::from(text(input, "fallbackPath")?.trim());
     absolute(&path)?;
     absolute(&fallback)?;
+    let fallback_meta = fs::symlink_metadata(&fallback)?;
     if path == fallback
-        || !fs::symlink_metadata(&fallback)?.is_file()
-        || fs::metadata(&fallback)?.len() != 0
+        || !fallback_meta.is_file()
+        || fallback_meta.file_type().is_symlink()
+        || fallback_meta.len() != 0
     {
         return Err(invalid("config fallback candidate"));
     }

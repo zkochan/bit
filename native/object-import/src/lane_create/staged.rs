@@ -137,45 +137,64 @@ fn bitmap_row_matches(key: &str, row: &Value, scope: &str, name: &str, _full: &s
 }
 
 fn remote(moved: &mut Moved, scope_path: &Path, model: &Value) -> io::Result<Option<String>> {
-    let scope = model["scope"].as_str().ok_or_else(invalid)?;
-    let name = model["name"].as_str().ok_or_else(invalid)?;
+    let scope = model["scope"]
+        .as_str()
+        .map(str::trim)
+        .ok_or_else(invalid)?;
+    let name = model["name"]
+        .as_str()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .ok_or_else(invalid)?;
     if !super::valid_scope(scope) {
         return Err(invalid());
     }
-    let bytes = match moved.read(
-        &scope_path
-            .join("refs/remote")
-            .join(scope)
-            .join("main"),
-    )? {
-        Some(bytes) => Some(bytes),
-        None => moved.read(
-            &scope_path
-                .join("refs/remotes")
-                .join(scope)
-                .join("main"),
-        )?,
-    };
-    let Some(bytes) = bytes else {
+    let Some(bytes) = read_remote_main(moved, scope_path, scope)? else {
         return Ok(None);
     };
     let parsed = crate::parse_jsonc(&bytes)?;
     let rows = parsed.as_array().ok_or_else(invalid)?;
     let full = format!("{scope}/{name}");
     rows.iter()
-        .find(|row| {
-            let row_scope = row["id"]["scope"].as_str().unwrap_or_default();
-            (row["id"]["name"] == name && (row_scope.is_empty() || row_scope == scope))
-                || row["id"].as_str() == Some(full.as_str())
-                || row["id"].as_str() == Some(name)
-        })
+        .find(|row| remote_row_matches(row, scope, name, &full))
         .map(|row| {
             row["head"]
                 .as_str()
+                .map(str::trim)
+                .filter(|head| !head.is_empty())
                 .map(str::to_owned)
                 .ok_or_else(invalid)
         })
         .transpose()
+}
+
+fn read_remote_main(
+    moved: &mut Moved,
+    scope_path: &Path,
+    scope: &str,
+) -> io::Result<Option<Vec<u8>>> {
+    match moved.read(
+        &scope_path
+            .join("refs/remote")
+            .join(scope)
+            .join("main"),
+    )? {
+        Some(bytes) => Ok(Some(bytes)),
+        None => moved.read(
+            &scope_path
+                .join("refs/remotes")
+                .join(scope)
+                .join("main"),
+        ),
+    }
+}
+
+fn remote_row_matches(row: &Value, scope: &str, name: &str, full: &str) -> bool {
+    let row_scope = row["id"]["scope"].as_str().map_or("", str::trim);
+    (row["id"]["name"].as_str().map(str::trim) == Some(name)
+        && (row_scope.is_empty() || row_scope == scope))
+        || row["id"].as_str().map(str::trim) == Some(full)
+        || row["id"].as_str().map(str::trim) == Some(name)
 }
 
 fn resolve_workspace_hash<'a>(model: &'a Value, workspace: &'a str, head: &'a str) -> &'a str {

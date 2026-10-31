@@ -188,10 +188,13 @@ impl Documents {
         let id = json!({"name":name,"scope":scope});
         lanes.push(json!({"id":id,"hash":lane_hash}));
         tracking.push(json!({"localLane":alias,"remoteLane":name,"remoteScope":scope}));
-        self.scope_json["lanes"]["new"]
-            .as_array_mut()
-            .ok_or_else(invalid)?
-            .push(json!(name));
+        let new_lanes = self.scope_json["lanes"]["new"].as_array_mut().ok_or_else(invalid)?;
+        if !new_lanes
+            .iter()
+            .any(|entry| entry.as_str().map(str::trim) == Some(name))
+        {
+            new_lanes.push(json!(name));
+        }
         self.bitmap["_bit_lane"] = json!({"id":id,"exported":false});
         Ok(())
     }

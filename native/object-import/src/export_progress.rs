@@ -49,6 +49,7 @@ pub fn emit(event: Event) -> bool {
             Event::Transfer { scope: scope.trim().to_owned(), objects }
         }
         Event::Persist { scope } => Event::Persist { scope: scope.trim().to_owned() },
+        Event::HubMessage(message) => Event::HubMessage(message.trim().to_owned()),
         other => other,
     };
     current().is_some_and(|sender| sender.send(event).is_ok())

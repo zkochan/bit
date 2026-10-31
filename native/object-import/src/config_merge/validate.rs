@@ -24,6 +24,12 @@ pub(super) fn semver(input: &Value) -> io::Result<()> {
 }
 fn semver_entry(input: &Value) -> io::Result<()> {
     fields(input, &["version", "range", "minimum", "minimumText"])?;
+    if input
+        .get("minimumText")
+        .is_some_and(|value| !value.is_null())
+    {
+        text(input, "minimumText")?;
+    }
     for field in ["version", "minimum"] {
         if let Some(version) = input
             .get(field)

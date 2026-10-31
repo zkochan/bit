@@ -57,7 +57,10 @@ pub(super) fn blame(request: Request, cache: &mut Cache) -> io::Result<Value> {
 fn initial_rows(text: &str) -> Vec<Value> {
     text.split('\n')
         .enumerate()
-        .map(|(index, line)| json!({"lineNumber":index+1,"lineContent":line}))
+        .map(|(index, line)| {
+            let clean = line.strip_suffix('\r').unwrap_or(line);
+            json!({"lineNumber":index+1,"lineContent":clean})
+        })
         .collect()
 }
 fn assign_remaining(

@@ -61,7 +61,7 @@ fn validate_request(request: &Request, seen: &mut HashSet<String>) -> io::Result
     }
     for model in &request.model_files {
         super::read::relative(&model.relative_path)?;
-        crate::merge_history::hash(&model.hash)?;
+        crate::merge_history::hash(model.normalized_hash())?;
         if !seen.insert(model.relative_path.clone()) {
             return Err(invalid("duplicate inspection diff model path"));
         }

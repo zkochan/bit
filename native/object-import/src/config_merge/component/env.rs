@@ -53,12 +53,11 @@ fn one(engine: &mut Engine<'_>, side: &str) -> io::Result<Value> {
 fn is_envs_extension(entry: &Value) -> bool {
     entry["name"]
         .as_str()
+        .or_else(|| entry["stringId"].as_str())
         .is_some_and(|name| {
-            name.trim()
-                .split('@')
-                .next()
-                .map(str::trim)
-                == Some("teambit.envs/envs")
+            let trimmed = name.trim();
+            let bare = trimmed.rsplit_once('@').map_or(trimmed, |(prefix, _)| prefix.trim());
+            bare == "teambit.envs/envs"
         })
 }
 

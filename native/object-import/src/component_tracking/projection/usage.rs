@@ -9,8 +9,9 @@ pub(super) fn filter(
     existing_root(candidate, existing)?;
     let owned = plan.bitmap
         .as_object()
-        .unwrap()
+        .ok_or_else(|| error("invalid component bitmap"))?
         .iter()
+        .filter(|(_, row)| super::super::active(row))
         .filter_map(|(key, row)| {
             Some((
                 rows::row_name(key, row)?.to_owned(),

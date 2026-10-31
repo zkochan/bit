@@ -41,7 +41,10 @@ impl Options {
             ));
         }
         if directories.len() > 1
-            && let Some(id) = &self.id
+            && let Some(id) = self.id
+                .as_deref()
+                .map(str::trim)
+                .filter(|id| !id.is_empty())
         {
             return Err(error(format!(
                 "the --id flag ({id}) is used for a single component only, however, got {} paths",

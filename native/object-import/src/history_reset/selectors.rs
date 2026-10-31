@@ -87,11 +87,11 @@ pub(super) fn soft(input: Value) -> io::Result<Value> {
             .as_deref()
             .map(str::trim)
             .filter(|version| !version.is_empty())
-            && !cleared.contains(&alias)
         {
             text(version)?;
-            selected.push(index);
-            cleared.insert(alias);
+            if cleared.insert(alias) {
+                selected.push(index);
+            }
         }
     }
     Ok(json!({"selected":selected}))
