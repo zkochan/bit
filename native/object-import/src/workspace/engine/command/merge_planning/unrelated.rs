@@ -16,18 +16,22 @@ pub(super) fn distance(
     {
         return Ok(());
     }
-    let main = selected.model["head"].as_str();
+    let main = selected.model["head"]
+        .as_str()
+        .map(str::trim)
+        .filter(|head| !head.is_empty());
     let mut facts = json!({"hasMain":main.is_some()});
     if let Some(main) = main {
         for (key, reference) in [
-            ("hasResolvedLocally", selected.current_head.as_str()),
-            ("hasResolvedRemotely", selected.remote.as_str()),
+            ("hasResolvedLocally", selected.current_head.trim()),
+            ("hasResolvedRemotely", selected.remote.trim()),
         ] {
+            let reference = (!reference.is_empty()).then_some(reference);
             let compared = history.distance(
                 &record.request.root,
                 identity,
                 &selected.model,
-                [Some(reference), Some(main)],
+                [reference, Some(main)],
                 &mut record.repository,
             )?;
             facts[key] = json!(compared["noCommon"] != true);

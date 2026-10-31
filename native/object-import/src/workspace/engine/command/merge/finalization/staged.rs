@@ -101,8 +101,12 @@ pub(super) fn mark_lane_new(
     let mut rows = json(bytes)?;
     let rows_array = rows.as_array_mut().ok_or_else(|| invalid("snap staged lane rows"))?;
     for identity in identities {
-        let (scope, name) =
-            identity.split_once('/').ok_or_else(|| invalid("snap staged lane identity"))?;
+        let (scope, name) = identity
+            .trim()
+            .split_once('/')
+            .map(|(scope, name)| (scope.trim(), name.trim()))
+            .filter(|(scope, name)| !scope.is_empty() && !name.is_empty())
+            .ok_or_else(|| invalid("snap staged lane identity"))?;
         let row = rows_array
             .iter_mut()
             .find(|row| {
@@ -122,17 +126,22 @@ pub(super) fn mark_lane_new(
     Ok(())
 }
 fn update(rows: &mut Value, bitmap: &Value, input: &Input<'_>, snapshot: bool) -> io::Result<()> {
-    let (scope, name) =
-        input.identity.split_once('/').ok_or_else(|| invalid("merge staged identity"))?;
+    let (scope, name) = input.identity
+        .trim()
+        .split_once('/')
+        .map(|(scope, name)| (scope.trim(), name.trim()))
+        .filter(|(scope, name)| !scope.is_empty() && !name.is_empty())
+        .ok_or_else(|| invalid("merge staged identity"))?;
     let rows = rows.as_array_mut().ok_or_else(|| invalid("merge staged config shape"))?;
     if rows.len() > 4096 {
         return Err(invalid("merge staged config budget"));
     }
+    let dir = input.directory.trim();
     let entry = bitmap
         .as_object()
         .ok_or_else(|| invalid("merge staged bitmap"))?
         .values()
-        .find(|entry| entry["rootDir"] == input.directory)
+        .find(|entry| entry["rootDir"].as_str().map(str::trim) == Some(dir))
         .ok_or_else(|| invalid("merge staged bitmap component"))?;
     if !snapshot && entry.get("config").is_some() {
         return Err(invalid("merge staged configured component"));

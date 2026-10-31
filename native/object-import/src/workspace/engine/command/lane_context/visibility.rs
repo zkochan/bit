@@ -187,20 +187,23 @@ fn selected_entry(
     on_lane: bool,
     entry: &Entry,
 ) -> io::Result<Value> {
-    let model = imported
-        .lane_model(&entry.identity)?
-        .ok_or_else(|| invalid("command lane component absent"))?;
-    let main = model["head"].as_str();
+    let identity = entry.identity.trim();
+    let model =
+        imported.lane_model(identity)?.ok_or_else(|| invalid("command lane component absent"))?;
+    let main = model["head"]
+        .as_str()
+        .map(str::trim)
+        .filter(|head| !head.is_empty() && *head != "0");
     let current = entries
         .iter()
-        .find(|row| row.identity == entry.identity);
+        .find(|row| row.identity.trim() == identity);
     let current_head = history_head(current, main, on_lane);
     let visible = visible
         .iter()
-        .any(|row| row["identity"] == entry.identity);
-    let bitmap_present = visible || bitmap_has(bitmap, &entry.identity);
+        .any(|row| row["identity"].as_str().map(str::trim) == Some(identity));
+    let bitmap_present = visible || bitmap_has(bitmap, identity);
     Ok(
-        json!({"identity":entry.identity,"head":entry.head,"currentHead":current_head,"mainHead":main,
+        json!({"identity":identity,"head":entry.head.trim(),"currentHead":current_head,"mainHead":main,
         "hidden":current.is_some_and(|row| row.hidden),"incomingHidden":entry.hidden,
         "bitmapPresent":bitmap_present,"currentIdPresent":bitmap_present || current.is_some() || (!on_lane && main.is_some()),
         "visible":visible,"currentSource":current.map_or_else(|| if main.is_some() {"main"} else {"none"}, |row| if row.hidden {"hidden"} else {"visible"})}),
@@ -217,15 +220,18 @@ fn history_head<'a>(
 pub(super) fn effective_scope(row: &Value) -> Option<&str> {
     row["scope"]
         .as_str()
+        .map(str::trim)
         .filter(|scope| !scope.is_empty())
         .or_else(|| {
             row["defaultScope"]
                 .as_str()
+                .map(str::trim)
                 .filter(|scope| !scope.is_empty())
         })
 }
 
 fn bitmap_has(bitmap: &Value, identity: &str) -> bool {
+    let identity = identity.trim();
     let Some(rows) = bitmap.as_object() else {
         return false;
     };
@@ -238,10 +244,15 @@ fn bitmap_has(bitmap: &Value, identity: &str) -> bool {
                 return false;
             }
             let (scope, name) = crate::reset_lane::bitmap::row_identity(key, row);
-            let Some(scope) = scope.or_else(|| effective_scope(row)) else {
+            let Some(scope) = scope
+                .map(str::trim)
+                .filter(|scope| !scope.is_empty())
+                .or_else(|| effective_scope(row))
+            else {
                 return false;
             };
-            format!("{scope}/{name}") == identity
+            let name = name.trim();
+            !name.is_empty() && format!("{scope}/{name}") == identity
         })
 }
 

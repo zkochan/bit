@@ -197,6 +197,7 @@ fn decode_history(bytes: &[u8], hash: &str) -> io::Result<Value> {
     crate::parse_jsonc(body).map_err(io::Error::other)
 }
 fn reachable(rows: &[Value], local: &str, remote: &str) -> bool {
+    let (local, remote) = (local.trim(), remote.trim());
     let mut pending = vec![local];
     let mut seen = std::collections::HashSet::new();
     while let Some(hash) = pending.pop() {
@@ -205,7 +206,7 @@ fn reachable(rows: &[Value], local: &str, remote: &str) -> bool {
         }
         let Some(row) = rows
             .iter()
-            .find(|row| row["hash"] == hash)
+            .find(|row| row["hash"].as_str().map(str::trim) == Some(hash))
         else {
             return false;
         };
@@ -213,7 +214,13 @@ fn reachable(rows: &[Value], local: &str, remote: &str) -> bool {
             return true;
         }
         let Some(parents) = row["parents"].as_array() else { return false };
-        pending.extend(parents.iter().filter_map(Value::as_str));
+        pending.extend(
+            parents
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::trim)
+                .filter(|parent| !parent.is_empty()),
+        );
     }
     false
 }

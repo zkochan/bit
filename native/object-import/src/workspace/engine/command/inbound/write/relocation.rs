@@ -127,11 +127,16 @@ fn unavailable(
         .find(|(_, row)| trimmed_str(&row["rootDir"]) == Some(directory))
     {
         let (row_scope, row_name) = crate::reset_lane::bitmap::row_identity(key, row);
+        let scope_prefix = row_scope
+            .map(str::trim)
+            .filter(|scope| !scope.is_empty())
+            .or_else(|| trimmed_str(&row["defaultScope"]))
+            .map_or_else(String::new, |scope| format!("{scope}/"));
+        let version_suffix =
+            trimmed_str(&row["version"]).map_or_else(String::new, |version| format!("@{version}"));
         return Ok(Some(format!(
-            "it is already used by {}/{}@{}",
-            row_scope.unwrap_or_default(),
-            row_name,
-            trimmed_str(&row["version"]).unwrap_or_default(),
+            "it is already used by {scope_prefix}{}{version_suffix}",
+            row_name.trim(),
         )));
     }
     let path = root.join(directory);

@@ -41,7 +41,16 @@ fn membership(bitmap: &Value, settings: &Value) -> io::Result<HashSet<String>> {
         .filter(|(key, row)| is_component_bitmap_row(key, row))
         .filter_map(|(key, row)| {
             let (scope, name) = crate::reset_lane::bitmap::row_identity(key, row);
+            let name = name.trim();
             scope
+                .map(str::trim)
+                .filter(|sc| !sc.is_empty())
+                .or_else(|| {
+                    row["defaultScope"]
+                        .as_str()
+                        .map(str::trim)
+                        .filter(|sc| !sc.is_empty())
+                })
                 .filter(|_| !name.is_empty())
                 .map(|scope| format!("{scope}/{name}"))
         })

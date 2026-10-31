@@ -50,10 +50,13 @@ impl Prepared {
             }
             let original = expected
                 .iter()
-                .find(|row| row["identity"] == id)
+                .find(|row| row["identity"].as_str().map(str::trim) == Some(id))
                 .ok_or_else(|| invalid("snapshot unknown package manifest"))?;
             let mut manifest = normalize(row["manifest"].clone(), &original["manifest"])?;
-            if aspects.contains(id) {
+            if aspects
+                .iter()
+                .any(|aspect| aspect.trim() == id)
+            {
                 aspect_exports(&mut manifest)?;
             }
             writes.push((self.manifest_index(id)?, pretty(&manifest, true)?));
@@ -107,7 +110,13 @@ fn normalize(mut manifest: Value, original: &Value) -> io::Result<Value> {
     if !manifest.is_object() {
         return Err(invalid("snapshot package manifest shape"));
     }
-    if matches!(manifest["version"].as_str().map(str::trim), Some("latest" | "head")) {
+    if manifest["version"]
+        .as_str()
+        .map(str::trim)
+        .is_some_and(|version| {
+            version.eq_ignore_ascii_case("latest") || version.eq_ignore_ascii_case("head")
+        })
+    {
         manifest["version"] = value!("0.0.1-new");
     } else if let Some(hash) = manifest["version"]
         .as_str()

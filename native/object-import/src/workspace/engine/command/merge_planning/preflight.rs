@@ -18,15 +18,16 @@ pub(super) fn validate(
     }
     let identities = prepared.pending
         .iter()
-        .map(|input| input.identity.as_str())
+        .map(|input| input.identity.trim())
         .collect::<HashSet<_>>();
     for target in targets {
         validate_target(&target.version)?;
         let identity = target.output["id"]
             .as_str()
-            .and_then(|id| id.rsplit_once('@'))
-            .ok_or_else(|| invalid("command fast-forward identity"))?
-            .0;
+            .and_then(|id| id.trim().rsplit_once('@'))
+            .map(|(identity, _)| identity.trim())
+            .filter(|identity| !identity.is_empty())
+            .ok_or_else(|| invalid("command fast-forward identity"))?;
         if !prepared.policy.as_ref().is_some_and(|policy| policy.dependencies_ready) {
             prepared.proofs.extend(cache_guard::verify(record, captured, target, identity)?);
         }

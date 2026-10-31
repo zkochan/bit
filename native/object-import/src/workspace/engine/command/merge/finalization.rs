@@ -78,11 +78,13 @@ fn prepare_with(
     for input in inputs
         .iter()
         .filter(|input| {
-            !input.directory.is_empty()
-                && input.directory != "."
+            let dir = input.directory.trim();
+            let identity = input.identity.trim();
+            !dir.is_empty()
+                && dir != "."
                 && !skip_packages
                     .iter()
-                    .any(|id| id == input.identity)
+                    .any(|id| id.trim() == identity)
         })
     {
         packages::prepare(

@@ -10,11 +10,14 @@ pub(super) fn receipt(value: &Value, inputs: &[Input<'_>]) -> io::Result<()> {
     }
     for (row, input) in rows.iter().zip(inputs) {
         independent(input, inputs)?;
-        if row["identity"] != input.identity {
+        if row["identity"].as_str().map(str::trim) != Some(input.identity.trim()) {
             return Err(invalid("command snap allocation identity"));
         }
         crate::merge_history::hash(
-            row["hash"].as_str().ok_or_else(|| invalid("command snap hash"))?,
+            row["hash"]
+                .as_str()
+                .map(str::trim)
+                .ok_or_else(|| invalid("command snap hash"))?,
         )?;
     }
     receipt_scalars(value)?;
@@ -94,35 +97,46 @@ pub(super) fn message_text(
     lane: Option<&Value>,
     message: &str,
 ) -> io::Result<String> {
+    let message = message.trim();
     if !message.is_empty() {
         return Ok(message.to_owned());
     }
     if let Some(other) = lane.map(|lane| &lane["otherId"])
-        && other != "main"
-        && other["name"] != "main"
+        && other.as_str().map(str::trim) != Some("main")
+        && other["name"].as_str().map(str::trim) != Some("main")
     {
         let (scope, name) = other
             .as_str()
-            .and_then(|raw| raw.split_once('/'))
+            .and_then(|raw| raw.trim().split_once('/'))
             .or_else(|| Some((other["scope"].as_str()?, other["name"].as_str()?)))
+            .map(|(sc, nm)| (sc.trim(), nm.trim()))
+            .filter(|(sc, nm)| !sc.is_empty() && !nm.is_empty())
             .ok_or_else(|| invalid("merge lane scope"))?;
         return Ok(format!("merge {scope}/{name}"));
     }
-    Ok(format!(
-        "merge {}/main",
-        model["scope"].as_str().ok_or_else(|| invalid("merge model scope"))?,
-    ))
+    let scope = model["scope"]
+        .as_str()
+        .map(str::trim)
+        .filter(|sc| !sc.is_empty())
+        .ok_or_else(|| invalid("merge model scope"))?;
+    Ok(format!("merge {scope}/main"))
 }
 
 fn apply_origin(input: &Input<'_>, version: &mut Value) -> io::Result<()> {
-    let (scope, name) =
-        input.identity.split_once('/').ok_or_else(|| invalid("merge snap identity"))?;
+    let (scope, name) = input.identity
+        .trim()
+        .split_once('/')
+        .map(|(sc, nm)| (sc.trim(), nm.trim()))
+        .filter(|(sc, nm)| !sc.is_empty() && !nm.is_empty())
+        .ok_or_else(|| invalid("merge snap identity"))?;
     version["origin"] = json!({"id":{"scope":scope,"name":name}});
     if let Some(lane) = input.lane.filter(|lane| !lane["current"].is_null()) {
         let current = &lane["currentId"];
         let mut lane_obj = if let Some((lane_scope, lane_name)) = current
             .as_str()
-            .and_then(|raw| raw.split_once('/'))
+            .and_then(|raw| raw.trim().split_once('/'))
+            .map(|(sc, nm)| (sc.trim(), nm.trim()))
+            .filter(|(sc, nm)| !sc.is_empty() && !nm.is_empty())
         {
             json!({"scope":lane_scope,"name":lane_name})
         } else {
@@ -140,18 +154,19 @@ fn apply_squash(input: &Input<'_>, receipt: &Value, version: &mut Value) -> io::
     let Some(lane) = input.lane.filter(|lane| lane["shouldSquash"] == true) else {
         return Ok(());
     };
+    let identity = input.identity.trim();
     let allocation = receipt["versions"]
         .as_array()
         .and_then(|rows| {
             rows.iter()
-                .find(|row| row["identity"] == input.identity)
+                .find(|row| row["identity"].as_str().map(str::trim) == Some(identity))
         })
         .ok_or_else(|| invalid("lane squash allocation"))?;
     let log = allocation["squashLog"].as_object().ok_or_else(|| invalid("lane squash log"))?;
     if log
         .get("date")
         .and_then(Value::as_str)
-        .is_none()
+        .is_none_or(|date| date.trim().is_empty())
     {
         return Err(invalid("lane squash log date"));
     }
@@ -164,13 +179,21 @@ fn apply_squash(input: &Input<'_>, receipt: &Value, version: &mut Value) -> io::
 
 pub(super) fn squash_lane(model: &Value, lane: &Value) -> io::Result<Value> {
     let other = &lane["otherId"];
-    if other == "main" || other["name"] == "main" {
-        let scope = model["scope"].as_str().ok_or_else(|| invalid("merge model scope"))?;
+    if other.as_str().map(str::trim) == Some("main")
+        || other["name"].as_str().map(str::trim) == Some("main")
+    {
+        let scope = model["scope"]
+            .as_str()
+            .map(str::trim)
+            .filter(|sc| !sc.is_empty())
+            .ok_or_else(|| invalid("merge model scope"))?;
         return Ok(json!({"scope":scope,"name":"main"}));
     }
     if let Some((scope, name)) = other
         .as_str()
-        .and_then(|raw| raw.split_once('/'))
+        .and_then(|raw| raw.trim().split_once('/'))
+        .map(|(sc, nm)| (sc.trim(), nm.trim()))
+        .filter(|(sc, nm)| !sc.is_empty() && !nm.is_empty())
     {
         return Ok(json!({"scope":scope,"name":name}));
     }
@@ -331,8 +354,15 @@ fn receipt_scalars(value: &Value) -> io::Result<()> {
 /// Default registered application types execute plugins during canonical snapping.
 pub(super) fn no_application_files(files: &[Value]) -> io::Result<()> {
     for file in files {
-        let path = file["relativePath"].as_str().ok_or_else(|| invalid("snap filename"))?;
-        let name = path.rsplit('/').next().unwrap_or(path);
+        let path = file["relativePath"]
+            .as_str()
+            .map(str::trim)
+            .ok_or_else(|| invalid("snap filename"))?;
+        let name = path
+            .rsplit('/')
+            .next()
+            .unwrap_or(path)
+            .to_ascii_lowercase();
         if [".bit-app.", ".node-app.", ".react-app."]
             .iter()
             .any(|pattern| name.contains(pattern))

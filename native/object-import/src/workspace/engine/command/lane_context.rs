@@ -94,7 +94,7 @@ fn refresh_other_main(
     bitmap: &Value,
     targets: &Value,
 ) -> io::Result<()> {
-    let options = request.options.lane.as_ref().unwrap();
+    let options = request.options.lane.as_ref().ok_or_else(|| invalid("command lane options"))?;
     if !lanes.other_id.is_main() || options.skip_fetch {
         return Ok(());
     }

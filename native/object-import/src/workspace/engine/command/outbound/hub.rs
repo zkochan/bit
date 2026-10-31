@@ -19,7 +19,12 @@ pub(super) struct Plan {
 }
 
 pub(super) fn plan(input: &Prepare, pending: &[Pending]) -> io::Result<Option<Plan>> {
-    if input.options.origin_directly || input.options.resume.is_some() || pending.is_empty() {
+    if input.options.origin_directly
+        || input.options.resume
+            .as_deref()
+            .is_some_and(|resume| !resume.trim().is_empty())
+        || pending.is_empty()
+    {
         return Ok(None);
     }
     let scopes = pending
@@ -184,7 +189,9 @@ fn persist_failure(scopes: &[String], errors: &Value) -> io::Error {
         .as_object()
         .into_iter()
         .flatten()
-        .map(|(scope, message)| format!("{scope} - {}", message.as_str().unwrap_or_default()))
+        .map(|(scope, message)| {
+            format!("{} - {}", scope.trim(), message.as_str().map_or("", str::trim))
+        })
         .collect::<Vec<_>>()
         .join("\n");
     io::Error::other(format!(

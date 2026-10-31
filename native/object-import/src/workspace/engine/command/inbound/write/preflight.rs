@@ -54,6 +54,18 @@ fn existing_target(
     let Some(scope) = scope
         .map(str::trim)
         .filter(|scope| !scope.is_empty())
+        .or_else(|| {
+            row["defaultScope"]
+                .as_str()
+                .map(str::trim)
+                .filter(|scope| !scope.is_empty())
+        })
+        .or_else(|| {
+            target.scope
+                .as_deref()
+                .map(str::trim)
+                .filter(|scope| !scope.is_empty())
+        })
     else {
         return Ok(());
     };

@@ -82,9 +82,18 @@ pub(in crate::workspace::engine::command) fn targets(
 ) -> Vec<Value> {
     additions.iter().filter_map(|addition| {
         let identity = format!("{}/{}", trimmed_str(&addition["scope"])?, trimmed_str(&addition["name"])?);
-        selected.iter().find(|target| trimmed_str(&target["identity"]) == Some(identity.as_str()) && target["currentIdPresent"] == false && target["bitmapPresent"] == false)?;
+        selected.iter().find(|target| {
+            bare_target_identity(target) == Some(identity.as_str())
+                && target["currentIdPresent"] == false
+                && target["bitmapPresent"] == false
+        })?;
         Some(json!({"identity":identity,"version":addition["version"],"directory":addition["rootDir"],"mainFile":addition["mainFile"],"config":null,"packageJson":null}))
     }).collect()
+}
+
+fn bare_target_identity(target: &Value) -> Option<&str> {
+    trimmed_str(&target["identity"])
+        .map(|raw| raw.rsplit_once('@').map_or(raw, |(base, _)| base.trim()))
 }
 
 fn trimmed_str(value: &Value) -> Option<&str> {
@@ -151,18 +160,26 @@ fn validate_overlap<'a>(addition: &Value, rows: impl Iterator<Item = &'a Value>)
     Ok(())
 }
 
+fn split_scope_id(scope_id: &str) -> io::Result<(&str, &str)> {
+    let mut parts = scope_id.split('.');
+    match (parts.next(), parts.next()) {
+        (Some(owner), Some(scope)) if !owner.trim().is_empty() && !scope.trim().is_empty() => {
+            Ok((owner.trim(), scope.trim()))
+        }
+        (_, None) if !scope_id.is_empty() => Ok(("", scope_id)),
+        _ => Err(invalid("lane destination scope")),
+    }
+}
+
 fn directory(settings: &Value, scope_id: &str, name: &str) -> io::Result<String> {
+    let scope_id = scope_id.trim();
+    let (owner, scope) = split_scope_id(scope_id)?;
     let pattern = settings
         .get("defaultDirectory")
         .and_then(trimmed_str)
         .unwrap_or("components/{name}");
     let pattern =
         if pattern.contains("{name}") { pattern.to_owned() } else { format!("{pattern}/{{name}}") };
-    let mut parts = scope_id.split('.');
-    let first = parts.next().ok_or_else(|| invalid("lane destination scope"))?;
-    let (owner, scope) = parts
-        .next()
-        .map_or(("", first), |scope| (first, scope));
     let pattern = if owner.is_empty() {
         pattern.replacen("{owner}.", "", 1).replacen("{owner}/", "", 1)
     } else {

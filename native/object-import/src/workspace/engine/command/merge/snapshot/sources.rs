@@ -119,7 +119,14 @@ fn source(version: &Value, file: &Value, budget: &Budget) -> io::Result<(Value, 
         .filter(|rel| !rel.is_empty())
         .ok_or_else(|| invalid("command snap relative path"))?;
     let bytes = budget.read(fs::File::open(path)?)?;
-    if source["spoolHash"].as_str().map(str::trim) != Some(digest(&bytes).as_str()) {
+    if source["spoolHash"]
+        .as_str()
+        .is_none_or(|expected| {
+            !expected
+                .trim()
+                .eq_ignore_ascii_case(&digest(&bytes))
+        })
+    {
         return Err(invalid("command snap source proof"));
     }
     let bytes = if bytes.starts_with(&[239, 187, 191]) { bytes[3..].to_vec() } else { bytes };

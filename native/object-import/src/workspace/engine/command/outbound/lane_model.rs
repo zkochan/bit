@@ -111,9 +111,8 @@ struct Loaded {
 fn load_lane(input: &Prepare, scope: &str, name: &str) -> io::Result<Loaded> {
     let index: Value =
         crate::parse_jsonc(&fs::read(crate::scope_path(&input.root).join("index.json"))?)?;
-    let lane_row = index["lanes"]
-        .as_array()
-        .ok_or_else(|| invalid("outbound lane index"))?
+    let lanes = index["lanes"].as_array().ok_or_else(|| invalid("outbound lane index"))?;
+    let lane_row = lanes
         .iter()
         .find(|row| {
             crate::workspace::engine::command::inbound::remote::file_list::row_lane_matches(
@@ -121,13 +120,13 @@ fn load_lane(input: &Prepare, scope: &str, name: &str) -> io::Result<Loaded> {
             )
         })
         .ok_or_else(|| invalid("outbound current lane missing"))?;
-    let hash = lane_row["hash"]
-        .as_str()
-        .ok_or_else(|| invalid("outbound lane hash"))?
-        .to_owned();
+    let hash_str = lane_row["hash"].as_str().ok_or_else(|| invalid("outbound lane hash"))?;
+    let hash = hash_str.trim().to_owned();
     let dir = crate::scope_path(&input.root).join("objects");
     let lane = model::read_object(&dir, &hash, "Lane")?;
-    if lane["scope"] != scope || lane["name"] != name {
+    if lane["scope"].as_str().map(str::trim) != Some(scope)
+        || lane["name"].as_str().map(str::trim) != Some(name)
+    {
         return Err(invalid("outbound lane identity"));
     }
     let forked_from = forked_from(&lane, scope, input.options.fork_lane_new_scope)?;
@@ -135,7 +134,7 @@ fn load_lane(input: &Prepare, scope: &str, name: &str) -> io::Result<Loaded> {
     let history_hash =
         crate::validate::hexadecimal(&Sha1::digest(format!("{hash}:LaneHistory").as_bytes()));
     let history = model::read_object(&dir, &history_hash, "LaneHistory")?;
-    if history["laneHash"] != hash {
+    if history["laneHash"].as_str().map(str::trim) != Some(hash.as_str()) {
         return Err(invalid("outbound LaneHistory identity"));
     }
     Ok(Loaded { index, lane, hash, history_hash, dir, forked_from })
@@ -148,9 +147,7 @@ fn forked_from(lane: &Value, scope: &str, new_scope: bool) -> io::Result<Option<
         .map(|parent| {
             let (parent_scope, parent_name) = if let Some(raw) = parent.as_str().map(str::trim) {
                 raw.split_once('/')
-                    .map_or(("", raw), |(scope_part, name_part)| {
-                        (scope_part.trim(), name_part.trim())
-                    })
+                    .map_or(("", raw), |(sc, nm)| (sc.trim(), nm.trim()))
             } else {
                 (
                     parent["scope"].as_str().map_or("", str::trim),
@@ -258,11 +255,21 @@ impl RemoteLaneHeads {
         let lane_remote_head = self.lane
             .iter()
             .find(|row| component.matches(row))
-            .and_then(|row| row["head"].as_str());
+            .and_then(|row| {
+                row["head"]
+                    .as_str()
+                    .map(str::trim)
+                    .filter(|head| !head.is_empty())
+            });
         let fork_remote_head = self.fork
             .iter()
             .find(|row| component.matches(row))
-            .and_then(|row| row["head"].as_str());
+            .and_then(|row| {
+                row["head"]
+                    .as_str()
+                    .map(str::trim)
+                    .filter(|head| !head.is_empty())
+            });
         if (!exhaustive || context.input.options.head_only)
             && lane_remote_head == Some(component.head)
             && !(context.input.options.fork_lane_new_scope

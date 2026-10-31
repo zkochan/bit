@@ -42,6 +42,12 @@ pub(super) fn prepare(
             .as_str()
             .map(str::trim)
             .filter(|scope| !scope.is_empty())
+            .or_else(|| {
+                model["defaultScope"]
+                    .as_str()
+                    .map(str::trim)
+                    .filter(|scope| !scope.is_empty())
+            })
             .ok_or_else(|| invalid("squash model scope"))?,
         model["name"]
             .as_str()
@@ -50,7 +56,7 @@ pub(super) fn prepare(
             .ok_or_else(|| invalid("squash model name"))?,
     );
     let replacement = replacement_message(title, distance, lane, repository)?;
-    Ok(Some(Prepared { identity, hash: hash.to_owned(), version: value, replacement }))
+    Ok(Some(Prepared { identity, hash: hash.trim().to_owned(), version: value, replacement }))
 }
 impl Prepared {
     pub(super) fn message_hash(&self) -> Option<&str> {

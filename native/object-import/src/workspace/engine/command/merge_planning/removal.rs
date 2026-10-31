@@ -9,12 +9,16 @@ pub(super) struct Removed {
 
 pub(super) fn validate(root: &Path, removed: &[Removed]) -> io::Result<()> {
     for row in removed {
-        crate::checkout::plan::relative_path(&row.directory)?;
-        if row.directory == "." {
+        let directory = row.directory.trim();
+        crate::checkout::plan::relative_path(directory)?;
+        if directory == "." {
             return Err(invalid("command removed workspace root"));
         }
         let mut path = root.to_path_buf();
-        for segment in row.directory.split('/') {
+        for segment in directory
+            .split('/')
+            .filter(|segment| !segment.is_empty())
+        {
             path.push(segment);
             match fs::symlink_metadata(&path) {
                 Ok(metadata) if metadata.is_dir() => {}
@@ -29,7 +33,7 @@ pub(super) fn validate(root: &Path, removed: &[Removed]) -> io::Result<()> {
 
 pub(super) fn remove(root: &Path, removed: &[Removed]) -> io::Result<()> {
     for row in removed {
-        let directory = root.join(&row.directory);
+        let directory = root.join(row.directory.trim());
         match fs::remove_dir_all(&directory) {
             Ok(()) => {}
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}

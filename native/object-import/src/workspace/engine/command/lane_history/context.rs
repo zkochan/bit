@@ -43,7 +43,11 @@ fn attach_versions(request: &super::super::input::Prepare, context: &mut Value) 
             });
         let (_, version) = phase.versions
             .iter()
-            .find(|(id, _)| row_id == Some(id.trim()))
+            .find(|(id, _)| {
+                let id = id.trim();
+                let id = id.rsplit_once('@').map_or(id, |(base, _)| base.trim());
+                row_id == Some(id)
+            })
             .ok_or_else(|| invalid("history target membership"))?;
         row["historicalVersion"] = json!(version.trim());
     }

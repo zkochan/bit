@@ -265,14 +265,15 @@ fn detector(input: &Comparison<'_>, path: &Path) -> io::Result<Option<&'static s
     let extension = path
         .extension()
         .and_then(|value| value.to_str())
+        .map(str::to_ascii_lowercase)
         .unwrap_or_default();
-    if matches!(extension, "ts" | "tsx" | "mts" | "cts") {
+    if matches!(extension.as_str(), "ts" | "tsx" | "mts" | "cts") {
         if !input.typescript {
             return Err(invalid("merge dependency TypeScript version"));
         }
         return Ok(Some("typescript5.9"));
     }
-    if matches!(extension, "js" | "jsx" | "mjs" | "cjs") {
+    if matches!(extension.as_str(), "js" | "jsx" | "mjs" | "cjs") {
         return Ok(Some("commonjs"));
     }
     if input.detectors.contains(format!(".{extension}").as_str()) {

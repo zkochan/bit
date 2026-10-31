@@ -16,9 +16,10 @@ pub(super) fn verify(
     target: &materialization::Prepared,
     identity: &str,
 ) -> io::Result<Vec<Proof>> {
+    let identity = identity.trim();
     let current = captured
         .iter()
-        .find(|current| current.target.identity == identity)
+        .find(|current| current.target.identity.trim() == identity)
         .ok_or_else(|| invalid("command fast-forward capture"))?;
     metadata(&current.target.current, &current.target.files, &target.version)?;
     merge_dependency_guard::verify(

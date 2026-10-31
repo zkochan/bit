@@ -39,7 +39,11 @@ pub(super) fn prepare(
     if input.version["files"].as_array().is_none_or(Vec::is_empty) {
         return Err(invalid("command checkout target has no files"));
     }
-    let workspace_root = input.current.target.directory == ".";
+    let workspace_root = input.current.target.directory.trim() == ".";
+    let strategy = input.options.strategy
+        .as_deref()
+        .map(str::trim)
+        .filter(|st| !st.is_empty());
     let request = transition_request(input)?;
     let plan = match repository.overlay() {
         Some(overlay) => {
@@ -47,7 +51,7 @@ pub(super) fn prepare(
         }
         None => checkout_transition::prepare_with_workspace(&request, state, snapshots)?,
     };
-    if plan["hasConflicts"] == true && input.options.strategy.is_none() {
+    if plan["hasConflicts"] == true && strategy.is_none() {
         return Err(super::super::response::canonical(format!(
             "automatic merge has failed for component {}.\nplease use \"--auto-merge-resolve\" with 'manual', 'ours' or 'theirs' to resolve the conflict/s",
             input.current.target.identity,
@@ -56,7 +60,7 @@ pub(super) fn prepare(
     let applied = checkout_transition::apply(
         "checkoutApply",
         json!({
-            "token":plan["token"],"strategy":input.options.strategy,"forceOurs":input.options.force_ours,
+            "token":plan["token"],"strategy":strategy,"forceOurs":input.options.force_ours,
             "currentExists":!input.current.added,"tracked":!input.current.added,"workspaceRoot":workspace_root,
         }),
         state,

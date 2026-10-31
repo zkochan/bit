@@ -43,28 +43,19 @@ pub(super) fn prepare(
         manifest(root, input, name, &directory, allow_missing, snapshot, output)?
     };
     for file in input.version["files"].as_array().ok_or_else(|| invalid("merge package files"))? {
-        let relative =
-            file["relativePath"].as_str().ok_or_else(|| invalid("merge package filename"))?;
+        let relative = file["relativePath"]
+            .as_str()
+            .map(str::trim)
+            .filter(|path| !path.is_empty())
+            .ok_or_else(|| invalid("merge package filename"))?;
         crate::checkout::plan::relative_path(relative)?;
         if relative == "package.json" && !tracked {
             return Err(invalid("merge tracked package manifest"));
         }
-        link(
-            root,
-            &root.join(input.directory).join(relative),
-            &directory.join(relative),
-            snapshot,
-            output,
-        )?;
+        let source = root.join(input.directory.trim()).join(relative);
+        link(root, &source, &directory.join(relative), snapshot, output)?;
         if roots && !created {
-            root_copies(
-                root,
-                name,
-                relative,
-                &root.join(input.directory).join(relative),
-                snapshot,
-                output,
-            )?;
+            root_copies(root, name, relative, &source, snapshot, output)?;
         }
     }
     windows_source_link(root, input, &directory, snapshot, output)?;
@@ -105,11 +96,15 @@ fn validate_package(
     name: &str,
     snapshot: bool,
 ) -> io::Result<()> {
-    let (scope, component) =
-        input.identity.split_once('/').ok_or_else(|| invalid("merge package identity"))?;
-    if package["name"] != name
+    let identity = input.identity.trim();
+    let (scope, component) = identity
+        .split_once('/')
+        .map(|(scope, component)| (scope.trim(), component.trim()))
+        .filter(|(scope, component)| !scope.is_empty() && !component.is_empty())
+        .ok_or_else(|| invalid("merge package identity"))?;
+    if package["name"].as_str().map(str::trim) != Some(name.trim())
         || package["_bit_local"] != true
-        || !package_id_matches(&package["componentId"], input.identity, scope, component)
+        || !package_id_matches(&package["componentId"], identity, scope, component)
     {
         return Err(invalid("merge generated package identity"));
     }
@@ -361,18 +356,28 @@ fn update_manifest_versions(
         package[field] = input.version[version_field].clone();
     }
     if snapshot && cfg!(windows) {
-        let main =
-            input.version["mainFile"].as_str().ok_or_else(|| invalid("snapshot package main"))?;
+        let main = input.version["mainFile"]
+            .as_str()
+            .map(str::trim)
+            .filter(|main| !main.is_empty())
+            .ok_or_else(|| invalid("snapshot package main"))?;
         let types = format!("_src/{main}");
         package["types"] = value!(types);
     }
-    let component_version = input.semantic_version.unwrap_or(input.hash);
-    let version =
-        input.semantic_version.map_or_else(|| format!("0.0.0-{}", input.hash), str::to_owned);
+    let semantic = input.semantic_version
+        .map(str::trim)
+        .filter(|ver| !ver.is_empty());
+    let hash = input.hash.trim();
+    let component_version = semantic.unwrap_or(hash);
+    let version = semantic.map_or_else(|| format!("0.0.0-{hash}"), str::to_owned);
     package["version"] = value!(version);
     if package["componentId"].get("version").is_none() {
-        let (scope, name) =
-            input.identity.split_once('/').ok_or_else(|| invalid("merge package identity"))?;
+        let (scope, name) = input.identity
+            .trim()
+            .split_once('/')
+            .map(|(scope, name)| (scope.trim(), name.trim()))
+            .filter(|(scope, name)| !scope.is_empty() && !name.is_empty())
+            .ok_or_else(|| invalid("merge package identity"))?;
         package["componentId"] = value!({"name":name,"version":component_version,"scope":scope});
     } else {
         package["componentId"]["version"] = value!(component_version);

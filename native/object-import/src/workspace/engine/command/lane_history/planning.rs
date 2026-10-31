@@ -15,13 +15,13 @@ pub(in crate::workspace::engine::command) fn attach(
         .collect::<Vec<_>>();
     let mut targets = Vec::new();
     for (identity, version) in &phase.versions {
-        let identity = identity.trim();
+        let identity = bare_id(identity);
         let version = version.trim();
         if let Some(index) = captured
             .iter()
             .position(|row| {
                 row.as_ref()
-                    .is_some_and(|row| row.target.identity.trim() == identity)
+                    .is_some_and(|row| bare_id(&row.target.identity) == identity)
             })
         {
             if let Some(entry) = captured[index].take() {
@@ -30,7 +30,7 @@ pub(in crate::workspace::engine::command) fn attach(
             targets.push(
                 record.targets
                     .iter()
-                    .find(|row| row["identity"].as_str().map(str::trim) == Some(identity))
+                    .find(|row| row_bare_id(row) == Some(identity))
                     .ok_or_else(|| invalid("history current target"))?
                     .clone(),
             );
@@ -45,6 +45,18 @@ pub(in crate::workspace::engine::command) fn attach(
     }
     record.targets = targets;
     Ok(())
+}
+
+fn bare_id(raw: &str) -> &str {
+    let raw = raw.trim();
+    raw.rsplit_once('@').map_or(raw, |(base, _)| base.trim())
+}
+
+fn row_bare_id(row: &Value) -> Option<&str> {
+    row["identity"]
+        .as_str()
+        .or_else(|| row["id"].as_str())
+        .map(bare_id)
 }
 pub(in crate::workspace::engine::command) fn added(
     target: &Value,

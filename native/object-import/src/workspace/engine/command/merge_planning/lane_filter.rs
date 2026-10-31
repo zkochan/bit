@@ -15,9 +15,10 @@ pub(super) fn validate_captures(record: &Record, planned: &planning::Planned) ->
         .as_array()
         .ok_or_else(|| invalid("lane selected targets"))?;
     for target in targets {
+        let target_id = target["identity"].as_str().map(str::trim);
         if !planned.captured
             .iter()
-            .any(|captured| target["identity"] == captured.target.identity)
+            .any(|captured| Some(captured.target.identity.trim()) == target_id)
         {
             return Err(invalid("lane target requires native non-workspace capture"));
         }
@@ -252,9 +253,15 @@ pub(super) fn gap_targets(
         let versions = gap_versions(row, include_history)?;
         for version in versions {
             targets.push(crate::command_import::Target {
-                scope: row.model["scope"].as_str().map(str::to_owned),
+                scope: row.model["scope"]
+                    .as_str()
+                    .map(str::trim)
+                    .filter(|scope| !scope.is_empty())
+                    .map(str::to_owned),
                 name: row.model["name"]
                     .as_str()
+                    .map(str::trim)
+                    .filter(|name| !name.is_empty())
                     .ok_or_else(|| invalid("lane gap name"))?
                     .to_owned(),
                 version,
@@ -266,8 +273,9 @@ pub(super) fn gap_targets(
 
 fn gap_versions(row: &Selected, include_history: bool) -> io::Result<Vec<String>> {
     let mut versions = Vec::new();
-    if !row.base.is_empty() {
-        versions.push(row.base.clone());
+    let base = row.base.trim();
+    if !base.is_empty() {
+        versions.push(base.to_owned());
     }
     if include_history {
         for hash in row.distance["targetOnly"]
@@ -276,6 +284,8 @@ fn gap_versions(row: &Selected, include_history: bool) -> io::Result<Vec<String>
         {
             versions.push(
                 hash.as_str()
+                    .map(str::trim)
+                    .filter(|hash| !hash.is_empty())
                     .ok_or_else(|| invalid("lane gap reference"))?
                     .to_owned(),
             );

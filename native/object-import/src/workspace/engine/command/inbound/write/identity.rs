@@ -8,8 +8,34 @@ pub(super) fn matches_target(key: &str, row: &Value, target: &Target) -> bool {
         return false;
     }
     let (row_scope, row_name) = crate::reset_lane::bitmap::row_identity(key, row);
-    row_name.trim() == target.name.trim()
-        && row_scope.map(str::trim) == target.scope.as_deref().map(str::trim)
+    let target_scope = target.scope
+        .as_deref()
+        .map(str::trim)
+        .filter(|sc| !sc.is_empty());
+    row_name.trim() == target.name.trim() && row_effective_scope(row_scope, row) == target_scope
+}
+
+fn row_effective_scope<'a>(row_scope: Option<&'a str>, row: &'a Value) -> Option<&'a str> {
+    row_scope
+        .map(str::trim)
+        .filter(|sc| !sc.is_empty())
+        .or_else(|| {
+            row["defaultScope"]
+                .as_str()
+                .map(str::trim)
+                .filter(|sc| !sc.is_empty())
+        })
+}
+
+pub(super) fn has_unscoped_entry(rows: &Map<String, Value>, name: &str) -> bool {
+    let name = name.trim();
+    rows.iter()
+        .any(|(key, row)| {
+            let (row_scope, row_name) = crate::reset_lane::bitmap::row_identity(key, row);
+            is_component_bitmap_entry(key, row)
+                && row_name.trim() == name
+                && row_scope.map_or("", str::trim).is_empty()
+        })
 }
 
 fn is_component_bitmap_entry(key: &str, row: &Value) -> bool {
@@ -36,9 +62,7 @@ pub(super) fn bitmap_key(
         let (row_scope, row_name) = crate::reset_lane::bitmap::row_identity(&key, &row);
         let is_same_name = is_component_bitmap_entry(&key, &row) && row_name.trim() == name;
         let key = if is_same_name {
-            let row_scope = row_scope
-                .map(str::trim)
-                .filter(|val| !val.is_empty())
+            let row_scope = row_effective_scope(row_scope, &row)
                 .ok_or_else(|| invalid("inbound bitmap scope"))?;
             format!("{row_scope}/{name}")
         } else {

@@ -30,9 +30,11 @@ pub(super) fn prepare(record: &mut Record, plan: &planning::Planned) -> io::Resu
     {
         let identity = result["id"]
             .as_str()
-            .and_then(|id| id.trim().rsplit_once('@'))
-            .map(|(identity, _)| identity.trim())
-            .filter(|identity| !identity.is_empty())
+            .map(|raw| {
+                let raw = raw.trim();
+                raw.rsplit_once('@').map_or(raw, |(base, _)| base.trim())
+            })
+            .filter(|identity| identity.contains('/'))
             .ok_or_else(|| invalid("lane result identity"))?;
         if let Some(value) = projection.version(identity, &mut record.repository)? {
             heads.push((identity.to_owned(), value));

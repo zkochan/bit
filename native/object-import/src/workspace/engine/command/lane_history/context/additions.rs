@@ -54,10 +54,10 @@ fn selected(
     let existing = context["targets"].as_array().ok_or_else(|| invalid("history targets"))?;
     let mut selected = Vec::new();
     for (id, version) in &phase.versions {
-        let id = id.trim();
+        let id = bare_id(id);
         if existing
             .iter()
-            .any(|row| row["identity"].as_str().map(str::trim) == Some(id))
+            .any(|row| row_bare_id(row) == Some(id))
         {
             continue;
         }
@@ -71,4 +71,16 @@ fn selected(
         );
     }
     Ok(selected)
+}
+
+fn bare_id(raw: &str) -> &str {
+    let raw = raw.trim();
+    raw.rsplit_once('@').map_or(raw, |(base, _)| base.trim())
+}
+
+fn row_bare_id(row: &Value) -> Option<&str> {
+    row["identity"]
+        .as_str()
+        .or_else(|| row["id"].as_str())
+        .map(bare_id)
 }

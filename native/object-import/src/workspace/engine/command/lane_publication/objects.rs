@@ -13,6 +13,7 @@ pub(super) fn update(
     let head = head.trim();
     crate::merge_history::hash(head)?;
     let (scope, name) = parse_scoped_identity(identity, "lane component identity")?;
+    let normalized = format!("{scope}/{name}");
     if hidden {
         if lane.get("updateDependents").is_none() {
             lane["updateDependents"] = json!([]);
@@ -24,9 +25,9 @@ pub(super) fn update(
             entry
                 .as_str()
                 .and_then(|value| value.trim().rsplit_once('@'))
-                .is_none_or(|(value, _)| value.trim() != identity)
+                .is_none_or(|(value, _)| value.trim() != normalized)
         });
-        entries.push(json!(format!("{scope}/{name}@{head}")));
+        entries.push(json!(format!("{normalized}@{head}")));
         return Ok(());
     }
     let entries = lane["components"].as_array_mut().ok_or_else(|| invalid("lane components"))?;

@@ -152,7 +152,7 @@ fn extend_dependencies(
         let id = format!("{}/{}", text(dependency, "scope")?, text(dependency, "name")?);
         let Some(other) = input.statuses
             .iter()
-            .position(|row| row["identity"] == id)
+            .position(|row| row["identity"].as_str().map(str::trim) == Some(id.as_str()))
         else {
             continue;
         };
@@ -252,8 +252,15 @@ fn on_lane(
     }
     Ok(distance["sourceOnly"]
         .as_array()
-        .is_some_and(|rows| rows.iter().any(|row| row == version)))
+        .is_some_and(|rows| {
+            rows.iter()
+                .any(|row| row.as_str().map(str::trim) == Some(version))
+        }))
 }
 fn text<'a>(value: &'a Value, key: &str) -> io::Result<&'a str> {
-    value[key].as_str().ok_or_else(|| invalid("lane filter text"))
+    value[key]
+        .as_str()
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+        .ok_or_else(|| invalid("lane filter text"))
 }

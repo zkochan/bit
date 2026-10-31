@@ -69,8 +69,16 @@ impl BodyInput<'_> {
                 return Ok("main".into());
             }
             let value = &lane[field]["value"];
-            let scope = value["scope"].as_str().ok_or_else(|| invalid("merge label lane scope"))?;
-            let name = value["name"].as_str().ok_or_else(|| invalid("merge label lane name"))?;
+            let scope = value["scope"]
+                .as_str()
+                .map(str::trim)
+                .filter(|scope| !scope.is_empty())
+                .ok_or_else(|| invalid("merge label lane scope"))?;
+            let name = value["name"]
+                .as_str()
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .ok_or_else(|| invalid("merge label lane name"))?;
             Ok(format!("{scope}/{name}"))
         };
         let (current, incoming) = if let Some(lane) = self.lane {
@@ -80,8 +88,8 @@ impl BodyInput<'_> {
         };
         let same = current == incoming;
         Ok(
-            json!({"current":format!("{} ({})",self.current.target.version,if same {"current"} else {&current}),
-            "other":format!("{} ({})",self.sides[2].hash,if same {"incoming"} else {&incoming})}),
+            json!({"current":format!("{} ({})",self.current.target.version.trim(),if same {"current"} else {&current}),
+            "other":format!("{} ({})",self.sides[2].hash.trim(),if same {"incoming"} else {&incoming})}),
         )
     }
 
@@ -119,15 +127,18 @@ impl State {
         input: &BodyInput<'_>,
         plan: &Value,
     ) -> io::Result<Prepared> {
-        if plan["hasConflicts"] == true && input.options.strategy.is_none() {
+        let strategy = input.options.strategy
+            .as_deref()
+            .map(str::trim)
+            .filter(|strategy| !strategy.is_empty());
+        if plan["hasConflicts"] == true && strategy.is_none() {
             return Err(invalid("command merge requires conflict prompt"));
         }
-        let target = if input.options.strategy.as_deref().map(str::trim) == Some("theirs") {
-            &input.sides[2]
-        } else {
-            &input.sides[1]
-        };
-        let applied = self.apply(json!({"planToken":plan["token"],"target":manifest(target)?,"strategy":input.options.strategy}), input.overlay)?;
+        let target = if strategy == Some("theirs") { &input.sides[2] } else { &input.sides[1] };
+        let applied = self.apply(
+            json!({"planToken":plan["token"],"target":manifest(target)?,"strategy":strategy}),
+            input.overlay,
+        )?;
         if applied.get("deferredError").is_some() {
             return Err(invalid("command merge deferred apply failure"));
         }
@@ -237,6 +248,8 @@ fn output_files(applied: &Value) -> io::Result<Vec<Value>> {
         .map(|file| {
             let path = file["relativePath"]
                 .as_str()
+                .map(str::trim)
+                .filter(|path| !path.is_empty())
                 .ok_or_else(|| invalid("command merge output path"))?;
             crate::checkout::plan::relative_path(path)?;
             if path == ".bitmap" {

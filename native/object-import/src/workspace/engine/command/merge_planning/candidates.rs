@@ -25,12 +25,20 @@ pub(in crate::workspace::engine::command) fn select_targets(
         let Some(model) = model(context, &identity)? else {
             continue;
         };
+        let local_head = model["head"]
+            .as_str()
+            .map(str::trim)
+            .filter(|head| !head.is_empty());
         let remote = repository.remote_head(&identity)?;
+        let remote_head = remote
+            .as_deref()
+            .map(str::trim)
+            .filter(|head| !head.is_empty());
         let distance = history.distance(
             &request.root,
             &identity,
             &model,
-            [model["head"].as_str(), remote.as_deref()],
+            [local_head, remote_head],
             repository,
         )?;
         if !distance["sourceOnly"].as_array().is_some_and(Vec::is_empty)

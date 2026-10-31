@@ -44,13 +44,23 @@ fn select(
     committed: bool,
 ) -> io::Result<(usize, Value)> {
     let history = read(&input.root, lane_hash)?;
+    let history_id = input.id.trim();
     let item = history["history"]
-        .get(input.id.trim())
+        .get(history_id)
+        .or_else(|| {
+            history["history"]
+                .as_object()
+                .and_then(|map| {
+                    map.iter()
+                        .find_map(|(key, val)| (key.trim() == history_id).then_some(val))
+                })
+        })
         .ok_or_else(|| {
             response::with_progress(
                 response::canonical(format!(
-                    r#"unable to find history "{}" in lane "{}/{}""#,
-                    input.id, lane_id.scope, lane_id.name,
+                    r#"unable to find history "{history_id}" in lane "{}/{}""#,
+                    lane_id.scope.trim(),
+                    lane_id.name.trim(),
                 )),
                 json!({"imports":[]}),
             )

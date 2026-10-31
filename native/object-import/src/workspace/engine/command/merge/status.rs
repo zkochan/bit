@@ -114,9 +114,13 @@ fn divergence(input: &Input<'_>) -> io::Result<Value> {
     let target = distance["targetOnly"]
         .as_array()
         .ok_or_else(|| invalid("command merge target distance"))?;
+    let resolve_unrelated = input.options.resolve_unrelated
+        .as_deref()
+        .map(str::trim)
+        .filter(|strategy| !strategy.is_empty());
     Ok(json!({"error":error,"detachHead":false,"common":distance["common"],
         "sourceAhead":!source.is_empty(),"targetAhead":!target.is_empty(),"diverged":!source.is_empty()&&!target.is_empty(),
-        "handleTargetAheadAsDiverged":input.options.target_as_diverged,"resolveUnrelated":input.options.resolve_unrelated}))
+        "handleTargetAheadAsDiverged":input.options.target_as_diverged,"resolveUnrelated":resolve_unrelated}))
 }
 
 fn removed(version: &Value) -> io::Result<bool> {

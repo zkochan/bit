@@ -68,14 +68,24 @@ pub(in crate::workspace::engine::command) fn local<'a>(
 
 fn matches_row_identity(id_value: &Value, identity: &str) -> bool {
     let identity = identity.trim();
+    let identity = identity.rsplit_once('@').map_or(identity, |(base, _)| base.trim());
     if crate::command_import::lane::component_identity(id_value).ok().as_deref() == Some(identity) {
         return true;
     }
-    let Some((scope, name)) = identity.split_once('/') else {
+    let Some((scope, name)) = identity
+        .split_once('/')
+        .map(|(sc, nm)| (sc.trim(), nm.trim()))
+        .filter(|(sc, nm)| !sc.is_empty() && !nm.is_empty())
+    else {
         return false;
     };
     if let Some(raw_id) = id_value.as_str().map(str::trim) {
-        return raw_id == identity || raw_id == name;
+        let raw_id = raw_id.rsplit_once('@').map_or(raw_id, |(base, _)| base.trim());
+        return raw_id == identity
+            || raw_id == name
+            || raw_id
+                .split_once('/')
+                .is_some_and(|(sc, nm)| sc.trim() == scope && nm.trim() == name);
     }
     let row_scope = id_value["scope"].as_str().map_or("", str::trim);
     id_value["name"].as_str().map(str::trim) == Some(name)

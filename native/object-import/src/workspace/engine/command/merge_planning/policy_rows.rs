@@ -34,6 +34,8 @@ fn binding_prefix(current: &capture::Captured, context: &Value) -> io::Result<St
     if !current.added {
         return current.target.current["bindingPrefix"]
             .as_str()
+            .map(str::trim)
+            .filter(|prefix| !prefix.is_empty())
             .map(str::to_owned)
             .ok_or_else(|| invalid("command FF prefix"));
     }

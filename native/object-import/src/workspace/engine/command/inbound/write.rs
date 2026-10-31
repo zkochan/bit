@@ -142,14 +142,14 @@ fn prepare_targets(
     for target in targets {
         plan_target(&context, target, &mut directories, rows, &mut changes, &mut written)?;
     }
-    let added = changes.additions
+    let added: usize = changes.additions
         .iter()
         .map(|(_, bytes)| bytes.len())
-        .fold(0_usize, usize::saturating_add);
-    let replaced = changes.replacements
+        .sum();
+    let replaced: usize = changes.replacements
         .iter()
         .map(|item| item.after.len())
-        .fold(0_usize, usize::saturating_add);
+        .sum();
     if added.saturating_add(replaced) > MAX_WRITTEN_BYTES {
         return Err(invalid("inbound workspace materialization bytes"));
     }
@@ -202,10 +202,9 @@ fn plan_target(
         .iter()
         .find_map(|(key, row)| matches_target(key, row, target).then(|| row.clone()));
     let directory = if let Some(row) = &existing {
-        row["rootDir"]
-            .as_str()
-            .ok_or_else(|| invalid("inbound existing root directory"))?
-            .to_owned()
+        let dir =
+            row["rootDir"].as_str().ok_or_else(|| invalid("inbound existing root directory"))?;
+        dir.trim().to_owned()
     } else {
         directories.next().ok_or_else(|| invalid("inbound new root directory"))?
     };
@@ -261,21 +260,15 @@ fn prepare_target(
     rows: &mut Map<String, Value>,
     lane: Option<&Value>,
 ) -> io::Result<Vec<(PathBuf, Vec<u8>)>> {
-    let scope = target.scope.as_deref().ok_or_else(|| invalid("inbound workspace scope"))?;
-    if rows
-        .iter()
-        .any(|(key, row)| {
-            let (row_scope, row_name) = crate::reset_lane::bitmap::row_identity(key, row);
-            !key.starts_with('$')
-                && !matches!(key.as_str(), "_bit_lane" | "version")
-                && row.is_object()
-                && row_name == target.name
-                && row_scope.is_none()
-        })
-    {
+    let scope = target.scope.as_deref().map_or("", str::trim);
+    if scope.is_empty() {
+        return Err(invalid("inbound workspace scope"));
+    }
+    let name = target.name.trim();
+    if identity::has_unscoped_entry(rows, name) {
         return Err(invalid("inbound unscoped workspace identity"));
     }
-    let model = super::details::model(root, import, scope, &target.name)?;
+    let model = super::details::model(root, import, scope, name)?;
     let (version_name, hash) = version(&model, &target.version)?;
     let version_obj = import.overlay
         .read(&hash, "Version")?
@@ -284,14 +277,14 @@ fn prepare_target(
         return Err(invalid("inbound lane snap requires canonical history check"));
     }
     crate::history_query::validate_version(version_obj)?;
-    let main = version_obj["mainFile"].as_str().ok_or_else(|| invalid("inbound main file"))?;
+    let main = version_obj["mainFile"]
+        .as_str()
+        .ok_or_else(|| invalid("inbound main file"))?
+        .trim();
     crate::checkout::plan::relative_path(main)?;
     let files = target_files(root, directory, version_obj, main, import)?;
-    let key = bitmap_key(rows, &target.name, scope)?;
-    rows.insert(
-        key,
-        json!({"name":target.name,"scope":scope,"version":version_name,"mainFile":main,"rootDir":directory}),
-    );
+    let key = bitmap_key(rows, name, scope)?;
+    rows.insert(key, json!({"name":name,"scope":scope,"version":version_name,"mainFile":main,"rootDir":directory}));
     Ok(files)
 }
 
@@ -302,11 +295,12 @@ pub(super) fn requires_canonical_history_check(
     hash: &str,
     version: &Value,
 ) -> bool {
+    let ver = target.version.trim();
+    let head = model["head"].as_str().map_or("", str::trim);
     lane.is_none()
-        && target.version.len() == 40
-        && target.version.bytes().all(|byte| byte.is_ascii_hexdigit())
-        && (model["head"].as_str().is_none()
-            || (Some(hash) != model["head"].as_str() && !version["origin"]["lane"].is_null()))
+        && ver.len() == 40
+        && ver.bytes().all(|byte| byte.is_ascii_hexdigit())
+        && (head.is_empty() || (hash.trim() != head && !version["origin"]["lane"].is_null()))
 }
 
 fn new_directory(

@@ -171,22 +171,18 @@ impl Prepared {
         let mut output = Vec::new();
         for (plan, receipt) in plans.iter().zip(receipts) {
             let lane = &plan["lane"];
-            let hash = lane["hash"].as_str().ok_or_else(|| invalid("import lane hash"))?;
-            let history = objects::history(
-                &lane["value"],
-                hash,
-                plan["previous"].clone(),
-                receipt,
-                plan["message"].as_str().ok_or_else(|| invalid("import lane history message"))?,
-            )?;
-            if self.context["current"]["hash"] == hash {
+            let hash = non_empty_str(&lane["hash"], "import lane hash")?;
+            let msg = plan["message"]
+                .as_str()
+                .map(str::trim)
+                .ok_or_else(|| invalid("import lane history message"))?;
+            let history =
+                objects::history(&lane["value"], hash, plan["previous"].clone(), receipt, msg)?;
+            if self.context["current"]["hash"].as_str().map(str::trim) == Some(hash) {
                 self.history = history.clone();
             }
             output.push((
-                plan["hash"]
-                    .as_str()
-                    .ok_or_else(|| invalid("import history identity"))?
-                    .to_owned(),
+                non_empty_str(&plan["hash"], "import history identity")?.to_owned(),
                 history,
             ));
         }
@@ -222,14 +218,21 @@ impl Prepared {
     }
     fn update_snap_entries(&mut self, versions: &[Value]) -> io::Result<()> {
         for version in versions {
-            let identity =
-                version["identity"].as_str().ok_or_else(|| invalid("lane snap identity"))?;
-            let head = version["hash"].as_str().ok_or_else(|| invalid("lane snap hash"))?;
+            let identity = version["identity"]
+                .as_str()
+                .map(str::trim)
+                .filter(|id| !id.is_empty())
+                .ok_or_else(|| invalid("lane snap identity"))?;
+            let head = version["hash"]
+                .as_str()
+                .map(str::trim)
+                .filter(|hash| !hash.is_empty())
+                .ok_or_else(|| invalid("lane snap hash"))?;
             let target = self.context["targets"]
                 .as_array()
                 .and_then(|rows| {
                     rows.iter()
-                        .find(|row| row["identity"] == identity)
+                        .find(|row| row["identity"].as_str().map(str::trim) == Some(identity))
                 })
                 .ok_or_else(|| invalid("lane snapped target"))?;
             objects::snapshot_update(
@@ -276,6 +279,13 @@ impl Prepared {
     pub(super) fn commit_recovery(&self) -> io::Result<()> {
         self.recovery.commit()
     }
+}
+fn non_empty_str<'a>(value: &'a Value, err: &'static str) -> io::Result<&'a str> {
+    value
+        .as_str()
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+        .ok_or_else(|| invalid(err))
 }
 fn load_history(context: &Value, repository: &mut Repository) -> io::Result<Value> {
     if context["current"].is_null() {

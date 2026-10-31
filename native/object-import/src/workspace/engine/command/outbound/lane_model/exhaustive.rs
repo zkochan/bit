@@ -162,9 +162,19 @@ pub(super) fn all_lane_versions(
         output.push(hash);
     }
     output.reverse();
+    append_main_head(dir, main_head, &seen, &mut output)?;
+    Ok(output)
+}
+
+fn append_main_head(
+    dir: &Path,
+    main_head: Option<&str>,
+    seen: &HashSet<String>,
+    output: &mut Vec<String>,
+) -> io::Result<()> {
     if let Some(main) = main_head
         .map(str::trim)
-        .filter(|main| !seen.contains(*main))
+        .filter(|main| !main.is_empty() && !seen.contains(*main))
     {
         crate::merge_history::hash(main)?;
         if dir
@@ -175,5 +185,5 @@ pub(super) fn all_lane_versions(
             output.push(main.to_owned());
         }
     }
-    Ok(output)
+    Ok(())
 }

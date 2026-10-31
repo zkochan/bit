@@ -131,20 +131,24 @@ impl Prepared {
     pub(in crate::workspace::engine::command) fn removed_snap_ids(
         &self,
     ) -> io::Result<Vec<String>> {
-        let versions = &self.finalized
-            .as_ref()
-            .ok_or_else(|| invalid("command removed snap absent"))?
-            .snapshot
-            .versions;
+        let finalized =
+            self.finalized.as_ref().ok_or_else(|| invalid("command removed snap absent"))?;
         self.publication.removed
             .iter()
             .map(|row| {
-                let hash = versions
+                let id = row.identity.trim();
+                let found = finalized.snapshot.versions
                     .iter()
-                    .find(|version| version["identity"] == row.identity)
-                    .and_then(|version| version["hash"].as_str())
+                    .find(|ver| ver["identity"].as_str().map(str::trim) == Some(id));
+                let hash = found
+                    .and_then(|ver| {
+                        ver["hash"]
+                            .as_str()
+                            .map(str::trim)
+                            .filter(|hash| !hash.is_empty())
+                    })
                     .ok_or_else(|| invalid("command removed snap reference"))?;
-                Ok(format!("{}@{hash}", row.identity))
+                Ok(format!("{id}@{hash}"))
             })
             .collect()
     }
@@ -236,31 +240,37 @@ impl Prepared {
         snapshot.versions
             .iter()
             .filter(|version| {
+                let ver_id = version["identity"].as_str().map(str::trim);
                 !self.publication.removed
                     .iter()
-                    .any(|row| version["identity"] == row.identity)
+                    .any(|row| Some(row.identity.trim()) == ver_id)
                     && self.pending
                         .iter()
                         .any(|pending| {
-                            !pending.directory.is_empty() && version["identity"] == pending.identity
+                            !pending.directory.trim().is_empty()
+                                && Some(pending.identity.trim()) == ver_id
                         })
             })
             .map(|version| {
-                Ok(bitmap::Update {
-                    identity: version["identity"]
-                        .as_str()
-                        .ok_or_else(|| invalid("command snapped identity"))?
-                        .to_owned(),
-                    version: version["hash"]
-                        .as_str()
-                        .ok_or_else(|| invalid("command snapped hash"))?
-                        .to_owned(),
-                    main_file: version["version"]["mainFile"]
-                        .as_str()
-                        .ok_or_else(|| invalid("command snapped main file"))?
-                        .to_owned(),
-                    keep_ours: true,
-                })
+                let identity = version["identity"]
+                    .as_str()
+                    .map(str::trim)
+                    .filter(|id| !id.is_empty())
+                    .ok_or_else(|| invalid("command snapped identity"))?
+                    .to_owned();
+                let hash = version["hash"]
+                    .as_str()
+                    .map(str::trim)
+                    .filter(|hash| !hash.is_empty())
+                    .ok_or_else(|| invalid("command snapped hash"))?
+                    .to_owned();
+                let main_file = version["version"]["mainFile"]
+                    .as_str()
+                    .map(str::trim)
+                    .filter(|file| !file.is_empty())
+                    .ok_or_else(|| invalid("command snapped main file"))?
+                    .to_owned();
+                Ok(bitmap::Update { identity, version: hash, main_file, keep_ours: true })
             })
             .collect()
     }
@@ -361,17 +371,18 @@ fn policy_material(
     materials: &[merge::Prepared],
     identity: &str,
 ) -> io::Result<usize> {
+    let identity = identity.trim();
     pending
         .iter()
-        .position(|row| row.identity == identity)
+        .position(|row| row.identity.trim() == identity)
         .or_else(|| {
             materials
                 .iter()
                 .position(|material| {
                     material.output["id"]
                         .as_str()
-                        .and_then(|id| id.rsplit_once('@'))
-                        .is_some_and(|(id, _)| id == identity)
+                        .and_then(|id| id.trim().rsplit_once('@'))
+                        .is_some_and(|(id, _)| id.trim() == identity)
                 })
         })
         .ok_or_else(|| invalid("command policy material absent"))
