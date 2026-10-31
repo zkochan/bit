@@ -119,7 +119,13 @@ impl State {
         }
         for id in ids {
             let name = id.name.trim();
-            if name.is_empty() || name.len() > 4096 || name.contains('\0') {
+            if name.is_empty()
+                || name.len() > 4096
+                || name.contains('\0')
+                || id.scope
+                    .as_deref()
+                    .is_some_and(|scope| scope.trim().len() > 4096 || scope.contains('\0'))
+            {
                 return Err(invalid("invalid unmerged name"));
             }
         }

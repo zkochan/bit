@@ -89,9 +89,11 @@ fn references(component: &Value) -> io::Result<HashSet<String>> {
     if let Some(local) = component["state"]["versions"].as_object() {
         for label in local
             .keys()
+            .map(String::as_str)
+            .map(str::trim)
             .filter(|label| crate::merge_history::hash(label).is_ok())
         {
-            refs.insert(label.clone());
+            refs.insert(label.to_owned());
         }
     }
     Ok(refs)

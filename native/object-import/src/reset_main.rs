@@ -57,12 +57,7 @@ pub struct Plan {
 
 impl Plan {
     pub fn prepare(root: &Path, identity: &str, head_only: bool, force: bool) -> io::Result<Self> {
-        let (scope, name) = identity
-            .trim()
-            .split_once('/')
-            .map(|(scope, name)| (scope.trim(), name.trim()))
-            .filter(|(scope, name)| !scope.is_empty() && !name.is_empty() && !name.contains(".."))
-            .ok_or_else(|| invalid("reset identity"))?;
+        let (scope, name) = parse_identity(identity)?;
         let identity = format!("{scope}/{name}");
         let bitmap = bitmap::Bitmap::load(root, scope, name)?;
         let repository = repository::Repository::load(root, scope, name)?;
@@ -89,6 +84,15 @@ impl Plan {
     pub fn commit(&self, file_id: &str) -> io::Result<()> {
         publication::commit(self, file_id)
     }
+}
+
+fn parse_identity(identity: &str) -> io::Result<(&str, &str)> {
+    let raw = identity.trim();
+    let bare = raw.rsplit_once('@').map_or(raw, |(base, _)| base.trim());
+    bare.split_once('/')
+        .map(|(scope, name)| (scope.trim(), name.trim()))
+        .filter(|(scope, name)| !scope.is_empty() && !name.is_empty() && !name.contains(".."))
+        .ok_or_else(|| invalid("reset identity"))
 }
 
 fn validate_detached(component: &Value, selection: &Selection) -> io::Result<()> {

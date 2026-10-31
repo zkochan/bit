@@ -45,7 +45,10 @@ impl Batch {
     ) -> io::Result<Self> {
         let identities = identities
             .iter()
-            .map(|id| id.trim())
+            .map(|id| {
+                let trimmed = id.trim();
+                trimmed.rsplit_once('@').map_or(trimmed, |(bare, _)| bare.trim())
+            })
             .filter(|id| !id.is_empty())
             .map(str::to_owned)
             .collect();

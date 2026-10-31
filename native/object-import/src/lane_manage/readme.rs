@@ -201,17 +201,21 @@ fn readme_row_matches(
 
 pub(super) fn lane_row_identity(row: &Value) -> Option<(String, String)> {
     if let Some(raw) = row["id"].as_str().or_else(|| row.as_str()) {
-        let bare = raw.rsplit_once('@').map_or(raw, |(base, _)| base);
+        let raw = raw.trim();
+        let bare = raw.rsplit_once('@').map_or(raw, |(base, _)| base.trim());
         let (scope, name) = bare.split_once('/')?;
+        let (scope, name) = (scope.trim(), name.trim());
         return (!scope.is_empty() && !name.is_empty()).then(|| {
             (name.to_owned(), scope.to_owned())
         });
     }
     let name = row["id"]["name"]
         .as_str()
+        .map(str::trim)
         .filter(|val| !val.is_empty())?;
     let scope = row["id"]["scope"]
         .as_str()
+        .map(str::trim)
         .filter(|val| !val.is_empty())?;
     Some((name.to_owned(), scope.to_owned()))
 }
@@ -222,32 +226,48 @@ pub(super) fn matches_lane_row(row: &Value, name: &str, scope: &str) -> bool {
 }
 
 pub(super) fn history_components(lane: &Value) -> io::Result<Vec<String>> {
-    let default_scope = lane["scope"].as_str().unwrap_or_default();
+    let default_scope = lane["scope"].as_str().map_or("", str::trim);
     lane["components"]
         .as_array()
         .ok_or_else(invalid)?
         .iter()
         .filter(|component| component["isDeleted"] != true)
-        .map(|component| {
-            let head = component["head"].as_str().ok_or_else(invalid)?;
-            if let Some(raw) = component["id"]
-                .as_str()
-                .filter(|val| !val.is_empty())
-            {
-                let id = raw.split('@').next().unwrap_or(raw);
-                return Ok(if id.contains('/') || default_scope.is_empty() {
-                    format!("{id}@{head}")
-                } else {
-                    format!("{default_scope}/{id}@{head}")
-                });
-            }
-            let scope = component["id"]["scope"]
-                .as_str()
-                .filter(|val| !val.is_empty())
-                .or_else(|| (!default_scope.is_empty()).then_some(default_scope))
-                .ok_or_else(invalid)?;
-            let name = component["id"]["name"].as_str().ok_or_else(invalid)?;
-            Ok(format!("{scope}/{name}@{head}"))
-        })
+        .map(|component| history_component_entry(component, default_scope))
         .collect()
+}
+
+fn history_component_entry(component: &Value, default_scope: &str) -> io::Result<String> {
+    let head = component["head"]
+        .as_str()
+        .map(str::trim)
+        .filter(|val| !val.is_empty())
+        .ok_or_else(invalid)?;
+    if let Some(raw) = component["id"]
+        .as_str()
+        .map(str::trim)
+        .filter(|val| !val.is_empty())
+    {
+        let id = raw
+            .split('@')
+            .next()
+            .unwrap_or(raw)
+            .trim();
+        return Ok(if id.contains('/') || default_scope.is_empty() {
+            format!("{id}@{head}")
+        } else {
+            format!("{default_scope}/{id}@{head}")
+        });
+    }
+    let scope = component["id"]["scope"]
+        .as_str()
+        .map(str::trim)
+        .filter(|val| !val.is_empty())
+        .or_else(|| (!default_scope.is_empty()).then_some(default_scope))
+        .ok_or_else(invalid)?;
+    let name = component["id"]["name"]
+        .as_str()
+        .map(str::trim)
+        .filter(|val| !val.is_empty())
+        .ok_or_else(invalid)?;
+    Ok(format!("{scope}/{name}@{head}"))
 }

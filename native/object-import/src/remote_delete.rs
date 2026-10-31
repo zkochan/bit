@@ -370,16 +370,21 @@ fn unmerged(scope: &Path, removed: &[String]) -> io::Result<Option<(Vec<u8>, Vec
     Ok(Some((before, serde_json::to_vec_pretty(&value)?)))
 }
 fn matches_unmerged_row(row: &Value, target: &str) -> bool {
-    if let Some(raw) = row["id"].as_str() {
-        let base = raw.split('@').next().unwrap_or(raw);
-        let target_name = target.split_once('/').map_or(target, |(_, name)| name);
+    let target = target.trim();
+    if let Some(raw) = row["id"].as_str().map(str::trim) {
+        let base = raw
+            .split('@')
+            .next()
+            .unwrap_or(raw)
+            .trim();
+        let target_name = target.split_once('/').map_or(target, |(_, name)| name.trim());
         return base == target || base == target_name;
     }
-    let row_scope = row["id"]["scope"].as_str().unwrap_or_default();
-    let row_name = row["id"]["name"].as_str().unwrap_or_default();
+    let row_scope = row["id"]["scope"].as_str().map_or("", str::trim);
+    let row_name = row["id"]["name"].as_str().map_or("", str::trim);
     let (target_scope, target_name) = target
         .split_once('/')
-        .unwrap_or(("", target));
+        .map_or(("", target), |(scope, name)| (scope.trim(), name.trim()));
     row_name == target_name && (row_scope.is_empty() || row_scope == target_scope)
 }
 pub(super) fn invalid(message: &str) -> io::Error {

@@ -102,7 +102,7 @@ fn preflight(objects: &[Object]) -> io::Result<Vec<Prepared>> {
     let mut prepared = Vec::with_capacity(objects.len());
     for object in objects {
         hash(&object.hash)?;
-        if !found.insert(&object.hash) {
+        if !found.insert(object.hash.trim()) {
             return Err(invalid("snapshot duplicate object hash"));
         }
         let body = body(object, MAX_RAW.saturating_sub(total))?;
@@ -135,7 +135,7 @@ fn body(object: &Object, maximum: usize) -> io::Result<(usize, Vec<u8>)> {
 }
 fn validate_body(object: &Object, body: &[u8]) -> io::Result<()> {
     if matches!(object.kind, Kind::Source) {
-        if crate::validate::hexadecimal(&Sha1::digest(body)) != object.hash {
+        if crate::validate::hexadecimal(&Sha1::digest(body)) != object.hash.trim() {
             return Err(invalid("snapshot Source identity changed"));
         }
     } else if !crate::parse_jsonc(body).is_ok_and(|value| value.is_object()) {
@@ -176,19 +176,22 @@ fn read(workspace: &Workspace, maximum: usize) -> io::Result<Vec<u8>> {
     let mut raw = Vec::new();
     file.take((maximum + 1) as u64)
         .read_to_end(&mut raw)?;
-    if raw.len() > maximum || crate::validate::hexadecimal(&Sha1::digest(&raw)) != workspace.hash {
+    if raw.len() > maximum
+        || crate::validate::hexadecimal(&Sha1::digest(&raw)) != workspace.hash.trim()
+    {
         return Err(invalid("snapshot workspace identity changed"));
     }
     Ok(raw)
 }
 fn prepare(object: &Object, body: &[u8]) -> io::Result<Prepared> {
+    let hash = object.hash.trim();
     let length = String::from_utf8_lossy(body).encode_utf16().count();
-    let header = format!("{} {} {length}\0", object.kind.name(), object.hash);
+    let header = format!("{} {hash} {length}\0", object.kind.name());
     let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
     encoder.write_all(header.as_bytes())?;
     encoder.write_all(body)?;
     Ok(Prepared {
-        hash: object.hash.clone(),
+        hash: hash.to_owned(),
         compressed: encoder.finish()?,
         inflated_size: header.len() + body.len(),
     })

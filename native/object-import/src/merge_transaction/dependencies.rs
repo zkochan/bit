@@ -10,29 +10,36 @@ fn rows<'a>(input: &'a Value, field: &str) -> io::Result<&'a [Value]> {
 fn identity(value: &Value) -> io::Result<(Option<&str>, &str)> {
     let target = value.get("id").unwrap_or(value);
     if let Some(raw) = target.as_str() {
-        let raw = raw.trim();
-        let bare = raw.rsplit_once('@').map_or(raw, |(prefix, _)| prefix.trim());
-        let (scope, name) = match bare.split_once('/') {
-            Some((scope, name)) => {
-                (Some(scope.trim()).filter(|scope| !scope.is_empty()), name.trim())
-            }
-            None => (None, bare),
-        };
-        if name.is_empty() || name.len() > 4096 {
-            return Err(invalid("merge dependency name"));
-        }
-        return Ok((scope, name));
+        return string_identity(raw);
     }
     let scope = match target.get("scope") {
         None | Some(Value::Null) => None,
-        Some(Value::String(scope)) => Some(scope.trim()).filter(|scope| !scope.is_empty()),
+        Some(Value::String(scope)) if scope.trim().len() <= 4096 && !scope.contains('\0') => {
+            Some(scope.trim()).filter(|scope| !scope.is_empty())
+        }
         _ => return Err(invalid("merge dependency scope")),
     };
     let name = target["name"]
         .as_str()
         .map(str::trim)
-        .filter(|name| !name.is_empty() && name.len() <= 4096)
+        .filter(|name| !name.is_empty() && name.len() <= 4096 && !name.contains('\0'))
         .ok_or_else(|| invalid("merge dependency name"))?;
+    Ok((scope, name))
+}
+fn string_identity(raw: &str) -> io::Result<(Option<&str>, &str)> {
+    let raw = raw.trim();
+    let bare = raw.rsplit_once('@').map_or(raw, |(prefix, _)| prefix.trim());
+    let (scope, name) = match bare.split_once('/') {
+        Some((scope, name)) => (Some(scope.trim()).filter(|scope| !scope.is_empty()), name.trim()),
+        None => (None, bare),
+    };
+    if name.is_empty()
+        || name.len() > 4096
+        || name.contains('\0')
+        || scope.is_some_and(|sc| sc.len() > 4096 || sc.contains('\0'))
+    {
+        return Err(invalid("merge dependency name"));
+    }
     Ok((scope, name))
 }
 fn hashes(input: &Value, field: &str) -> io::Result<HashSet<String>> {

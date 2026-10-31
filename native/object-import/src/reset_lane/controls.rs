@@ -35,14 +35,18 @@ pub(crate) fn prepare(root: &Path, identities: &[String]) -> io::Result<Vec<Cont
 
 fn matches_identity(row: &Value, identities: &[String]) -> bool {
     let (row_scope, row_name) = super::row_id_parts(&row["id"]);
+    if row_name.is_empty() {
+        return false;
+    }
     let candidate = format!("{row_scope}/{row_name}");
     identities
         .iter()
         .any(|id| {
             let trimmed = id.trim();
-            trimmed == candidate
+            let bare = trimmed.rsplit_once('@').map_or(trimmed, |(base, _)| base.trim());
+            bare == candidate
                 || (row_scope.is_empty()
-                    && trimmed
+                    && bare
                         .split_once('/')
                         .is_some_and(|(_, name)| name.trim() == row_name))
         })

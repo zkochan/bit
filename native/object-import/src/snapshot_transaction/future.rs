@@ -88,7 +88,12 @@ fn choice<'a>(
     {
         return raw(entered, 1.0, None, semver);
     }
-    Ok(default_choice(params, &params.release_type, params.exact_version.as_deref(), params.soft))
+    Ok(default_choice(
+        params,
+        params.release_type.trim(),
+        params.exact_version.as_deref().map(str::trim),
+        params.soft,
+    ))
 }
 fn default_choice<'a>(
     params: &'a Params,
@@ -169,7 +174,7 @@ fn latest(component: &Component, semver: &Value) -> io::Result<Value> {
     Ok(latest)
 }
 fn prelike(release: &str) -> bool {
-    matches!(release, "prerelease" | "premajor" | "preminor" | "prepatch")
+    matches!(release.trim(), "prerelease" | "premajor" | "preminor" | "prepatch")
 }
 
 fn tagged<'a>(
@@ -189,6 +194,7 @@ fn tagged<'a>(
 fn automatic(params: &Params) -> io::Result<Choice<'_>> {
     if let Some(release) = params.auto_tag_release_type
         .as_deref()
+        .map(str::trim)
         .filter(|text| !text.is_empty())
     {
         return Ok(default_choice(params, release, None, params.soft));
@@ -196,8 +202,8 @@ fn automatic(params: &Params) -> io::Result<Choice<'_>> {
     if prelike(&params.release_type) {
         return Ok(default_choice(
             params,
-            &params.release_type,
-            if params.soft { None } else { params.exact_version.as_deref() },
+            params.release_type.trim(),
+            if params.soft { None } else { params.exact_version.as_deref().map(str::trim) },
             params.soft,
         ));
     }

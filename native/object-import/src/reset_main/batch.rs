@@ -36,7 +36,10 @@ impl Batch {
     ) -> io::Result<Self> {
         let identities = identities
             .iter()
-            .map(|id| id.trim())
+            .map(|id| {
+                let trimmed = id.trim();
+                trimmed.rsplit_once('@').map_or(trimmed, |(bare, _)| bare.trim())
+            })
             .filter(|id| !id.is_empty())
             .map(str::to_owned)
             .collect();
@@ -122,7 +125,13 @@ fn candidates(root: &Path) -> io::Result<Vec<String>> {
         .ok_or_else(|| invalid("reset batch index"))?;
     let mut selected = Vec::new();
     for row in rows {
-        let hash = row["hash"].as_str().ok_or_else(|| invalid("reset batch model hash"))?;
+        if row["isSymlink"] == true {
+            continue;
+        }
+        let hash = row["hash"]
+            .as_str()
+            .map(str::trim)
+            .ok_or_else(|| invalid("reset batch model hash"))?;
         let model =
             outbound::read_object(&crate::scope_path(root).join("objects"), hash, "Component")?;
         if model["state"]["versions"]
@@ -188,7 +197,7 @@ fn project_index(root: &Path, items: &[Plan]) -> io::Result<Option<BytesChange>>
     for item in items.iter().filter(|item| item.index.is_some()) {
         let position = rows
             .iter()
-            .position(|row| row["hash"] == item.object.hash)
+            .position(|row| row["hash"].as_str().map(str::trim) == Some(item.object.hash.as_str()))
             .ok_or_else(|| invalid("reset batch model absent"))?;
         rows.remove(position);
     }

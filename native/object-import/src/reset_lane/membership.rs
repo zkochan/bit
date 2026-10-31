@@ -14,6 +14,7 @@ pub(super) fn hidden_head(lane: &Value, identity: &str) -> io::Result<Option<Str
             .map(str::trim)
             .and_then(|row| row.rsplit_once('@'))
             .map(|(id, hash)| (id.trim(), hash.trim()))
+            .filter(|(id, _)| !id.is_empty())
             .ok_or_else(|| invalid("lane reset hidden identity"))?;
         if id == identity {
             crate::merge_history::hash(hash)?;

@@ -69,7 +69,12 @@ fn parse_lane_id(id: &str) -> io::Result<(&str, &str)> {
         .split_once('/')
         .ok_or_else(|| invalid("remote lane id"))?;
     let (lane_scope, name) = (raw_scope.trim(), raw_name.trim());
-    if lane_scope.is_empty() || name.is_empty() || lane_scope.contains("..") || name.contains("..")
+    if lane_scope.is_empty()
+        || name.is_empty()
+        || lane_scope.contains("..")
+        || name.contains("..")
+        || lane_scope.contains(['/', '\\', '\0'])
+        || name.contains(['/', '\\', '\0'])
     {
         return Err(invalid("remote lane id"));
     }

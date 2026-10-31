@@ -255,17 +255,18 @@ fn classify(index: usize, file: &Current, execution: &Execution<'_>) -> io::Resu
         row["other"] = json!(other);
     }
     if kind == "updatedFiles" {
-        other_body(&mut row, other.unwrap(), execution.prepared, execution.wire_bodies);
+        let other = other.ok_or_else(|| invalid("merge missing other index"))?;
+        other_body(&mut row, other, execution.prepared, execution.wire_bodies);
     }
     if kind == "modifiedFiles" {
+        let other = other.ok_or_else(|| invalid("merge missing other index"))?;
+        let merged_fields = merged(index, base, other, execution)?
+            .as_object()
+            .cloned()
+            .ok_or_else(|| invalid("merge invalid Git output"))?;
         row.as_object_mut()
-            .unwrap()
-            .extend(
-                merged(index, base, other.unwrap(), execution)?
-                    .as_object()
-                    .unwrap()
-                    .clone(),
-            );
+            .ok_or_else(|| invalid("merge invalid row"))?
+            .extend(merged_fields);
     }
     Ok(row)
 }
@@ -294,7 +295,7 @@ fn missing(
             added.push(row);
             continue;
         };
-        if request.base[base].hash == file.hash {
+        if request.base[base].hash.trim() == file.hash.trim() {
             deleted.push(json!({"kind":"remainDeletedFiles","other":index,"base":base}));
             continue;
         }

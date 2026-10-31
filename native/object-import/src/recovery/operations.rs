@@ -83,7 +83,12 @@ impl Operation {
         match self {
             Self::Copy { source, destination } => copy::file(source, destination),
             Self::Remove { path } => crate::workspace::actions::remove(path),
-            Self::EnsureDir { path } => fs::create_dir_all(path),
+            Self::EnsureDir { path } => {
+                if fs::symlink_metadata(path).is_ok_and(|meta| meta.file_type().is_symlink()) {
+                    return Err(invalid("recovery ensure dir is a symlink"));
+                }
+                fs::create_dir_all(path)
+            }
         }
     }
 }

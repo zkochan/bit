@@ -3,32 +3,15 @@ use super::{count, hash, invalid};
 use serde_json::Value;
 use std::io;
 pub(crate) fn validate(value: &Value) -> io::Result<()> {
-    if !value
+    if value
         .get("mainFile")
-        .is_some_and(|value| {
-            value
-                .as_str()
-                .is_some_and(|text| !text.trim().is_empty())
-        })
+        .and_then(Value::as_str)
+        .is_none_or(|text| text.trim().is_empty())
         || !value.get("log").is_some_and(Value::is_object)
     {
         return Err(invalid("history invalid Version required metadata"));
     }
-    let files = value
-        .get("files")
-        .and_then(Value::as_array)
-        .ok_or_else(|| invalid("history missing Version files"))?;
-    count(files.len())?;
-    for file in files {
-        if !file.is_object() {
-            return Err(invalid("history invalid Version file"));
-        }
-        hash(
-            file.get("file")
-                .and_then(Value::as_str)
-                .ok_or_else(|| invalid("history missing Source ref"))?,
-        )?;
-    }
+    validate_files(value)?;
     for field in
         ["dependencies", "devDependencies", "flattenedDependencies", "flattenedDevDependencies"]
     {
@@ -41,6 +24,32 @@ pub(crate) fn validate(value: &Value) -> io::Result<()> {
     extensions(value)?;
     lane(value, "unrelated")?;
     lane(value, "squashed")
+}
+
+fn validate_files(value: &Value) -> io::Result<()> {
+    let files = value
+        .get("files")
+        .and_then(Value::as_array)
+        .ok_or_else(|| invalid("history missing Version files"))?;
+    count(files.len())?;
+    for file in files {
+        if !file.is_object()
+            || file
+                .get("relativePath")
+                .is_some_and(|path| {
+                    path.as_str()
+                        .is_none_or(|text| text.trim().is_empty())
+                })
+        {
+            return Err(invalid("history invalid Version file"));
+        }
+        hash(
+            file.get("file")
+                .and_then(Value::as_str)
+                .ok_or_else(|| invalid("history missing Source ref"))?,
+        )?;
+    }
+    Ok(())
 }
 fn truthy(value: &Value) -> bool {
     !value.is_null()

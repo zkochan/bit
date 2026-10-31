@@ -269,11 +269,17 @@ impl Cursor {
 }
 impl State {
     pub(super) fn begin(&mut self, input: Value, owner: &journal::State) -> io::Result<Value> {
-        let identity: Identity = serde_json::from_value(input).map_err(io::Error::other)?;
+        let raw: Identity = serde_json::from_value(input).map_err(io::Error::other)?;
+        let identity = Identity {
+            token: raw.token.trim().to_owned(),
+            id: raw.id.trim().to_owned(),
+            id_without_version: raw.id_without_version.trim().to_owned(),
+            ..raw
+        };
         owner.verify(&identity.token, identity.index)?;
         if self.records.len() >= 4096
-            || identity.id.len() > 4096
-            || identity.id_without_version.len() > 4096
+            || invalid_status_id(&identity.id)
+            || invalid_status_id(&identity.id_without_version)
         {
             return Err(invalid("merge status bounds"));
         }
@@ -340,4 +346,8 @@ fn already_merged(value: &Value) -> io::Result<bool> {
 }
 fn unrelated_result(strategy: &str, local: bool, main: bool) -> Value {
     json!({"strategy":strategy,"head":if local {"current"}else {"other"},"unrelatedHead":if local {"other"}else {"current"},"lane":if main || strategy=="theirs" {"current"}else {"other"}})
+}
+
+fn invalid_status_id(value: &str) -> bool {
+    value.is_empty() || value.len() > 4096 || value.contains('\0')
 }

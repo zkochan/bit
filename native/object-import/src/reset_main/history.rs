@@ -50,7 +50,14 @@ fn append_removed(objects: &Path, history: &mut Value, selection: &Selection) ->
             continue;
         }
         let version = outbound::read_object(objects, reference, "Version")?;
-        versions.push(json!({"hash":reference,"parents":version["parents"]}));
+        let mut entry = json!({"hash":reference,"parents":version["parents"]});
+        if let Some(unrelated) = version["unrelated"]["head"].as_str() {
+            entry["unrelated"] = json!(unrelated);
+        }
+        if let Some(squashed) = version["squashed"]["previousParents"].as_array() {
+            entry["squashed"] = json!(squashed);
+        }
+        versions.push(entry);
         changed = true;
     }
     Ok(changed)

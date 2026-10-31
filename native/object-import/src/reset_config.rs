@@ -113,9 +113,12 @@ fn file(root: &Path, lane: Option<(&str, &str)>) -> io::Result<std::path::PathBu
     let Some((scope, name)) = lane else {
         return Ok(base.join("main.json"));
     };
+    let (scope, name) = (scope.trim(), name.trim());
     if [scope, name]
         .iter()
-        .any(|part| part.is_empty() || *part == "." || *part == ".." || part.contains(['/', '\\']))
+        .any(|part| {
+            part.is_empty() || *part == "." || *part == ".." || part.contains(['/', '\\', '\0'])
+        })
     {
         return Err(invalid("reset staged config path"));
     }

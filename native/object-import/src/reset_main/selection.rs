@@ -47,18 +47,34 @@ fn local_refs(component: &Value) -> io::Result<HashMap<String, String>> {
         if row["local"] != true {
             continue;
         }
-        let hash = versions
-            .get(label)
-            .or_else(|| orphaned.and_then(|map| map.get(label)))
-            .and_then(Value::as_str)
-            .unwrap_or(label)
-            .trim();
+        let trimmed = label.trim();
+        let hash = resolve_label_hash(versions, orphaned, label, trimmed);
         crate::merge_history::hash(hash)?;
-        if local.insert(hash.to_owned(), label.to_owned()).is_some() {
+        if local.insert(hash.to_owned(), trimmed.to_owned()).is_some() {
             return Err(invalid("reset duplicate local hash"));
         }
     }
     Ok(local)
+}
+
+fn resolve_label_hash<'a>(
+    versions: &'a Map<String, Value>,
+    orphaned: Option<&'a Map<String, Value>>,
+    label: &'a str,
+    trimmed: &'a str,
+) -> &'a str {
+    versions
+        .get(label)
+        .or_else(|| versions.get(trimmed))
+        .or_else(|| {
+            orphaned.and_then(|map| {
+                map.get(label)
+                    .or_else(|| map.get(trimmed))
+            })
+        })
+        .and_then(Value::as_str)
+        .unwrap_or(trimmed)
+        .trim()
 }
 
 fn walk(
@@ -144,13 +160,9 @@ fn labels(component: &Value, removed: &[String]) -> io::Result<Vec<String>> {
     Ok(state
         .iter()
         .filter_map(|(label, row)| {
-            let hash = versions
-                .get(label)
-                .or_else(|| orphaned.and_then(|map| map.get(label)))
-                .and_then(Value::as_str)
-                .unwrap_or(label)
-                .trim();
-            (row["local"] == true && selected.contains(hash)).then_some(label.clone())
+            let trimmed = label.trim();
+            let hash = resolve_label_hash(versions, orphaned, label, trimmed);
+            (row["local"] == true && selected.contains(hash)).then(|| trimmed.to_owned())
         })
         .collect())
 }
@@ -164,7 +176,7 @@ impl Selection {
             .chain(component["orphanedVersions"].as_object())
             .flat_map(|versions| versions.iter())
             .find_map(|(label, value)| {
-                (value.as_str().map(str::trim) == Some(head)).then_some(label.clone())
+                (value.as_str().map(str::trim) == Some(head)).then(|| label.trim().to_owned())
             })
             .unwrap_or_else(|| head.to_owned())
     }

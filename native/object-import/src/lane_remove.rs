@@ -24,7 +24,13 @@ impl Plan {
         }
         let scope_dir = crate::scope_path(root);
         let before = fs::read(scope_dir.join("index.json"))?;
-        let mut index: Value = crate::parse_jsonc(&before)?;
+        let mut index: Value = match crate::parse_jsonc(&before)? {
+            Value::Array(components) => serde_json::json!({"components":components,"lanes":[]}),
+            other => other,
+        };
+        if index.is_object() && index.get("lanes").is_none_or(Value::is_null) {
+            index["lanes"] = serde_json::json!([]);
+        }
         let before_bitmap = fs::read(root.join(".bitmap"))?;
         let bitmap = recovery::jsonc::parse(&before_bitmap)?;
         let rows = index["lanes"].as_array_mut().ok_or_else(|| invalid("lane index"))?;

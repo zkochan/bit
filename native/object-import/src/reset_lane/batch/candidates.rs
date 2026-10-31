@@ -141,10 +141,14 @@ fn matching_member_id(row: &Value, membership: &HashSet<String>) -> io::Result<O
         return Ok(membership.contains(&candidate).then_some(candidate));
     }
     let suffix = format!("/{name}");
-    Ok(membership
+    let mut matches = membership
         .iter()
-        .find(|member| member.ends_with(&suffix))
-        .cloned())
+        .filter(|member| member.ends_with(&suffix));
+    let Some(first) = matches.next().cloned() else { return Ok(None) };
+    if matches.next().is_some() {
+        return Err(invalid("lane candidate ambiguous unscoped member"));
+    }
+    Ok(Some(first))
 }
 
 fn identity(id: &Value) -> io::Result<String> {

@@ -115,16 +115,13 @@ pub(super) fn capture_heads(repository: &Repository, heads: &[String]) -> io::Re
         if seen.len() > 4096 {
             return Err(invalid("lane reset graph proof limit"));
         }
-        let raw = match fs::read(object_path(&repository.objects, &hash)) {
-            Ok(raw) => Some(raw),
-            Err(error) if error.kind() == io::ErrorKind::NotFound => None,
-            Err(error) => return Err(error),
-        };
+        let path = object_path(&repository.objects, &hash);
+        let raw = regular(&path)?;
         bytes = bytes.saturating_add(raw.as_ref().map_or(0, Vec::len));
         if bytes > 96 * 1024 * 1024 {
             return Err(invalid("lane reset graph proof byte limit"));
         }
-        proofs.push((object_path(&repository.objects, &hash), raw));
+        proofs.push((path, raw));
     }
     Ok(proofs)
 }

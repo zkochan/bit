@@ -43,12 +43,12 @@ fn append_missing_ancestors(
     versions: &mut Vec<Value>,
     current: &str,
 ) -> io::Result<()> {
-    let mut pending = vec![current.to_owned()];
+    let mut pending = vec![current.trim().to_owned()];
     let mut seen = HashSet::new();
     while let Some(current) = pending.pop() {
         if versions
             .iter()
-            .any(|entry| entry["hash"] == current)
+            .any(|entry| entry["hash"].as_str().map(str::trim) == Some(current.as_str()))
         {
             continue;
         }
@@ -112,7 +112,11 @@ fn pending_history(
     if selected.contains(&identity) {
         return Ok(None);
     }
-    let current = row["head"].as_str().ok_or_else(|| invalid("lane pending head"))?;
+    let current = row["head"]
+        .as_str()
+        .map(str::trim)
+        .filter(|head| !head.is_empty())
+        .ok_or_else(|| invalid("lane pending head"))?;
     let hash = object_hash(&format!("{identity}:VersionHistory"));
     let history = match outbound::read_object(objects, &hash, "VersionHistory") {
         Ok(history) => history,
@@ -125,7 +129,7 @@ fn pending_history(
         history["versions"].as_array().ok_or_else(|| invalid("lane pending versions"))?;
     if versions
         .iter()
-        .any(|entry| entry["hash"] == current)
+        .any(|entry| entry["hash"].as_str().map(str::trim) == Some(current))
     {
         return Ok(None);
     }
@@ -138,9 +142,9 @@ pub(super) fn lane_history(
 ) -> io::Result<ObjectChange> {
     let hash = object_hash(&format!("{}:LaneHistory", repository.lane_hash));
     let mut history = outbound::read_object(&repository.objects, &hash, "LaneHistory")?;
-    if history["laneHash"] != repository.lane_hash
-        || history["scope"] != repository.lane_scope
-        || history["name"] != repository.lane_name
+    if history["laneHash"].as_str().map(str::trim) != Some(repository.lane_hash.as_str())
+        || history["scope"].as_str().map(str::trim) != Some(repository.lane_scope.as_str())
+        || history["name"].as_str().map(str::trim) != Some(repository.lane_name.as_str())
     {
         return Err(invalid("lane reset LaneHistory identity"));
     }
@@ -158,7 +162,11 @@ pub(super) fn batch_ids(objects: &Path, removed: &[String]) -> io::Result<HashSe
         .iter()
         .map(|hash| {
             let version = outbound::read_object(objects, hash, "Version")?;
-            Ok(version["batchId"].as_str().map(str::to_owned))
+            Ok(version["batchId"]
+                .as_str()
+                .map(str::trim)
+                .filter(|id| !id.is_empty())
+                .map(str::to_owned))
         })
         .collect::<io::Result<Vec<_>>>()
         .map(|rows| rows.into_iter().flatten().collect())

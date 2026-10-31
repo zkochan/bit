@@ -87,6 +87,9 @@ fn rows(value: &Value, names: &[&str]) -> io::Result<Value> {
 }
 
 fn extensions(value: &Value) -> io::Result<Value> {
+    if matches!(value, Value::Undefined) {
+        return Ok(Value::Undefined);
+    }
     let Value::Array(rows) = value else {
         return Err(invalid("snapshot extensions required"));
     };

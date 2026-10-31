@@ -50,6 +50,12 @@ fn execute(
     labels: [&str; 2],
     paths: [PathBuf; 3],
 ) -> io::Result<(std::process::ExitStatus, Vec<u8>, Vec<u8>)> {
+    if labels
+        .iter()
+        .any(|label| label.trim().is_empty() || label.len() > 32768 || label.contains('\0'))
+    {
+        return Err(invalid("merge label/path limit"));
+    }
     let mut child = spawn(labels, paths)?;
     let stderr = child.0.stderr.take().ok_or_else(|| invalid("merge missing stderr"))?;
     let thread = std::thread::spawn(move || {

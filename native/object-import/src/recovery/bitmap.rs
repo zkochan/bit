@@ -16,6 +16,10 @@ pub(super) fn plan(filename: &Path, current: &[String]) -> io::Result<Value> {
     {
         return Err(invalid("bitmap current roots"));
     }
+    let link_meta = std::fs::symlink_metadata(filename)?;
+    if link_meta.file_type().is_symlink() || !link_meta.is_file() {
+        return Err(invalid("bitmap file"));
+    }
     let file = File::open(filename)?;
     if !file.metadata()?.is_file() {
         return Err(invalid("bitmap file"));

@@ -149,6 +149,9 @@ impl State {
             .filter(|parent| !parent.is_empty())
             .map(str::to_owned);
         if let Some(parent) = &parent_token {
+            if parent.len() > 256 || parent.contains('\0') {
+                return Err(invalid("stale merge owner"));
+            }
             self.live(parent)?;
         }
         let mut record = Record {

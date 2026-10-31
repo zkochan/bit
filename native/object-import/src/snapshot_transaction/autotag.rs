@@ -77,8 +77,8 @@ fn walk(
     Ok(())
 }
 fn qualifies(changed: &Value, dependency: &Value, semver: &Value) -> io::Result<bool> {
-    let left = changed["version"].as_str().map(str::trim);
-    let right = dependency["version"].as_str().map(str::trim);
+    let left = version_str(changed);
+    let right = version_str(dependency);
     if let (Some(left), Some(right)) = (left, right)
         && let (Some(left), Some(right)) =
             (semver[left].get("version"), semver[right].get("version"))
@@ -86,6 +86,17 @@ fn qualifies(changed: &Value, dependency: &Value, semver: &Value) -> io::Result<
         return Ok(crate::config_merge::compare_versions(left, right)? != Ordering::Less);
     }
     Ok(true)
+}
+fn version_str(id: &Value) -> Option<&str> {
+    id["version"]
+        .as_str()
+        .map(str::trim)
+        .filter(|ver| !ver.is_empty())
+        .or_else(|| {
+            id.as_str()
+                .and_then(|raw| raw.rsplit_once('@').map(|(_, ver)| ver.trim()))
+                .filter(|ver| !ver.is_empty())
+        })
 }
 pub(super) fn identity(id: &Value) -> io::Result<String> {
     if let Some(raw) = id.as_str() {

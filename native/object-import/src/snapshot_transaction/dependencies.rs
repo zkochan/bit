@@ -51,9 +51,11 @@ fn normalize_component_id(id: &Value, version: String) -> io::Result<Value> {
         return Ok(normalized);
     }
     let key = autotag::identity(&normalized)?;
-    if let Some((scope, name)) = key.split_once('/') {
-        normalized = json!({"scope": scope, "name": name, "version": version});
-    }
+    normalized = if let Some((scope, name)) = key.split_once('/') {
+        json!({"scope": scope, "name": name, "version": version})
+    } else {
+        json!({"name": key, "version": version})
+    };
     Ok(normalized)
 }
 fn resolver_rows(component: &Value, components: &[Value]) -> io::Result<Vec<Value>> {

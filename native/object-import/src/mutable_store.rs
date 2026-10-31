@@ -22,11 +22,15 @@ pub(crate) fn persist_serialized(
 }
 
 fn check_header(hash: &str, serialized: &[u8], models: bool) -> io::Result<()> {
+    crate::merge_history::hash(hash)?;
     let end = serialized
         .iter()
         .position(|byte| *byte == 0)
         .filter(|end| *end < 256)
         .ok_or_else(|| invalid("invalid mutable header"))?;
+    if serialized.len().saturating_sub(end + 1) > 32 * 1024 * 1024 {
+        return Err(invalid("unsupported mutable identity or type"));
+    }
     let header = std::str::from_utf8(&serialized[..end])
         .map_err(|_| invalid("invalid mutable header text"))?;
     let mut parts = header.split(' ');

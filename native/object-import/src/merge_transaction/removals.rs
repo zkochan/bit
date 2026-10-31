@@ -35,7 +35,10 @@ pub(super) fn apply(input: &Value, current: &[Value]) -> io::Result<Value> {
 fn status<'a>(statuses: &'a mut Vec<Value>, path: &str) -> io::Result<&'a str> {
     let found = statuses
         .iter()
-        .position(|row| row["relativePath"] == path || row["path"] == path);
+        .position(|row| {
+            row["relativePath"].as_str().map(str::trim) == Some(path)
+                || row["path"].as_str().map(str::trim) == Some(path)
+        });
     let status = if let Some(index) = found {
         statuses[index]["status"]
             .as_str()

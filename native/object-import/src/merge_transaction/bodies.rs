@@ -132,7 +132,7 @@ impl State {
     }
     pub(super) fn removals(&self, input: &Value, owners: &journal::State) -> io::Result<Value> {
         let (binding, _) = self.binding(input, owners)?;
-        if input["tracked"] == true
+        if super::decision::boolean(input, "tracked")?
             && binding.current
                 .iter()
                 .enumerate()

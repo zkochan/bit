@@ -45,10 +45,10 @@ fn regular(path: &Path) -> io::Result<fs::Metadata> {
 fn ancestors(path: &Path) -> io::Result<()> {
     for parent in path.ancestors().skip(1) {
         let metadata = fs::symlink_metadata(parent)?;
-        acl(parent)?;
-        if !metadata.is_dir() {
+        if metadata.file_type().is_symlink() || !metadata.is_dir() {
             return Err(invalid("recovery copy parent is not an ordinary directory"));
         }
+        acl(parent)?;
     }
     Ok(())
 }

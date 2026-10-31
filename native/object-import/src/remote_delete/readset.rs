@@ -89,8 +89,12 @@ fn validate_hash(hash: &str) -> io::Result<()> {
 }
 
 fn optional(path: &Path) -> io::Result<Option<Vec<u8>>> {
-    match fs::metadata(path) {
-        Ok(meta) if meta.len() > 32 * 1024 * 1024 => {
+    match fs::symlink_metadata(path) {
+        Ok(meta)
+            if meta.file_type().is_symlink()
+                || !meta.is_file()
+                || meta.len() > 32 * 1024 * 1024 =>
+        {
             return Err(invalid("remote object readset budget"));
         }
         Ok(_) => {}

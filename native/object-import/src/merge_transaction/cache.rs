@@ -101,7 +101,11 @@ pub(super) fn receipts(input: &Value, output: &mut Value, trace: Trace) -> io::R
         .ok_or_else(|| invalid("merge body token"))?
         .to_owned();
     let directory = PathBuf::from(
-        input["snapshotDirectory"].as_str().ok_or_else(|| invalid("merge capsule directory"))?,
+        input["snapshotDirectory"]
+            .as_str()
+            .map(str::trim)
+            .filter(|dir| !dir.is_empty() && !dir.contains('\0'))
+            .ok_or_else(|| invalid("merge capsule directory"))?,
     );
     output["reads"] = trace.stats();
     let retained = output["bodies"]

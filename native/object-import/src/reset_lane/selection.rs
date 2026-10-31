@@ -81,7 +81,7 @@ fn add_detached(repository: &Repository, local: &mut Vec<String>) -> io::Result<
 }
 
 fn eligible(repository: &Repository, hash: &str) -> io::Result<bool> {
-    if hash == repository.heads.current {
+    if hash.trim().eq_ignore_ascii_case(repository.heads.current.trim()) {
         return Ok(true);
     }
     let version = match outbound::read_object(&repository.objects, hash, "Version") {

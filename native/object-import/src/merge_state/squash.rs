@@ -54,16 +54,17 @@ fn rewrite(input: &Policy, previous: &[String]) -> io::Result<Value> {
     } else {
         ("none", None)
     };
+    let previous_parents: Vec<_> = previous
+        .iter()
+        .map(|entry| entry.trim().to_owned())
+        .collect();
     let parents = match parent {
-        Some(_) if legacy => previous
-            .iter()
-            .map(|entry| entry.trim().to_owned())
-            .collect(),
+        Some(_) if legacy => previous_parents.clone(),
         Some(parent) => vec![parent.trim().to_owned()],
         None => Vec::new(),
     };
     Ok(
-        json!({"action":"rewrite","parentChoice":choice,"parents":parents,"previousParents":previous}),
+        json!({"action":"rewrite","parentChoice":choice,"parents":parents,"previousParents":previous_parents}),
     )
 }
 fn validate(input: &Policy) -> io::Result<()> {

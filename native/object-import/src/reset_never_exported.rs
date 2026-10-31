@@ -34,9 +34,9 @@ impl Plan {
             if let Some((label, path, data)) = select_row(root, key, row)? {
                 labels.push(label);
                 objects.push((path, data));
-                row.as_object_mut()
-                    .ok_or_else(|| invalid("never-exported row"))?
-                    .insert("version".into(), Value::String(String::new()));
+                let row_obj = row.as_object_mut().ok_or_else(|| invalid("never-exported row"))?;
+                row_obj.insert("version".into(), Value::String(String::new()));
+                row_obj.shift_remove("nextVersion");
             }
         }
         let after = crate::inspection::render_bitmap(&bitmap)?;
@@ -105,17 +105,25 @@ fn select_row(root: &Path, key: &str, row: &Value) -> io::Result<Option<Selected
         .unwrap_or_default();
     let identity = format!("{scope}/{name}");
     let label = if version.is_empty() { identity } else { format!("{identity}@{version}") };
+    let (path, data) = read_object_file(root, name)?;
+    Ok(Some((label, path, data)))
+}
+
+fn read_object_file(root: &Path, name: &str) -> io::Result<(PathBuf, Option<Vec<u8>>)> {
     let hash = format!("{:x}", Sha1::digest(name.as_bytes()));
     let path = crate::scope_path(root)
         .join("objects")
         .join(&hash[..2])
         .join(&hash[2..]);
+    if fs::symlink_metadata(&path).is_ok_and(|meta| meta.file_type().is_symlink()) {
+        return Err(invalid("never-exported object symlink"));
+    }
     let data = match fs::read(&path) {
         Ok(data) => Some(data),
         Err(error) if error.kind() == io::ErrorKind::NotFound => None,
         Err(error) => return Err(error),
     };
-    Ok(Some((label, path, data)))
+    Ok((path, data))
 }
 
 fn is_ignored_row(key: &str, row: &Value) -> bool {

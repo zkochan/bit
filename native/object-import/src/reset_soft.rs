@@ -26,7 +26,13 @@ pub struct Plan {
 
 impl Plan {
     pub fn prepare(root: &Path, pattern: Option<&str>) -> io::Result<Self> {
-        Self::prepare_with(root, pattern.map(str::trim), None)
+        Self::prepare_with(
+            root,
+            pattern
+                .map(str::trim)
+                .filter(|pat| !pat.is_empty()),
+            None,
+        )
     }
 
     pub fn prepare_selected(root: &Path, identities: &[String]) -> io::Result<Self> {
@@ -85,7 +91,14 @@ fn select(
 ) -> io::Result<Vec<Entry>> {
     let mut found = Vec::new();
     for (key, row) in rows.iter_mut() {
-        if key.starts_with('$') || key == "_bit_lane" || key == "version" {
+        let key_trimmed = key.trim();
+        if key_trimmed.is_empty()
+            || key_trimmed.starts_with('$')
+            || key_trimmed == "_bit_lane"
+            || key_trimmed == "version"
+            || !row.is_object()
+            || row["isAvailableOnCurrentLane"] == false
+        {
             continue;
         }
         let Some(version) = row["nextVersion"]["version"]

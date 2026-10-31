@@ -78,6 +78,7 @@ impl Reader<'_> {
         known: &mut HashSet<String>,
         added: &mut Vec<Version>,
     ) -> io::Result<()> {
+        let head = head.trim();
         hash(head)?;
         let mut stack = vec![head.to_string()];
         while let Some(current) = stack.pop() {
@@ -87,7 +88,7 @@ impl Reader<'_> {
             count(known.len())?;
             let version = self.version(&current)?;
             for parent in version.parents.iter().rev() {
-                stack.push(parent.clone());
+                stack.push(parent.trim().to_string());
             }
             added.push(version);
         }

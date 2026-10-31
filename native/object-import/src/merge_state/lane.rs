@@ -35,9 +35,11 @@ struct Options {
 
 pub(super) fn plan(input: &Plan) -> io::Result<Value> {
     validate(input)?;
-    let hidden = input.lane.explicit_hidden.unwrap_or_else(|| {
-        input.lane.existing_hidden && input.lane.existing_visible_head.is_none()
-    });
+    let has_visible_head = input.lane.existing_visible_head
+        .as_deref()
+        .is_some_and(|val| !val.trim().is_empty());
+    let hidden =
+        input.lane.explicit_hidden.unwrap_or(input.lane.existing_hidden && !has_visible_head);
     let mut output = json!({
         "bucket":if hidden {"hidden"} else {"visible"},
         "overrideUpdateDependents":hidden && !input.lane.existing_hidden,
@@ -68,9 +70,13 @@ fn validate(input: &Plan) -> io::Result<()> {
     let has_parent = input.parent
         .as_deref()
         .is_some_and(|val| !val.trim().is_empty());
-    if !has_parent
-        && (input.lane.existing_visible_head.is_some() || input.lane.model_head.is_some())
-    {
+    let has_visible_head = input.lane.existing_visible_head
+        .as_deref()
+        .is_some_and(|val| !val.trim().is_empty());
+    let has_model_head = input.lane.model_head
+        .as_deref()
+        .is_some_and(|val| !val.trim().is_empty());
+    if !has_parent && (has_visible_head || has_model_head) {
         return Err(invalid("lane snapshot requires previous version"));
     }
     Ok(())

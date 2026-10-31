@@ -21,11 +21,21 @@ pub(super) fn remote_head(
     {
         return Err(invalid("lane reset remote ref path"));
     }
-    let path = crate::scope_path(root)
+    let scope_dir = crate::scope_path(root);
+    let path = scope_dir
         .join("refs/remotes")
         .join(lane_scope)
         .join(lane_name);
-    let Some(bytes) = proofs::read(&path, reads)? else { return Ok(None) };
+    let bytes = if let Some(bytes) = proofs::read(&path, reads)? {
+        bytes
+    } else {
+        let legacy = scope_dir
+            .join("refs/remote")
+            .join(lane_scope)
+            .join(lane_name);
+        let Some(bytes) = proofs::read(&legacy, reads)? else { return Ok(None) };
+        bytes
+    };
     if bytes.len() > 4 * 1024 * 1024 {
         return Err(invalid("lane reset remote refs oversized"));
     }

@@ -28,22 +28,37 @@ pub(crate) fn read_at(directory: &Path, lane_hash: &str) -> io::Result<Value> {
         return Err(invalid());
     }
     let history = value["history"].as_object().ok_or_else(invalid)?;
-    if history.len() > 4096 {
+    if history.len() > 4096
+        || history
+            .iter()
+            .any(|(id, entry)| !valid_history_entry(id, entry))
+    {
         return Err(invalid());
     }
-    for (id, entry) in history {
-        if id.trim().is_empty()
-            || !entry["log"].is_object()
-            || entry["log"]["date"]
-                .as_str()
-                .and_then(|date| date.trim().parse::<i64>().ok())
-                .is_none()
-            || !entry["components"].is_array()
-        {
-            return Err(invalid());
-        }
-    }
     Ok(value)
+}
+
+fn valid_history_entry(id: &str, entry: &Value) -> bool {
+    let valid_components = entry["components"]
+        .as_array()
+        .is_some_and(|rows| {
+            rows.iter()
+                .all(|row| {
+                    row.as_str()
+                        .is_some_and(|text| !text.trim().is_empty())
+                })
+        });
+    let invalid_dependents = entry
+        .get("updateDependents")
+        .is_some_and(|dependents| !dependents.is_null() && !dependents.is_array());
+    !id.trim().is_empty()
+        && entry["log"].is_object()
+        && entry["log"]["date"]
+            .as_str()
+            .and_then(|date| date.trim().parse::<i64>().ok())
+            .is_some()
+        && valid_components
+        && !invalid_dependents
 }
 
 pub(crate) fn hash(lane_hash: &str) -> String {

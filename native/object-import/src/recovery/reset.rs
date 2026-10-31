@@ -92,11 +92,11 @@ fn select(input: &Value, needed: bool) -> io::Result<Selection> {
     walk(array(input, "versions")?, head)
 }
 fn walk(versions: &[Value], head: &str) -> io::Result<Selection> {
-    let mut current = head;
+    let mut current = head.trim();
     let mut seen = HashSet::new();
     while let Some(index) = versions
         .iter()
-        .position(|version| version["hash"] == current)
+        .position(|version| version["hash"].as_str().map(str::trim) == Some(current))
     {
         if !seen.insert(index) {
             return Err(invalid("reset cycle"));
@@ -111,7 +111,7 @@ fn walk(versions: &[Value], head: &str) -> io::Result<Selection> {
         let parent = text(&parents[0])?;
         if !versions
             .iter()
-            .any(|version| version["hash"] == parent)
+            .any(|version| version["hash"].as_str().map(str::trim) == Some(parent))
         {
             return Ok(Selection {
                 hash: Some(parent.into()),

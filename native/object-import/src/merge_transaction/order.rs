@@ -39,6 +39,7 @@ pub(super) fn permutation(input: &Value, groups: &[Value], count: usize) -> io::
 fn indices(value: &Value, loads: bool) -> io::Result<Vec<usize>> {
     value
         .as_array()
+        .filter(|rows| rows.len() <= 4096)
         .ok_or_else(|| invalid("merge order array"))?
         .iter()
         .map(|row| {

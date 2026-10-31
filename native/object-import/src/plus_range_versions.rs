@@ -42,11 +42,11 @@ fn dependency_usage(dependency: &Value) -> Option<String> {
                 format!("{}/{}", text(&target["scope"]), text(&target["name"]))
             },
             |id| {
-                id.trim()
-                    .split('@')
-                    .next()
-                    .unwrap_or(id)
-                    .trim()
+                let trimmed = id.trim();
+                trimmed
+                    .rsplit_once('@')
+                    .filter(|(base, _)| !base.trim().is_empty())
+                    .map_or(trimmed, |(base, _)| base.trim())
                     .to_owned()
             },
         );

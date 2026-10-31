@@ -165,13 +165,14 @@ impl ComponentPlan {
     fn actions(&self) -> Vec<Value> {
         let mut present: HashSet<_> = self.existing
             .iter()
-            .map(|[tag, _]| tag.as_str())
+            .map(|[tag, _]| tag.trim())
             .collect();
         let mut actions = Vec::new();
         self.replacements(&mut present, &mut actions);
         for (index, [tag, _]) in self.incoming.iter().enumerate() {
+            let tag_str = tag.trim();
             let missing =
-                if self.origin { present.insert(tag) } else { !present.contains(tag.as_str()) };
+                if self.origin { present.insert(tag_str) } else { !present.contains(tag_str) };
             if missing {
                 actions.push(json!([if self.origin { "tag" } else { "orphan" }, 1, index]));
             }
@@ -180,7 +181,7 @@ impl ComponentPlan {
             self.orphaned
                 .iter()
                 .enumerate()
-                .filter(|(_, [tag, _])| !present.contains(tag.as_str()))
+                .filter(|(_, [tag, _])| !present.contains(tag.trim()))
                 .map(|(index, _)| json!(["orphan", 2, index])),
         );
         actions

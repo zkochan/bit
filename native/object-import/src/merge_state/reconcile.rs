@@ -77,7 +77,14 @@ fn previous(input: &Plan) -> io::Result<&str> {
     Ok(previous)
 }
 fn parents(input: &Plan, parent: &str) -> Vec<String> {
-    if input.is_legacy { input.current_parents.clone() } else { vec![parent.into()] }
+    if input.is_legacy {
+        input.current_parents
+            .iter()
+            .map(|entry| entry.trim().to_owned())
+            .collect()
+    } else {
+        vec![parent.into()]
+    }
 }
 fn legacy_unrelated(input: &Plan, lane: &Value) -> io::Result<Value> {
     let previous = previous(input)?;
@@ -101,17 +108,26 @@ fn squashed(input: &Plan, lane: &Value) -> io::Result<Value> {
         .first()
         .map(|val| val.trim())
         .ok_or_else(|| invalid("squashed snapshot requires first parent"))?;
-    let set_message = input.current_message.as_ref().is_none_or(String::is_empty);
-    Ok(json!({"mode":"squashed","parents":input.current_parents,
+    let parents: Vec<_> = input.current_parents
+        .iter()
+        .map(|entry| entry.trim().to_owned())
+        .collect();
+    let set_message = input.current_message
+        .as_ref()
+        .is_none_or(|msg| msg.trim().is_empty());
+    Ok(json!({"mode":"squashed","parents":parents,
         "squashed":{"previousParents":[parent,input.entry.head.trim()],"lane":lane},
         "setMergeMessage":set_message}))
 }
 fn merged(input: &Plan) -> Value {
-    let mut parents = input.current_parents.clone();
+    let mut parents: Vec<_> = input.current_parents
+        .iter()
+        .map(|entry| entry.trim().to_owned())
+        .collect();
     if !input.is_legacy
         && !parents
             .iter()
-            .any(|parent| parent.trim().eq_ignore_ascii_case(input.entry.head.trim()))
+            .any(|parent| parent.eq_ignore_ascii_case(input.entry.head.trim()))
     {
         parents.push(input.entry.head.trim().to_owned());
     }

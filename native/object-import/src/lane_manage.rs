@@ -110,10 +110,15 @@ impl Documents {
         if self.bitmap["_bit_lane"]["exported"] != false
             || !self.scope_json["lanes"]["new"]
                 .as_array()
-                .is_some_and(|names| names.contains(&json!(name)))
+                .is_some_and(|names| {
+                    names
+                        .iter()
+                        .any(|entry| entry.as_str().map(str::trim) == Some(name.as_str()))
+                })
             || self.scope_json["lanes"]["current"]
                 .as_str()
-                .is_some_and(|current| current != "main")
+                .map(str::trim)
+                .is_some_and(|current| !current.is_empty() && current != "main")
         {
             return Err(invalid());
         }
@@ -126,13 +131,17 @@ impl Documents {
         }
         let scope = self.scope_json["name"]
             .as_str()
+            .map(str::trim)
+            .filter(|scope| !scope.is_empty())
             .ok_or_else(invalid)?
             .to_owned();
         Ok(("main".to_owned(), scope))
     }
 
     fn resolve_lane_id(&self, name: &str) -> io::Result<(String, String)> {
+        let name = name.trim();
         if let Some((scope, lane_name)) = name.split_once('/') {
+            let (scope, lane_name) = (scope.trim(), lane_name.trim());
             if scope.is_empty() || lane_name.is_empty() || lane_name.contains('/') {
                 return Err(invalid());
             }
@@ -141,6 +150,8 @@ impl Documents {
         if name == "main" {
             let scope = self.scope_json["name"]
                 .as_str()
+                .map(str::trim)
+                .filter(|scope| !scope.is_empty())
                 .ok_or_else(invalid)?
                 .to_owned();
             return Ok(("main".to_owned(), scope));
@@ -197,6 +208,8 @@ impl Documents {
             .iter()
             .find(|row| matches_lane_row(row, &original.name, &original.scope))
             .and_then(|row| row["hash"].as_str())
+            .map(str::trim)
+            .filter(|hash| !hash.is_empty())
             .map(str::to_owned)
             .ok_or_else(invalid)
     }
@@ -207,8 +220,8 @@ impl Documents {
         original: &Original,
     ) -> io::Result<(String, String, String)> {
         let (name, scope, message) = match change {
-            Change::Rename(name) => self.rename(name, original)?,
-            Change::Scope(scope) => self.change_scope(scope, original)?,
+            Change::Rename(name) => self.rename(name.trim(), original)?,
+            Change::Scope(scope) => self.change_scope(scope.trim(), original)?,
         };
         let new_id = json!({"name":name,"scope":scope});
         let row = self.index["lanes"]
@@ -234,20 +247,20 @@ impl Documents {
             || duplicate
             || tracking
                 .iter()
-                .any(|row| row["localLane"] == name)
+                .any(|row| row["localLane"].as_str().map(str::trim) == Some(name))
         {
             return Err(invalid());
         }
         let tracked = tracking
             .iter_mut()
-            .find(|row| row["localLane"] == original.name)
+            .find(|row| row["localLane"].as_str().map(str::trim) == Some(original.name.as_str()))
             .ok_or_else(invalid)?;
         tracked["localLane"] = json!(name);
         tracked["remoteLane"] = json!(name);
         let new = self.scope_json["lanes"]["new"].as_array_mut().ok_or_else(invalid)?;
         for value in new
             .iter_mut()
-            .filter(|value| **value == original.name)
+            .filter(|value| value.as_str().map(str::trim) == Some(original.name.as_str()))
         {
             *value = json!(name);
         }
@@ -275,7 +288,7 @@ impl Documents {
             .as_array_mut()
             .ok_or_else(invalid)?
             .iter_mut()
-            .find(|row| row["localLane"] == original.name)
+            .find(|row| row["localLane"].as_str().map(str::trim) == Some(original.name.as_str()))
             .ok_or_else(invalid)?;
         tracked["remoteScope"] = json!(scope);
         Ok((
@@ -304,7 +317,9 @@ impl Objects {
             lane_hash,
             "Lane",
         )?;
-        if lane["name"] != original.name || lane["scope"] != original.scope {
+        if lane["name"].as_str().map(str::trim) != Some(original.name.as_str())
+            || lane["scope"].as_str().map(str::trim) != Some(original.scope.as_str())
+        {
             return Err(invalid());
         }
         Ok(Self {

@@ -177,6 +177,9 @@ fn dependencies(version: &Value) -> Vec<String> {
 
 fn id(value: &Value) -> Option<String> {
     if let Some(text) = non_empty(value).or_else(|| non_empty(&value["id"])) {
+        if let Some((bare, "latest" | "head")) = text.rsplit_once('@') {
+            return Some(bare.trim().to_owned());
+        }
         return Some(text.to_owned());
     }
     let id_obj = value

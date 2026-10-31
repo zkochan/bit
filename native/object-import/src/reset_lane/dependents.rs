@@ -127,7 +127,7 @@ fn tag(model: &Value, hash: &str) -> String {
 }
 
 fn dependency_id(value: &Value) -> Option<String> {
-    if let Some(id) = non_empty_str(value) {
+    if let Some(id) = non_empty_str(value).or_else(|| non_empty_str(&value["id"])) {
         return Some(id.to_owned());
     }
     let id_obj = value

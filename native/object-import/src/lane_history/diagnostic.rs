@@ -62,6 +62,12 @@ fn file_remote(root: &Path, global: &Path, scope: &str) -> io::Result<bool> {
     };
     let host = local["remotes"]
         .get(scope)
+        .filter(|value| {
+            value
+                .as_str()
+                .is_some_and(|text| !text.trim().is_empty())
+        })
+        .or_else(|| global["remotes"].get(scope))
         .unwrap_or_else(|| &global[scope]);
     Ok(host
         .as_str()

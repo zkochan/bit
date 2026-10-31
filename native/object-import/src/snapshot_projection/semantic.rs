@@ -108,12 +108,18 @@ fn component_id(value: &Value) -> io::Result<String> {
         return Err(invalid("dependency component name required"));
     }
     let scope = get(value, "scope");
+    let scope_text = if scope.truthy()? { text(scope)? } else { String::new() };
+    let scope_trimmed = scope_text.trim();
     let mut id =
-        if scope.truthy()? { format!("{}/{name}", text(scope)?.trim()) } else { name.to_owned() };
+        if scope_trimmed.is_empty() { name.to_owned() } else { format!("{scope_trimmed}/{name}") };
     let version = get(value, "version");
     if version.truthy()? {
-        id.push('@');
-        id.push_str(text(version)?.trim());
+        let ver_text = text(version)?;
+        let ver_trimmed = ver_text.trim();
+        if !ver_trimmed.is_empty() {
+            id.push('@');
+            id.push_str(ver_trimmed);
+        }
     }
     Ok(id)
 }

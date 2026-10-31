@@ -234,7 +234,10 @@ fn indexed_hash(index: &Value, section: &str, scope: &str, name: &str) -> io::Re
         index[section].as_array().ok_or_else(|| invalid("lane reset index section"))?
     };
     let row = &rows[unique_position(rows, scope, name)?];
-    let hash = row["hash"].as_str().ok_or_else(|| invalid("lane reset index hash"))?;
+    let hash = row["hash"]
+        .as_str()
+        .map(str::trim)
+        .ok_or_else(|| invalid("lane reset index hash"))?;
     crate::merge_history::hash(hash)?;
     Ok(hash.to_owned())
 }
