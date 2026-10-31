@@ -79,7 +79,11 @@ pub(super) fn apply(plan: &Plan) -> io::Result<()> {
         return Ok(());
     }
     validate(plan)?;
-    fs::remove_dir_all(plan.root.join(&plan.identity.source_directory))
+    match fs::remove_dir_all(plan.root.join(plan.identity.source_directory.trim())) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error),
+    }
 }
 fn reparse(metadata: &fs::Metadata) -> bool {
     #[cfg(windows)]

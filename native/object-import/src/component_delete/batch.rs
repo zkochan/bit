@@ -54,23 +54,9 @@ impl Batch {
             if plan.package.as_os_str().is_empty() {
                 continue;
             }
-            let identity = plan.full_id
-                .split('@')
-                .next()
-                .unwrap_or(&plan.full_id);
-            let Some(name) = components
-                .iter()
-                .find(|row| {
-                    row["identity"]
-                        .as_str()
-                        .or_else(|| row["id"].as_str())
-                        .map(str::trim)
-                        == Some(identity)
-                })
-                .and_then(|row| row["packageName"].as_str())
-                .map(str::trim)
-                .filter(|name| !name.is_empty())
-            else {
+            let full = plan.full_id.trim();
+            let identity = full.rsplit_once('@').map_or(full, |(bare, _)| bare.trim());
+            let Some(name) = matched_package_name(components, identity) else {
                 continue;
             };
             let relative = Path::new(name);
@@ -107,6 +93,24 @@ impl Batch {
             self.plans.iter().filter_map(|plan| plan.files.as_deref()),
         )
     }
+}
+
+fn matched_package_name<'a>(components: &'a [Value], identity: &str) -> Option<&'a str> {
+    components
+        .iter()
+        .find(|row| {
+            row["identity"]
+                .as_str()
+                .or_else(|| row["id"].as_str())
+                .map(|raw| {
+                    let trimmed = raw.trim();
+                    trimmed.rsplit_once('@').map_or(trimmed, |(bare, _)| bare.trim())
+                })
+                == Some(identity)
+        })
+        .and_then(|row| row["packageName"].as_str())
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
 }
 
 fn dependency_facts(

@@ -36,12 +36,13 @@ fn used_removed_aspect<'a>(identities: &'a [String], extensions: &[Value]) -> Op
     identities
         .iter()
         .find(|removed| {
+            let target = removed.trim();
             extensions
                 .iter()
                 .filter_map(extension_id)
-                .any(|id| *removed == &id)
+                .any(|id| target == id)
         })
-        .map(String::as_str)
+        .map(|removed| removed.trim())
 }
 fn extension_id(value: &Value) -> Option<String> {
     if let Some(id) = value
@@ -52,18 +53,20 @@ fn extension_id(value: &Value) -> Option<String> {
         .map(str::trim)
         .filter(|id| !id.is_empty())
     {
-        let bare = id.split('@').next()?.trim();
+        let bare = match id.rsplit_once('@') {
+            Some((prefix, _)) if !prefix.trim().is_empty() => prefix.trim(),
+            _ => id,
+        };
         return (!bare.is_empty()).then(|| bare.to_owned());
     }
     let id = value
         .get("extensionId")
         .or_else(|| value.get("id"))?;
-    let name = id["name"]
-        .as_str()?
-        .trim()
-        .split('@')
-        .next()?
-        .trim();
+    let raw_name = id["name"].as_str()?.trim();
+    let name = match raw_name.rsplit_once('@') {
+        Some((prefix, _)) if !prefix.trim().is_empty() => prefix.trim(),
+        _ => raw_name,
+    };
     if name.is_empty() {
         return None;
     }

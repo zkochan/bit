@@ -254,8 +254,18 @@ pub(super) fn date(version: &Value) -> io::Result<&str> {
     version["modified"]
         .as_array()
         .and_then(|rows| rows.last())
-        .map_or(&version["log"]["date"], |row| &row["date"])
-        .as_str()
+        .and_then(|row| {
+            row["date"]
+                .as_str()
+                .map(str::trim)
+                .filter(|date| !date.is_empty())
+        })
+        .or_else(|| {
+            version["log"]["date"]
+                .as_str()
+                .map(str::trim)
+                .filter(|date| !date.is_empty())
+        })
         .ok_or_else(|| invalid("import Version date"))
 }
 pub(super) fn update_index(
@@ -263,6 +273,7 @@ pub(super) fn update_index(
     target: &Target,
     hash: &str,
 ) -> io::Result<()> {
+    let hash = hash.trim();
     let rows = if plan.writes.index.is_array() {
         &mut plan.writes.index
     } else {
@@ -271,13 +282,17 @@ pub(super) fn update_index(
     let rows = rows.as_array_mut().ok_or_else(|| invalid("import index components"))?;
     if rows
         .iter()
-        .any(|row| row["hash"] == hash)
+        .any(|row| row["hash"].as_str().map(str::trim) == Some(hash))
     {
         return Ok(());
     }
     plan.writes.index_changed = true;
+    let scope = target.scope
+        .as_deref()
+        .map(str::trim)
+        .filter(|scope| !scope.is_empty());
     rows.push(
-        json!({"id":{"scope":target.scope,"name":target.name},"isSymlink":false,"hash":hash}),
+        json!({"id":{"scope":scope,"name":target.name.trim()},"isSymlink":false,"hash":hash}),
     );
     Ok(())
 }

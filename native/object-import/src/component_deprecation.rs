@@ -157,7 +157,14 @@ pub fn set_config(
     undo: bool,
 ) -> io::Result<()> {
     let key = selection::key(bitmap, identity)?.to_owned();
-    let replacement = replacement.map(|id| selection::id_object(bitmap, id)).transpose()?;
+    let replacement = replacement
+        .map(str::trim)
+        .filter(|val| !val.is_empty())
+        .map(|id| selection::id_object(bitmap, id))
+        .transpose()?;
+    let range = range
+        .map(str::trim)
+        .filter(|val| !val.is_empty());
     let row = &mut bitmap[&key];
     if !row["config"].is_object() {
         row["config"] = json!({});
@@ -165,7 +172,7 @@ pub fn set_config(
     if let Some(cfg) = row["config"].as_object_mut() {
         cfg.retain(|cfg_key, _| !cfg_key.starts_with(&format!("{ASPECT}@")));
     }
-    let mut config = json!({"deprecate":!undo && range.is_none_or(str::is_empty)});
+    let mut config = json!({"deprecate":!undo && range.is_none()});
     if undo {
         config["newId"] = json!("");
     } else if let Some(id) = replacement {

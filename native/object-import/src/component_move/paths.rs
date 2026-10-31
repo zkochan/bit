@@ -66,7 +66,9 @@ pub(super) fn relative(root: &Path, path: &Path) -> io::Result<String> {
         .strip_prefix(root)
         .map_err(|_| unsupported("move outside workspace"))?
         .to_string_lossy()
-        .replace('\\', "/"))
+        .replace('\\', "/")
+        .trim_matches('/')
+        .to_owned())
 }
 pub(super) fn observe_tree(root: &Path, path: &Path, observed: &mut Observed) -> io::Result<()> {
     observed.ancestors(root, path)?;

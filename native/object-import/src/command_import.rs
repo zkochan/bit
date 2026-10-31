@@ -145,16 +145,25 @@ impl PreparedImport {
         targets: &[Target],
         default_scope: &str,
     ) -> bool {
+        let default_scope = default_scope.trim();
+        let local_scope = self.environment.local_scope.trim();
+        let is_unmapped = |scope: &str| {
+            !self.environment.remote_overrides.contains_key(scope)
+                && self.environment.remotes.get(scope).is_none()
+        };
         let mut external = targets
             .iter()
-            .map(|target| target.scope.as_deref().unwrap_or(default_scope))
-            .filter(|scope| *scope != self.environment.local_scope.as_str());
+            .filter_map(|target| {
+                target.scope
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|scope| !scope.is_empty())
+                    .or_else(|| (!default_scope.is_empty()).then_some(default_scope))
+            })
+            .filter(|scope| *scope != local_scope);
         external
             .next()
-            .is_some_and(|first| {
-                self.environment.remotes.get(first).is_none()
-                    && external.all(|scope| self.environment.remotes.get(scope).is_none())
-            })
+            .is_some_and(|first| is_unmapped(first) && external.all(is_unmapped))
     }
 
     pub(crate) fn recovery_staged(&mut self, bytes: Option<&[u8]>) -> io::Result<()> {

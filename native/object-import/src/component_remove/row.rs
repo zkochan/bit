@@ -16,15 +16,19 @@ pub(super) fn supported_row<'a>(
     let identity = (key_id == name || key_id == format!("{scope}/{name}"))
         && valid_name(name)
         && valid_scope(scope);
+    let row_scope = row["scope"]
+        .as_str()
+        .map(str::trim)
+        .filter(|val| !val.is_empty());
+    let row_default = row["defaultScope"]
+        .as_str()
+        .map(str::trim)
+        .filter(|val| !val.is_empty());
     let local = if matches!(kind, RowKind::Imported | RowKind::ExportedLane) {
-        (row["scope"].as_str().map(str::trim) == Some(scope)
-            || (row.get("scope").is_none() && id_scope == Some(scope)))
-            && row.get("defaultScope").is_none()
+        (row_scope == Some(scope) || (row_scope.is_none() && id_scope == Some(scope)))
+            && row_default.is_none()
     } else {
-        row["scope"]
-            .as_str()
-            .map_or("", str::trim)
-            .is_empty()
+        row_scope.is_none()
     };
     if !identity
         || !local

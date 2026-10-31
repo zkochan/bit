@@ -28,7 +28,7 @@ impl LocalBatch {
         track: bool,
         components: &[Value],
     ) -> io::Result<Self> {
-        if !root.is_absolute() {
+        if !root.is_absolute() || identities.len() > 4096 || components.len() > 4096 {
             return Err(invalid("component removal workspace root must be absolute"));
         }
         preparation::prepare(root, identities, keep_files, track, components)

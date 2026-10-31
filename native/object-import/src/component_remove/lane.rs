@@ -99,6 +99,7 @@ fn read_lane(root: &Path, scope: &str, name: &str) -> io::Result<Lane> {
 
 pub(crate) fn matches_component_entry(entry: &Value, scope: &str, name: &str) -> bool {
     let (entry_scope, entry_name) = lane_id_parts(&entry["id"]);
+    let (scope, name) = (scope.trim(), name.trim());
     entry_name == name && (entry_scope == scope || entry_scope.is_empty())
 }
 
@@ -119,9 +120,17 @@ fn validate_component(
     }
     let head = matching
         .first()
-        .and_then(|entry| entry["head"].as_str())
-        .map(str::trim);
-    let expected = expected_version.map(str::trim);
+        .and_then(|entry| {
+            entry["head"]
+                .as_str()
+                .or_else(|| entry["head"]["ref"].as_str())
+                .or_else(|| entry["head"]["hash"].as_str())
+        })
+        .map(str::trim)
+        .filter(|val| !val.is_empty());
+    let expected = expected_version
+        .map(str::trim)
+        .filter(|val| !val.is_empty());
     if matches!(kind, RowKind::LaneSnap | RowKind::ExportedLane)
         && (matching.len() != 1
             || head

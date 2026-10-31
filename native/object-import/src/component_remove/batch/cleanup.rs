@@ -125,8 +125,12 @@ fn manifest(root: &Path, packages: &[String]) -> io::Result<Option<Change>> {
     };
     let dependencies =
         dependencies.as_object_mut().ok_or_else(|| invalid("workspace package dependencies"))?;
+    let mut changed = false;
     for package in packages {
-        dependencies.shift_remove(package);
+        changed |= dependencies.shift_remove(package.trim()).is_some();
+    }
+    if !changed {
+        return Ok(None);
     }
     let text = std::str::from_utf8(&before).map_err(io::Error::other)?;
     let after = bit_workspace_config::package_json::stringify_package(

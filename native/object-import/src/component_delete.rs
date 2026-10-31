@@ -308,7 +308,7 @@ fn find_indexed_model_hash<'a>(rows: &'a [Value], scope: &str, name: &str) -> io
 
 fn resolve_model_version<'a>(value: &'a Value, version: &'a str) -> Option<&'a str> {
     let version = version.trim();
-    if matches!(version, "latest" | "head") {
+    if matches!(version, "" | "latest" | "head") {
         return value["head"]
             .as_str()
             .map(str::trim)
@@ -319,7 +319,11 @@ fn resolve_model_version<'a>(value: &'a Value, version: &'a str) -> Option<&'a s
         .or_else(|| value["orphanedVersions"][version].as_str())
         .map(str::trim)
         .filter(|val| !val.is_empty())
-        .or_else(|| (version.len() == 40).then_some(version))
+        .or_else(|| {
+            (version.len() == 40 && version.bytes().all(|byte| byte.is_ascii_hexdigit())).then_some(
+                version,
+            )
+        })
 }
 
 fn lane_state(

@@ -92,12 +92,20 @@ fn write_lanes(plans: &[VersionedPlan]) -> io::Result<()> {
     fs::write(&first.path, outbound::encode_object(&first.hash, "Lane", &value)?)
 }
 fn remove_object(path: &std::path::Path) -> io::Result<()> {
-    fs::remove_file(path)?;
+    match fs::remove_file(path) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error),
+    }
     let parent = path.parent().ok_or_else(|| invalid("object directory"))?;
-    if fs::read_dir(parent)?.next().is_none() {
+    if fs::read_dir(parent).is_ok_and(|mut entries| entries.next().is_none()) {
         match fs::remove_dir(parent) {
             Ok(()) => {}
-            Err(error) if error.kind() == io::ErrorKind::DirectoryNotEmpty => {}
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::DirectoryNotEmpty | io::ErrorKind::NotFound,
+                ) => {}
             Err(error) => return Err(error),
         }
     }

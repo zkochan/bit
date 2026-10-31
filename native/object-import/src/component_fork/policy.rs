@@ -40,7 +40,12 @@ pub fn dependency_policy(source: &Value) -> io::Result<Vec<Value>> {
     Ok(output)
 }
 fn excluded_dependency(row: &Value, excluded: Option<&Vec<Value>>) -> bool {
-    let Some(component) = row.get("componentId") else { return row["id"] == "@teambit/legacy" };
+    let Some(component) = row
+        .get("componentId")
+        .filter(|val| !val.is_null())
+    else {
+        return row["id"].as_str().map(str::trim) == Some("@teambit/legacy");
+    };
     let Some(identity) = component_identity(component) else { return false };
     excluded.is_some_and(|rows| {
         rows.iter()
@@ -51,17 +56,15 @@ fn component_identity(component: &Value) -> Option<String> {
     component
         .as_str()
         .map(|id| {
-            id.trim()
-                .split('@')
-                .next()
-                .unwrap_or(id)
-                .trim()
+            let trimmed = id.trim();
+            trimmed.rsplit_once('@').map_or(trimmed, |(bare, _)| bare.trim())
         })
         .filter(|id| !id.is_empty())
         .map(str::to_owned)
         .or_else(|| {
             let scope = component["scope"].as_str()?.trim();
-            let name = component["name"].as_str()?.trim();
+            let raw_name = component["name"].as_str()?.trim();
+            let name = raw_name.rsplit_once('@').map_or(raw_name, |(bare, _)| bare.trim());
             (!scope.is_empty() && !name.is_empty()).then(|| format!("{scope}/{name}"))
         })
 }

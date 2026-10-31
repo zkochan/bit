@@ -122,35 +122,34 @@ fn validate_graph(bitmap: &Value, components: &[DependencyComponent]) -> io::Res
     Ok(())
 }
 
+fn non_empty_str(value: &Value) -> Option<&str> {
+    value
+        .as_str()
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+}
+
 fn bitmap_row_identity(key: &str, row: &Value) -> io::Result<String> {
+    let key = key.trim();
     let (key_id, key_ver) = key
         .rsplit_once('@')
-        .map_or((key, None), |(id, ver)| (id, Some(ver)));
-    let key_scope = key_id.split_once('/').map(|(scope_part, _)| scope_part);
-    let scope = row["scope"]
-        .as_str()
-        .map(str::trim)
-        .filter(|scope| !scope.is_empty())
-        .or_else(|| {
-            row["defaultScope"]
-                .as_str()
-                .map(str::trim)
-                .filter(|scope| !scope.is_empty())
-        })
+        .map_or((key, None), |(id, ver)| (id.trim(), Some(ver.trim())));
+    let key_scope = key_id
+        .split_once('/')
+        .map(|(scope_part, _)| scope_part.trim())
+        .filter(|scope| !scope.is_empty());
+    let scope = non_empty_str(&row["scope"])
+        .or_else(|| non_empty_str(&row["defaultScope"]))
         .or(key_scope)
         .ok_or_else(|| invalid("dependency component scope"))?;
-    let name = row["name"]
-        .as_str()
-        .map(str::trim)
-        .filter(|name| !name.is_empty())
+    let name = non_empty_str(&row["name"])
         .unwrap_or_else(|| {
             key_id
                 .strip_prefix(&format!("{scope}/"))
                 .unwrap_or(key_id)
+                .trim()
         });
-    let version = row["version"]
-        .as_str()
-        .map(str::trim)
+    let version = non_empty_str(&row["version"])
         .or(key_ver)
         .ok_or_else(|| invalid("dependency component version"))?;
     Ok(if version.is_empty() {
@@ -161,9 +160,11 @@ fn bitmap_row_identity(key: &str, row: &Value) -> io::Result<String> {
 }
 
 fn matches_index_row(row: &Value, scope: &str, name: &str) -> bool {
+    let scope = scope.trim();
+    let name = name.trim();
     let (row_scope, row_name) =
         crate::workspace::engine::command::inbound::remote::file_list::row_id_parts(row)
-            .map_or(("", ""), |(sc, nm)| (sc.unwrap_or_default(), nm));
+            .map_or(("", ""), |(sc, nm)| (sc.unwrap_or_default().trim(), nm.trim()));
     row["isSymlink"] != true && row_name == name && (row_scope.is_empty() || row_scope == scope)
 }
 

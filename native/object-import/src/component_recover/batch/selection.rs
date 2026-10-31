@@ -58,9 +58,7 @@ pub(super) fn key(bitmap: &Value, id: &str) -> io::Result<Option<String>> {
 }
 pub(super) fn bare(id: &str) -> &str {
     let id = id.trim();
-    id.split('@')
-        .next()
-        .map_or(id, str::trim)
+    id.rsplit_once('@').map_or(id, |(bare, _)| bare.trim())
 }
 pub(super) fn select(batch: &mut Batch, pattern: &str) -> io::Result<Vec<String>> {
     if !pattern.contains(['*', '?']) {
@@ -155,10 +153,16 @@ fn lane_component(batch: &mut Batch, pattern: &str) -> io::Result<Option<String>
     let (row_scope, row_name) = repository::row_id_parts(&row["id"]);
     let bare = format!("{row_scope}/{row_name}");
     let version = pattern
-        .split_once('@')
-        .map(|(_, version)| version)
+        .trim()
+        .rsplit_once('@')
+        .map(|(_, version)| version.trim())
         .filter(|version| !version.is_empty() && !matches!(*version, "latest" | "head"))
-        .or_else(|| row["head"].as_str())
+        .or_else(|| {
+            row["head"]
+                .as_str()
+                .map(str::trim)
+                .filter(|head| !head.is_empty())
+        })
         .ok_or_else(|| invalid("recovery lane head"))?;
     Ok(Some(format!("{bare}@{version}")))
 }

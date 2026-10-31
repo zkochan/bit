@@ -60,7 +60,13 @@ fn matching(bitmap: &serde_json::Value, parts: &[&str]) -> io::Result<Vec<String
 }
 fn matches(id: &str, parts: &[&str]) -> bool {
     let id = strip_version(id);
-    let matched = |pattern: &str| bit_workspace_config::glob::matches(strip_version(pattern), id);
+    let matched = |pattern: &str| {
+        let pat = strip_version(pattern);
+        bit_workspace_config::glob::matches(pat, id)
+            || id
+                .split_once('/')
+                .is_some_and(|(_, name)| bit_workspace_config::glob::matches(pat, name))
+    };
     parts
         .iter()
         .filter(|part| !part.trim().starts_with('!'))
@@ -77,7 +83,7 @@ fn matches(id: &str, parts: &[&str]) -> bool {
 fn strip_version(value: &str) -> &str {
     let trimmed = value.trim();
     match trimmed.rsplit_once('@') {
-        Some((base, _)) if !base.is_empty() => base,
+        Some((base, _)) if !base.trim().is_empty() => base.trim(),
         _ => trimmed,
     }
 }

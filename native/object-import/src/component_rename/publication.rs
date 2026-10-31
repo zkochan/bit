@@ -50,7 +50,11 @@ pub(super) fn finish_original(
     if !package.as_os_str().is_empty()
         && (!plan.identity.exported || !plan.options.deprecate)
     {
-        remove(&plan.root.join("node_modules").join(package))?;
+        let relative = Path::new("node_modules").join(&package);
+        if let Some(parent) = relative.parent() {
+            crate::component_remove::validate_ancestors(&plan.root, parent)?;
+        }
+        remove(&plan.root.join(relative))?;
     }
     if !plan.identity.exported {
         return Ok(());

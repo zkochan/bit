@@ -24,8 +24,9 @@ pub fn probe_remote(
         .block_on(async {
             let mut result = BTreeMap::new();
             for id in ids {
-                let (scope, _) = id
-                    .trim()
+                let trimmed = id.trim();
+                let bare = trimmed.rsplit_once('@').map_or(trimmed, |(prefix, _)| prefix.trim());
+                let (scope, _) = bare
                     .split_once('/')
                     .map(|(scope, name)| (scope.trim(), name.trim()))
                     .filter(|(scope, name)| !scope.is_empty() && !name.is_empty())

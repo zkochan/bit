@@ -30,7 +30,7 @@ fn projection(parsed: &Value) -> io::Result<Value> {
     if !parsed.is_object() {
         return Err(invalid("recovery component.json must be an object"));
     }
-    let has_scope = parsed["componentId"]
+    let str_scoped = parsed["componentId"]
         .as_str()
         .map(str::trim)
         .and_then(|raw| {
@@ -38,14 +38,17 @@ fn projection(parsed: &Value) -> io::Result<Value> {
                 .map_or(raw, |(bare, _)| bare.trim())
                 .split_once('/')
         })
-        .is_some_and(|(scope, name)| !scope.trim().is_empty() && !name.trim().is_empty())
-        || parsed["componentId"]["scope"]
+        .is_some_and(|(scope, name)| !scope.trim().is_empty() && !name.trim().is_empty());
+    let obj_scoped = parsed["componentId"]["name"]
+        .as_str()
+        .is_some_and(|val| !val.trim().is_empty())
+        && (parsed["componentId"]["scope"]
             .as_str()
             .is_some_and(|val| !val.trim().is_empty())
-        || parsed["defaultScope"]
-            .as_str()
-            .is_some_and(|val| !val.trim().is_empty());
-    if !has_scope {
+            || parsed["defaultScope"]
+                .as_str()
+                .is_some_and(|val| !val.trim().is_empty()));
+    if !str_scoped && !obj_scoped {
         return Err(invalid("recovery component.json requires a scoped componentId"));
     }
     let mut extensions = parsed["extensions"]

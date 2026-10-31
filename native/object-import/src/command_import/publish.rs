@@ -12,6 +12,7 @@ use std::{
 };
 
 pub(super) fn object(hash: &str, kind: &str, value: Value) -> io::Result<Object> {
+    let kind = kind.trim();
     let serialized = serialized(hash, kind, &value)?;
     let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
     encoder.write_all(&serialized)?;
@@ -38,10 +39,11 @@ pub(super) fn reusing_candidates(
     value: Value,
     candidates: impl IntoIterator<Item = Object>,
 ) -> io::Result<Object> {
+    let kind = kind.trim();
     let expected = serialized(hash, kind, &value)?;
     for incoming in candidates {
         let raw = crate::checkout::repository::inflate(&incoming.bytes, 32 * 1024 * 1024)?;
-        if incoming.kind == kind && raw == expected {
+        if incoming.kind.trim() == kind && raw == expected {
             return Ok(incoming);
         }
     }

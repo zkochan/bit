@@ -125,9 +125,15 @@ impl Batch {
             if item.action != Action::ProbeRemote {
                 continue;
             }
+            let bare = selection::bare(&item.id);
             let deleted = removed
-                .get(&item.id)
-                .or_else(|| removed.get(selection::bare(&item.id)))
+                .get(item.id.trim())
+                .or_else(|| removed.get(bare))
+                .or_else(|| {
+                    removed
+                        .iter()
+                        .find_map(|(key, val)| (selection::bare(key) == bare).then_some(val))
+                })
                 .ok_or_else(|| unsupported("recovery remote classification missing"))?;
             item.action = if *deleted { Action::Import } else { Action::None };
         }

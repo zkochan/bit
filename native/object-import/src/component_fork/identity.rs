@@ -125,18 +125,23 @@ pub(super) fn source_id<'a>(
     options: &'a Options,
     source: &'a Value,
 ) -> io::Result<(&'a str, &'a str)> {
-    let id = source["identity"]
+    let raw = source["identity"]
         .as_str()
-        .unwrap_or(&options.source)
-        .split('@')
-        .next()
-        .unwrap_or_default();
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .unwrap_or_else(|| options.source.trim());
+    let id = raw.rsplit_once('@').map_or(raw, |(bare, _)| bare.trim());
     id.split_once('/')
-        .filter(|(scope, name)| !scope.trim().is_empty() && !name.trim().is_empty())
+        .map(|(scope, name)| (scope.trim(), name.trim()))
+        .filter(|(scope, name)| !scope.is_empty() && !name.is_empty())
         .ok_or_else(|| unsupported("fork requires scoped source identity"))
 }
 pub(super) fn leaf(name: &str) -> &str {
-    name.rsplit('/').next().unwrap_or(name)
+    let name = name.trim();
+    name.rsplit('/')
+        .next()
+        .unwrap_or(name)
+        .trim()
 }
 fn scope_name(scope: &str) -> io::Result<()> {
     if scope.is_empty()

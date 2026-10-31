@@ -57,14 +57,15 @@ pub(super) fn prepare(plan: &mut Plan, facts: &Value) -> io::Result<()> {
 fn identity_matches(row: &Value, expected: &str) -> bool {
     let Some(raw) = row["identity"]
         .as_str()
+        .or_else(|| row["id"].as_str())
         .map(str::trim)
         .filter(|id| !id.is_empty())
     else {
         return false;
     };
     let expected = expected.trim();
-    let bare = raw.rsplit_once('@').map_or(raw, |(prefix, _)| prefix);
-    let expected_bare = expected.rsplit_once('@').map_or(expected, |(prefix, _)| prefix);
+    let bare = raw.rsplit_once('@').map_or(raw, |(prefix, _)| prefix.trim());
+    let expected_bare = expected.rsplit_once('@').map_or(expected, |(prefix, _)| prefix.trim());
     bare == expected_bare
         || bare
             .split_once('/')

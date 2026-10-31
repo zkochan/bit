@@ -11,13 +11,7 @@ pub(super) fn refresh(batch: &mut Batch, rows: &[Value]) -> io::Result<()> {
         let identity = selection::bare(&item.id);
         let row = rows
             .iter()
-            .find(|row| {
-                row["identity"]
-                    .as_str()
-                    .or_else(|| row["id"].as_str())
-                    .map_or("", str::trim)
-                    == identity
-            })
+            .find(|row| row_matches_identity(row, identity))
             .ok_or_else(|| invalid("recovery loaded component receipt missing"))?;
         let extensions = row["current"]["extensions"]
             .as_array()
@@ -33,6 +27,20 @@ pub(super) fn refresh(batch: &mut Batch, rows: &[Value]) -> io::Result<()> {
     }
     batch.items = items;
     Ok(())
+}
+
+fn row_matches_identity(row: &Value, identity: &str) -> bool {
+    row["identity"]
+        .as_str()
+        .map(str::trim)
+        .filter(|val| !val.is_empty())
+        .or_else(|| {
+            row["id"]
+                .as_str()
+                .map(str::trim)
+                .filter(|val| !val.is_empty())
+        })
+        .is_some_and(|raw| selection::bare(raw) == identity)
 }
 
 fn remove_extension_config(extensions: &[Value]) -> Option<&Value> {

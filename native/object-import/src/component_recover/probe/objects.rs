@@ -176,13 +176,18 @@ pub(crate) fn version_hash(model: &Value, id: &str) -> io::Result<String> {
     Ok(hash.into())
 }
 fn removed(model: &Value, version: &Value, hash: &str) -> bool {
+    let hash = hash.trim();
     let config = super::super::batch::repository::removal(version);
     if config["removed"] == true {
         return true;
     }
     if config["snaps"]
         .as_array()
-        .is_some_and(|snaps| snaps.iter().any(|snap| snap == hash))
+        .is_some_and(|snaps| {
+            snaps
+                .iter()
+                .any(|snap| snap.as_str().map(str::trim) == Some(hash))
+        })
     {
         return true;
     }
@@ -191,10 +196,11 @@ fn removed(model: &Value, version: &Value, hash: &str) -> bool {
         .into_iter()
         .chain(model["orphanedVersions"].as_object())
         .flat_map(|versions| versions.iter())
-        .find(|(_, reference)| reference.as_str() == Some(hash))
-        .map(|(tag, _)| tag);
+        .find(|(_, reference)| reference.as_str().map(str::trim) == Some(hash))
+        .map(|(tag, _)| tag.trim());
     let range = config["range"]
         .as_str()
+        .map(str::trim)
         .and_then(|range| node_semver::Range::parse(range).ok());
     tag.and_then(|tag| node_semver::Version::parse(tag).ok())
         .zip(range)

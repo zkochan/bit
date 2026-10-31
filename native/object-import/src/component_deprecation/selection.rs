@@ -1,13 +1,17 @@
 use super::{Value, invalid};
 use std::io;
 pub(crate) fn identity(key: &str, row: &Value) -> Option<String> {
+    let key = key.trim();
     if key.starts_with('$') || key == "_bit_lane" || key == "version" || !row.is_object() {
         return None;
     }
     let (key_id, key_ver) = key
         .rsplit_once('@')
-        .map_or((key, None), |(id, ver)| (id, Some(ver)));
-    let key_scope = key_id.split_once('/').map(|(scope, _)| scope);
+        .map_or((key, None), |(id, ver)| (id.trim(), Some(ver.trim())));
+    let key_scope = key_id
+        .split_once('/')
+        .map(|(scope, _)| scope.trim())
+        .filter(|scope| !scope.is_empty());
     let scope = non_empty_field(row, "scope")
         .or_else(|| non_empty_field(row, "defaultScope"))
         .or(key_scope)?;
@@ -16,7 +20,11 @@ pub(crate) fn identity(key: &str, row: &Value) -> Option<String> {
             key_id
                 .strip_prefix(&format!("{scope}/"))
                 .unwrap_or(key_id)
+                .trim()
         });
+    if name.is_empty() {
+        return None;
+    }
     let version = non_empty_field(row, "version")
         .or_else(|| {
             key_ver

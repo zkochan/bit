@@ -138,8 +138,8 @@ fn insert_config(output: &mut Value, key: &str, config: &Value) {
     if trimmed.is_empty() {
         return;
     }
-    let bare = match trimmed.split_once('@') {
-        Some((prefix, _)) if !prefix.is_empty() => prefix,
+    let bare = match trimmed.rsplit_once('@') {
+        Some((prefix, _)) if !prefix.trim().is_empty() => prefix.trim(),
         _ => trimmed,
     };
     if !matches!(bare, "teambit.pkg/pkg" | "teambit.component/renaming")

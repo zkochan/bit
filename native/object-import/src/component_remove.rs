@@ -199,11 +199,7 @@ pub(super) fn find_row<'a>(
     _kind: RowKind,
 ) -> io::Result<(&'a String, &'a Value)> {
     let name = name.trim();
-    let bare_name = name
-        .split('@')
-        .next()
-        .unwrap_or(name)
-        .trim();
+    let bare_name = name.rsplit_once('@').map_or(name, |(prefix, _)| prefix.trim());
     bitmap
         .as_object()
         .ok_or_else(|| invalid("component bitmap"))?
@@ -211,7 +207,11 @@ pub(super) fn find_row<'a>(
         .find(|(key, row)| {
             key.trim() == name
                 || crate::component_deprecation::selection::identity(key, row)
-                    .is_some_and(|id| id == name || id.split('@').next() == Some(bare_name))
+                    .is_some_and(|id| {
+                        id == name
+                            || id.rsplit_once('@').map_or(id.as_str(), |(bare, _)| bare.trim())
+                                == bare_name
+                    })
         })
         .ok_or_else(|| invalid("component not tracked"))
 }
@@ -303,22 +303,29 @@ fn validate_component_root(relative: &Path) -> io::Result<()> {
     Ok(())
 }
 
+fn is_ignored_overlap_row(other_key: &str, key: &str, other: &Value) -> bool {
+    other_key == key
+        || other_key.starts_with('$')
+        || matches!(other_key, "_bit_lane" | "version")
+        || !other.is_object()
+        || other["isAvailableOnCurrentLane"] == false
+        || crate::workspace::engine::client_status::config::is_config_removed(&other["config"])
+}
+
 fn validate_no_overlap(
     rows: &serde_json::Map<String, Value>,
     key: &str,
     relative: &Path,
 ) -> io::Result<()> {
     for (other_key, other) in rows {
-        if other_key == key
-            || other_key.starts_with('$')
-            || other_key == "_bit_lane"
-            || other_key == "version"
-            || !other.is_object()
-            || other["isAvailableOnCurrentLane"] == false
-        {
+        if is_ignored_overlap_row(other_key, key, other) {
             continue;
         }
-        let Some(other) = other["rootDir"].as_str() else {
+        let Some(other) = other["rootDir"]
+            .as_str()
+            .map(str::trim)
+            .filter(|dir| !dir.is_empty())
+        else {
             return Err(invalid("another component has no root"));
         };
         let other = Path::new(other);

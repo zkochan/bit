@@ -160,20 +160,20 @@ fn select_all(root: &Path, bitmap: &Value, identities: &[String]) -> io::Result<
 
 fn row_matches_identity(key: &str, row: &Value, identity: &str) -> bool {
     let identity = identity.trim();
-    let bare = identity
-        .split('@')
-        .next()
-        .unwrap_or(identity)
-        .trim();
-    if key.starts_with('$') || matches!(key, "_bit_lane" | "version") || !row.is_object() {
+    let bare = identity.rsplit_once('@').map_or(identity, |(prefix, _)| prefix.trim());
+    let key_trimmed = key.trim();
+    if key_trimmed.starts_with('$')
+        || matches!(key_trimmed, "_bit_lane" | "version")
+        || !row.is_object()
+    {
         return false;
     }
-    let (scope, name) = crate::reset_lane::bitmap::row_identity(key, row);
+    let (scope, name) = crate::reset_lane::bitmap::row_identity(key_trimmed, row);
     let full = match scope {
         Some(sc) => format!("{sc}/{name}"),
         None => name.to_owned(),
     };
-    key.trim() == identity || name == bare || full == bare
+    key_trimmed == identity || name == bare || full == bare
 }
 fn select(root: &Path, bitmap: &Value, key: &str, row: &Value) -> io::Result<Selected> {
     let mut shape = row.clone();
@@ -198,6 +198,21 @@ fn select(root: &Path, bitmap: &Value, key: &str, row: &Value) -> io::Result<Sel
     })
 }
 
+pub(super) fn component_matches_identity(component: &Value, target: &str) -> bool {
+    component["identity"]
+        .as_str()
+        .map(str::trim)
+        .filter(|val| !val.is_empty())
+        .or_else(|| {
+            component["id"]
+                .as_str()
+                .map(str::trim)
+                .filter(|val| !val.is_empty())
+        })
+        .map(|raw| raw.rsplit_once('@').map_or(raw, |(bare, _)| bare.trim()))
+        == Some(target)
+}
+
 pub(super) fn custom_packages(
     root: &Path,
     selected: &mut [Selected],
@@ -207,9 +222,10 @@ pub(super) fn custom_packages(
         if row.package.as_os_str().is_empty() {
             continue;
         }
+        let target = row.identity.trim();
         let Some(name) = components
             .iter()
-            .find(|component| component["identity"].as_str().map(str::trim) == Some(&row.identity))
+            .find(|component| component_matches_identity(component, target))
             .and_then(|component| component["packageName"].as_str())
             .map(str::trim)
             .filter(|name| !name.is_empty())

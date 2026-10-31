@@ -24,9 +24,15 @@ pub(super) fn prepare(root: &Path, selected: &[Selected]) -> io::Result<Option<C
     if rows.len() == length {
         return Ok(None);
     }
-    let mut after = serde_json::to_vec_pretty(&value)?;
+    let mut text = serde_json::to_string_pretty(&value)?;
     if before.ends_with(b"\n") {
-        after.push(b'\n');
+        text.push('\n');
     }
-    Ok(Some(Change { path, before, after }))
+    if before
+        .windows(2)
+        .any(|window| window == b"\r\n")
+    {
+        text = text.replace('\n', "\r\n");
+    }
+    Ok(Some(Change { path, before, after: text.into_bytes() }))
 }

@@ -99,7 +99,7 @@ impl Plan {
     }
     /// Environment/config facts can be resolved after `Workspace.write` and before tracking.
     pub fn set_config(&mut self, config: Value) -> io::Result<()> {
-        if !config.is_object() {
+        if !config.is_object() || !self.bitmap[&self.identity.key].is_object() {
             return Err(unsupported("fork config must be an object"));
         }
         self.bitmap[&self.identity.key]["config"] = config;
@@ -110,6 +110,7 @@ impl Plan {
         if file_id.is_empty() {
             return Err(invalid("fork bitmap file id is empty"));
         }
+        crate::component_remove::validate_file_id(file_id)?;
         if !self.materialized {
             return Err(invalid("fork sources have not been materialized"));
         }

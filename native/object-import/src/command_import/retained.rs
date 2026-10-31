@@ -101,7 +101,10 @@ impl super::capture::Capture {
     pub(super) fn accept_published(&mut self, files: &HashMap<PathBuf, Vec<u8>>) -> io::Result<()> {
         for (path, bytes) in files {
             let metadata = fs::symlink_metadata(path)?;
-            if !metadata.is_file() || metadata.file_type().is_symlink() || fs::read(path)? != *bytes
+            if !metadata.is_file()
+                || metadata.file_type().is_symlink()
+                || metadata.len() != bytes.len() as u64
+                || fs::read(path)? != *bytes
             {
                 return Err(invalid("retained import publication changed"));
             }

@@ -93,10 +93,7 @@ impl PackageMatcher {
             .apply_cow(Cow::Borrowed(bytes))?
             .into_owned())
     }
-    fn apply_cow<'a>(&mut self, bytes: Cow<'a, [u8]>) -> io::Result<Cow<'a, [u8]>> {
-        if crate::checkout::eol::binary(bytes.as_ref()) {
-            return Ok(bytes);
-        }
+    fn compiled_regex(&mut self) -> io::Result<&Regex> {
         if self.regex.is_none() {
             let pattern = format!(r#"{}(['"/])"#, self.source);
             self.regex = Some(match &self.cache {
@@ -104,28 +101,42 @@ impl PackageMatcher {
                 None => Arc::new(Regex::new(&pattern).map_err(|error| invalid(error.to_string()))?),
             });
         }
-        let regex = self.regex.as_ref().ok_or_else(|| invalid("package matcher unavailable"))?;
-        let text = String::from_utf8_lossy(bytes.as_ref());
-        let mut output: Option<String> = None;
-        let mut offset = 0;
-        for found in regex.find_iter(&text) {
-            let result = output.get_or_insert_with(String::new);
-            result.push_str(&text[offset..found.range.start]);
-            result.push_str(&self.target);
-            if let Some(suffix) = found.captures.first().and_then(Clone::clone) {
-                result.push_str(&text[suffix]);
-            }
-            offset = found.range.end;
+        self.regex.as_deref().ok_or_else(|| invalid("package matcher unavailable"))
+    }
+    fn apply_cow<'a>(&mut self, bytes: Cow<'a, [u8]>) -> io::Result<Cow<'a, [u8]>> {
+        if crate::checkout::eol::binary(bytes.as_ref()) {
+            return Ok(bytes);
         }
-        if let Some(mut result) = output {
-            result.push_str(&text[offset..]);
-            return Ok(Cow::Owned(result.into_bytes()));
+        let text = String::from_utf8_lossy(bytes.as_ref());
+        if !self.source.is_empty() {
+            let target = self.target.clone();
+            let regex = self.compiled_regex()?;
+            if let Some(result) = replace_package_matches(regex, &text, &target) {
+                return Ok(Cow::Owned(result.into_bytes()));
+            }
         }
         match text {
             Cow::Borrowed(_) => Ok(bytes),
             Cow::Owned(normalized) => Ok(Cow::Owned(normalized.into_bytes())),
         }
     }
+}
+fn replace_package_matches(regex: &Regex, text: &str, target: &str) -> Option<String> {
+    let mut output: Option<String> = None;
+    let mut offset = 0;
+    for found in regex.find_iter(text) {
+        let result = output.get_or_insert_with(String::new);
+        result.push_str(&text[offset..found.range.start]);
+        result.push_str(target);
+        if let Some(suffix) = found.captures.first().and_then(Clone::clone) {
+            result.push_str(&text[suffix]);
+        }
+        offset = found.range.end;
+    }
+    output.map(|mut result| {
+        result.push_str(&text[offset..]);
+        result
+    })
 }
 pub(super) struct PackageMatchers(Vec<PackageMatcher>);
 impl PackageMatchers {

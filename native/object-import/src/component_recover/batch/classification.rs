@@ -75,12 +75,20 @@ fn tracked_head(batch: &mut Batch, id: &str, model: Option<&Value>) -> io::Resul
 }
 pub(super) fn has_remove_info(config: &Value) -> bool {
     config["removed"] == true
+        || config["removeOnMain"] == true
         || config["range"]
             .as_str()
             .is_some_and(|value| !value.trim().is_empty())
         || config["snaps"]
             .as_array()
-            .is_some_and(|snaps| !snaps.is_empty())
+            .is_some_and(|snaps| {
+                snaps
+                    .iter()
+                    .any(|snap| {
+                        snap.as_str()
+                            .is_some_and(|text| !text.trim().is_empty())
+                    })
+            })
 }
 pub(super) fn update(bitmap: &mut Value, item: &Item) -> io::Result<()> {
     if item.configuration.is_some() || matches!(item.action, Action::None | Action::ProbeRemote) {

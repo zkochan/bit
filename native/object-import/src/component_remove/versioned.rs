@@ -272,7 +272,11 @@ fn model_hashes(model: &Value, selection: &ModelSelection<'_>) -> io::Result<Vec
         .chain(orphaned)
         .flat_map(serde_json::Map::values)
     {
-        let hash = value.as_str().ok_or_else(|| invalid("tagged version ref"))?;
+        let hash = value
+            .as_str()
+            .map(str::trim)
+            .filter(|hash| !hash.is_empty())
+            .ok_or_else(|| invalid("tagged version ref"))?;
         crate::merge_history::hash(hash)?;
         if !hashes
             .iter()

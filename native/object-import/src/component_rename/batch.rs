@@ -239,7 +239,18 @@ impl Batch {
     }
     pub fn write_refactored_targets(&mut self, changed: &[String]) -> io::Result<()> {
         for plan in &mut self.plans {
-            if !plan.identity.exported && changed.contains(&plan.identity.target) {
+            let target = plan.identity.target.trim();
+            if !plan.identity.exported
+                && changed
+                    .iter()
+                    .any(|id| {
+                        let bare = id
+                            .trim()
+                            .rsplit_once('@')
+                            .map_or_else(|| id.trim(), |(prefix, _)| prefix);
+                        bare.trim() == target
+                    })
+            {
                 super::files::batch::workspace_refactor(plan)?;
             }
         }

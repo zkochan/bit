@@ -246,19 +246,7 @@ fn read_repository(root: &Path, selected: &Selection) -> io::Result<(Repository,
     let (scope, name) =
         selected.identity.split_once('/').ok_or_else(|| invalid("component identity"))?;
     let (index, model, model_value) = read_model(root, scope, name)?;
-    let version_hash = if selected.lane.is_some() {
-        selected.version.as_str()
-    } else if matches!(selected.version.as_str(), "latest" | "head") {
-        model_value["head"].as_str().ok_or_else(|| invalid("component version is not in model"))?
-    } else {
-        model_value["versions"][&selected.version]
-            .as_str()
-            .or_else(|| model_value["orphanedVersions"][&selected.version].as_str())
-            .or_else(|| {
-                (model_value["head"] == selected.version).then_some(selected.version.as_str())
-            })
-            .ok_or_else(|| invalid("component version is not in model"))?
-    };
+    let version_hash = resolve_version_hash(selected, &model_value)?;
     let version_object = frozen(root, version_hash)?;
     let objects_dir = crate::scope_path(root).join("objects");
     let manifest = outbound::read_object(&objects_dir, version_hash, "Version")?;
@@ -271,6 +259,32 @@ fn read_repository(root: &Path, selected: &Selection) -> io::Result<(Repository,
         objects.push(object);
     }
     Ok((Repository { index, objects, sources: Vec::new() }, manifest))
+}
+fn resolve_version_hash<'a>(
+    selected: &'a Selection,
+    model_value: &'a Value,
+) -> io::Result<&'a str> {
+    let requested = selected.version.trim();
+    if selected.lane.is_some() {
+        return Ok(requested);
+    }
+    if matches!(requested, "" | "latest" | "head") {
+        return model_value["head"]
+            .as_str()
+            .map(str::trim)
+            .filter(|hash| !hash.is_empty())
+            .ok_or_else(|| invalid("component version is not in model"));
+    }
+    model_value["versions"][requested]
+        .as_str()
+        .or_else(|| model_value["orphanedVersions"][requested].as_str())
+        .map(str::trim)
+        .filter(|hash| !hash.is_empty())
+        .or_else(|| {
+            (requested.len() == 40 && requested.bytes().all(|byte| byte.is_ascii_hexdigit()))
+                .then_some(requested)
+        })
+        .ok_or_else(|| invalid("component version is not in model"))
 }
 fn matches_index_row(row: &Value, scope: &str, name: &str) -> bool {
     let (row_scope, row_name) =

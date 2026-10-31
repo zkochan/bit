@@ -53,11 +53,17 @@ impl Configuration {
 }
 fn remove(document: &mut Document, identity: &str) -> bool {
     let value = document.value();
-    let existing = value
+    let keys: Vec<_> = value
         .as_object()
-        .and_then(|values| values.keys().find(|key| matches_aspect_identity(key, identity)))
-        .cloned();
-    let mut changed = existing.is_some_and(|key| document.remove(&[&key]));
+        .into_iter()
+        .flat_map(|values| values.keys())
+        .filter(|key| matches_aspect_identity(key, identity))
+        .cloned()
+        .collect();
+    let mut changed = false;
+    for key in keys {
+        changed |= document.remove(&[&key]);
+    }
     let gen_key = value
         .as_object()
         .and_then(|values| {
@@ -68,13 +74,13 @@ fn remove(document: &mut Document, identity: &str) -> bool {
     if let Some(mut envs) = document
         .get(&[&gen_key, "envs"])
         .and_then(|value| value.as_array().cloned())
-        && let Some(index) = envs
-            .iter()
-            .position(|env| env.as_str().is_some_and(|val| matches_aspect_identity(val, identity)))
     {
-        envs.remove(index);
-        document.set(&[&gen_key, "envs"], &serde_json::Value::Array(envs));
-        changed = true;
+        let before_len = envs.len();
+        envs.retain(|env| !env.as_str().is_some_and(|val| matches_aspect_identity(val, identity)));
+        if envs.len() != before_len {
+            document.set(&[&gen_key, "envs"], &serde_json::Value::Array(envs));
+            changed = true;
+        }
     }
     changed
 }

@@ -82,19 +82,16 @@ fn select_row<'a>(
     id: &str,
     include_removed: bool,
 ) -> io::Result<(&'a str, &'a Value)> {
-    let id = id
-        .trim()
-        .split('@')
-        .next()
-        .unwrap_or(id)
-        .trim();
+    let trimmed = id.trim();
+    let id = trimmed.rsplit_once('@').map_or(trimmed, |(bare, _)| bare.trim());
     let mut rows = bitmap
         .as_object()
         .ok_or_else(|| unsupported("rename bitmap"))?
         .iter()
         .filter(|(key, row)| {
-            let key_id = key.rsplit_once('@').map_or(key.as_str(), |(bare, _)| bare);
-            let row_name = row_name(key, row);
+            let key_trimmed = key.trim();
+            let key_id = key_trimmed.rsplit_once('@').map_or(key_trimmed, |(bare, _)| bare.trim());
+            let row_name = row_name(key_trimmed, row);
             row["rootDir"].is_string()
                 && row["isAvailableOnCurrentLane"] != false
                 && (include_removed
@@ -102,9 +99,10 @@ fn select_row<'a>(
                         &row["config"],
                     ))
                 && (key_id == id
-                    || *key == id
+                    || key_trimmed == id
                     || row_name == id
-                    || row_scope(key, row).is_some_and(|scope| format!("{scope}/{row_name}") == id))
+                    || row_scope(key_trimmed, row)
+                        .is_some_and(|scope| format!("{scope}/{row_name}") == id))
         });
     let (key, row) = rows
         .next()

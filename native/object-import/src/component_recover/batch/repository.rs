@@ -140,15 +140,23 @@ pub(super) fn head(batch: &mut Batch, bare: &str, model: &Value) -> io::Result<O
         .map(str::to_owned))
 }
 pub(super) fn version(batch: &mut Batch, id: &str, model: &Value) -> io::Result<Option<Value>> {
+    let id = id.trim();
     let (bare, version) = id
         .rsplit_once('@')
-        .map_or((id, None), |(id, version)| (id, Some(version)));
+        .map_or((id, None), |(bare, version)| (bare.trim(), Some(version.trim())));
     let hash = version
         .filter(|version| !version.is_empty() && !matches!(*version, "latest" | "head"))
         .map(|version| {
             model["versions"][version]
                 .as_str()
-                .or_else(|| model["orphanedVersions"][version].as_str())
+                .map(str::trim)
+                .filter(|hash| !hash.is_empty())
+                .or_else(|| {
+                    model["orphanedVersions"][version]
+                        .as_str()
+                        .map(str::trim)
+                        .filter(|hash| !hash.is_empty())
+                })
                 .unwrap_or(version)
                 .to_owned()
         })

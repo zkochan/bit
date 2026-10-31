@@ -26,14 +26,20 @@ pub(super) fn ancestry(objects: &Path, head: &str) -> io::Result<Vec<Value>> {
         if parents.len() > 1 {
             return Err(invalid("merged lane snap ancestry"));
         }
-        versions.push(json!({"hash":current,"parents":parents}));
-        let Some(parent) = parents.first() else { break };
-        parent
+        let Some(parent) = parents.first() else {
+            versions.push(json!({"hash":current,"parents":[]}));
+            break;
+        };
+        let next = parent
             .as_str()
+            .or_else(|| parent["ref"].as_str())
+            .or_else(|| parent["hash"].as_str())
             .map(str::trim)
             .filter(|hash| !hash.is_empty())
             .ok_or_else(|| invalid("lane snap parent"))?
-            .clone_into(&mut current);
+            .to_owned();
+        versions.push(json!({"hash":current,"parents":[next]}));
+        current = next;
     }
     Ok(versions)
 }

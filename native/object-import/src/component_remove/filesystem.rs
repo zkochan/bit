@@ -8,8 +8,8 @@ pub(super) fn package(root: &Path, scope: &str, name: &str) -> io::Result<PathBu
     let (scope, name) = (scope.trim(), name.trim());
     let (owner, rest) = scope
         .split_once('.')
-        .map_or((scope, ""), |(owner, rest)| (owner, rest));
-    if owner.is_empty() || name.is_empty() {
+        .map_or((scope, ""), |(owner, rest)| (owner.trim(), rest.trim()));
+    if owner.is_empty() || (scope.contains('.') && rest.is_empty()) || name.is_empty() {
         return Err(invalid("component package path"));
     }
     let filename = if rest.is_empty() {

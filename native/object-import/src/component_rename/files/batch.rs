@@ -29,7 +29,13 @@ pub(in crate::component_rename) fn batch_dependents(
         let id = row_identity(row).ok_or_else(|| unsupported("scope rename loaded identity"))?;
         if targets
             .iter()
-            .any(|target| target == &id || target.split('@').next() == Some(id.as_str()))
+            .any(|target| {
+                let bare = target
+                    .trim()
+                    .rsplit_once('@')
+                    .map_or_else(|| target.trim(), |(prefix, _)| prefix);
+                bare.trim() == id
+            })
         {
             continue;
         }
@@ -50,18 +56,24 @@ fn row_identity(row: &Value) -> Option<String> {
         .filter(|value| !value.is_empty())
     {
         let bare = identity
-            .split('@')
-            .next()
-            .unwrap_or(identity)
+            .rsplit_once('@')
+            .map_or(identity, |(prefix, _)| prefix)
             .trim();
         return (!bare.is_empty()).then(|| bare.to_owned());
     }
     let object = row["id"].as_object()?;
-    let name = object
+    let raw_name = object
         .get("name")?
         .as_str()
         .map(str::trim)
         .filter(|value| !value.is_empty())?;
+    let name = raw_name
+        .rsplit_once('@')
+        .map_or(raw_name, |(prefix, _)| prefix)
+        .trim();
+    if name.is_empty() {
+        return None;
+    }
     match object
         .get("scope")
         .and_then(Value::as_str)

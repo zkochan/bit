@@ -44,6 +44,7 @@ pub(super) fn write(
     let metadata = fs::symlink_metadata(&bitmap_path)?;
     if !metadata.is_file()
         || metadata.file_type().is_symlink()
+        || metadata.len() != expected.len() as u64
         || fs::read(&bitmap_path)? != *expected
     {
         return Err(invalid("scope rename bitmap changed before publication"));

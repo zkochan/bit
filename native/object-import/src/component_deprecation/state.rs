@@ -93,21 +93,23 @@ fn model_hash(plan: &mut Plan, id: &str) -> io::Result<Option<String>> {
     let index_path = crate::scope_path(&plan.root).join("index.json");
     let bytes = plan.proofs.read(&index_path)?.ok_or_else(|| invalid("scope index missing"))?;
     let index: Value = crate::parse_jsonc(&bytes)?;
-    let bare = id.rsplit_once('@').map_or(id, |(bare_id, _)| bare_id);
+    let trimmed = id.trim();
+    let bare = trimmed.rsplit_once('@').map_or(trimmed, |(bare_id, _)| bare_id.trim());
     let found = index["components"]
         .as_array()
         .or_else(|| index.as_array())
         .and_then(|rows| rows.iter().find(|row| matches_indexed_component(row, bare)))
-        .and_then(|row| row["hash"].as_str());
+        .and_then(|row| non_empty_str(&row["hash"]));
     Ok(found.map(str::to_owned))
 }
 fn matches_indexed_component(row: &Value, bare: &str) -> bool {
+    let bare = bare.trim();
     let (scope_part, name_part) = bare
         .split_once('/')
-        .unwrap_or(("", bare));
+        .map_or(("", bare), |(sc, nm)| (sc.trim(), nm.trim()));
     let (row_scope, row_name) =
         crate::workspace::engine::command::inbound::remote::file_list::row_id_parts(row)
-            .map_or(("", ""), |(sc, nm)| (sc.unwrap_or_default(), nm));
+            .map_or(("", ""), |(sc, nm)| (sc.unwrap_or_default().trim(), nm.trim()));
     row["isSymlink"] != true
         && ((row_name == name_part
             && (row_scope.is_empty() || scope_part.is_empty() || row_scope == scope_part))

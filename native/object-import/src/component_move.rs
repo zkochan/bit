@@ -89,18 +89,27 @@ impl Plan {
 fn change_identity(row: &Value) -> Option<String> {
     if let Some(identity) = row["identity"]
         .as_str()
-        .or_else(|| row["id"].as_str())
         .map(str::trim)
         .filter(|value| !value.is_empty())
+        .or_else(|| {
+            row["id"]
+                .as_str()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+        })
     {
-        return Some(identity.to_owned());
+        let bare = identity.rsplit_once('@').map_or(identity, |(prefix, _)| prefix.trim());
+        if !bare.is_empty() {
+            return Some(bare.to_owned());
+        }
     }
     let object = row["id"].as_object()?;
-    let name = object
+    let raw_name = object
         .get("name")?
         .as_str()
         .map(str::trim)
         .filter(|value| !value.is_empty())?;
+    let name = raw_name.rsplit_once('@').map_or(raw_name, |(prefix, _)| prefix.trim());
     match object
         .get("scope")
         .and_then(Value::as_str)

@@ -17,12 +17,7 @@ pub(super) fn apply(
     let rows = bitmap.as_object_mut().ok_or_else(|| invalid("component bitmap"))?;
     let mut changes = vec![];
     for (key, row) in rows {
-        let Some(directory) = row["rootDir"]
-            .as_str()
-            .map(str::trim)
-            .filter(|dir| !dir.is_empty())
-            .map(str::to_owned)
-        else {
+        let Some(directory) = normalize_root_dir(row) else {
             continue;
         };
         let identity = identity(key, row)?;
@@ -30,7 +25,7 @@ pub(super) fn apply(
             let next = directory.replacen(&from, &to, 1);
             row["rootDir"] = json!(next);
             vec![json!({"from":directory,"to":next})]
-        } else if from.starts_with(&format!("{directory}/")) {
+        } else if from.starts_with(&directory) {
             internal(root, &directory, row, &from, &to, &inventory_bitmap, observed)?
         } else {
             vec![]
@@ -51,6 +46,17 @@ pub(super) fn apply(
         )));
     }
     Ok(changes)
+}
+fn normalize_root_dir(row: &Value) -> Option<String> {
+    row["rootDir"]
+        .as_str()
+        .map(|dir| {
+            dir.trim()
+                .replace('\\', "/")
+                .trim_matches('/')
+                .to_owned()
+        })
+        .filter(|dir| !dir.is_empty())
 }
 fn internal(
     root: &Path,

@@ -94,8 +94,10 @@ pub(super) fn source_path(
                 root.join(
                     source["rootDir"]
                         .as_str()
-                        .or_else(|| source["directory"].as_str())
-                        .map_or("", str::trim),
+                        .map(str::trim)
+                        .filter(|dir| !dir.is_empty())
+                        .or_else(|| source["directory"].as_str().map(str::trim))
+                        .unwrap_or(""),
                 )
             },
             PathBuf::from,

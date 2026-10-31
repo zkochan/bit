@@ -49,15 +49,12 @@ fn packages(
 ) -> io::Result<()> {
     batch::custom_packages(root, selected, components)?;
     for row in &mut *selected {
+        let target = row.identity.trim();
         if !row.main_exists
             && !components
                 .iter()
                 .any(|component| {
-                    component["identity"]
-                        .as_str()
-                        .or_else(|| component["id"].as_str())
-                        .map(str::trim)
-                        == Some(row.identity.trim())
+                    batch::component_matches_identity(component, target)
                         && component["packageName"]
                             .as_str()
                             .is_some_and(|pkg| !pkg.trim().is_empty())

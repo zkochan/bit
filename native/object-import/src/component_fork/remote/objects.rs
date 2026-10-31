@@ -45,29 +45,24 @@ fn trimmed_str(value: &Value) -> Option<&str> {
         .map(str::trim)
         .filter(|text| !text.is_empty())
 }
+fn row_matches_target(row: &Value, target_scope: &str, target_name: &str) -> bool {
+    let (row_scope, row_name) =
+        crate::workspace::engine::command::inbound::remote::file_list::row_id_parts(row)
+            .map_or(("", ""), |(sc, nm)| (sc.unwrap_or_default().trim(), nm.trim()));
+    row["isSymlink"] != true
+        && row_name == target_name
+        && (row_scope == target_scope || row_scope.is_empty())
+}
 fn model_row<'a>(index: &'a Value, id: &str) -> io::Result<&'a Value> {
-    let bare = id
-        .trim()
-        .split('@')
-        .next()
-        .unwrap_or(id)
-        .trim();
+    let trimmed = id.trim();
+    let bare = trimmed.rsplit_once('@').map_or(trimmed, |(prefix, _)| prefix.trim());
     let (target_scope, target_name) = bare
         .split_once('/')
         .map_or(("", bare), |(scope, name)| (scope.trim(), name.trim()));
     index["components"]
         .as_array()
         .or_else(|| index.as_array())
-        .and_then(|rows| {
-            rows.iter()
-                .find(|row| {
-                    let row_scope = trimmed_str(&row["id"]["scope"]).unwrap_or_default();
-                    row["isSymlink"] != true
-                        && (trimmed_str(&row["id"]) == Some(bare)
-                            || (trimmed_str(&row["id"]["name"]) == Some(target_name)
-                                && (row_scope == target_scope || row_scope.is_empty())))
-                })
-        })
+        .and_then(|rows| rows.iter().find(|row| row_matches_target(row, target_scope, target_name)))
         .ok_or_else(|| missing(id))
 }
 pub(super) fn http(items: &[ObjectItem], id: &str) -> io::Result<Captured> {

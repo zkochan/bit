@@ -8,12 +8,16 @@ impl PreparedImport {
         root: &Path,
         objects: &[(String, Vec<u8>)],
     ) -> io::Result<()> {
+        if !root.is_absolute() || objects.len() > 4096 {
+            return Err(invalid("import recovery object bounds"));
+        }
         for (hash, bytes) in objects {
             let canonical = crate::validate::hexadecimal(&crate::merge_history::hash(hash.trim())?);
             let path = LooseObject::path(&crate::scope_path(root), &canonical);
             let metadata = fs::symlink_metadata(&path)?;
             if !metadata.is_file()
                 || metadata.file_type().is_symlink()
+                || metadata.len() != bytes.len() as u64
                 || fs::read(&path)? != *bytes
             {
                 return Err(invalid("import restored component changed"));

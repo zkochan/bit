@@ -206,10 +206,12 @@ fn rename_aspects(plan: &mut Plan) {
     );
 }
 fn matches_source_id(candidate: &str, source: &str) -> bool {
+    let candidate = candidate.trim();
+    let source = source.trim();
     candidate == source
         || candidate
             .rsplit_once('@')
-            .is_some_and(|(bare, _)| bare == source)
+            .is_some_and(|(bare, _)| bare.trim() == source)
 }
 pub(super) fn replace_config(config: &mut Value, source: &str, target: &str, rename_env: bool) {
     let Some(config) = config.as_object_mut() else { return };
@@ -232,6 +234,9 @@ pub(super) fn replace_config(config: &mut Value, source: &str, target: &str, ren
     {
         env["env"] = json!(target);
     }
+    rename_generator_envs(config, source, target);
+}
+fn rename_generator_envs(config: &mut serde_json::Map<String, Value>, source: &str, target: &str) {
     if let Some((_, gen_cfg)) = config
         .iter_mut()
         .find(|(key, _)| {
@@ -239,11 +244,12 @@ pub(super) fn replace_config(config: &mut Value, source: &str, target: &str, ren
                 || key.starts_with("teambit.generator/generator@")
         })
         && let Some(envs) = gen_cfg.get_mut("envs").and_then(Value::as_array_mut)
-        && let Some(value) = envs
-            .iter_mut()
-            .find(|value| value.as_str().is_some_and(|val| matches_source_id(val, source)))
     {
-        *value = json!(target);
+        for value in envs.iter_mut() {
+            if value.as_str().is_some_and(|val| matches_source_id(val, source)) {
+                *value = json!(target);
+            }
+        }
     }
 }
 pub(super) fn publish(plan: &mut Plan, file_id: &str) -> io::Result<()> {

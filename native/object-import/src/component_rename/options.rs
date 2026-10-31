@@ -23,9 +23,13 @@ impl Options {
                 .map(str::to_owned),
             path: self.path
                 .as_deref()
-                .map(str::trim)
-                .filter(|val| !val.is_empty())
-                .map(str::to_owned),
+                .map(|val| {
+                    val.trim()
+                        .replace('\\', "/")
+                        .trim_matches('/')
+                        .to_owned()
+                })
+                .filter(|val| !val.is_empty()),
             ..*self
         }
     }
