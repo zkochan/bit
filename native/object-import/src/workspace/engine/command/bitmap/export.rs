@@ -58,12 +58,13 @@ fn find_export_row<'a>(
 }
 
 fn export_row_matches(key: &str, row: &Value, full: &str, scope: &str, name: &str) -> bool {
+    let key = key.trim();
     if key.starts_with('$') || matches!(key, "_bit_lane" | "version") || !row.is_object() {
         return false;
     }
     let (row_scope, row_name) = crate::reset_lane::bitmap::row_identity(key, row);
     let _ = full;
-    row_name == name && row_scope == Some(scope)
+    row_name.trim() == name && row_scope.map(str::trim) == Some(scope)
 }
 
 fn promote_export_row(row: &mut Value, scope: &str, name: &str) -> io::Result<bool> {

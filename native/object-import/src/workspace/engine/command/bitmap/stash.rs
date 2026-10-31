@@ -10,17 +10,6 @@ pub(super) fn append(prepared: &mut Prepared, context: &Value) -> io::Result<()>
         context["stashAdditions"].as_array().ok_or_else(|| invalid("stash bitmap additions"))?;
     for saved in additions {
         let mut entry = saved.clone();
-        entry
-            .as_object_mut()
-            .ok_or_else(|| invalid("stash bitmap entry"))?
-            .shift_remove("stashVersion");
-        let id = identity(&entry)?;
-        if rows
-            .iter()
-            .any(|row| identity(row).is_ok_and(|current| current == id))
-        {
-            continue;
-        }
         let root = entry["rootDir"]
             .as_str()
             .or_else(|| entry["directory"].as_str())
@@ -28,12 +17,22 @@ pub(super) fn append(prepared: &mut Prepared, context: &Value) -> io::Result<()>
             .filter(|value| !value.is_empty())
             .ok_or_else(|| invalid("stash bitmap root"))?
             .to_owned();
+        let entry_map = entry.as_object_mut().ok_or_else(|| invalid("stash bitmap entry"))?;
+        entry_map.shift_remove("stashVersion");
+        entry_map.shift_remove("directory");
+        entry_map.insert("rootDir".into(), Value::String(root.clone()));
+        let id = identity(&entry)?;
+        if rows
+            .iter()
+            .any(|row| identity(row).is_ok_and(|current| current == id))
+        {
+            continue;
+        }
         crate::checkout::plan::relative_path(&root)?;
         if root == "." {
             return Err(invalid("stash new workspace root"));
         }
         lane::validate_roots(&root, &rows)?;
-        entry["rootDir"] = Value::String(root);
         rows.push(entry);
         prepared.changed = true;
     }

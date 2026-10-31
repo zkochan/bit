@@ -178,39 +178,45 @@ pub(crate) fn is_config_removed(config: &Value) -> bool {
     config
         .as_object()
         .and_then(|cfg| {
-            cfg.get("teambit.component/remove")
-                .or_else(|| {
-                    cfg.iter()
-                        .find_map(|(key, value)| {
-                            key.starts_with("teambit.component/remove@").then_some(value)
-                        })
+            cfg.iter()
+                .find_map(|(key, value)| {
+                    let key = key.trim();
+                    (key == "teambit.component/remove"
+                        || key.starts_with("teambit.component/remove@"))
+                    .then_some(value)
                 })
         })
         .is_some_and(|rem| rem["removed"] == true)
 }
 
 pub(crate) fn is_extension_aspect(entry: &Value, id: &str) -> bool {
+    let id = id.trim();
     if let Some(name) = entry["name"]
         .as_str()
         .or_else(|| entry["legacyId"].as_str())
         .or_else(|| entry["extensionId"].as_str())
+        .or_else(|| entry["id"].as_str())
+        .map(str::trim)
     {
         return name == id || name.starts_with(&format!("{id}@"));
     }
     let Some((scope, bare_name)) = id.split_once('/') else {
         return false;
     };
-    entry["extensionId"]["scope"].as_str() == Some(scope)
+    entry["extensionId"]["scope"].as_str().map(str::trim) == Some(scope.trim())
         && entry["extensionId"]["name"]
             .as_str()
-            .is_some_and(|name| name == bare_name || name.starts_with(&format!("{bare_name}@")))
+            .map(str::trim)
+            .is_some_and(|name| {
+                let bare = bare_name.trim();
+                name == bare || name.starts_with(&format!("{bare}@"))
+            })
 }
 fn component_config(config: &Value) -> bool {
     config
         .as_object()
         .is_some_and(|aspects| aspects.iter().all(|(name, value)| aspect_config(name, value)))
 }
-
 fn aspect_config(name: &str, value: &Value) -> bool {
     let Some(fields) = value.as_object() else { return value == "-" };
     if let Some(specific) = fields.get("__specific") {
@@ -223,13 +229,13 @@ fn aspect_config(name: &str, value: &Value) -> bool {
     }
     aspect_fields(name, value, fields)
 }
-
 fn aspect_fields(name: &str, value: &Value, fields: &serde_json::Map<String, Value>) -> bool {
     if fields.is_empty() {
         return true;
     }
+    let name = name.trim();
     let bare = match name.split_once('@') {
-        Some((prefix, _)) if !prefix.is_empty() => prefix,
+        Some((prefix, _)) if !prefix.trim().is_empty() => prefix.trim(),
         _ => name,
     };
     match bare {

@@ -83,7 +83,10 @@ fn artifacts(value: &Value) -> io::Result<Vec<[u8; 20]>> {
             .and_then(Value::as_array)
             .ok_or_else(|| invalid("unsupported artifact files"))?;
         for file in files {
-            result.push(hash(file.get("file"))?);
+            result.push(hash(
+                file.get("file")
+                    .or_else(|| file.get("ref")),
+            )?);
             if result.len() > MAX_OBJECTS {
                 return Err(invalid("artifact count exceeds bounds"));
             }

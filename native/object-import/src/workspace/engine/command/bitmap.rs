@@ -287,12 +287,20 @@ fn apply_update(entry: &mut Value, context: &Value, update: &Update) -> io::Resu
 fn render_rows(rows: Vec<Value>, schema: &Value, lane: Option<Value>) -> io::Result<Vec<u8>> {
     let mut names = HashMap::<String, usize>::new();
     for entry in &rows {
-        let name = entry["name"].as_str().ok_or_else(|| invalid("command bitmap name"))?;
+        let name = entry["name"]
+            .as_str()
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .ok_or_else(|| invalid("command bitmap name"))?;
         *names.entry(name.to_owned()).or_default() += 1;
     }
     let mut keyed = Vec::new();
     for entry in rows {
-        let name = entry["name"].as_str().ok_or_else(|| invalid("command bitmap name"))?;
+        let name = entry["name"]
+            .as_str()
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .ok_or_else(|| invalid("command bitmap name"))?;
         let key = if names[name] > 1 { identity(&entry)? } else { name.to_owned() };
         keyed.push((key, crate::inspection::component_row(&entry)?));
     }
@@ -310,17 +318,19 @@ fn render_rows(rows: Vec<Value>, schema: &Value, lane: Option<Value>) -> io::Res
     crate::inspection::render_bitmap(&Value::Object(output))
 }
 fn tag(context: &Value, identity: &str, version: &str) -> io::Result<String> {
+    let version = version.trim();
     if crate::merge_history::hash(version).is_err() {
         return Ok(version.to_owned());
     }
+    let identity = identity.trim();
     let models = context["models"].as_array().ok_or_else(|| invalid("command bitmap models"))?;
     let model = models
         .iter()
         .find(|model| {
             format!(
                 "{}/{}",
-                model["scope"].as_str().unwrap_or_default(),
-                model["name"].as_str().unwrap_or_default(),
+                model["scope"].as_str().map_or("", str::trim),
+                model["name"].as_str().map_or("", str::trim),
             ) == identity
         })
         .ok_or_else(|| invalid("command bitmap model"))?;
@@ -329,9 +339,12 @@ fn tag(context: &Value, identity: &str, version: &str) -> io::Result<String> {
             && let Some((tag, _)) = tags
                 .iter()
                 .rev()
-                .find(|(_, hash)| hash.as_str() == Some(version))
+                .find(|(_, hash)| {
+                    hash.as_str()
+                        .is_some_and(|val| val.trim().eq_ignore_ascii_case(version))
+                })
         {
-            return Ok(tag.clone());
+            return Ok(tag.trim().to_owned());
         }
     }
     Ok(version.to_owned())

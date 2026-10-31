@@ -160,40 +160,52 @@ pub(super) fn initialize(state: &mut State, input: &Value) -> io::Result<Value> 
 
 fn fragment_entry(state: &State, fragment: wire::Fragment) -> io::Result<Entry> {
     match fragment {
-        wire::Fragment::Collection(reference) => {
-            let mut entry = state.collections
-                .get(reference.collection_token.trim())
-                .and_then(|entries| entries.get(reference.index))
-                .cloned()
-                .ok_or_else(|| invalid("unknown collection provenance"))?;
-            entry.scope = reference.scope;
-            object::name(&Descriptor {
-                hash: entry.hash,
-                scope: entry.scope.clone(),
-                seconds: 0,
-                body: Body::Repository,
-            })?;
-            Ok(entry)
-        }
-        wire::Fragment::Metadata { metadata } => {
-            let descriptor = Descriptor {
-                hash: crate::merge_history::hash(&metadata.hash)?,
-                scope: metadata.scope,
-                seconds: 0,
-                body: Body::Metadata(wire::hexadecimal(&metadata.compressed)?),
-            };
-            let mut entries = freeze(Path::new("/"), vec![descriptor])?;
-            let entry = entries.pop().ok_or_else(|| invalid("empty metadata"))?;
-            if metadata.kind
-                .as_deref()
-                .map(str::trim)
-                .is_some_and(|kind| entry.kind != kind)
-            {
-                return Err(invalid("metadata type differs"));
-            }
-            Ok(entry)
-        }
+        wire::Fragment::Collection(reference) => collection_entry(state, &reference),
+        wire::Fragment::Metadata { metadata } => metadata_entry(&metadata),
     }
+}
+
+fn collection_entry(state: &State, reference: &wire::Reference) -> io::Result<Entry> {
+    let mut entry = state.collections
+        .get(reference.collection_token.trim())
+        .and_then(|entries| entries.get(reference.index))
+        .cloned()
+        .ok_or_else(|| invalid("unknown collection provenance"))?;
+    entry.scope = reference.scope
+        .as_deref()
+        .map(str::trim)
+        .filter(|scope| !scope.is_empty())
+        .map(str::to_owned);
+    object::name(&Descriptor {
+        hash: entry.hash,
+        scope: entry.scope.clone(),
+        seconds: 0,
+        body: Body::Repository,
+    })?;
+    Ok(entry)
+}
+
+fn metadata_entry(metadata: &wire::Metadata) -> io::Result<Entry> {
+    let descriptor = Descriptor {
+        hash: crate::merge_history::hash(&metadata.hash)?,
+        scope: metadata.scope
+            .as_deref()
+            .map(str::trim)
+            .filter(|scope| !scope.is_empty())
+            .map(str::to_owned),
+        seconds: 0,
+        body: Body::Metadata(wire::hexadecimal(&metadata.compressed)?),
+    };
+    let mut entries = freeze(Path::new("/"), vec![descriptor])?;
+    let entry = entries.pop().ok_or_else(|| invalid("empty metadata"))?;
+    if metadata.kind
+        .as_deref()
+        .map(str::trim)
+        .is_some_and(|kind| entry.kind != kind)
+    {
+        return Err(invalid("metadata type differs"));
+    }
+    Ok(entry)
 }
 
 fn aggregate(state: &State, extra: &[Entry]) -> io::Result<()> {

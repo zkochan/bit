@@ -14,8 +14,12 @@ pub(super) fn write(
     dependencies: &Map<String, Value>,
     file_id: &str,
 ) -> io::Result<()> {
-    let target = target.trim();
-    let path = root.join(if target == "package.json" { "package.json" } else { "workspace.jsonc" });
+    let target = match target.trim() {
+        "package.json" => "package.json",
+        "workspace.jsonc" => "workspace.jsonc",
+        _ => return Err(invalid("inbound dependency configuration target")),
+    };
+    let path = root.join(target);
     let before = read(&path)?;
     if before.is_none() && target != "package.json" {
         return Err(io::Error::new(io::ErrorKind::NotFound, "workspace configuration absent"));

@@ -54,8 +54,8 @@ where
 {
     let token = String::deserialize(deserializer)?;
     let trimmed = token.trim();
-    if trimmed.contains('\0') {
-        return Err(serde::de::Error::custom("snapshot token contains NUL"));
+    if trimmed.is_empty() || trimmed.len() > 256 || trimmed.contains('\0') {
+        return Err(serde::de::Error::custom("invalid snapshot token"));
     }
     Ok(trimmed.to_owned())
 }

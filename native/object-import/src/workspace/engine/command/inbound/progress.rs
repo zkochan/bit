@@ -53,7 +53,8 @@ fn adjust(
     head_dependencies: bool,
     scopes: usize,
 ) {
-    if latest_roots > 0 && row["reason"] == "of their latest on main" {
+    let reason = row["reason"].as_str().map(str::trim);
+    if latest_roots > 0 && reason == Some("of their latest on main") {
         row["components"] = json!(
             row["components"]
                 .as_u64()
@@ -63,7 +64,7 @@ fn adjust(
         return;
     }
     if !(object_phase || head_dependencies)
-        || row["reason"] != "for getting missing versions and dependencies"
+        || reason != Some("for getting missing versions and dependencies")
     {
         return;
     }

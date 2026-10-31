@@ -11,17 +11,18 @@ pub(super) fn on_lane(context: &Value) -> bool {
 
 /// Checkout rewrites already tracked lane rows without changing their visibility.
 pub(super) fn tracked_checkout(context: &Value, component: &str) -> bool {
+    let component = component.trim();
     let tracked = context["lane"]["trackedTargets"]
         .as_array()
         .is_some_and(|rows| {
             rows.iter()
-                .any(|row| row["identity"] == component)
+                .any(|row| row["identity"].as_str().map(str::trim) == Some(component))
         });
     let inactive = context["lane"]["inactiveTargets"]
         .as_array()
         .is_some_and(|rows| {
             rows.iter()
-                .any(|row| row["identity"] == component)
+                .any(|row| row["identity"].as_str().map(str::trim) == Some(component))
         });
     tracked && !inactive
 }
@@ -57,19 +58,27 @@ fn switch_flags(
     name: &str,
     lane_only: &[Value],
 ) -> io::Result<(bool, bool)> {
+    let component = component.trim();
     let has_main_head = name == "main"
         && repository::model(context, component)?
-            .is_some_and(|model| model["head"].as_str().is_some());
+            .is_some_and(|model| {
+                model["head"]
+                    .as_str()
+                    .is_some_and(|head| !head.trim().is_empty())
+            });
     let was_lane_only = !has_main_head
         && lane_only
             .iter()
-            .any(|value| value == component);
+            .any(|value| value.as_str().map(str::trim) == Some(component));
     let on_destination = was_lane_only
         && name != "main"
         && context["lane"]["switchLaneHeads"].get(component).is_some();
     let available = context["lane"]["switchSelectedIds"]
         .as_array()
-        .map_or(!was_lane_only || on_destination, |ids| ids.iter().any(|id| id == component));
+        .map_or(!was_lane_only || on_destination, |ids| {
+            ids.iter()
+                .any(|id| id.as_str().map(str::trim) == Some(component))
+        });
     let lane_only = on_destination && (context["lane"]["switchWorkspaceOnly"] != true || available);
     Ok((available, lane_only))
 }
@@ -239,7 +248,13 @@ pub(super) fn make_available_on_main(entries: &mut [Value], context: &Value) -> 
             continue;
         }
         let id = identity(entry)?;
-        if repository::model(context, &id)?.is_some_and(|model| model["head"].is_string()) {
+        if repository::model(context, &id)?
+            .is_some_and(|model| {
+                model["head"]
+                    .as_str()
+                    .is_some_and(|head| !head.trim().is_empty())
+            })
+        {
             let fields = entry.as_object_mut().ok_or_else(|| invalid("command bitmap entry"))?;
             fields.shift_remove("isAvailableOnCurrentLane");
             fields.shift_remove("onLanesOnly");

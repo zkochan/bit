@@ -43,7 +43,6 @@ pub fn recovery_remote_connection(
     let transport = serde_json::from_value(transport.clone()).map_err(io::Error::other)?;
     remote::recovery_connection(root, home, &transport)
 }
-
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(in crate::workspace::engine) struct Prepare {
@@ -58,7 +57,6 @@ pub(in crate::workspace::engine) struct Prepare {
     #[serde(flatten)]
     transport: Transport,
 }
-
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(in crate::workspace::engine) struct Transport {
@@ -70,7 +68,6 @@ pub(in crate::workspace::engine) struct Transport {
     #[serde(default)]
     token: Option<String>,
 }
-
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Options {
@@ -85,7 +82,6 @@ struct Options {
     lanes: bool,
     components: bool,
 }
-
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Resolution {
@@ -100,7 +96,6 @@ struct Resolution {
     #[serde(default)]
     adoption: Adoption,
 }
-
 #[derive(Default, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Adoption {
@@ -111,7 +106,6 @@ struct Adoption {
     #[serde(default)]
     write_deps: Option<String>,
 }
-
 #[derive(Default, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Dependents {
@@ -122,7 +116,6 @@ struct Dependents {
     #[serde(default)]
     silent: bool,
 }
-
 #[derive(Default, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Traversal {
@@ -137,7 +130,6 @@ struct Traversal {
     #[serde(default)]
     dependents: Dependents,
 }
-
 /// `commandInboundList`: the remote listings of wildcard patterns, before
 /// `commandInboundPrepare` imports the selected ids.
 #[derive(Clone, Deserialize)]
@@ -153,7 +145,6 @@ pub(in crate::workspace::engine) struct List {
     #[serde(flatten)]
     transport: Transport,
 }
-
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(in crate::workspace::engine) struct RemoteLog {
@@ -163,11 +154,9 @@ pub(in crate::workspace::engine) struct RemoteLog {
     #[serde(flatten)]
     transport: Transport,
 }
-
 pub(in crate::workspace::engine) fn remote_log(input: &RemoteLog) -> io::Result<(usize, Value)> {
     remote::log(input)
 }
-
 #[derive(Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(in crate::workspace::engine) struct Apply {
@@ -175,7 +164,6 @@ pub(in crate::workspace::engine) struct Apply {
     #[serde(default)]
     omit_owned_write_receipts: bool,
 }
-
 pub(super) struct Retained {
     token: String,
     receipt: Value,
@@ -185,7 +173,6 @@ pub(super) struct Retained {
     pending: Option<dependents::Pending>,
     proofs: Vec<super::proof::Proof>,
 }
-
 struct ReceiptRoots<'a> {
     roots: &'a [Target],
     prefetched: &'a [Target],
@@ -354,26 +341,33 @@ fn targets(input: &Prepare) -> io::Result<Vec<Target>> {
 }
 
 fn identity(target: &Target) -> io::Result<String> {
-    let scope = target.scope.as_deref().ok_or_else(|| invalid("inbound scope"))?;
-    Ok(format!("{scope}/{}@{}", target.name, target.version))
+    let scope = target.scope
+        .as_deref()
+        .map(str::trim)
+        .filter(|sc| !sc.is_empty())
+        .ok_or_else(|| invalid("inbound scope"))?;
+    Ok(format!("{scope}/{}@{}", target.name.trim(), target.version.trim()))
 }
-
 fn imported_identity(
     root: &Path,
     target: &Target,
     imported: &command_import::PreparedImport,
 ) -> io::Result<String> {
-    let scope = target.scope.as_deref().ok_or_else(|| invalid("inbound target scope"))?;
-    let model = details::model(root, imported, scope, &target.name)?;
-    let is_head = target.version.is_empty() || matches!(target.version.as_str(), "latest" | "head");
-    let version = if is_head {
+    let scope = target.scope
+        .as_deref()
+        .map(str::trim)
+        .filter(|sc| !sc.is_empty())
+        .ok_or_else(|| invalid("inbound target scope"))?;
+    let name = target.name.trim();
+    let model = details::model(root, imported, scope, name)?;
+    let ver = target.version.trim();
+    let version = if matches!(ver, "" | "latest" | "head") {
         details::head_as_tag_or_hash(model.as_ref())?
     } else {
-        target.version.clone()
+        ver.to_owned()
     };
-    Ok(format!("{scope}/{}@{version}", target.name))
+    Ok(format!("{scope}/{name}@{version}"))
 }
-
 pub(in crate::workspace::engine) fn overlay<'a>(
     state: &'a State,
     token: Option<&str>,
@@ -391,7 +385,6 @@ pub(in crate::workspace::engine) fn overlay<'a>(
     retained.import.validate()?;
     Ok(Some(&retained.import.overlay))
 }
-
 fn prepare_recovery(
     input: &Prepare,
     targets: &[Target],
@@ -404,7 +397,6 @@ fn prepare_recovery(
         fetch,
     )
 }
-
 pub(in crate::workspace::engine) fn local_preflight(input: &Prepare) -> io::Result<(usize, Value)> {
     validation::local(input)?;
     if input.options.objects_only || input.options.lanes {

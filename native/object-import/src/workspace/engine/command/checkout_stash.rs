@@ -53,10 +53,19 @@ pub(super) fn selected(options: &Options, targets: &[Value]) -> io::Result<Optio
         return Ok(None);
     };
     let ids: HashSet<_> = match &stash.reset_ids {
-        Some(ids) => ids.iter().map(|id| id.trim()).collect(),
+        Some(ids) => ids
+            .iter()
+            .map(|id| {
+                let raw = id.trim();
+                raw.rsplit_once('@').map_or(raw, |(base, _)| base.trim())
+            })
+            .collect(),
         None => stash.versions
             .iter()
-            .map(|row| row.identity.trim())
+            .map(|row| {
+                let raw = row.identity.trim();
+                raw.rsplit_once('@').map_or(raw, |(base, _)| base.trim())
+            })
             .collect(),
     };
     let selected: Vec<_> = targets

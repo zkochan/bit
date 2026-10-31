@@ -85,7 +85,7 @@ pub(in crate::workspace::engine) fn configuration_value(
     let workspace = workspace_settings(config)?;
     extensions(config)?;
     let scope = document(&crate::scope_path(root).join("scope.json"))?;
-    if !lane && scope["lanes"]["current"] != "main" {
+    if !lane && scope["lanes"]["current"].as_str().map_or("main", str::trim) != "main" {
         return Err(invalid("status non-main scope"));
     }
     if !fs::symlink_metadata(crate::scope_path(root).join("objects"))?.is_dir() {
@@ -95,6 +95,7 @@ pub(in crate::workspace::engine) fn configuration_value(
 }
 
 fn aspect_value<'a>(config: &'a Value, id: &str) -> Option<&'a Value> {
+    let id = id.trim();
     let prefix = format!("{id}@");
     config
         .as_object()
@@ -102,7 +103,10 @@ fn aspect_value<'a>(config: &'a Value, id: &str) -> Option<&'a Value> {
             map.get(id)
                 .or_else(|| {
                     map.iter()
-                        .find_map(|(key, val)| key.starts_with(&prefix).then_some(val))
+                        .find_map(|(key, val)| {
+                            let trimmed = key.trim();
+                            (trimmed == id || trimmed.starts_with(&prefix)).then_some(val)
+                        })
                 })
         })
 }

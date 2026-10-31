@@ -59,15 +59,21 @@ fn capture_remotes(
 
 fn matches_any_entry(target: &Target, entries: &[lane::Entry]) -> bool {
     let name = target.name.trim();
-    let identity = target.scope
+    let scope = target.scope
         .as_deref()
         .map(str::trim)
-        .filter(|scope| !scope.is_empty())
-        .map_or_else(|| name.to_owned(), |scope| format!("{scope}/{name}"));
+        .filter(|scope| !scope.is_empty());
     entries
         .iter()
         .any(|entry| {
             let raw = entry.identity.trim();
-            raw.rsplit_once('@').map_or(raw, |(base, _)| base.trim()) == identity
+            let bare = raw.rsplit_once('@').map_or(raw, |(base, _)| base.trim());
+            match (bare.split_once('/'), scope) {
+                (Some((entry_scope, entry_name)), Some(scope)) => {
+                    entry_scope.trim() == scope && entry_name.trim() == name
+                }
+                (None, None) => bare == name,
+                _ => false,
+            }
         })
 }

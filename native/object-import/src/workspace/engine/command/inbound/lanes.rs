@@ -21,8 +21,11 @@ struct Selection {
 /// existing lane importer owns component closure and remote refs without
 /// publishing the Lane object into the local index.
 pub(super) fn prepare(input: &Prepare, state: &mut State) -> io::Result<(usize, Value)> {
-    if input.operation == "fetch"
-        && (input.ids.is_empty() || input.ids.iter().any(|id| id == "main"))
+    if input.operation.trim() == "fetch"
+        && (input.ids.is_empty()
+            || input.ids
+                .iter()
+                .any(|id| id.trim() == "main"))
     {
         return aggregate::prepare(input, state);
     }

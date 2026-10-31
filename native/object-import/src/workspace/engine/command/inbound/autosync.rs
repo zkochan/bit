@@ -45,7 +45,7 @@ pub(in crate::workspace::engine) fn finalize(
             },
         };
         if let Some(version) = head(&model) {
-            updates.push((id.clone(), version));
+            updates.push((bare_id(id).to_owned(), version));
         }
     }
     let (bitmap, count) = bitmap::auto_sync(&input.root, &updates)?;

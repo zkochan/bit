@@ -34,7 +34,7 @@ pub(super) fn read(
         .map(str::trim)
         .ok_or_else(|| invalid("Source hash missing"))?;
     crate::merge_history::hash(hash)?;
-    if crate::validate::hexadecimal(&Sha1::digest(&bytes)) != hash {
+    if !crate::validate::hexadecimal(&Sha1::digest(&bytes)).eq_ignore_ascii_case(hash) {
         return Err(invalid("snapshot Source identity differs"));
     }
     Ok(bytes)
@@ -52,7 +52,10 @@ fn workspace(source: &wire::Workspace, maximum: usize) -> io::Result<Vec<u8>> {
     File::open(&source.path)?
         .take((maximum + 1) as u64)
         .read_to_end(&mut bytes)?;
-    if bytes.len() > maximum || crate::validate::hexadecimal(&Sha1::digest(&bytes)) != source.hash {
+    if bytes.len() > maximum
+        || !crate::validate::hexadecimal(&Sha1::digest(&bytes))
+            .eq_ignore_ascii_case(source.hash.trim())
+    {
         return Err(invalid("workspace snapshot differs"));
     }
     if source.normalization == wire::Normalization::Workspace && bytes.starts_with(&[239, 187, 191])
@@ -60,13 +63,16 @@ fn workspace(source: &wire::Workspace, maximum: usize) -> io::Result<Vec<u8>> {
         bytes.drain(..3);
     }
     let bytes = crate::checkout::eol::normalize(bytes, false);
-    if crate::validate::hexadecimal(&Sha1::digest(&bytes)) != source.source_hash {
+    if !crate::validate::hexadecimal(&Sha1::digest(&bytes))
+        .eq_ignore_ascii_case(source.source_hash.trim())
+    {
         return Err(invalid("normalized Source identity differs"));
     }
     Ok(bytes)
 }
 
 fn hex(text: &str, maximum: usize) -> io::Result<Vec<u8>> {
+    let text = text.trim();
     if text.len() > maximum.min(MAX_RAW) * 2
         || !text.len().is_multiple_of(2)
         || !text.bytes().all(|byte| byte.is_ascii_hexdigit())

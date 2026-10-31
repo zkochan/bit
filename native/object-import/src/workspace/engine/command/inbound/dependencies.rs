@@ -216,7 +216,11 @@ fn parse_target_str(text: &str) -> io::Result<Target> {
 }
 
 pub(super) fn target(value: &Value) -> io::Result<Target> {
-    if let Some(text) = value.as_str().map(str::trim) {
+    if let Some(text) = value
+        .as_str()
+        .or_else(|| value["id"].as_str())
+        .map(str::trim)
+    {
         return parse_target_str(text);
     }
     let id_obj = value
@@ -255,12 +259,24 @@ pub(super) fn target(value: &Value) -> io::Result<Target> {
 }
 
 pub(super) fn identity(target: &Target) -> io::Result<String> {
-    let scope = target.scope.as_deref().ok_or_else(|| invalid("inbound dependency scope"))?;
-    Ok(format!("{scope}/{}", target.name))
+    let scope = target.scope
+        .as_deref()
+        .map(str::trim)
+        .filter(|scope| !scope.is_empty())
+        .ok_or_else(|| invalid("inbound dependency scope"))?;
+    let name = target.name.trim();
+    if name.is_empty() {
+        return Err(invalid("inbound dependency name"));
+    }
+    Ok(format!("{scope}/{name}"))
 }
 
 pub(super) fn versioned(target: &Target) -> io::Result<String> {
-    Ok(format!("{}@{}", identity(target)?, target.version))
+    let version = target.version.trim();
+    if version.is_empty() {
+        return Err(invalid("inbound dependency version"));
+    }
+    Ok(format!("{}@{version}", identity(target)?))
 }
 
 fn newest(dependencies: Vec<Target>) -> io::Result<Vec<Target>> {

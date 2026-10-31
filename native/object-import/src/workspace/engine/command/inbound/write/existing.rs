@@ -84,64 +84,60 @@ fn reorder_bitmap(bitmap: &mut Value) -> io::Result<()> {
     Ok(())
 }
 
+fn trimmed_str(value: &Value) -> Option<&str> {
+    value
+        .as_str()
+        .map(str::trim)
+        .filter(|val| !val.is_empty())
+}
 fn imported_model<'a>(
     input: &'a Input<'_>,
     rows: &Map<String, Value>,
 ) -> io::Result<Cow<'a, Value>> {
-    let scope = input.target.scope.as_deref().ok_or_else(|| invalid("inbound existing scope"))?;
-    if input.row["scope"]
-        .as_str()
-        .filter(|val| !val.is_empty())
-        .is_some_and(|row_scope| row_scope != scope)
+    let scope = input.target.scope
+        .as_deref()
+        .map(str::trim)
+        .filter(|sc| !sc.is_empty())
+        .ok_or_else(|| invalid("inbound existing scope"))?;
+    if trimmed_str(&input.row["scope"]).is_some_and(|row_scope| row_scope != scope)
         || !rows
             .values()
             .any(|row| row == input.row)
     {
         return Err(invalid("inbound existing workspace identity"));
     }
-    details::model(input.root, input.imported, scope, &input.target.name)
+    details::model(input.root, input.imported, scope, input.target.name.trim())
 }
-
 fn has_diverged_local_versions(input: &Input<'_>, model: &Value) -> io::Result<bool> {
-    let has_local = model["state"]["versions"]
-        .as_object()
-        .is_some_and(|versions| {
-            versions
-                .values()
-                .any(|entry| entry["local"] == true)
-        });
-    if !has_local {
+    let Some(versions) = model["state"]["versions"].as_object() else { return Ok(false) };
+    if !versions
+        .values()
+        .any(|entry| entry["local"] == true)
+    {
         return Ok(false);
     }
     if input.resolution.merge_strategy.is_some() {
         return Ok(true);
     }
-    let Some(scope) = input.target.scope.as_deref() else { return Ok(false) };
-    let Some(remote_head) = input.imported.overlay
-        .refs(scope)
-        .and_then(|rows| {
-            rows.iter()
-                .find(|row| {
-                    super::super::remote::file_list::row_lane_matches(
-                        row,
-                        scope,
-                        &input.target.name,
-                    )
-                })
-        })
-        .and_then(|row| row["head"].as_str())
+    let Some(scope) = input.target.scope.as_deref().map(str::trim) else { return Ok(false) };
+    let Some(refs) = input.imported.overlay.refs(scope) else { return Ok(false) };
+    let matches_target = |row: &&Value| {
+        super::super::remote::file_list::row_lane_matches(row, scope, &input.target.name)
+    };
+    let Some(remote_head) = refs
+        .iter()
+        .find(matches_target)
+        .and_then(|row| trimmed_str(&row["head"]))
     else {
         return Ok(false);
     };
-    let Some(local_head) = model["head"].as_str() else { return Ok(false) };
+    let Some(local_head) = trimmed_str(&model["head"]) else { return Ok(false) };
     Ok(!is_ancestor_version(input, local_head, remote_head)?)
 }
-
 fn is_ancestor_version(input: &Input<'_>, start: &str, target: &str) -> io::Result<bool> {
-    let mut stack = vec![start.to_owned()];
-    let mut visited = HashSet::new();
+    let (mut stack, mut visited) = (vec![start.trim().to_owned()], HashSet::new());
     while let Some(cur) = stack.pop() {
-        if cur == target {
+        if cur == target.trim() {
             return Ok(true);
         }
         if visited.insert(cur.clone()) && visited.len() <= 4096 {
@@ -150,26 +146,23 @@ fn is_ancestor_version(input: &Input<'_>, start: &str, target: &str) -> io::Resu
     }
     Ok(false)
 }
-
 fn version_parents(input: &Input<'_>, hash: &str) -> io::Result<Vec<String>> {
     let version = if let Some(ver) = details::local_object(input.root, hash, "Version")? {
         Some(ver)
     } else {
         input.imported.overlay.read(hash, "Version")?.cloned()
     };
-    Ok(version
-        .and_then(|ver| ver["parents"].as_array().cloned())
-        .into_iter()
-        .flatten()
-        .filter_map(|val| val.as_str().map(String::from))
+    let Some(parents) = version.and_then(|ver| ver["parents"].as_array().cloned()) else {
+        return Ok(Vec::new());
+    };
+    Ok(parents
+        .iter()
+        .filter_map(trimmed_str)
+        .map(String::from)
         .collect())
 }
-
 fn versions(input: &Input<'_>, model: &Value) -> io::Result<(Value, String, String)> {
-    let current = input.row["version"]
-        .as_str()
-        .filter(|ver| !ver.is_empty())
-        .unwrap_or("latest");
+    let current = trimmed_str(&input.row["version"]).unwrap_or("latest");
     let (_, current_hash) = version(model, current)?;
     let old = if let Some(version) = details::local_object(input.root, &current_hash, "Version")? {
         version
@@ -182,7 +175,6 @@ fn versions(input: &Input<'_>, model: &Value) -> io::Result<(Value, String, Stri
     let (new_name, new_hash) = version(model, &input.target.version)?;
     Ok((old, new_hash, new_name))
 }
-
 fn validate_new(new: &Value) -> io::Result<&str> {
     crate::history_query::validate_version(new)?;
     let main = new["mainFile"]
@@ -192,7 +184,6 @@ fn validate_new(new: &Value) -> io::Result<&str> {
     checkout::plan::relative_path(main)?;
     Ok(main)
 }
-
 fn plan_files(
     input: &Input<'_>,
     old: &Value,
@@ -200,12 +191,10 @@ fn plan_files(
     incoming_version: &str,
     changes: &mut WorkspaceFiles,
 ) -> io::Result<()> {
-    let old_files = files(old)?;
-    let new_files = files(new)?;
+    let (old_files, new_files) = (files(old)?, files(new)?);
     plan_old(input, &old_files, &new_files, incoming_version, changes)?;
     plan_new(input, &old_files, &new_files, changes)
 }
-
 fn plan_old(
     input: &Input<'_>,
     old_files: &HashMap<String, String>,
@@ -230,7 +219,6 @@ fn plan_old(
     }
     Ok(())
 }
-
 fn plan_old_file(
     input: &Input<'_>,
     relative: &str,
@@ -270,7 +258,6 @@ fn plan_old_file(
     }
     Ok(())
 }
-
 fn resolve(
     input: &Input<'_>,
     before: Option<&[u8]>,
@@ -293,18 +280,16 @@ fn resolve(
                 .filter(|ver| !ver.is_empty())
                 .unwrap_or("latest");
             let labels = [format!("{current_version} modified"), incoming_version.to_owned()];
-            let (merged, conflict) = crate::merge_history::merge::git::workspace_merge(
+            crate::merge_history::merge::git::workspace_merge(
                 current,
                 base,
                 &incoming,
                 [&labels[0], &labels[1]],
-            )?;
-            Ok((merged, conflict))
+            )
         }
         _ => Err(invalid("inbound merge strategy")),
     }
 }
-
 fn old_source(input: &Input<'_>, hash: &str, compressed: &mut usize) -> io::Result<Vec<u8>> {
     if let Some(source) = input.imported.overlay.source(hash) {
         return Ok(checkout::eol::auto(source.to_vec()));
@@ -317,7 +302,6 @@ fn old_source(input: &Input<'_>, hash: &str, compressed: &mut usize) -> io::Resu
     )?;
     Ok(checkout::eol::auto(source))
 }
-
 fn current_or_missing(
     input: &Input<'_>,
     path: &Path,

@@ -74,21 +74,27 @@ fn index_component_hash(scope: &Path, id: &str) -> Option<[u8; 20]> {
         .filter(|row| row["type"].as_str().unwrap_or("Component") == "Component")
         .filter(|row| row["isSymlink"] != true)
         .find(|row| {
-            let (entry_scope, entry_name) = if let Some(id_str) = row["id"].as_str().map(str::trim)
-            {
-                id_str
-                    .split_once('/')
-                    .unwrap_or(("", id_str))
-            } else {
-                (
-                    row["id"]["scope"].as_str().map_or("", str::trim),
-                    row["id"]["name"].as_str().map_or("", str::trim),
-                )
-            };
+            let (entry_scope, entry_name) = index_row_parts(row);
             entry_name == target_name && (entry_scope == target_scope || entry_scope.is_empty())
         })
         .and_then(|row| row["hash"].as_str())
         .and_then(|hash| merge_history::hash(hash.trim()).ok())
+}
+
+fn index_row_parts(row: &Value) -> (&str, &str) {
+    if let Some(id_str) = row["id"].as_str().map(str::trim) {
+        let bare = id_str.rsplit_once('@').map_or(id_str, |(base, _)| base.trim());
+        let (scope, name) = bare
+            .split_once('/')
+            .unwrap_or(("", bare));
+        (scope.trim(), name.trim())
+    } else {
+        let raw_name = row["id"]["name"].as_str().map_or("", str::trim);
+        (
+            row["id"]["scope"].as_str().map_or("", str::trim),
+            raw_name.rsplit_once('@').map_or(raw_name, |(base, _)| base.trim()),
+        )
+    }
 }
 
 fn reference<'a>(model: &'a Value, target: &'a Target) -> io::Result<&'a str> {
@@ -97,6 +103,7 @@ fn reference<'a>(model: &'a Value, target: &'a Target) -> io::Result<&'a str> {
         model["head"]
             .as_str()
             .map(str::trim)
+            .filter(|head| !head.is_empty())
             .ok_or_else(|| invalid("status unknown version"))?
     } else if merge_history::hash(version).is_ok() {
         version
@@ -106,6 +113,7 @@ fn reference<'a>(model: &'a Value, target: &'a Target) -> io::Result<&'a str> {
             .unwrap_or_else(|| &model["versions"][version])
             .as_str()
             .map(str::trim)
+            .filter(|hash| !hash.is_empty())
             .ok_or_else(|| invalid("status unknown version"))?
     };
     Ok(reference)

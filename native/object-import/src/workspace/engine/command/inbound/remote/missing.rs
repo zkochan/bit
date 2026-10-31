@@ -84,8 +84,19 @@ impl Objects<'_> {
         if identity.is_empty() {
             return None;
         }
-        let model_hash = hexadecimal(&sha1::Sha1::digest(identity.as_bytes()));
-        let model = self.object(&model_hash, "Component")?;
+        let (normalized, unscoped) = identity
+            .split_once('/')
+            .map_or_else(
+                || (identity.to_owned(), None),
+                |(sc, nm)| (format!("{}/{}", sc.trim(), nm.trim()), Some(nm.trim())),
+            );
+        let model_hash = hexadecimal(&sha1::Sha1::digest(normalized.as_bytes()));
+        let model = self
+            .object(&model_hash, "Component")
+            .or_else(|| {
+                let fallback = hexadecimal(&sha1::Sha1::digest(unscoped?.as_bytes()));
+                self.object(&fallback, "Component")
+            })?;
         let hash = match version {
             None | Some("" | "latest" | "head") => non_empty_str(&model["head"])?.to_owned(),
             Some(version) if merge_history::hash(version).is_ok() => version.to_owned(),

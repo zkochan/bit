@@ -124,10 +124,10 @@ fn enqueue(
 }
 fn bare(id: &str) -> &str {
     let id = id.trim();
-    id.split('@')
-        .next()
+    id.rsplit_once('@')
+        .map(|(base, _)| base.trim())
+        .filter(|base| !base.is_empty())
         .unwrap_or(id)
-        .trim()
 }
 
 #[cfg(test)]

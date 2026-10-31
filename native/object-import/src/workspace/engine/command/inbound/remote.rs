@@ -134,15 +134,18 @@ async fn list_pattern(
     fork_order: bool,
 ) -> io::Result<(String, Vec<Listed>)> {
     let (scope, namespaces) = pattern
+        .trim()
         .split_once('/')
-        .filter(|(scope, _)| !scope.is_empty())
+        .map(|(scope, namespaces)| (scope.trim(), namespaces.trim()))
+        .filter(|(scope, namespaces)| !scope.is_empty() && !namespaces.is_empty())
         .ok_or_else(|| invalid("inbound list pattern"))?;
     let matcher = file_list::matcher(scope, namespaces)?;
+    let entry_key = |entry: &Listed| format!("{}/{}", entry.scope.trim(), entry.name.trim());
     let mut listed = lane_rows
         .iter()
         .filter(|entry| {
             matcher
-                .find(&format!("{}/{}", entry.scope, entry.name))
+                .find(&entry_key(entry))
                 .is_some()
         })
         .cloned()
@@ -152,11 +155,11 @@ async fn list_pattern(
         let main = list_order::main(&remote, scope, namespaces, network, fork_order).await?;
         let mut seen = listed
             .iter()
-            .map(|entry| format!("{}/{}", entry.scope, entry.name))
+            .map(entry_key)
             .collect::<HashSet<_>>();
         listed.extend(
             main.into_iter()
-                .filter(|entry| seen.insert(format!("{}/{}", entry.scope, entry.name))),
+                .filter(|entry| seen.insert(entry_key(entry))),
         );
     }
     Ok((pattern.to_owned(), listed))
@@ -367,7 +370,8 @@ fn collect(
         if total > MAX_INBOUND_BYTES || objects.len() >= MAX_INBOUND_OBJECTS {
             return Err(invalid("inbound remote object bounds"));
         }
-        match objects.entry(item.hash) {
+        let hash = crate::validate::hexadecimal(&crate::merge_history::hash(&item.hash)?);
+        match objects.entry(hash) {
             Entry::Vacant(entry) => {
                 entry.insert(item.compressed);
             }

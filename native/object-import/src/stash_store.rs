@@ -19,8 +19,15 @@ impl PreparedLoad {
     /// Select an explicit stash ID or the lexically latest published filename.
     pub fn prepare(scope: &Path, id: Option<&str>) -> io::Result<Self> {
         let observation = Observation::read(scope)?;
-        let filename = match id.map(str::trim) {
+        let filename = match id
+            .map(str::trim)
+            .filter(|id| !id.is_empty())
+        {
             Some(id) => {
+                let id = id
+                    .strip_suffix(".json")
+                    .unwrap_or(id)
+                    .trim();
                 validate_id(id)?;
                 format!("{id}.json")
             }
@@ -75,7 +82,10 @@ pub fn list(scope: &Path) -> io::Result<Vec<Value>> {
                 "id": name.strip_suffix(".json").unwrap_or(name),
                 "components": components,
             });
-            if let Some(message) = data["metadata"].get("message") {
+            if let Some(message) = data["metadata"]
+                .get("message")
+                .filter(|msg| !msg.is_null())
+            {
                 row["message"] = message.clone();
             }
             Ok(row)

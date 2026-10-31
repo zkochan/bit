@@ -169,7 +169,7 @@ fn link(source: &Path, destination: &Path, avoid_hard_link: bool) -> io::Result<
         match result {
             Ok(()) => return Ok(()),
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
-                if !retry_link(source, destination, attempt, error)? {
+                if !retry_link(source, destination, avoid_hard_link, attempt, error)? {
                     return Ok(());
                 }
             }
@@ -192,17 +192,18 @@ fn link_once(source: &Path, destination: &Path, avoid_hard_link: bool) -> io::Re
 fn retry_link(
     source: &Path,
     destination: &Path,
+    avoid_hard_link: bool,
     attempt: u64,
     error: io::Error,
 ) -> io::Result<bool> {
-    if linked_correctly(source, destination) {
+    if linked_correctly(source, destination, avoid_hard_link) {
         return Ok(false);
     }
     if attempt == 5 {
         return Err(error);
     }
     std::thread::sleep(std::time::Duration::from_millis(50 * attempt));
-    if linked_correctly(source, destination) {
+    if linked_correctly(source, destination, avoid_hard_link) {
         return Ok(false);
     }
     tolerate_locked_destination(remove(destination))?;
@@ -243,9 +244,10 @@ fn hard_link(source: &Path, destination: &Path) -> io::Result<()> {
 }
 
 #[cfg(unix)]
-fn linked_correctly(source: &Path, destination: &Path) -> bool {
+fn linked_correctly(source: &Path, destination: &Path, avoid_hard_link: bool) -> bool {
     use std::os::unix::fs::MetadataExt;
-    if let (Ok(source), Ok(destination)) = (fs::metadata(source), fs::metadata(destination))
+    if !avoid_hard_link
+        && let (Ok(source), Ok(destination)) = (fs::metadata(source), fs::metadata(destination))
         && source.ino() != 0
         && source.ino() == destination.ino()
         && source.dev() == destination.dev()

@@ -77,9 +77,13 @@ pub(crate) fn metadata(bytes: &[u8], hash: [u8; 20]) -> io::Result<serde_json::V
     let (header, body) =
         inflated.split_once('\0').ok_or_else(|| invalid("missing transfer header"))?;
     let fields = header.split(' ').collect::<Vec<_>>();
+    let declared = fields
+        .get(2)
+        .and_then(|field| field.parse::<usize>().ok())
+        .ok_or_else(|| invalid("unsupported transfer object header"))?;
     if fields.len() != 3
-        || fields[1] != crate::validate::hexadecimal(&hash)
-        || fields[2].parse::<usize>().is_err()
+        || !fields[1].eq_ignore_ascii_case(&crate::validate::hexadecimal(&hash))
+        || (declared != body.len() && declared != body.encode_utf16().count())
         || !known(fields[0])
     {
         return Err(invalid("unsupported transfer object header"));

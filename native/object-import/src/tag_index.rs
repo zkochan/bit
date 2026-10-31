@@ -24,12 +24,14 @@ impl TagIndex {
     pub(crate) fn insert(&mut self, hash: &str, label: &str, normal: bool) {
         let (hash, label) = (hash.trim(), label.trim());
         if !hash.is_empty() && !label.is_empty() {
-            self.0.insert(hash.to_owned(), (label.to_owned(), normal));
+            self.0.insert(hash.to_ascii_lowercase(), (label.to_owned(), normal));
         }
     }
     pub(crate) fn get(&self, hash: &str) -> Option<(&str, bool)> {
+        let hash = hash.trim();
         self.0
-            .get(hash.trim())
+            .get(hash)
+            .or_else(|| self.0.get(&hash.to_ascii_lowercase()))
             .map(|(label, normal)| (label.as_str(), *normal))
     }
 }

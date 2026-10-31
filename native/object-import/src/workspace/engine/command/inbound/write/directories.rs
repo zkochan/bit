@@ -108,7 +108,8 @@ fn owner_directory(target: &Target, directory: &str, all: &[String]) -> Option<S
         .map(str::trim)
         .filter(|owner| !owner.is_empty())?;
     let owned = format!("{owner}/{directory}");
-    (!directory.starts_with(owner) && !all.contains(&owned)).then_some(owned)
+    let has_owner_prefix = directory == owner || directory.starts_with(&format!("{owner}/"));
+    (!has_owner_prefix && !all.contains(&owned)).then_some(owned)
 }
 
 /// `fixDirsIfNested`: a directory that would contain another component's

@@ -13,10 +13,15 @@ pub(super) fn ids(input: &Prepare) -> io::Result<Vec<String>> {
         .iter()
         .map(String::as_str)
         .map(str::trim)
+        .map(|id| id.rsplit_once('@').map_or(id, |(base, _)| base.trim()))
         .filter(|id| !id.is_empty() && *id != "main")
         .map(|id| {
-            if id.contains('/') {
-                return Ok(id.to_owned());
+            if let Some((scope, lane)) = id.split_once('/') {
+                let (scope, lane) = (scope.trim(), lane.trim());
+                if scope.is_empty() || lane.is_empty() {
+                    return Err(invalid("inbound lane ID"));
+                }
+                return Ok(format!("{scope}/{lane}"));
             }
             let row = scope["lanes"]["tracking"]
                 .as_array()

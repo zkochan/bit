@@ -54,9 +54,10 @@ struct Selection {
 pub(in crate::workspace::engine) fn read(input: &Request) -> io::Result<(usize, Value)> {
     validate(input)?;
     let (remotes, network, global) = connection(input)?;
+    let mode = input.selection.mode.trim();
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
     let outcome = runtime.block_on(async {
-        match input.selection.mode.as_str() {
+        match mode {
             "list" => list(input, &remotes, &network).await,
             "latestVersions" => {
                 latest::versions(input, &remotes, &network, &global).await.map(|rows| (rows, false))
@@ -72,7 +73,7 @@ pub(in crate::workspace::engine) fn read(input: &Request) -> io::Result<(usize, 
         error
     })?;
     let count = rows.len();
-    let receipt = if input.selection.mode == "list" {
+    let receipt = if mode == "list" {
         json!({"components": rows, "oldServerWarning": warning})
     } else {
         json!({"ids": rows})
@@ -94,7 +95,7 @@ fn validate(input: &Request) -> io::Result<()> {
     {
         return Err(invalid("remote inventory paths"));
     }
-    match input.selection.mode.as_str() {
+    match input.selection.mode.trim() {
         "list"
             if input.selection.ids.is_empty()
                 && input.selection.scope.as_deref().is_some_and(valid_scope)
@@ -287,10 +288,18 @@ fn file_row(
     compressed: &mut usize,
 ) -> io::Result<Option<Value>> {
     let model = file_list::object(path, hash, "Component", compressed)?;
-    if model["scope"] != scope || model["name"] != name {
+    if model["scope"].as_str().map(str::trim) != Some(scope.trim())
+        || model["name"].as_str().map(str::trim) != Some(name.trim())
+    {
         return Err(invalid("remote file model identity"));
     }
-    let Some(head) = model["head"].as_str() else { return Ok(None) };
+    let Some(head) = model["head"]
+        .as_str()
+        .map(str::trim)
+        .filter(|head| !head.is_empty() && *head != "0")
+    else {
+        return Ok(None);
+    };
     let version = file_list::object(path, head, "Version", compressed)?;
     crate::history_query::validate_version(&version)?;
     file_component(scope, name, &model, &version, include_deleted)

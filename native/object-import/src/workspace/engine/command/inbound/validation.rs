@@ -154,7 +154,9 @@ fn is_unscoped_match(key: &str, row: &Value, raw_id: &str) -> bool {
     let has_scope = row["scope"]
         .as_str()
         .is_some_and(|scope| !scope.trim().is_empty());
-    !has_scope && (key == raw_id || crate::reset_lane::bitmap::row_identity(key, row).1 == raw_id)
+    let name_part = raw_id.split_once('/').map_or(raw_id, |(_, name)| name.trim());
+    let row_name = crate::reset_lane::bitmap::row_identity(key, row).1;
+    !has_scope && (key == raw_id || row_name == raw_id || row_name == name_part)
 }
 
 fn has_local_unscoped_conflict(input: &Prepare) -> io::Result<bool> {
@@ -165,9 +167,8 @@ fn has_local_unscoped_conflict(input: &Prepare) -> io::Result<bool> {
         return Ok(false);
     };
     for id in &input.ids {
-        let (raw_id, _) = id
-            .split_once('@')
-            .unwrap_or((id.as_str(), ""));
+        let trimmed = id.trim();
+        let raw_id = trimmed.rsplit_once('@').map_or(trimmed, |(base, _)| base.trim());
         if rows.iter().any(|(key, row)| is_unscoped_match(key, row, raw_id)) {
             return Ok(true);
         }

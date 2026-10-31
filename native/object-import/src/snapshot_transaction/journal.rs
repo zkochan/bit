@@ -75,12 +75,12 @@ impl State {
     ) -> io::Result<Value> {
         let request: Begin = serde_json::from_value(input).map_err(io::Error::other)?;
         bound(request.count)?;
-        if self.journals.len() >= 4096 {
-            return Err(invalid("snapshot active journal limit"));
-        }
         let trimmed = token.trim();
         if trimmed.is_empty() || trimmed.len() > 256 || trimmed.contains('\0') {
             return Err(invalid("snapshot journal token"));
+        }
+        if self.journals.len() >= 4096 || self.journals.contains_key(trimmed) {
+            return Err(invalid("snapshot active journal limit"));
         }
         let token = if trimmed.len() == token.len() { token } else { trimmed.to_owned() };
         let phases = if repository {

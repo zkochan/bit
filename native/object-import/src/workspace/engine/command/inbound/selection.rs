@@ -72,5 +72,9 @@ fn valid_target_parts(scope: &str, name: &str, raw_version: &str) -> bool {
 
 fn normalize_target_version(raw_version: &str) -> &str {
     let raw_version = raw_version.trim();
-    if raw_version == "head" { "latest" } else { raw_version }
+    if raw_version.eq_ignore_ascii_case("head") || raw_version.eq_ignore_ascii_case("latest") {
+        "latest"
+    } else {
+        raw_version
+    }
 }

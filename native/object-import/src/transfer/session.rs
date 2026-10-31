@@ -86,9 +86,13 @@ impl State {
 
     pub(super) fn receipt(&mut self, input: &Value) -> io::Result<Value> {
         let request = serde::Deserialize::deserialize(input).map_err(io::Error::other)?;
-        self.transaction
+        let output = self.transaction
             .as_mut()
             .ok_or_else(|| invalid("no owned transfer transaction"))?
-            .receipt(&request)
+            .receipt(&request)?;
+        if matches!(output["directive"]["kind"].as_str(), Some("done" | "failed")) {
+            self.transaction = None;
+        }
+        Ok(output)
     }
 }

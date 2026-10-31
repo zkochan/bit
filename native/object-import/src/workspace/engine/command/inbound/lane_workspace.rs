@@ -80,7 +80,14 @@ fn choose(input: &Prepare, roots: &[Target], entries: Vec<lane::Entry>) -> io::R
     let visible = entries
         .into_iter()
         .filter(|entry| !entry.hidden)
-        .map(|entry| (entry.identity.trim().to_owned(), entry.head.trim().to_owned()))
+        .map(|entry| {
+            let raw = entry.identity.trim();
+            let bare = raw.rsplit_once('@').map_or(raw, |(base, _)| base.trim());
+            let key = bare
+                .split_once('/')
+                .map_or_else(|| bare.to_owned(), |(sc, nm)| format!("{}/{}", sc.trim(), nm.trim()));
+            (key, entry.head.trim().to_owned())
+        })
         .collect::<HashMap<_, _>>();
     let bitmap = config::document(&input.root.join(".bitmap"))?;
     let (selected, main, changed) = select(input, roots, &visible, &bitmap)?;
@@ -168,10 +175,22 @@ fn check_head_update(
     name: &str,
     head: &str,
 ) -> io::Result<bool> {
+    let name = name.trim();
     let head = head.trim();
-    let head_changed = bitmap
+    let row = bitmap
         .get(name)
-        .is_some_and(|row| row["version"].as_str().map(str::trim) != Some(head));
+        .or_else(|| {
+            bitmap
+                .as_object()?
+                .iter()
+                .find_map(|(key, val)| {
+                    (!key.starts_with('$')
+                        && !matches!(key.as_str(), "_bit_lane" | "version")
+                        && crate::reset_lane::bitmap::row_identity(key, val).1 == name)
+                        .then_some(val)
+                })
+        });
+    let head_changed = row.is_some_and(|row| row["version"].as_str().map(str::trim) != Some(head));
     if head_changed
         && !input.options.resolution.override_existing
         && input.options.resolution.merge_strategy.is_none()

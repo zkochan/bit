@@ -99,16 +99,20 @@ fn identity(object: &wire::Object) -> io::Result<String> {
     let expected = object.hash
         .as_deref()
         .map(str::trim)
-        .filter(|hash| !hash.is_empty());
+        .filter(|hash| !hash.is_empty())
+        .map(str::to_ascii_lowercase);
     if object.kind == "Source" {
-        return expected.map(str::to_owned).ok_or_else(|| invalid("Source hash missing"));
+        return expected.ok_or_else(|| invalid("Source hash missing"));
     }
     let hash = crate::snapshot_projection::identity(
         &object.kind,
         object.fields.as_ref().ok_or_else(|| invalid("metadata fields missing"))?,
-        expected,
+        expected.as_deref(),
     )?;
-    if expected.is_some_and(|expected_hash| expected_hash != hash) {
+    if expected
+        .as_deref()
+        .is_some_and(|expected_hash| !expected_hash.eq_ignore_ascii_case(&hash))
+    {
         return Err(invalid("metadata identity differs"));
     }
     Ok(hash)

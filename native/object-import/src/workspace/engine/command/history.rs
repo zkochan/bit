@@ -53,7 +53,9 @@ impl State {
             }
             Err(error) => return Err(error),
         };
-        if value["name"] != model["name"] || value["scope"] != model["scope"] {
+        if value["name"].as_str().map(str::trim) != model["name"].as_str().map(str::trim)
+            || value["scope"].as_str().map(str::trim) != model["scope"].as_str().map(str::trim)
+        {
             return Err(invalid("command history identity"));
         }
         self.values.insert(identity.to_owned(), value);

@@ -80,21 +80,23 @@ impl Prepared {
         let mut entries = rows(&bitmap)?;
         let mut seen = HashSet::new();
         for (id, version) in versions {
+            let id_trimmed = id.trim();
             let version = version.trim();
-            if !seen.insert(id) || version.is_empty() {
+            if id_trimmed.is_empty() || !seen.insert(id_trimmed) || version.is_empty() {
                 return Err(invalid("soft tag version"));
             }
             let entry = entries
                 .iter_mut()
-                .find(|entry| identity(entry).ok().as_ref() == Some(id))
+                .find(|entry| identity(entry).ok().as_deref() == Some(id_trimmed))
                 .ok_or_else(|| invalid("soft tag bitmap identity"))?;
+            let component_log = component_logs
+                .get(id_trimmed)
+                .or_else(|| component_logs.get(id))
+                .unwrap_or(log);
             entry
                 .as_object_mut()
                 .ok_or_else(|| invalid("soft tag bitmap entry"))?
-                .insert(
-                    "nextVersion".into(),
-                    next_version(version, component_logs.get(id).unwrap_or(log), pre_release),
-                );
+                .insert("nextVersion".into(), next_version(version, component_log, pre_release));
         }
         self.output =
             render_rows(entries, &bitmap["$schema-version"], lane::header(context, &bitmap)?)?;
@@ -110,9 +112,10 @@ impl Prepared {
         let bitmap = crate::recovery::jsonc::parse(&self.output)?;
         let mut entries = rows(&bitmap)?;
         for id in identities {
+            let id_trimmed = id.trim();
             let entry = entries
                 .iter_mut()
-                .find(|entry| identity(entry).ok().as_ref() == Some(id))
+                .find(|entry| identity(entry).ok().as_deref() == Some(id_trimmed))
                 .ok_or_else(|| invalid("tag persist bitmap identity"))?;
             entry
                 .as_object_mut()

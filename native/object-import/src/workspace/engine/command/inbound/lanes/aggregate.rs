@@ -114,14 +114,23 @@ fn adjust(receipt: &mut Value, before: &HashMap<String, Vec<String>>) -> io::Res
         } else {
             "updated"
         });
-        if !row["versions"]
-            .as_array()
-            .is_some_and(|versions| versions.contains(&row["latestVersion"]))
-        {
+        if !has_version(&row["versions"], &row["latestVersion"]) {
             row["latestVersion"] = Value::Null;
         }
     }
     Ok(())
+}
+
+fn has_version(versions: &Value, latest: &Value) -> bool {
+    let Some(latest) = latest.as_str().map(str::trim) else {
+        return false;
+    };
+    versions
+        .as_array()
+        .is_some_and(|rows| {
+            rows.iter()
+                .any(|ver| ver.as_str().map(str::trim) == Some(latest))
+        })
 }
 
 fn retain(

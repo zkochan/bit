@@ -124,10 +124,10 @@ fn addition(
         .map(str::trim)
         .filter(|val| !val.is_empty())
         .unwrap_or(scope);
-    if existing.contains(&format!("{original_scope}/{name}")) {
+    let identity = format!("{scope}/{name}");
+    if existing.contains(&format!("{original_scope}/{name}")) || existing.contains(&identity) {
         return Ok(None);
     }
-    let identity = format!("{scope}/{name}");
     let version = entry["id"]["version"]
         .as_str()
         .or_else(|| {
@@ -135,7 +135,9 @@ fn addition(
                 .as_str()
                 .and_then(|raw| raw.rsplit_once('@').map(|(_, ver)| ver))
         })
+        .or_else(|| entry["version"].as_str())
         .map(str::trim)
+        .filter(|ver| !ver.is_empty())
         .ok_or_else(|| invalid("stash new version"))?;
     crate::merge_history::hash(version)?;
     let mut row = json!({"name":name,"scope":"","version":"","defaultScope":scope,"mainFile":entry["mainFile"],"rootDir":entry["rootDir"]});

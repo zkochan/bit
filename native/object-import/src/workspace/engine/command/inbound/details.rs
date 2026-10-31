@@ -65,13 +65,21 @@ pub(super) fn details(
     targets
         .iter()
         .map(|target| {
-            let scope = target.scope.as_deref().ok_or_else(|| invalid("inbound scope"))?;
-            let model = model(root, imported, scope, &target.name)?;
-            let id = format!("{scope}/{}", target.name);
+            let scope = target.scope
+                .as_deref()
+                .map(str::trim)
+                .filter(|scope| !scope.is_empty())
+                .ok_or_else(|| invalid("inbound scope"))?;
+            let name = target.name.trim();
+            let model = model(root, imported, scope, name)?;
+            let id = format!("{scope}/{name}");
             let conflicts = workspace.and_then(|workspace| workspace.conflicts(&id));
             let prefetched = prefetched
                 .iter()
-                .any(|root| root.scope == target.scope && root.name == target.name);
+                .any(|root| {
+                    root.scope.as_deref().map(str::trim) == Some(scope)
+                        && root.name.trim() == name
+                });
             detail(root, scope, target, model.as_ref(), imported, conflicts, prefetched)
         })
         .collect()
@@ -133,20 +141,14 @@ fn removed(
         .and_then(|_| {
             crate::merge_history::hash(&target.version).is_ok().then_some(target.version.as_str())
         });
-    let Some(head) = lane_head.or_else(|| model["head"].as_str()) else {
+    let Some(head) = lane_head
+        .or_else(|| model["head"].as_str())
+        .map(str::trim)
+        .filter(|head| !head.is_empty() && *head != "0")
+    else {
         return Ok(false);
     };
-    let local;
-    let version = match imported.overlay.read(head, "Version")? {
-        Some(version) => version,
-        None => match local_object(root, head, "Version")? {
-            Some(version) => {
-                local = version;
-                &local
-            }
-            None => return Ok(false),
-        },
-    };
+    let Some(version) = head_version(root, head, imported)? else { return Ok(false) };
     let aspect = version["extensions"]
         .as_array()
         .into_iter()
@@ -168,6 +170,17 @@ fn removed(
     Ok(false)
 }
 
+fn head_version<'a>(
+    root: &Path,
+    head: &str,
+    imported: &'a command_import::PreparedImport,
+) -> io::Result<Option<Cow<'a, Value>>> {
+    if let Some(version) = imported.overlay.read(head, "Version")? {
+        return Ok(Some(Cow::Borrowed(version)));
+    }
+    Ok(local_object(root, head, "Version")?.map(Cow::Owned))
+}
+
 /// `ModelComponent.isDeprecated`: the legacy flag, else the deprecation aspect
 /// of the head Version, imported or local; a head neither holds is not
 /// deprecated. A deprecated version `range` needs semver and declines.
@@ -179,7 +192,13 @@ fn deprecated(
     if model["deprecated"] == true {
         return Ok(true);
     }
-    let Some(head) = model["head"].as_str() else { return Ok(false) };
+    let Some(head) = model["head"]
+        .as_str()
+        .map(str::trim)
+        .filter(|head| !head.is_empty() && *head != "0")
+    else {
+        return Ok(false);
+    };
     let local;
     let version = match imported.overlay.read(head, "Version")? {
         Some(version) => version,

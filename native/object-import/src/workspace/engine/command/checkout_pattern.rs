@@ -36,10 +36,7 @@ pub(in crate::workspace::engine) fn select(
             trimmed.rsplit_once('@').map_or(trimmed, |(base, _)| base.trim())
         })
         .collect::<HashSet<_>>();
-    if selected.is_empty()
-        || selected.len() != input.identities.len()
-        || !selected.is_subset(&known)
-    {
+    if selected.is_empty() || selected.contains("") || !selected.is_subset(&known) {
         return Err(invalid("checkout selected identities"));
     }
     proof::verify(&record.proofs)?;

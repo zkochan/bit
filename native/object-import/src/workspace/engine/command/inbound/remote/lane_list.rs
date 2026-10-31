@@ -8,8 +8,9 @@ pub(super) fn visible(entries: Vec<lane::Entry>) -> io::Result<Vec<Listed>> {
         .into_iter()
         .filter(|entry| !entry.hidden)
         .map(|entry| {
-            let (scope, name) = entry.identity
-                .trim()
+            let raw = entry.identity.trim();
+            let bare = raw.rsplit_once('@').map_or(raw, |(base, _)| base.trim());
+            let (scope, name) = bare
                 .split_once('/')
                 .map(|(scope, name)| (scope.trim(), name.trim()))
                 .filter(|(scope, name)| !scope.is_empty() && !name.is_empty())

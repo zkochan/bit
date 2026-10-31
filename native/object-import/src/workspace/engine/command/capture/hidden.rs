@@ -75,7 +75,7 @@ fn retain_files(
             .map(str::trim)
             .ok_or_else(|| invalid("hidden Source reference"))?;
         let hash = crate::workspace::engine::hash(&bytes);
-        if hash != reference {
+        if !hash.eq_ignore_ascii_case(reference) {
             return Err(invalid("hidden lane Source hash mismatch"));
         }
         let path = private_root.join(version).join(relative);

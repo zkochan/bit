@@ -7,11 +7,14 @@ use sha1::{Digest, Sha1};
 use std::{collections::HashSet, fs::File, io, path::Path};
 
 pub(super) fn list(path: &Path, scope: &str, namespaces: &str) -> io::Result<Vec<Listed>> {
+    let (scope, namespaces) = (scope.trim(), namespaces.trim());
     let config: Value =
         crate::parse_jsonc(&Budget::new(1024 * 1024).read(File::open(path.join("scope.json"))?)?)?;
-    if config["name"] != scope
+    if config["name"].as_str().map(str::trim) != Some(scope)
         || config["lanes"]["current"]
             .as_str()
+            .map(str::trim)
+            .filter(|lane| !lane.is_empty())
             .is_some_and(|lane| lane != "main")
     {
         return Err(invalid("inbound file scope identity or lane"));
@@ -114,13 +117,13 @@ pub(crate) fn row_lane_matches(row: &Value, scope: &str, name: &str) -> bool {
     row["id"]
         .as_str()
         .map(str::trim)
-        .map(|raw| {
-            raw.split('@')
-                .next()
-                .unwrap_or(raw)
-                .trim()
+        .and_then(|raw| {
+            raw.rsplit_once('@')
+                .map_or(Some(raw), |(base, _)| Some(base.trim()))
+                .filter(|val| !val.is_empty())
         })
-        .is_some_and(|raw| raw == format!("{scope}/{name}"))
+        .and_then(|bare| bare.split_once('/'))
+        .is_some_and(|(row_scope, row_name)| row_scope.trim() == scope && row_name.trim() == name)
 }
 
 pub(super) fn indexed(
@@ -160,12 +163,12 @@ pub(crate) fn row_id_parts(row: &Value) -> Option<(Option<&str>, &str)> {
     {
         return Some((row["id"]["scope"].as_str().map(str::trim), name));
     }
-    let raw = row["id"]
-        .as_str()?
-        .trim()
-        .split('@')
-        .next()?
-        .trim();
+    let trimmed = row["id"].as_str()?.trim();
+    let raw = trimmed
+        .rsplit_once('@')
+        .map(|(base, _)| base.trim())
+        .filter(|base| !base.is_empty())
+        .unwrap_or(trimmed);
     let (scope, name) = raw
         .split_once('/')
         .map_or((None, raw), |(scope, name)| (Some(scope.trim()), name.trim()));
@@ -197,7 +200,13 @@ fn component(
     model: &Value,
     compressed: &mut usize,
 ) -> io::Result<Option<Listed>> {
-    let Some(head) = model["head"].as_str() else { return Ok(None) };
+    let Some(head) = model["head"]
+        .as_str()
+        .map(str::trim)
+        .filter(|head| !head.is_empty() && *head != "0")
+    else {
+        return Ok(None);
+    };
     let version = object(path, head, "Version", compressed)?;
     crate::history_query::validate_version(&version)?;
     if extension(&version, "teambit.component/remove", "removed") {

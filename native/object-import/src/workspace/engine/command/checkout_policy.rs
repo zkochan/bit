@@ -112,6 +112,9 @@ pub(super) fn receipt_versions<'a>(
     materials: impl IntoIterator<Item = (&'a Value, bool)>,
     strategy: Option<&str>,
 ) -> io::Result<Option<Value>> {
+    let strategy = strategy
+        .map(str::trim)
+        .filter(|val| !val.is_empty());
     if strategy == Some("ours") {
         return Ok(None);
     }
@@ -196,7 +199,10 @@ fn selected_dependency<'a>(dependency: &'a Value, entries: &[Value]) -> Option<(
         .filter(|version| !version.is_empty())?;
     entries
         .iter()
-        .any(|entry| entry["dependencyId"] == name && entry["value"]["version"] != version)
+        .any(|entry| {
+            entry["dependencyId"].as_str().map(str::trim) == Some(name)
+                && entry["value"]["version"].as_str().map(str::trim) != Some(version)
+        })
         .then_some((name, version))
 }
 

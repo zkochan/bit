@@ -70,7 +70,7 @@ fn component_rows(facts: &Value, root_names: &[Value], rows: &mut Vec<Value>) ->
                 continue;
             };
             if dependency["isExtension"] == true
-                || dependency["lifecycleType"] == "peer"
+                || dependency["lifecycleType"].as_str().map(str::trim) == Some("peer")
                 || local.contains(name)
                 || root_names
                     .iter()

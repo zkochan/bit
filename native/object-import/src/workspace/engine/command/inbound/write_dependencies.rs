@@ -39,7 +39,9 @@ pub(in crate::workspace::engine) fn complete(
         .as_array()
         .ok_or_else(|| invalid("inbound imported identifiers"))?
         .iter()
-        .map(|id| requested_target(id.as_str().unwrap_or_default()))
+        .map(|id| {
+            requested_target(id.as_str().ok_or_else(|| invalid("inbound imported identifiers"))?)
+        })
         .collect::<io::Result<Vec<_>>>()?;
     workspace.refresh_policy(&targets, &mut retained.import)?;
     retained.receipt["requiresWriteDependencies"] = json!(false);
