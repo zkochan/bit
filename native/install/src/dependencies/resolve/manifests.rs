@@ -11,6 +11,7 @@ use std::{
 impl Resolver<'_> {
     /// `resolvePackagePath` from the component dir, then `resolvePackageData`.
     pub fn package(&mut self, from: &Path, name: &str) -> io::Result<Resolved> {
+        let name = name.trim();
         let Some(manifest) = self.find_manifest(from, name)? else {
             return Ok(Resolved::Missing(name.to_owned()));
         };
@@ -19,6 +20,10 @@ impl Resolver<'_> {
 
     /// The `package.json` of `node_modules/<name>` closest to `from`.
     pub fn find_manifest(&mut self, from: &Path, name: &str) -> io::Result<Option<Value>> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Ok(None);
+        }
         for dir in from.ancestors() {
             let path = dir
                 .join("node_modules")

@@ -300,7 +300,7 @@ async fn own_env(
 fn has_env_jsonc(component: &WorkspaceComponent) -> bool {
     component.files
         .iter()
-        .any(|file| file == "env.jsonc" || file == "env.json")
+        .any(|file| matches!(file.trim().trim_start_matches("./"), "env.jsonc" | "env.json"))
 }
 
 /// Detection, overrides, versions and the final list of one component.
@@ -352,7 +352,8 @@ fn detected(
     resolver: &mut Resolver<'_>,
 ) -> io::Result<Detected> {
     // The workspace-root component (`rootDir: "."`) is the workspace itself: never detected.
-    if subject.component.root_dir == "." {
+    let rel = subject.component.root_dir.trim().trim_start_matches("./");
+    if rel.is_empty() || rel == "." {
         return Ok(Detected::default());
     }
     let cache = context.workspace.options.use_cache && !cache::disabled();

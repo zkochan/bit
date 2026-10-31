@@ -80,7 +80,7 @@ fn merge_direct(root: &mut Value, direct: &Value) {
 
 /// `isSameDirectDependency`.
 fn same_direct(left: &Value, right: &Value) -> bool {
-    match (left["name"].as_str(), right["name"].as_str()) {
+    match (left["name"].as_str().map(str::trim), right["name"].as_str().map(str::trim)) {
         (Some(left_name), Some(right_name)) if !left_name.is_empty() && !right_name.is_empty() => {
             left_name == right_name
                 && (left["specifier"] == right["specifier"]
@@ -93,7 +93,7 @@ fn same_direct(left: &Value, right: &Value) -> bool {
 
 /// `isWildcardSpecifier`.
 fn is_wildcard(specifier: &Value) -> bool {
-    specifier.is_null() || specifier == "*" || specifier == ""
+    specifier.is_null() || matches!(specifier.as_str().map(str::trim), Some("" | "*"))
 }
 
 /// `nodeIdLessThan`.

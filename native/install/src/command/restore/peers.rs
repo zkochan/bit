@@ -199,10 +199,10 @@ fn add_version(versions: &mut Versions, package: &str) {
     if let Some((name, version)) = parse_package_id(package)
         && SemVer::parse(&version).is_ok()
     {
-        versions
-            .entry(name)
-            .or_default()
-            .push(version);
+        let list = versions.entry(name).or_default();
+        if !list.contains(&version) {
+            list.push(version);
+        }
     }
     for peer in split_peer_ids(package) {
         add_version(versions, &peer);

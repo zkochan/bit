@@ -181,7 +181,7 @@ fn serialized_package_name(dependency: &Value) -> Option<String> {
 }
 
 fn lifecycle(value: &Value) -> Lifecycle {
-    match value.as_str() {
+    match value.as_str().map(str::trim) {
         Some("dev") => Lifecycle::Dev,
         Some("peer") => Lifecycle::Peer,
         _ => Lifecycle::Runtime,
@@ -191,9 +191,10 @@ fn lifecycle(value: &Value) -> Lifecycle {
 /// `hidden` and `optional` come from the first policy entry naming the dependency.
 fn apply_policy_flags(policy: &[PolicyEntry], list: &mut ComponentDependencies) {
     let find = |name: &str| {
+        let target = name.trim();
         policy
             .iter()
-            .find(|entry| entry.name == name)
+            .find(|entry| entry.name.trim() == target)
     };
     for package in &mut list.packages {
         if let Some(entry) = find(&package.name) {

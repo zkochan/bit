@@ -145,7 +145,10 @@ impl Loaded {
     pub fn components(&self) -> Vec<WorkspaceComponent> {
         self.workspace
             .active()
-            .filter(|(entry, _)| entry.root_dir != ".")
+            .filter(|(entry, _)| {
+                let rel = entry.root_dir.trim().trim_start_matches("./");
+                !rel.is_empty() && rel != "."
+            })
             .map(|(_, component)| component.clone())
             .collect()
     }

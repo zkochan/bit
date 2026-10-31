@@ -198,8 +198,10 @@ fn global_tls(global: &GlobalConfig) -> io::Result<TlsSettings> {
         local_address: global_string(global, "network.local_address").map(str::to_string),
     };
     if tls.ca.is_none()
-        && let Some(cafile) =
-            first(global, &["network.cafile", "proxy.cafile"]).and_then(Value::as_str)
+        && let Some(cafile) = first(global, &["network.cafile", "proxy.cafile"])
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|cafile| !cafile.is_empty())
     {
         tls.ca = read_ca_file(Path::new(cafile))?;
     }

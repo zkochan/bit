@@ -44,7 +44,9 @@ fn read(path: &Path) -> io::Result<Option<String>> {
         Err(error) => return Err(error),
     }
     let bytes = fs::read(path)?;
-    Ok(String::from_utf8(bytes).ok())
+    Ok(String::from_utf8(bytes)
+        .ok()
+        .map(|text| text.strip_prefix('\u{feff}').map_or_else(|| text.clone(), str::to_owned)))
 }
 
 fn script(path: &Path, source: String) -> Vec<String> {

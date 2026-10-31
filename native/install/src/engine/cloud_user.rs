@@ -22,7 +22,8 @@ pub const LOOKUP_TIMEOUT: Duration = Duration::from_secs(5);
 /// the cloud answers within `timeout`.
 pub async fn cloud_username(global: &GlobalConfig, timeout: Duration) -> Option<String> {
     let token = global_string(global, "user.token")?;
-    let url = format!("{}/graphql", symphony_url(global));
+    let base_url = symphony_url(global);
+    let url = format!("{}/graphql", base_url.trim_end_matches('/'));
     let client = reqwest::Client::builder()
         .timeout(timeout)
         .build()

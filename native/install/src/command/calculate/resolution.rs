@@ -17,14 +17,27 @@ pub(super) struct Resolved {
     pub(super) dependencies: IndexMap<String, ComponentDependencies>,
 }
 
+fn validate_paths(session: &Session<'_>, loaded: &Loaded) -> io::Result<()> {
+    if session.root
+        .to_string_lossy()
+        .trim()
+        .is_empty()
+        || loaded.workspace.scope_path
+            .to_string_lossy()
+            .trim()
+            .is_empty()
+    {
+        return Err(io::Error::other("workspace or scope path is empty"));
+    }
+    Ok(())
+}
+
 pub(super) async fn resolve(
     session: &Session<'_>,
     loaded: &Loaded,
     components: &[WorkspaceComponent],
 ) -> io::Result<Resolved> {
-    if session.root.as_os_str().is_empty() || loaded.workspace.scope_path.as_os_str().is_empty() {
-        return Err(io::Error::other("workspace or scope path is empty"));
-    }
+    validate_paths(session, loaded)?;
     // `InstallMain.install` loads the components before the manifests; the envs that
     // registers are the only ones the env requests see until the package manager ran.
     session.host.prepare_install(&workspace_aspects(session, loaded)).await?;
@@ -37,9 +50,7 @@ pub(super) async fn resolve_initialized(
     components: &[WorkspaceComponent],
     cache_initialized: bool,
 ) -> io::Result<Resolved> {
-    if session.root.as_os_str().is_empty() || loaded.workspace.scope_path.as_os_str().is_empty() {
-        return Err(io::Error::other("workspace or scope path is empty"));
-    }
+    validate_paths(session, loaded)?;
     let objects = ScopeObjects::new(&loaded.workspace.scope_path);
     let env_policies = policy::load_env_policies(&session.root, components, session.host).await?;
     let workspace_policy = workspace_policy(loaded)?;

@@ -44,8 +44,8 @@ pub fn update_document(
         .unwrap_or(Value::Null);
     let mut policy = config_entries(&initial);
     for (name, version) in entries {
-        let name = name.trim();
-        if !name.is_empty() && admits(&policy, name, existing)? {
+        let (name, version) = (name.trim(), version.trim());
+        if !name.is_empty() && !version.is_empty() && admits(&policy, name, existing)? {
             policy.push((0, name.to_owned(), json!(version)));
         }
     }
@@ -84,15 +84,19 @@ pub fn add_to_root_policy(
     entries: &[(String, String)],
     lifecycle: &str,
 ) -> io::Result<()> {
-    let field = usize::from(lifecycle == "peer");
+    let field = usize::from(lifecycle.trim() == "peer");
     let mut policy = config_entries(&loaded.config.dependency_resolver.policy);
     for (name, version) in entries {
-        if !admits(&policy, name, session.options.existing_entries)? {
+        let (name, version) = (name.trim(), version.trim());
+        if name.is_empty()
+            || version.is_empty()
+            || !admits(&policy, name, session.options.existing_entries)?
+        {
             continue;
         }
         // `remove()` returns a new policy without changing this one, so an existing
         // entry stays and the added one, written later, wins in `toConfigObject`.
-        policy.push((field, name.clone(), json!(version)));
+        policy.push((field, name.to_owned(), json!(version)));
     }
     let fields = to_config_object(&policy);
     workspace_jsonc::edit(

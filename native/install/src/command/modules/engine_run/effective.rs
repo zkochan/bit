@@ -102,7 +102,12 @@ fn cleanup(root: &Path, receipt: &Value) -> io::Result<()> {
             .or_else(|| non_empty_dir(&entry["rootDir"]))
             .map(Path::new)
             .filter(|directory| {
-                directory.is_absolute() && directory.starts_with(root) && *directory != root
+                directory.is_absolute()
+                    && !directory
+                        .components()
+                        .any(|comp| matches!(comp, std::path::Component::ParentDir))
+                    && directory.starts_with(root)
+                    && *directory != root
             })
             .ok_or_else(|| io::Error::other("subscriber component directory outside workspace"))?;
         // DependencyInstaller.cleanCompsNodeModules is best effort, before the PM runs.

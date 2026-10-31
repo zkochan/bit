@@ -11,8 +11,12 @@ pub(super) async fn run(
 ) -> io::Result<Option<Value>> {
     let components = calculated.components
         .iter()
-        .filter(|component| component.root_dir.trim() != "." && !component.root_dir.trim().is_empty())
-        .map(|component| json!({"id":component_id(&component.id),"directory":session.root.join(component.root_dir.trim())}))
+        .filter_map(|component| {
+            let rel = component.root_dir.trim().trim_start_matches("./");
+            (!rel.is_empty() && rel != ".").then(
+                || json!({"id":component_id(&component.id),"directory":session.root.join(rel)}),
+            )
+        })
         .collect::<Vec<_>>();
     let mut options = json!({"linkedDependencies":{session.root.to_string_lossy().as_ref():calculated.subscriber_links},"installTeambitBit":false});
     if let Some(version) = calculated.outcome.plan.forced_harmony_version
@@ -22,6 +26,7 @@ pub(super) async fn run(
     {
         options["forcedHarmonyVersion"] = json!(version);
     }
+    let phase = phase.trim();
     session.host.install_subscribers(&json!({
         "phase":phase,"rootDir":session.root,"components":components,
         "rootPolicy":calculated.subscriber_policy,"options":options,

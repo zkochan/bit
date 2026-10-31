@@ -46,7 +46,11 @@ fn remove(path: &Path) -> io::Result<()> {
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
         Err(error) => return Err(error),
     };
-    if meta.is_dir() { fs::remove_dir_all(path) } else { fs::remove_file(path) }
+    if meta.is_dir() && !meta.file_type().is_symlink() {
+        fs::remove_dir_all(path)
+    } else {
+        fs::remove_file(path)
+    }
 }
 
 /// The package directories of the virtual store. With the global virtual

@@ -61,6 +61,7 @@ pub async fn add(
     packages: &[String],
     lifecycle: &str,
 ) -> io::Result<()> {
+    let lifecycle = lifecycle.trim();
     if lifecycle == "dev" {
         return Err(invalid("the workspace policy does not support dev dependencies"));
     }
@@ -72,13 +73,13 @@ pub async fn add(
             Err(_) if session.options.skip_unavailable => continue,
             Err(error) => return Err(error),
         };
-        if resolved.version.is_empty() {
+        if resolved.version.trim().is_empty() {
             continue;
         }
         let prefix = session.options.save_prefix.as_deref().or(config_prefix);
         let version =
             version_with_save_prefix(&resolved.version, prefix, resolved.wanted_range.as_deref())?;
-        entries.push((resolved.package_name, version));
+        entries.push((resolved.package_name.trim().to_owned(), version));
     }
     policy_edit::add_to_root_policy(session, loaded, &entries, lifecycle)
 }
@@ -90,9 +91,10 @@ pub fn version_with_save_prefix(
     wanted_range: Option<&str>,
 ) -> io::Result<String> {
     let version = version.trim();
+    let wanted_range = wanted_range.map(str::trim);
     let prerelease =
         semver::SemVer::parse(version).is_ok_and(|parsed| !parsed.prerelease.is_empty());
-    if prerelease || wanted_range.map(str::trim) == Some(version) {
+    if prerelease || wanted_range == Some(version) {
         return Ok(version.to_string());
     }
     if let Some(range) = wanted_range.filter(|range| range.starts_with(['~', '^'])) {
@@ -101,6 +103,7 @@ pub fn version_with_save_prefix(
     let with_prefix = format!(
         "{}{version}",
         prefix
+            .map(str::trim)
             .filter(|prefix| !prefix.is_empty())
             .unwrap_or("^"),
     );

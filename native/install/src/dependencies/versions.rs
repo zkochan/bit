@@ -142,15 +142,15 @@ fn in_fields(fields: &FieldMaps, name: &str) -> bool {
 #[must_use]
 pub fn valid_component_version(version: &str) -> Option<String> {
     let trimmed = version.trim();
-    if let Some(hash) = trimmed.strip_prefix("0.0.0-")
-        && is_snap(hash)
-    {
-        return Some(hash.to_owned());
-    }
     let normalized = trimmed
         .strip_prefix('v')
         .or_else(|| trimmed.strip_prefix('V'))
         .unwrap_or(trimmed);
+    if let Some(hash) = normalized.strip_prefix("0.0.0-")
+        && is_snap(hash)
+    {
+        return Some(hash.to_owned());
+    }
     if node_semver::Version::parse(normalized).is_ok() {
         return Some(normalized.to_owned());
     }

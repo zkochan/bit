@@ -16,6 +16,9 @@ pub(super) fn apply(workspace: &mut Workspace, order: &[String]) -> io::Result<(
         .zip(std::mem::take(&mut workspace.components))
         .map(|(entry, component)| (component.id.to_string_without_version(), (entry, component)))
         .collect::<HashMap<_, _>>();
+    if rows.len() != order.len() {
+        return Err(io::Error::other("installation component order duplicate identity"));
+    }
     let ordered = order
         .iter()
         .map(|identity| {

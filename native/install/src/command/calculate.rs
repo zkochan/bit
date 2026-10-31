@@ -299,15 +299,15 @@ fn in_workspace(loaded: &Loaded, id: &ComponentId) -> bool {
     let wanted = id.to_string_without_version();
     loaded.workspace.components
         .iter()
-        .any(|component| component.id.to_string_without_version() == wanted)
+        .any(|comp| comp.id.to_string_without_version() == wanted)
 }
 
 /// `scope/name` (the scope may contain dots, the name slashes).
 pub fn parse_id(id: &str) -> ComponentId {
-    let id = id.trim();
+    let id = id.trim().trim_matches('/');
     let (scope, name) = id
         .split_once('/')
-        .map_or(("", id), |(scope, name)| (scope.trim(), name.trim()));
+        .map_or(("", id), |(scope, name)| (scope.trim(), name.trim().trim_matches('/')));
     ComponentId {
         scope: (!scope.is_empty()).then(|| scope.to_string()),
         default_scope: None,
@@ -340,19 +340,17 @@ fn dependency_options(
     })
 }
 
-/// `getNotLoadedConfiguredExtensions` of the CLI start: the `workspace.jsonc` aspects
-/// that are not core, whose providers run in TypeScript before any component loads.
+/// `getNotLoadedConfiguredExtensions` of the CLI start.
 pub(super) fn workspace_aspects(session: &Session<'_>, loaded: &Loaded) -> Vec<String> {
-    let core_aspects = &session.info.core_aspects;
+    let core = &session.info.core_aspects;
     loaded.config
         .user_aspect_ids(&session.core_ids())
         .into_iter()
-        .filter(|id| !policy::slots::is_core(split_version(id).0, core_aspects))
+        .filter(|id| !policy::slots::is_core(split_version(id).0, core))
         .collect()
 }
 
-/// `getIdFromUpdateDependentsOnLane`: the current lane's hidden dependents, with
-/// their lane versions.
+/// `getIdFromUpdateDependentsOnLane`: the current lane's hidden dependents.
 fn update_dependents(loaded: &Loaded) -> io::Result<Vec<ComponentId>> {
     let Some(lane) = &loaded.workspace.lane else { return Ok(Vec::new()) };
     let lane_id = import::LaneId {
@@ -384,35 +382,30 @@ async fn apps(
     let patterns = session.host.app_types().await?;
     Ok(components
         .iter()
-        .filter(|component| {
-            component.files.iter().any(|file| glob::match_patterns(file, &patterns))
-        })
-        .map(|component| component.id.to_string_without_version())
+        .filter(|comp| comp.files.iter().any(|file| glob::match_patterns(file, &patterns)))
+        .map(|comp| comp.id.to_string_without_version())
         .collect())
 }
 
-/// `generateFilterFnForDepsFromLocalRemote`: remotes from `scope.json` and the global
-/// remotes are not on the hub, and registry scopes still serve packages.
+/// `generateFilterFnForDepsFromLocalRemote`.
 fn remote_filter(session: &Session<'_>, loaded: &Loaded) -> io::Result<RemoteFilter> {
     let scope = crate::config::ScopeJson::load(&loaded.workspace.scope_path)?;
     let global = global_remotes(&session.info.global_config_dir)?;
-    Ok(RemoteFilter {
-        local_remotes: scope.remotes
-            .keys()
-            .chain(global.keys())
-            .map(|remote| remote.trim().to_string())
-            .filter(|remote| !remote.is_empty())
-            .collect(),
-        registry_scopes: loaded.engine.registry.registries.scopes
-            .keys()
-            .map(|scope| {
-                scope
-                    .trim()
-                    .trim_start_matches('@')
-                    .trim()
-                    .to_string()
-            })
-            .filter(|scope| !scope.is_empty())
-            .collect(),
-    })
+    let local_remotes = scope.remotes
+        .keys()
+        .chain(global.keys())
+        .map(|remote| remote.trim().to_string())
+        .filter(|remote| !remote.is_empty())
+        .collect();
+    let registry_scopes = loaded.engine.registry.registries.scopes
+        .keys()
+        .map(|name| {
+            name.trim()
+                .trim_start_matches('@')
+                .trim()
+                .to_string()
+        })
+        .filter(|name| !name.is_empty())
+        .collect();
+    Ok(RemoteFilter { local_remotes, registry_scopes })
 }

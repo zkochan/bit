@@ -118,6 +118,7 @@ pub fn put(cache: &Path, key: &str, data: &str) -> io::Result<()> {
 
 /// `cacache.rm.entry`: append a null-integrity tombstone without creating content.
 pub fn remove_entry(cache: &Path, key: &str) -> io::Result<()> {
+    let key = key.trim();
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(io::Error::other)?

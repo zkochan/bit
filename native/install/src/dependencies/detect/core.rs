@@ -59,5 +59,5 @@ fn relative(from: &Path, to: &Path) -> String {
             path.push(component.as_os_str());
         }
     }
-    path.to_string_lossy().replace(std::path::MAIN_SEPARATOR, "/")
+    path.to_string_lossy().replace('\\', "/")
 }

@@ -147,10 +147,11 @@ impl EffectiveConfig {
 
     /// `getConfigBoolean`: `"true"`/`"false"`; anything else is an error.
     pub fn get_bool(&self, key: &str) -> io::Result<Option<bool>> {
+        let key = key.trim();
         match self.get(key).as_deref().map(str::trim) {
             None => Ok(None),
-            Some("true") => Ok(Some(true)),
-            Some("false") => Ok(Some(false)),
+            Some(value) if value.eq_ignore_ascii_case("true") => Ok(Some(true)),
+            Some(value) if value.eq_ignore_ascii_case("false") => Ok(Some(false)),
             Some(value) => Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(

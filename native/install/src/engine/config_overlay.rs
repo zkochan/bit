@@ -157,7 +157,12 @@ fn apply_manifest_rewrites(
         let root = &settings.root;
         let joined = patched
             .iter()
-            .map(|(key, path)| (key.clone(), root.join(path).display().to_string()));
+            .filter_map(|(key, path)| {
+                let (key, path) = (key.trim(), path.trim());
+                (!key.is_empty() && !path.is_empty()).then(|| {
+                    (key.to_owned(), root.join(path).display().to_string())
+                })
+            });
         config.patched_dependencies = Some(joined.collect());
         config.workspace_dir.get_or_insert_with(|| root.clone());
     }
@@ -167,6 +172,11 @@ fn apply_manifest_rewrites(
         .iter()
         .cloned()
         .collect();
+    config.overrides = Some(manifest_overrides(call));
+    Ok(())
+}
+
+fn manifest_overrides(call: &CallOverlay<'_>) -> DependencyMap {
     let mut overrides = call.overrides.clone();
     overrides.insert("@teambit/legacy@*".to_string(), "-".to_string());
     if let Some(version) = call.forced_harmony_version
@@ -178,8 +188,7 @@ fn apply_manifest_rewrites(
     } else {
         overrides.insert("@teambit/harmony@*".to_string(), "-".to_string());
     }
-    config.overrides = Some(overrides);
-    Ok(())
+    overrides
 }
 
 /// With root components, the components' own packages are not hoisted unless

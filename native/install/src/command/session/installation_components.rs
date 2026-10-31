@@ -95,9 +95,10 @@ fn ordered_row(
     let actual = if Path::new(directory).is_absolute() {
         Path::new(directory).to_path_buf()
     } else {
-        root.join(directory)
+        root.join(directory.trim_start_matches("./"))
     };
-    if actual != root.join(&component.root_dir) {
+    let expected = root.join(component.root_dir.trim().trim_start_matches("./"));
+    if actual != expected {
         return Err(invalid());
     }
     Ok(component)

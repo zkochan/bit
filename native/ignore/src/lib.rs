@@ -58,6 +58,9 @@ impl Ignore {
         patterns: impl IntoIterator<Item = &'pattern str>,
     ) -> Result<&mut Self, UnsupportedPattern> {
         for pattern in patterns {
+            if pattern.is_empty() {
+                continue;
+            }
             for line in pattern
                 .split('\n')
                 .map(|line| line.strip_suffix('\r').unwrap_or(line))

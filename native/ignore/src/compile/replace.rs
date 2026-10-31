@@ -47,6 +47,9 @@ pub fn js_replace(
     global: bool,
     mut replacement: impl FnMut(&Found<'_>) -> String,
 ) -> String {
+    if text.is_empty() {
+        return String::new();
+    }
     let length = utf16_len(text);
     let mut output = String::with_capacity(text.len());
     let mut copied = 0;

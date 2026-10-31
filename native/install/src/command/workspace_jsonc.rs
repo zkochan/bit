@@ -32,10 +32,14 @@ pub fn edit(
 
 fn backup(path: &Path, scope_path: &Path, file_id: &str, reason: &str) -> io::Result<()> {
     let file_id = file_id.trim();
-    if file_id.is_empty() || file_id.contains(['/', '\\']) {
+    if file_id.is_empty() || matches!(file_id, "." | "..") || file_id.contains(['/', '\\']) {
         return Err(io::Error::new(io::ErrorKind::InvalidInput, "backup file_id is invalid"));
     }
-    let reason = reason.trim();
+    let reason = reason
+        .lines()
+        .next()
+        .unwrap_or_default()
+        .trim();
     let directory = scope_path.join("workspace-config-history");
     let files = directory.join("files");
     fs::create_dir_all(&files)?;

@@ -71,7 +71,7 @@ fn load_package_json(path: &Path) -> io::Result<(String, Value)> {
         Err(error) if error.kind() == io::ErrorKind::NotFound => String::new(),
         Err(error) => return Err(error),
     };
-    let manifest = if text.is_empty() {
+    let manifest = if text.trim().is_empty() {
         Value::Object(Map::new())
     } else {
         crate::jsonc::parse(&text)

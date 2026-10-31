@@ -46,7 +46,7 @@ impl EngineError {
 /// never applies.
 impl fmt::Display for EngineError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(&self.message)?;
+        formatter.write_str(self.message.trim())?;
         match self.hint
             .as_deref()
             .map(str::trim)

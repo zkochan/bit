@@ -62,7 +62,7 @@ fn absolute(value: &Value) -> Option<PathBuf> {
 
 fn parse_absolute_str(text: &str) -> Option<PathBuf> {
     let trimmed = text.trim();
-    if trimmed.is_empty() || trimmed.contains('\0') {
+    if trimmed.is_empty() || trimmed.contains(['\0', '\n', '\r']) {
         return None;
     }
     let path = PathBuf::from(trimmed);

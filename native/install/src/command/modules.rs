@@ -268,7 +268,8 @@ fn provided_by_root(calculated: &Calculated, links: &DependencyMap) -> HashSet<S
         .collect();
     let projects = &calculated.outcome.plan.projects;
     if let Some(root) = projects.first() {
-        for field in ["dependencies", "devDependencies"] {
+        for field in ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"]
+        {
             provided.extend(dependency_names(root.manifest.get(field)));
         }
     }

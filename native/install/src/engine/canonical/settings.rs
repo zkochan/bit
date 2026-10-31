@@ -64,7 +64,10 @@ fn apply_store(settings: &mut EngineSettings, request: &Request<'_>) -> Option<(
     {
         return None;
     }
-    settings.store.pnpm_home_dir = string(request.options, "pnpmHomeDir")?.map(PathBuf::from);
+    settings.store.pnpm_home_dir = string(request.options, "pnpmHomeDir")?
+        .map(|dir| dir.trim().to_owned())
+        .filter(|dir| !dir.is_empty())
+        .map(PathBuf::from);
     Some(())
 }
 

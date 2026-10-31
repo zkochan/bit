@@ -47,6 +47,7 @@ impl MergeConfig {
         let divider = "-".repeat(80);
         let kept: Vec<&str> = text
             .split('\n')
+            .map(|line| line.strip_suffix('\r').unwrap_or(line))
             .filter(|line| *line != divider && !line.starts_with('#'))
             .collect();
         let joined = kept.join("\n");

@@ -237,10 +237,11 @@ fn packages(
             version.clone_from(model);
         }
     }
-    let typescript = file.ends_with(".ts")
-        || file.ends_with(".tsx")
-        || file.ends_with(".mts")
-        || file.ends_with(".cts");
+    let lower = file.to_ascii_lowercase();
+    let typescript = lower.ends_with(".ts")
+        || lower.ends_with(".tsx")
+        || lower.ends_with(".mts")
+        || lower.ends_with(".cts");
     if typescript {
         let names = found.keys().chain(tree.missing.iter());
         let types: Vec<(String, String)> =

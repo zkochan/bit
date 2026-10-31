@@ -122,13 +122,14 @@ pub(super) fn intersections(issues: &PeerDependencyIssues) -> MissingPeers {
     names.sort();
     let mut result = MissingPeers::new();
     for name in names {
+        let trimmed = name.trim();
         let entries = &issues.missing[name];
-        if entries.iter().all(|entry| entry.optional) {
+        if trimmed.is_empty() || entries.iter().all(|entry| entry.optional) {
             continue;
         }
         if let Some(range) = safe_intersect(entries.iter().map(|entry| entry.wanted_range.as_str()))
         {
-            result.insert(name.clone(), range);
+            result.insert(trimmed.to_owned(), range);
         }
     }
     result

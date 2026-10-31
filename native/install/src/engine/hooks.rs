@@ -49,7 +49,10 @@ impl BitHooks {
         let Value::Object(mut manifest) = manifest else { return manifest };
         if self.root_components
             && let Some(dir) = workspace_dir
-            && !dir.to_string_lossy().contains(BIT_ROOTS_DIR)
+            && !dir
+                .to_string_lossy()
+                .replace('\\', "/")
+                .contains(BIT_ROOTS_DIR)
         {
             read_workspace_package(&mut manifest);
         }
@@ -95,7 +98,7 @@ fn read_workspace_package(manifest: &mut Map<String, Value>) {
     for (name, version) in object_entries(manifest.get("dependencies")) {
         if !version
             .as_str()
-            .is_some_and(|version| version.starts_with("workspace:"))
+            .is_some_and(|version| version.trim().starts_with("workspace:"))
         {
             dependencies.insert(name, version);
         }

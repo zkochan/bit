@@ -115,7 +115,14 @@ fn apply_workspace_policy(workspace: &Workspace<'_>, detected: &mut Detected) {
     let mut moved = Vec::new();
     for field in [RUNTIME, DEV] {
         for dependency in &mut detected.components[field] {
-            let Some(name) = dependency.package_name.clone() else { continue };
+            let Some(name) = dependency.package_name
+                .as_deref()
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .map(str::to_owned)
+            else {
+                continue;
+            };
             if let Some(version) = peers.get(&name) {
                 dependency.version_range = Some(version.clone());
                 moved.push(dependency.clone());

@@ -155,7 +155,7 @@ pub fn dev_patterns(
     match &env.patterns {
         Some(Value::Object(named)) => {
             for (name, value) in named {
-                let aspect = match name.as_str() {
+                let aspect = match name.trim() {
                     "tests" => TESTER,
                     "docs" => DOCS,
                     "compositions" => COMPOSITIONS,

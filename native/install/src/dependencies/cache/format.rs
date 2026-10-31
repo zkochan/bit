@@ -14,7 +14,12 @@ pub fn serialize(detected: &Detected) -> Value {
     for (index, field) in PACKAGE_FIELDS.iter().enumerate() {
         let entries: Map<String, Value> = detected.packages[index]
             .iter()
-            .map(|(name, version)| (name.clone(), Value::String(version.clone())))
+            .filter_map(|(name, version)| {
+                let name = name.trim();
+                (!name.is_empty()).then(|| {
+                    (name.to_owned(), Value::String(version.trim().to_owned()))
+                })
+            })
             .collect();
         packages.insert((*field).to_owned(), Value::Object(entries));
     }

@@ -126,7 +126,10 @@ pub fn env_own_peers(
     let Some(own) = subject.own_env.as_ref() else { return Ok(Vec::new()) };
     let mut manifest: indexmap::IndexMap<String, String> = indexmap::IndexMap::new();
     for entry in &own.self_policy {
-        manifest.insert(entry.name.clone(), entry.version.clone());
+        let name = entry.name.trim();
+        if !name.is_empty() {
+            manifest.insert(name.to_owned(), entry.version.trim().to_owned());
+        }
     }
     if manifest.is_empty() {
         return Ok(Vec::new());

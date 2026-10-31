@@ -184,13 +184,15 @@ impl WorkspaceConfig {
     pub fn user_aspect_ids(&self, core_ids: &[String]) -> Vec<String> {
         self.aspects
             .keys()
-            .filter(|key| !key.starts_with("file:"))
+            .map(|key| key.trim())
+            .filter(|key| !key.is_empty() && !key.starts_with("file:"))
             .filter(|key| {
+                let without_version = aspect_id_without_version(key);
                 !core_ids
                     .iter()
-                    .any(|core| core == aspect_id_without_version(key))
+                    .any(|core| aspect_id_without_version(core) == without_version)
             })
-            .cloned()
+            .map(str::to_owned)
             .collect()
     }
 

@@ -73,6 +73,14 @@ pub async fn run_with_options(
     host: &dyn Host,
     sink: Sink,
 ) -> io::Result<Outcome> {
+    let ci_enabled = std::env::var_os("CI")
+        .is_some_and(|ci| {
+            let normalized = ci
+                .to_string_lossy()
+                .trim()
+                .to_ascii_lowercase();
+            !matches!(normalized.as_str(), "" | "0" | "false")
+        });
     let session = Session {
         root: session::find_root(cwd)?,
         options,
@@ -80,7 +88,7 @@ pub async fn run_with_options(
         host,
         output: Output::new(info.color, info.columns.is_some(), info.loader, sink)
             .with_console(info.write_to_console.unwrap_or(info.loader))
-            .with_ci(std::env::var_os("CI").is_some_and(|ci| !ci.is_empty())),
+            .with_ci(ci_enabled),
         started: Instant::now(),
         cloud_username: OnceLock::new(),
     };

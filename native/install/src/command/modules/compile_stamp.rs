@@ -182,6 +182,9 @@ fn is_intact(current: Option<&Output>, size: u64, modified: u64, sha256: &str) -
 /// Copy each restored file back, creating its directory.
 pub(super) fn restore(restores: &[Restore]) -> io::Result<()> {
     for Restore { from, to } in restores {
+        if from == to {
+            continue;
+        }
         if let Some(parent) = to.parent() {
             fs::create_dir_all(parent)?;
         }
@@ -213,13 +216,12 @@ fn read(stamp: &Path) -> Option<Stamp> {
     serde_json::from_slice(&bytes)
         .ok()
         .or_else(|| {
-            let value = crate::jsonc::parse(std::str::from_utf8(&bytes).ok()?).ok()?;
-            serde_json::from_value(value).ok()
+            serde_json::from_value(crate::jsonc::parse(std::str::from_utf8(&bytes).ok()?).ok()?)
+                .ok()
         })
 }
 
-/// A `link:` or `file:` dependency of any project that resolves outside the workspace's
-/// components, its `node_modules` and the directories bit links its core aspects from.
+/// A `link:` or `file:` dependency of any project that resolves outside the workspace.
 pub(super) fn has_external_links(
     projects: &[Project],
     components: &[WorkspaceComponent],
@@ -231,7 +233,7 @@ pub(super) fn has_external_links(
         target.starts_with(&node_modules)
             || components
                 .iter()
-                .any(|component| target.starts_with(&component.dir))
+                .any(|comp| target.starts_with(&comp.dir))
             || bit_dirs
                 .iter()
                 .any(|dir| target.starts_with(dir))
@@ -242,7 +244,7 @@ pub(super) fn has_external_links(
             DEPENDENCY_FIELDS
                 .iter()
                 .filter_map(|field| project.manifest.get(*field).and_then(Value::as_object))
-                .flat_map(|dependencies| dependencies.values().filter_map(Value::as_str))
+                .flat_map(|deps| deps.values().filter_map(Value::as_str))
                 .filter_map(|spec| {
                     let trimmed = spec.trim();
                     trimmed

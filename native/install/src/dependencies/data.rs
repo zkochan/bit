@@ -202,7 +202,11 @@ pub fn string_map(value: &Value) -> IndexMap<String, String> {
         .map(|object| {
             object
                 .iter()
-                .filter_map(|(name, version)| Some((name.clone(), version.as_str()?.to_owned())))
+                .filter_map(|(name, version)| {
+                    let name = name.trim();
+                    let version = version.as_str()?.trim();
+                    (!name.is_empty()).then(|| (name.to_owned(), version.to_owned()))
+                })
                 .collect()
         })
         .unwrap_or_default()

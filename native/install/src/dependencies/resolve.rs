@@ -281,7 +281,9 @@ impl<'a> Resolver<'a> {
 fn is_typescript_origin(path: &Path) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| TYPESCRIPT_ORIGINS.contains(&extension))
+        .is_some_and(|extension| {
+            TYPESCRIPT_ORIGINS.contains(&extension.to_ascii_lowercase().as_str())
+        })
 }
 
 /// `resolvePackageNameByPath`: `@scope/name` or `name` of a specifier.

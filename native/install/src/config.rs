@@ -113,7 +113,11 @@ impl DependencyResolverConfig {
             self.package_manager.as_deref().map(str::trim),
         ) {
             (Some(linker), _) => linker,
-            (None, Some("teambit.dependencies/yarn" | "yarn")) => "hoisted",
+            (None, Some(pm))
+                if pm == "yarn" || pm == "@teambit/dependencies.yarn" || pm.ends_with("/yarn") =>
+            {
+                "hoisted"
+            }
             _ => "isolated",
         }
     }

@@ -75,7 +75,7 @@ fn enrich(error: io::Error, calculated: &Calculated, output: &Output) -> io::Err
         .map(str::trim)
         .filter(|code| !code.is_empty())
         .map_or_else(
-            || message.contains("No matching version found"),
+            || message.to_ascii_lowercase().contains("no matching version found"),
             |code| NO_MATCHING_VERSION.contains(&code),
         );
     if !candidate {
