@@ -55,26 +55,39 @@ fn index_by_dep_id(
 ) -> IndexMap<String, IndexEntry> {
     let mut index: IndexMap<String, IndexEntry> = IndexMap::new();
     for (origin, deps) in components {
-        for field in Field::ALL {
-            for (name, range) in deps.get(field) {
-                let item = Item { range: range.clone(), origin: origin.clone(), field };
+        insert_component_deps(&mut index, origin, deps);
+    }
+    for entry in policy
+        .iter()
+        .filter(|entry| entry.preserve.unwrap_or(true))
+    {
+        if let Some(existing) = index.get_mut(entry.name.trim()) {
+            existing.preserved =
+                Some((entry.version.trim().to_owned(), Field::of(entry.lifecycle)));
+        }
+    }
+    index
+}
+
+fn insert_component_deps(
+    index: &mut IndexMap<String, IndexEntry>,
+    origin: &str,
+    deps: &DepsObject,
+) {
+    for field in Field::ALL {
+        for (name, range) in deps.get(field) {
+            let name = name.trim();
+            if !name.is_empty() {
+                let item =
+                    Item { range: range.trim().to_owned(), origin: origin.to_owned(), field };
                 index
-                    .entry(name.clone())
+                    .entry(name.to_owned())
                     .or_default()
                     .items
                     .push(item);
             }
         }
     }
-    for entry in policy
-        .iter()
-        .filter(|entry| entry.preserve.unwrap_or(true))
-    {
-        if let Some(existing) = index.get_mut(&entry.name) {
-            existing.preserved = Some((entry.version.clone(), Field::of(entry.lifecycle)));
-        }
-    }
-    index
 }
 
 /// `mergeWithRootDeps`: the workspace policy always lands in the root.

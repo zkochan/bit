@@ -44,7 +44,7 @@ pub async fn install(
     let outcome = match outcome {
         Ok(outcome) => outcome,
         Err(error) => {
-            lockfile_attrs::restore_after_failure(root, removed_lockfile)?;
+            let _ = lockfile_attrs::restore_after_failure(root, removed_lockfile);
             return Err(error);
         }
     };

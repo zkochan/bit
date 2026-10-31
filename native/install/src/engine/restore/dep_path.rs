@@ -38,11 +38,12 @@ pub(super) fn parse(dep_path: &str) -> DependencyPath {
     else {
         return DependencyPath::default();
     };
-    let mut parsed = DependencyPath {
-        name: Some(dep_path[..separator].trim().to_string()),
-        ..DependencyPath::default()
-    };
+    let name = dep_path[..separator].trim();
     let mut version = dep_path[separator + 1..].trim();
+    if name.is_empty() || version.is_empty() {
+        return DependencyPath::default();
+    }
+    let mut parsed = DependencyPath { name: Some(name.to_string()), ..DependencyPath::default() };
     let DepPathSuffixIndex { peers_index, patch_hash_index } = index_of_dep_path_suffix(version);
     match (patch_hash_index, peers_index) {
         (Some(patch), Some(peers)) => {

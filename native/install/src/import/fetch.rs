@@ -66,6 +66,13 @@ impl Fetcher<'_> {
         options: &FetchOptions,
     ) -> io::Result<Vec<ObjectItem>> {
         let scope = scope.trim();
+        if scope.is_empty()
+            || !ids
+                .iter()
+                .any(|id| !id.trim().is_empty())
+        {
+            return Ok(Vec::new());
+        }
         let remote = self.remotes.resolve(scope, self.network).await.map_err(|error| {
             if error.kind() != io::ErrorKind::NotFound {
                 return error;

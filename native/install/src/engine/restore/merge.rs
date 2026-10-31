@@ -107,9 +107,15 @@ pub(super) fn drop_unreachable(lockfile: &mut Map<String, Value>, strip: fn(&str
 
 /// Whether `name@version` is an instance of one of `pkg_ids`.
 fn refers_to(pkg_ids: &HashSet<String>, name: &str, version: Option<&str>) -> bool {
-    version.is_some_and(|version| {
-        !is_local(version) && pkg_ids.contains(remove_suffix(&format!("{name}@{version}")))
-    })
+    let name = name.trim();
+    !name.is_empty()
+        && version
+            .map(str::trim)
+            .is_some_and(|version| {
+                !version.is_empty()
+                    && !is_local(version)
+                    && pkg_ids.contains(remove_suffix(&format!("{name}@{version}")))
+            })
 }
 
 /// Remove `pkg_ids` and every reference to them (`scrubPkgsFromLockfile`).

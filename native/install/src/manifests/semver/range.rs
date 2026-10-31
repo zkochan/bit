@@ -79,7 +79,7 @@ fn simplify_v7(set: Vec<Vec<Comparator>>) -> Vec<Vec<Comparator>> {
         .filter(|comps| {
             comps
                 .first()
-                .is_none_or(|comp| comp.value != NULL_SET)
+                .is_none_or(|comp| comp.value.trim() != NULL_SET)
         })
         .collect();
     if set.is_empty() {
@@ -87,7 +87,7 @@ fn simplify_v7(set: Vec<Vec<Comparator>>) -> Vec<Vec<Comparator>> {
     }
     match set
         .iter()
-        .find(|comps| comps.len() == 1 && comps[0].value.is_empty())
+        .find(|comps| comps.len() == 1 && comps[0].value.trim().is_empty())
     {
         Some(any) if set.len() > 1 => vec![any.clone()],
         _ => set,
@@ -135,16 +135,10 @@ impl Range {
         self.set.iter().any(|comps| test_set(comps, version, false))
     }
 
-    /// `range.test(versionString)`: an invalid version never satisfies.
-    pub(crate) fn test_str(&self, version: &str) -> bool {
-        SemVer::parse(version.trim()).is_ok_and(|version| self.test(&version))
-    }
-
-    /// `range.test(versionString)` with `includePrerelease`: a prerelease
+    /// `range.test(version)` with `includePrerelease`: a prerelease
     /// satisfies any comparator set it fits, not only one naming its tuple.
-    pub(crate) fn test_str_including_prerelease(&self, version: &str) -> bool {
-        SemVer::parse(version.trim())
-            .is_ok_and(|version| self.set.iter().any(|comps| test_set(comps, &version, true)))
+    pub(crate) fn test_including_prerelease(&self, version: &SemVer) -> bool {
+        self.set.iter().any(|comps| test_set(comps, version, true))
     }
 
     /// `range.intersects(other)` of semver 6.

@@ -17,7 +17,12 @@ pub(super) fn graph(serialized: &Value) -> Map<String, Value> {
     ] {
         if let Some(value) = serialized
             .get(source)
-            .filter(|value| !value.is_null())
+            .filter(|value| {
+                !value.is_null()
+                    && !value
+                        .as_str()
+                        .is_some_and(|str_val| str_val.trim().is_empty())
+            })
         {
             let normalized = value
                 .as_str()

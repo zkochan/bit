@@ -91,7 +91,9 @@ pub(super) fn resolve(
     allow_builds.extend(
         never_built
             .iter()
-            .map(|name| (name.clone(), false)),
+            .map(|name| name.trim())
+            .filter(|name| !name.is_empty())
+            .map(|name| (name.to_owned(), false)),
     );
     ScriptPolicy { allow_builds, ..ScriptPolicy::default() }
 }
@@ -99,19 +101,24 @@ pub(super) fn resolve(
 /// `dangerouslyAllowAllScripts`: everything builds, except the never-built
 /// dependencies, whose scripts are also removed from their manifests.
 fn allow_all_but(never_built: &[String]) -> ScriptPolicy {
-    if never_built.is_empty() {
+    let cleaned: Vec<String> = never_built
+        .iter()
+        .map(|name| name.trim().to_owned())
+        .filter(|name| !name.is_empty())
+        .collect();
+    if cleaned.is_empty() {
         return ScriptPolicy {
             dangerously_allow_all_builds: Some(true),
             ..ScriptPolicy::default()
         };
     }
     ScriptPolicy {
-        allow_builds: never_built
+        allow_builds: cleaned
             .iter()
             .map(|name| (name.clone(), false))
             .collect(),
         dangerously_allow_all_builds: None,
-        never_build_package_names: never_built.to_vec(),
+        never_build_package_names: cleaned,
     }
 }
 

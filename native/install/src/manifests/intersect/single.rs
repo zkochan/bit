@@ -61,8 +61,8 @@ fn merge_bound(left: &Comparator, right: &Comparator, end: End) -> Option<Compar
         return None;
     }
     let order = left_semver.compare(right_semver);
-    if left.operator != right.operator && order == Ordering::Equal {
-        let inclusive = if left.operator == end.inclusive() { left } else { right };
+    if left.operator.trim() != right.operator.trim() && order == Ordering::Equal {
+        let inclusive = if left.operator.trim() == end.inclusive() { left } else { right };
         return Some(inclusive.clone());
     }
     let wider = match end {

@@ -26,7 +26,8 @@ pub(super) fn dedupe(
                 continue;
             };
             deps.retain(|name, reference| {
-                !wins(name, reference, root_deps.get(name), peers.get(name).is_some())
+                let trimmed = name.trim();
+                !wins(trimmed, reference, root_deps.get(trimmed), peers.get(trimmed).is_some())
             });
         }
     }
@@ -59,9 +60,11 @@ fn overridden(lockfile: &Map<String, Value>) -> io::Result<HashSet<String>> {
         .and_then(Value::as_object)
         .into_iter()
         .flatten()
-        .map(|(selector, _)| {
-            pnpm_config_parse_overrides::parse_pkg_and_parent_selector(selector.trim())
-                .map(|(_, target)| target.name)
+        .map(|(selector, _)| selector.trim())
+        .filter(|selector| !selector.is_empty())
+        .map(|selector| {
+            pnpm_config_parse_overrides::parse_pkg_and_parent_selector(selector)
+                .map(|(_, target)| target.name.trim().to_owned())
                 .map_err(io::Error::other)
         })
         .collect()

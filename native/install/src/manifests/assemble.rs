@@ -138,7 +138,7 @@ pub(super) fn merge_linked_root(
     let root = root.to_path_buf();
     if let Some(root_manifest) = manifests.get_mut(&root) {
         let mut dependencies = manifest_field(root_manifest, "dependencies");
-        if forced_harmony_version.is_none()
+        if forced_harmony_version.is_none_or(|ver| ver.trim().is_empty())
             && dependencies.shift_remove("@teambit/harmony").is_some()
         {
             root_manifest.insert("dependencies".into(), map_value(&dependencies));

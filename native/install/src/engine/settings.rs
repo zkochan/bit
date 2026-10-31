@@ -62,7 +62,11 @@ pub(super) fn settings_with_base(
             store_dir: base.store_dir.clone().into(),
             cache_dir: base.cache_dir.clone(),
             pnpm_home_dir: pnpm_config::default_pnpm_home_dir::<Host>(),
-            package_import_method: config.package_import_method.clone(),
+            package_import_method: config.package_import_method
+                .as_deref()
+                .map(str::trim)
+                .filter(|method| !method.is_empty())
+                .map(str::to_owned),
         },
         layout: layout_settings(&base, config, info, enable_global_virtual_store),
         resolution: resolution_settings(&base, config, enable_global_virtual_store),

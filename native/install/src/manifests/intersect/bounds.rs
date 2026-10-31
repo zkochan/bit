@@ -179,12 +179,10 @@ pub(super) fn bound(
     let operators = end.operators();
     let mut valid = comparators
         .iter()
-        .filter(|comp| {
-            operators.contains(&comp.operator.as_str()) || comp.semver.is_none()
-        });
+        .filter(|comp| operators.contains(&comp.operator.trim()) || comp.semver.is_none());
     let opposite_versions: Vec<String> = comparators
         .iter()
-        .filter(|comp| comp.operator == opposite_inclusive(end))
+        .filter(|comp| comp.operator.trim() == opposite_inclusive(end))
         .map(version_text)
         .collect();
     let Some(first) = valid.next() else { return Comparator::parse("") };

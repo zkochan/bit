@@ -41,16 +41,18 @@ pub(super) fn legacy_env_peers(
     };
     let mut peers = DependencyMap::new();
     for entry in &env.self_policy {
-        if input.components
-            .iter()
-            .any(|local| local.package_name == entry.name)
+        let name = entry.name.trim();
+        if name.is_empty()
+            || input.components
+                .iter()
+                .any(|local| local.package_name.trim() == name)
         {
             continue;
         }
-        let resolved = found_version(deps, &entry.name).map(|version| snap_to_semver(&version));
+        let resolved = found_version(deps, name).map(|version| snap_to_semver(&version));
         let version =
             bit_object_import::plus_version::resolve(&entry.version, resolved.as_deref(), "*");
-        peers.insert(entry.name.clone(), version);
+        peers.insert(name.to_owned(), version);
     }
     peers
 }

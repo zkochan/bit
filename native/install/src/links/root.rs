@@ -63,7 +63,10 @@ pub fn linked_root_deps(
         core_aspect_links(root, info, &ids, !options.link_teambit_bit, &mut links);
     }
     for package in &info.core_packages {
-        links.insert(package.package_name.clone(), link_value(&bvm_or(info, package)));
+        let name = package.package_name.trim();
+        if !name.is_empty() {
+            links.insert(name.to_owned(), link_value(&bvm_or(info, package)));
+        }
     }
     Ok(links)
 }

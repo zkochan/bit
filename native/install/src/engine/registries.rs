@@ -38,7 +38,12 @@ impl Registries {
         let default = if default_uri.is_empty() { NPM_REGISTRY } else { default_uri };
         let mut map = IndexMap::from([("default".to_string(), default.to_string())]);
         for (name, registry) in &self.scopes {
-            let (name, uri) = (name.trim(), registry.uri.trim());
+            let (name, uri) = (
+                name.trim()
+                    .trim_start_matches('@')
+                    .trim(),
+                registry.uri.trim(),
+            );
             if !name.is_empty() && !uri.is_empty() {
                 map.insert(format!("@{name}"), uri.to_string());
             }

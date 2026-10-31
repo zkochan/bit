@@ -16,22 +16,26 @@ pub fn component_package_copies(
     let pkg_name = component.package_name.trim();
     let key = format!("node_modules/{pkg_name}");
     let mut directories = vec![root.join(&key)];
-    if let Some(copies) = injected_copy_paths(&injected, &key, &component.root_dir) {
-        directories.extend(
+    let extras: Vec<PathBuf> =
+        if let Some(copies) = injected_copy_paths(&injected, &key, &component.root_dir) {
             copies
                 .iter()
                 .map(|path| path.trim())
                 .filter(|path| !path.is_empty())
-                .map(|path| root.join(path)),
-        );
-    } else {
-        let mut roots = root_component_modules_dirs(root_components)?;
-        roots.sort();
-        directories.extend(
+                .map(|path| root.join(path))
+                .collect()
+        } else {
+            let mut roots = root_component_modules_dirs(root_components)?;
+            roots.sort();
             roots
                 .into_iter()
-                .map(|path| path.join(pkg_name)),
-        );
+                .map(|path| path.join(pkg_name))
+                .collect()
+        };
+    for dir in extras {
+        if !directories.contains(&dir) {
+            directories.push(dir);
+        }
     }
     Ok(directories)
 }

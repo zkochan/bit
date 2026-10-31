@@ -100,7 +100,7 @@ fn entry(lane: &LaneObject, message: &str, identity: &Identity) -> Value {
     let deleted: Vec<String> = lane.components
         .iter()
         .filter(|component| component.is_deleted)
-        .map(|component| format!("{}/{}@{}", component.scope, component.name, component.head))
+        .map(|comp| format!("{}/{}@{}", comp.scope.trim(), comp.name.trim(), comp.head.trim()))
         .collect();
     let update_dependents: Vec<String> = lane.update_dependents
         .iter()

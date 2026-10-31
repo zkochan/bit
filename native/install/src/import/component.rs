@@ -35,7 +35,12 @@ pub fn merge_component(
     }
     let mut merged = Fields::from(existing);
     apply_actions(&mut merged, existing, incoming, &plan["actions"])?;
-    if origin && local.is_empty() && incoming["head"].is_string() {
+    if origin
+        && local.is_empty()
+        && incoming["head"]
+            .as_str()
+            .is_some_and(|head| !head.trim().is_empty())
+    {
         merged.head = incoming["head"].clone();
     }
     merged.detached_heads = merged_heads(existing, incoming, &plan);

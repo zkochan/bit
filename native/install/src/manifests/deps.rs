@@ -130,7 +130,12 @@ pub(super) fn spread(maps: &[&DependencyMap]) -> DependencyMap {
 pub(super) fn map_value(map: &DependencyMap) -> Value {
     Value::Object(
         map.iter()
-            .map(|(name, version)| (name.clone(), Value::String(version.clone())))
+            .filter_map(|(name, version)| {
+                let (name, version) = (name.trim(), version.trim());
+                (!name.is_empty() && !version.is_empty()).then(|| {
+                    (name.to_owned(), Value::String(version.to_owned()))
+                })
+            })
             .collect(),
     )
 }

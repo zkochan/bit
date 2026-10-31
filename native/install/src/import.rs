@@ -131,7 +131,7 @@ fn connect(
     let remotes =
         Remotes::load(scope_json, &info.global_config_dir, global)?.with_resolver(resolver);
     let requester = (!local_scope.is_empty()).then_some(local_scope);
-    let network = Network::new(global, &info.bit_version, requester, info.token.as_deref())?;
+    let network = Network::new(global, &info.bit_version, requester, info.bearer_token())?;
     Ok((remotes, network))
 }
 
@@ -143,7 +143,10 @@ fn ids_to_import(bitmap: &Bitmap, lane: Option<&RemoteLane>) -> Vec<Id> {
     for id in &bitmap.current_lane_ids {
         if !ids
             .iter()
-            .any(|existing| existing.scope == id.scope && existing.name == id.name)
+            .any(|existing| {
+                existing.scope.trim() == id.scope.trim()
+                    && existing.name.trim() == id.name.trim()
+            })
         {
             ids.push(id.clone());
         }

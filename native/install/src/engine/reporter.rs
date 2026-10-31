@@ -97,6 +97,7 @@ impl Renderer {
         cwd: String,
         output: Option<OutputSink>,
     ) -> Self {
+        let width = settings.width.max(1);
         let options = StateOptions {
             append_only: settings.append_only,
             ignored_builds_instruction_text: Some(APPROVE_BUILDS_INSTRUCTION_TEXT.to_string()),
@@ -111,11 +112,11 @@ impl Renderer {
         Renderer {
             state: ReporterState::new_with_options(
                 cwd,
-                settings.width,
+                width,
                 Colors { enabled: settings.color },
                 options,
             ),
-            diff: Diff::new(settings.width.saturating_add(2)),
+            diff: Diff::new(width.saturating_add(2)),
             frame_buf: String::new(),
             throttle: settings.throttle_progress,
             last_write: None,

@@ -109,7 +109,7 @@ pub(crate) fn invalid_version(version: &str) -> io::Error {
 
 /// `semver.gt(a, b)`: throws on an invalid version.
 pub(crate) fn gt(left: &str, right: &str) -> io::Result<bool> {
-    Ok(SemVer::parse(left)?.compare(&SemVer::parse(right)?) == Ordering::Greater)
+    Ok(SemVer::parse(left.trim())?.compare(&SemVer::parse(right.trim())?) == Ordering::Greater)
 }
 
 /// `semver.coerce(version)?.version` (semver 7, left-to-right, no prereleases).

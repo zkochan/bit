@@ -42,6 +42,9 @@ impl ComponentId {
     #[must_use]
     pub fn to_string_without_version(&self) -> String {
         let name = self.name.trim().trim_matches('/');
+        if name.is_empty() {
+            return String::new();
+        }
         match self
             .effective_scope()
             .map(|scope| scope.trim_matches('/'))

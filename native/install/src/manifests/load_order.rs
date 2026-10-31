@@ -54,7 +54,8 @@ fn first_places(mut order: Vec<&WorkspaceComponent>) -> Vec<&WorkspaceComponent>
 fn envs_of(components: &[WorkspaceComponent]) -> HashSet<&str> {
     components
         .iter()
-        .map(|component| component.env_id.as_str())
+        .map(|component| component.env_id.trim())
+        .filter(|env| !env.is_empty())
         .collect()
 }
 
@@ -66,7 +67,8 @@ fn split_envs<'a>(
     let envs_of_components = envs_of(components);
     let (envs, configured): (Vec<&str>, Vec<&str>) = extensions
         .iter()
-        .map(String::as_str)
+        .map(|ext| ext.trim())
+        .filter(|ext| !ext.is_empty())
         .partition(|id| {
             envs_of_components.contains(id) || envs_of_components.contains(split_version(id).0)
         });

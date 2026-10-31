@@ -78,10 +78,14 @@ fn entries(lane: &LaneObject) -> Vec<(LaneComponent, bool)> {
         .iter()
         .flatten()
         .filter_map(|id| {
-            let head = id.version.clone()?;
+            let head = id.version
+                .as_deref()
+                .map(str::trim)
+                .filter(|head| !head.is_empty())?
+                .to_owned();
             let component = LaneComponent {
-                scope: id.scope.clone(),
-                name: id.name.clone(),
+                scope: id.scope.trim().to_owned(),
+                name: id.name.trim().to_owned(),
                 head,
                 is_deleted: false,
             };

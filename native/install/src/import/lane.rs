@@ -66,7 +66,10 @@ impl RemoteLane {
     pub fn contains(&self, id: &Id) -> bool {
         self.ids_with_update_dependents()
             .iter()
-            .any(|lane_id| lane_id.scope == id.scope && lane_id.name == id.name)
+            .any(|lane_id| {
+                lane_id.scope.trim() == id.scope.trim()
+                    && lane_id.name.trim() == id.name.trim()
+            })
     }
 }
 

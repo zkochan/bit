@@ -112,11 +112,17 @@ fn missing_from(history: &Value, start: &str) -> bool {
 /// Write the history again with `reference` appended to `graphCompleteRefs`,
 /// serialized in `VersionHistory.toObject()` key order.
 fn record(repo: &Repo, hash: &str, history: &Value, reference: &str) -> io::Result<()> {
+    let reference = reference.trim();
     let mut refs: Vec<Value> = history["graphCompleteRefs"]
         .as_array()
         .cloned()
         .unwrap_or_default();
-    refs.push(Value::String(reference.to_string()));
+    if !refs
+        .iter()
+        .any(|item| item.as_str().map(str::trim) == Some(reference))
+    {
+        refs.push(Value::String(reference.to_string()));
+    }
     let mut object = Map::new();
     object.insert("name".into(), history["name"].clone());
     object.insert("scope".into(), history["scope"].clone());

@@ -239,6 +239,7 @@ fn add_exports_types(manifest: &mut Manifest) {
         exports.shift_remove("default");
     }
     let types = types.as_str().map_or_else(|| types.to_string(), str::to_owned);
+    let types = types.trim().trim_start_matches("./");
     exports.insert("types".into(), format!("./{types}").into());
     if let Some(default) = default {
         exports.insert("default".into(), default);

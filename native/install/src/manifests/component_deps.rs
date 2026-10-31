@@ -114,9 +114,13 @@ fn filter_components<'a>(list: Vec<Dep<'a>>, components: &[WorkspaceComponent]) 
         .filter(|dep| match dep.component {
             None => !components
                 .iter()
-                .any(|component| component.package_name == dep.package_name),
+                .any(|component| {
+                    component.package_name.trim() == dep.package_name.trim()
+                }),
             Some(id) => {
-                id.version.is_some()
+                id.version
+                    .as_deref()
+                    .is_some_and(|ver| !ver.trim().is_empty())
                     && !components.iter().any(|component| same_id(&component.id, id))
             }
         })
@@ -129,13 +133,20 @@ fn from_registry(dep: &Dep<'_>, input: &ManifestInput<'_>) -> bool {
     let (Some(id), Some(filter)) = (dep.component, input.context.remote_filter) else {
         return true;
     };
-    let Some(scope) = id.effective_scope() else { return true };
+    let Some(scope) = id.effective_scope().map(str::trim) else { return true };
+    let pkg_name = dep.package_name.trim();
     !filter.local_remotes
         .iter()
-        .any(|remote| remote == scope)
+        .any(|remote| remote.trim() == scope)
         || filter.registry_scopes
             .iter()
-            .any(|registry| dep.package_name.starts_with(&format!("@{registry}/")))
+            .any(|registry| {
+                let registry = registry
+                    .trim()
+                    .trim_start_matches('@')
+                    .trim();
+                !registry.is_empty() && pkg_name.starts_with(&format!("@{registry}/"))
+            })
 }
 
 /// `updateDependencyVersion`: component policy, then workspace policy, then the dependency.

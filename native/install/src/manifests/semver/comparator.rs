@@ -72,20 +72,20 @@ impl Comparator {
 
     /// `comparator.intersects(comp)` of semver 6.
     pub(crate) fn intersects(&self, other: &Self) -> io::Result<bool> {
-        if self.operator.is_empty() {
-            if self.value.is_empty() {
+        if self.operator.trim().is_empty() {
+            if self.value.trim().is_empty() {
                 return Ok(true);
             }
-            let range = Range::parse(&other.value, Flavor::V6)?;
+            let range = Range::parse(other.value.trim(), Flavor::V6)?;
             return Ok(self.semver
                 .as_ref()
                 .is_some_and(|semver| range.test(semver)));
         }
-        if other.operator.is_empty() {
-            if other.value.is_empty() {
+        if other.operator.trim().is_empty() {
+            if other.value.trim().is_empty() {
                 return Ok(true);
             }
-            let range = Range::parse(&self.value, Flavor::V6)?;
+            let range = Range::parse(self.value.trim(), Flavor::V6)?;
             return Ok(other.semver
                 .as_ref()
                 .is_some_and(|semver| range.test(semver)));

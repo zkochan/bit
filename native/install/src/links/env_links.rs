@@ -77,15 +77,23 @@ fn env_dir(
     let bare = split_version(env_id).0;
     if let Some(aspect) = info.core_aspects
         .iter()
-        .find(|aspect| aspect.id == bare)
+        .find(|aspect| aspect.id.trim() == bare)
     {
         return bvm_or(info, aspect);
     }
     let package = components
         .iter()
         .find(|component| component.id.to_string_without_version() == bare)
-        .map(|component| component.package_name.clone())
-        .or_else(|| env_packages.get(bare).cloned())
+        .map(|component| component.package_name.trim())
+        .filter(|pkg| !pkg.is_empty())
+        .map(str::to_owned)
+        .or_else(|| {
+            env_packages
+                .get(bare)
+                .map(|pkg| pkg.trim())
+                .filter(|pkg| !pkg.is_empty())
+                .map(str::to_owned)
+        })
         .unwrap_or_else(|| default_package_name(&component_id(bare)));
     root.join("node_modules").join(package)
 }

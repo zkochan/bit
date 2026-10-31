@@ -105,9 +105,9 @@ fn each_token(comp: &str, token: Token, replace: impl Fn(&Parts<'_>) -> String) 
 /// `>1.x` / `<=1.2.x`: `>` becomes `>=` and `<=` becomes `<` on the next major or minor.
 fn xrange_with_operator(operator: &str, groups: &[Option<&str>], suffix: &str) -> String {
     let x_minor = is_x(groups[3]);
-    let major = groups[2].unwrap_or_default();
-    let minor = if x_minor { "0" } else { groups[3].unwrap_or_default() };
-    let (operator, bump) = match operator {
+    let major = groups[2].unwrap_or_default().trim();
+    let minor = if x_minor { "0" } else { groups[3].unwrap_or_default().trim() };
+    let (operator, bump) = match operator.trim() {
         ">" => (">=", true),
         "<=" => ("<", true),
         operator => (operator, false),
@@ -123,12 +123,12 @@ fn xrange_with_operator(operator: &str, groups: &[Option<&str>], suffix: &str) -
 
 /// `1.x` / `1.2.x` without an operator.
 fn xrange_without_operator(matched: &str, groups: &[Option<&str>], suffix: &str) -> String {
-    let major = groups[2].unwrap_or_default();
+    let major = groups[2].unwrap_or_default().trim();
     if is_x(groups[3]) {
         return format!(">={major}.0.0 <{}.0.0{suffix}", next(Some(major)));
     }
     if is_x(groups[4]) {
-        let minor = groups[3].unwrap_or_default();
+        let minor = groups[3].unwrap_or_default().trim();
         return format!(">={major}.{minor}.0 <{major}.{}.0{suffix}", next(Some(minor)));
     }
     matched.to_string()

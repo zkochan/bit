@@ -261,9 +261,11 @@ fn deps_requiring_build(graph: &Graph) -> Vec<String> {
     let mut deps: Vec<String> = graph.packages
         .iter()
         .filter(|(_, package)| package.get("requiresBuild") == Some(&Value::Bool(true)))
-        .map(|(id, _)| id.clone())
+        .map(|(id, _)| id.trim().to_owned())
+        .filter(|id| !id.is_empty())
         .collect();
     deps.sort();
+    deps.dedup();
     deps
 }
 

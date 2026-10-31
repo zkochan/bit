@@ -110,9 +110,10 @@ async fn link_components_with(
     let envs = env_props(&components, host).await?;
     let manifests =
         tracking::prepare(&components, host, options, &injected, &envs, tracking).await?;
-    let prepared_changes =
-        if tracking { tracking::persist(root, &components, &manifests)? } else { false };
-    let mut result = LinkResult { package_json_changed: prepared_changes, ..Default::default() };
+    let mut result = LinkResult {
+        package_json_changed: tracking && tracking::persist(root, &components, &manifests)?,
+        ..Default::default()
+    };
     for component in &components {
         let context = LinkContext { host, options, injected: &injected, envs: &envs, tracking };
         let (links, changed) = link_component(root, component, &context).await?;
@@ -122,7 +123,8 @@ async fn link_components_with(
     if options.has_root_components {
         let names: Vec<&str> = components
             .iter()
-            .map(|comp| comp.package_name.as_str())
+            .map(|comp| comp.package_name.trim())
+            .filter(|comp| !comp.is_empty())
             .collect();
         link_packages_to_root_components(options.root_components_dir, root, &names)?;
     }

@@ -217,21 +217,31 @@ fn packages_to_resolve(
         .into_iter()
         .flatten()
     {
-        let resolution = package.get("resolution");
-        let unresolved = resolution.is_none_or(Value::is_null)
-            || resolution
-                .and_then(|resolution| resolution.get("type"))
-                .and_then(Value::as_str)
-                .map(str::trim)
-                == Some("directory");
         let parsed = dep_path::parse(pkg_id);
-        if let (true, Some(name), Some(version)) = (unresolved, parsed.name, parsed.version)
-            && !workspace.contains(&(name.as_str(), version.as_str()))
+        if let (true, Some(name), Some(version)) =
+            (is_unresolved_package(package), parsed.name, parsed.version)
         {
-            result.push(PackageToResolve { pkg_id: pkg_id.clone(), name, version });
+            let (name, version) = (name.trim(), version.trim());
+            if !name.is_empty() && !version.is_empty() && !workspace.contains(&(name, version)) {
+                result.push(PackageToResolve {
+                    pkg_id: pkg_id.clone(),
+                    name: name.to_owned(),
+                    version: version.to_owned(),
+                });
+            }
         }
     }
     result
+}
+
+fn is_unresolved_package(package: &Value) -> bool {
+    let resolution = package.get("resolution");
+    resolution.is_none_or(Value::is_null)
+        || resolution
+            .and_then(|resolution| resolution.get("type"))
+            .and_then(Value::as_str)
+            .map(str::trim)
+            == Some("directory")
 }
 
 fn resolver(settings: &EngineSettings) -> io::Result<DefaultResolver> {

@@ -29,7 +29,10 @@ fn write(path: &Path, manifest: &Manifest, tracking: bool) -> io::Result<bool> {
     } else {
         directory.join(format!(".package.json.{}.tmp", std::process::id()))
     };
-    fs::write(&temporary, text)?;
+    if let Err(error) = fs::write(&temporary, text) {
+        let _ = fs::remove_file(&temporary);
+        return Err(error);
+    }
     if let Err(error) = fs::rename(&temporary, path) {
         let _ = fs::remove_file(&temporary);
         if !tracking {

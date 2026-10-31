@@ -172,11 +172,13 @@ fn merge_received(
     existing: Option<&Value>,
     per_remote: &[(String, Value)],
 ) -> io::Result<(Value, Option<String>)> {
-    let first = &per_remote[0].1;
+    let Some((_, first)) = per_remote.first() else {
+        return Ok((existing.cloned().unwrap_or(Value::Null), None));
+    };
     let scope = component_field(first, "scope");
     if let Some((_, origin)) = per_remote
         .iter()
-        .find(|(remote, _)| remote == scope)
+        .find(|(remote, _)| remote.trim() == scope)
     {
         let merged = merge_component(existing, origin, true)?;
         let head = origin["head"]

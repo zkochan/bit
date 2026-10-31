@@ -41,7 +41,7 @@ pub(super) fn remove_path(path: &Path) -> io::Result<()> {
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
         Err(error) => return Err(error),
     };
-    if meta.is_dir() {
+    if meta.is_dir() && !meta.file_type().is_symlink() {
         return fs::remove_dir_all(path);
     }
     fs::remove_file(path).or_else(|error| remove_dir_link(path, error))

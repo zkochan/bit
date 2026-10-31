@@ -72,13 +72,13 @@ pub fn sha1_hex(text: &str) -> String {
 /// `sha1("scope/name")`, the Component object of a component id.
 #[must_use]
 pub fn component_hash(scope: &str, name: &str) -> String {
-    sha1_hex(&format!("{scope}/{name}"))
+    sha1_hex(&format!("{}/{}", scope.trim(), name.trim()))
 }
 
 /// `sha1("scope/name:VersionHistory")`.
 #[must_use]
 pub fn version_history_hash(scope: &str, name: &str) -> String {
-    sha1_hex(&format!("{scope}/{name}:VersionHistory"))
+    sha1_hex(&format!("{}/{}:VersionHistory", scope.trim(), name.trim()))
 }
 
 #[must_use]

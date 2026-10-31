@@ -157,6 +157,7 @@ fn manifest_field(manifest: &Value, field: &str) -> String {
 pub(super) fn parse_package_name(input: &str) -> Option<(String, String)> {
     const SCOPED: &str = r"^(@[^/]+\/[^/@]+)(?:\/([^@]+))?(?:@([\s\S]+))?";
     const NORMAL: &str = r"^([^/@]+)(?:\/([^@]+))?(?:@([\s\S]+))?";
+    let input = input.trim();
     let pattern = if input.starts_with('@') { SCOPED } else { NORMAL };
     let regex = regress::Regex::new(pattern).ok()?;
     let found = regex.find(input)?;
@@ -165,5 +166,6 @@ pub(super) fn parse_package_name(input: &str) -> Option<(String, String)> {
             .group(index)
             .map_or("", |range| input[range].trim())
     };
-    Some((group(1).to_string(), group(3).to_string()))
+    let name = group(1);
+    (!name.is_empty()).then(|| (name.to_string(), group(3).to_string()))
 }

@@ -75,7 +75,9 @@ pub(super) fn policy_version<'a>(
 pub(super) fn without_version(id: &str) -> &str {
     let trimmed = id.trim();
     match trimmed.rfind('@') {
-        Some(index) if index > 0 && !trimmed[index + 1..].contains('/') => &trimmed[..index],
+        Some(index) if index > 0 && !trimmed[index + 1..].contains('/') => {
+            trimmed[..index].trim_end()
+        }
         _ => trimmed,
     }
 }

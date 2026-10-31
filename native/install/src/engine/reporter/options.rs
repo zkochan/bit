@@ -28,6 +28,7 @@ pub(super) fn throttle(value: Option<&Value>) -> io::Result<Option<Duration>> {
 
 fn invalid_type(value: &Value) -> io::Error {
     let kind = match value {
+        Value::Null => "Null",
         Value::String(_) => "String",
         Value::Bool(_) => "Boolean",
         _ => "Object",

@@ -199,7 +199,8 @@ fn root_policy(input: &ManifestInput<'_>) -> Vec<PolicyEntry> {
         .iter()
         .filter(|entry| {
             let name = entry.name.trim();
-            name != "@teambit/legacy"
+            !name.is_empty()
+                && name != "@teambit/legacy"
                 && !input.context.core_aspects
                     .iter()
                     .any(|aspect| aspect.package_name.trim() == name)

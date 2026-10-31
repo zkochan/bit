@@ -121,7 +121,10 @@ impl Importer<'_> {
         let refs = self.repo.remote_refs(scope, lane)?;
         let head = refs
             .into_iter()
-            .find(|entry| entry.scope == id.scope && entry.name == id.name);
+            .find(|entry| {
+                entry.scope.trim() == id.scope.trim()
+                    && entry.name.trim() == id.name.trim()
+            });
         Ok(head
             .map(|entry| entry.head)
             .filter(|head| self.repo.exists(head)))

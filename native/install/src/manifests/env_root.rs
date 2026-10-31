@@ -164,15 +164,22 @@ impl EnvRoot {
 
     fn per_component(&mut self, name: &str, versions: &IndexMap<String, IndexSet<String>>) {
         let name = name.trim();
+        if name.is_empty() {
+            return;
+        }
         for (version, envs) in versions
             .iter()
             .filter(|(version, _)| !bit_object_import::plus_version::is_plus(version))
         {
+            let version = version.trim();
+            if version.is_empty() {
+                continue;
+            }
             for env in envs {
                 self.component_peers
                     .entry(env.clone())
                     .or_default()
-                    .insert(name.to_string(), version.trim().to_string());
+                    .insert(name.to_string(), version.to_string());
             }
         }
     }

@@ -274,19 +274,22 @@ fn parse_lane_component(entry: &Value) -> Option<LaneComponent> {
         .filter(|head| !head.is_empty())?
         .to_string();
     let (scope, name) = if let Some(id_str) = entry["id"].as_str() {
+        let id_str = id_str.trim();
         let (sc, nm) = id_str
             .split_once('/')
             .unwrap_or(("", id_str));
-        (sc.to_owned(), nm.to_owned())
+        (sc.trim().to_owned(), nm.trim().to_owned())
     } else {
         let sc = entry["id"]["scope"]
             .as_str()
             .or_else(|| entry["scope"].as_str())
             .unwrap_or_default()
+            .trim()
             .to_owned();
         let nm = entry["id"]["name"]
             .as_str()
             .or_else(|| entry["name"].as_str())?
+            .trim()
             .to_owned();
         (sc, nm)
     };

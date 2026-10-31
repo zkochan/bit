@@ -110,7 +110,9 @@ impl EngineCall {
         BitHooks {
             root: self.settings.root.clone(),
             root_components: self.settings.layout.root_components,
-            forced_harmony: self.plan.forced_harmony_version.is_some(),
+            forced_harmony: self.plan.forced_harmony_version
+                .as_deref()
+                .is_some_and(|version| !version.trim().is_empty()),
             never_build: self.settings.policy.scripts.never_build_package_names
                 .iter()
                 .map(|name| name.trim().to_owned())

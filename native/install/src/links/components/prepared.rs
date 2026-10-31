@@ -37,11 +37,10 @@ pub fn link_prepared_component(
     if is_workspace_root_dir(&component.root_dir) {
         return Ok(ComponentLinks::default());
     }
+    let pkg_name = component.package_name.trim();
     let package = root
         .join("node_modules")
-        .join(
-            Path::new(component.package_name.trim()).components().collect::<std::path::PathBuf>(),
-        );
+        .join(Path::new(pkg_name).components().collect::<std::path::PathBuf>());
     let (links, existing) = plan_file_links(root, component, &package);
     if is_symlink(&package) {
         remove_path(&package)?;
@@ -53,8 +52,10 @@ pub fn link_prepared_component(
     if manifest.is_some() {
         link_injected_package_json(root, component, &package, &read_injected_deps(root)?)?;
     }
-    if let Some(directory) = root_components_dir {
-        link_packages_to_root_components(directory, root, &[&component.package_name])?;
+    if let Some(directory) = root_components_dir
+        && !pkg_name.is_empty()
+    {
+        link_packages_to_root_components(directory, root, &[pkg_name])?;
     }
     Ok(ComponentLinks {
         id: component.id.to_string_without_version(),

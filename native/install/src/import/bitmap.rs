@@ -18,13 +18,17 @@ pub struct Id {
 impl Id {
     #[must_use]
     pub fn without_version(&self) -> String {
-        format!("{}/{}", self.scope, self.name)
+        format!("{}/{}", self.scope.trim(), self.name.trim())
     }
 
     /// `scope/name@version`, as the fetch protocol expects.
     #[must_use]
     pub fn to_request(&self) -> String {
-        match &self.version {
+        match self.version
+            .as_deref()
+            .map(str::trim)
+            .filter(|ver| !ver.is_empty())
+        {
             Some(version) => format!("{}@{version}", self.without_version()),
             None => self.without_version(),
         }

@@ -67,7 +67,11 @@ pub(super) fn version(
     {
         strip_component_id_version(manifest);
     }
-    if component.id.version.is_none() && package_context.props.get("version").is_none() {
+    if component.id.version
+        .as_deref()
+        .is_none_or(|ver| ver.trim().is_empty())
+        && package_context.props.get("version").is_none()
+    {
         manifest.shift_remove("version");
     }
 }

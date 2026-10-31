@@ -223,7 +223,11 @@ pub fn resolve_version(component: &Value, version: &str) -> Option<String> {
 
 /// `toComponentVersion(undefined)`: the head, else the latest tag.
 fn latest(component: &Value) -> Option<String> {
-    if let Some(head) = component["head"].as_str() {
+    if let Some(head) = component["head"]
+        .as_str()
+        .map(str::trim)
+        .filter(|head| !head.is_empty())
+    {
         return Some(head.to_string());
     }
     let versions = component["versions"].as_object()?;
@@ -232,7 +236,7 @@ fn latest(component: &Value) -> Option<String> {
         .keys()
         .chain(orphaned.into_iter().flat_map(serde_json::Map::keys))
         .filter_map(|tag| {
-            node_semver::Version::parse(tag)
+            node_semver::Version::parse(tag.trim())
                 .ok()
                 .map(|parsed| (parsed, tag))
         })
@@ -241,6 +245,8 @@ fn latest(component: &Value) -> Option<String> {
         .get(tag.as_str())
         .or_else(|| orphaned.and_then(|map| map.get(tag.as_str())))
         .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|hash| !hash.is_empty())
         .map(str::to_string)
 }
 
@@ -256,6 +262,8 @@ fn version_refs(version: &Value) -> Vec<String> {
         .filter_map(|key| version[key].as_str());
     files
         .chain(graphs)
+        .map(str::trim)
+        .filter(|reference| !reference.is_empty())
         .map(str::to_string)
         .collect()
 }

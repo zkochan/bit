@@ -114,7 +114,7 @@ pub(super) fn re(token: Token) -> &'static Regex {
 pub(super) fn groups<'t>(found: &Match, text: &'t str) -> Vec<Option<&'t str>> {
     found
         .groups()
-        .map(|group| group.map(|range| &text[range]))
+        .map(|group| group.and_then(|range| text.get(range)))
         .collect()
 }
 

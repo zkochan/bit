@@ -49,14 +49,15 @@ fn add_one_occurrence_to_root(deduped: &mut Deduped, name: &str, items: &[Item])
     let Some(first) = items.first() else {
         return false;
     };
+    let first_range = first.range.trim();
     if items.len() > 1
         && items
             .iter()
-            .any(|item| item.range != first.range)
+            .any(|item| item.range.trim() != first_range)
     {
         return true;
     }
-    set_root(deduped, first.field, name, &first.range);
+    set_root(deduped, first.field, name, first_range);
     false
 }
 

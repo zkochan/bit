@@ -79,7 +79,7 @@ fn yaml_virtual_store_dir(line: &str) -> Option<String> {
 }
 
 fn realpath(path: &Path) -> PathBuf {
-    fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+    fs::canonicalize(path).unwrap_or_else(|_| super::hooks::normalize(path))
 }
 
 /// `SelfHostedVirtualStoreTransition`.

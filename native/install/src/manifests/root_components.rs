@@ -84,8 +84,9 @@ fn env_manifests(
 ) -> IndexMap<PathBuf, Manifest> {
     let mut envs: Vec<&str> = Vec::new();
     for component in input.components {
-        if !envs.contains(&component.env_id.as_str()) {
-            envs.push(&component.env_id);
+        let env_id = component.env_id.trim();
+        if !env_id.is_empty() && !envs.contains(&env_id) {
+            envs.push(env_id);
         }
     }
     envs.into_iter()

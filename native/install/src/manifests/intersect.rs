@@ -87,7 +87,7 @@ pub(crate) fn intersect(ranges: &[&str]) -> io::Result<Option<String>> {
     }
     let Ok(parsed) = ranges
         .iter()
-        .map(|range| Range::parse(range, Flavor::V6))
+        .map(|range| Range::parse(range.trim(), Flavor::V6))
         .collect::<io::Result<Vec<_>>>()
     else {
         return Ok(None);
