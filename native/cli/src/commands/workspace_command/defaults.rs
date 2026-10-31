@@ -52,7 +52,7 @@ fn policy_entries() -> Value {
 /// The receipt for `target` with `files`; compositions, docs and app files,
 /// which need their aspects' callbacks, decline.
 pub fn receipt(target: &Value, policy: &Policy, files: &[String]) -> io::Result<Value> {
-    if text(target.get("identity"))? == NODE_ENV {
+    if text(target.get("identity"))?.trim() == NODE_ENV {
         return Err(decline("command environment component"));
     }
     let compositions = dev_files::group_files(files, Group::Compositions);
@@ -164,7 +164,10 @@ pub(super) fn prepare(
         "options": options,
         "globalRemotesFile": cache::cache_root().join("config").join("global-remotes.json"),
     }))?;
-    let token = text(prepared.get("token"))?.to_string();
+    let token = text(prepared.get("token"))?.trim().to_string();
+    if token.is_empty() {
+        return Err(decline("command token"));
+    }
     let context = prepared
         .get("context")
         .filter(|context| truthy(Some(context)))

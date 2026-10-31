@@ -134,7 +134,7 @@ pub(super) fn format_report(
         .collect();
     if flags
         .iter()
-        .any(|arg| *arg == "--summary")
+        .any(|arg| matches!(arg.to_str().map(str::trim), Some("--summary" | "--summary=true")))
     {
         return summary;
     }
@@ -145,7 +145,7 @@ pub(super) fn format_report(
         chalk,
         flags
             .iter()
-            .any(|arg| *arg == "--verbose"),
+            .any(|arg| matches!(arg.to_str().map(str::trim), Some("--verbose" | "--verbose=true"))),
         &mut sections,
     );
     sections.push(summary);

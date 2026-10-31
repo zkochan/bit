@@ -41,9 +41,17 @@ fn list(engine: &mut Engine, root: &Path, scope: &str) -> io::Result<Vec<Value>>
         "patterns": [format!("{}/**", scope.trim())],
         "laneOnly": false,
     }))?;
-    Ok(array(listed["lists"][0].get("components"), "checkout scope components")?
+    let first = listed["lists"]
+        .get(0)
+        .and_then(|entry| entry.get("components"));
+    Ok(array(first, "checkout scope components")?
         .iter()
         .map(|component| component["id"].clone())
-        .filter(|id| !id.is_null())
+        .filter(|id| {
+            !id.is_null()
+                && id
+                    .as_str()
+                    .is_none_or(|text| !text.trim().is_empty())
+        })
         .collect())
 }

@@ -101,6 +101,7 @@ pub(in crate::commands) fn before(startup: &Startup) -> io::Result<()> {
 
 pub(in crate::commands) fn loaded(startup: &Startup) {
     print!("{}", startup.build_stdout);
+    let _ = io::stdout().flush();
 }
 
 pub(in crate::commands) fn failure(
@@ -116,6 +117,7 @@ pub(in crate::commands) fn failure(
         .and_then(|error| error.downcast_ref::<crate::host::callback_error::CallbackError>());
     if let Some(callback) = callback {
         print!("{}", callback.startup);
+        let _ = io::stdout().flush();
     }
     let failed_output =
         callback.map_or_else(String::new, |callback| callback.output.clone());
@@ -136,6 +138,7 @@ pub(in crate::commands) fn failure(
         } else {
             loaded(startup);
             print!("{failed_output}");
+            let _ = io::stdout().flush();
         }
         Err(error)
     })

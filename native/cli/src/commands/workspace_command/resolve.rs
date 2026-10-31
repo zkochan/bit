@@ -82,7 +82,11 @@ pub fn plan_snapshot(
         .map(str::trim)
         .filter(|ignored| !ignored.is_empty() && *ignored != "*")
     {
-        for name in ignored.split(',').map(str::trim) {
+        for name in ignored
+            .split(',')
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+        {
             issues::validate_name(name)?;
         }
     }
@@ -198,7 +202,7 @@ impl<'r> Session<'r> {
             root,
             kind: request.kind,
             engine,
-            token: text(prepared.get("token"))?.to_string(),
+            token: text(prepared.get("token"))?.trim().to_string(),
             context,
             capture,
             selector_loads: Vec::new(),

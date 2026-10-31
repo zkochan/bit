@@ -207,8 +207,8 @@ pub(super) fn merge(
         let count = ancestors.len();
         return Some((ancestors, count));
     };
-    if existing["name"] != name
-        || existing["scope"] != scope
+    if existing["name"].as_str().map(str::trim) != Some(name.trim())
+        || existing["scope"].as_str().map(str::trim) != Some(scope.trim())
         || !super::existing::complete_refs(&existing["graphCompleteRefs"])?
     {
         return None;
@@ -217,9 +217,10 @@ pub(super) fn merge(
     if !super::existing::valid_rows(&rows)? {
         return None;
     }
+    let head_hash = &ancestors.first()?["hash"];
     let head_exists = rows
         .iter()
-        .any(|row| row["hash"] == ancestors[0]["hash"]);
+        .any(|row| &row["hash"] == head_hash);
     let count = ancestors.len() - usize::from(head_exists);
     refresh_rows(&mut rows, ancestors);
     Some((rows, count))

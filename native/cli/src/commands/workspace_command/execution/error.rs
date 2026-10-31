@@ -21,7 +21,10 @@ pub fn with_error_details(error: io::Error, details: String) -> io::Error {
 
 pub(in crate::commands) fn print(error: &io::Error, chalk: Chalk) {
     eprintln!("{}", chalk.red(&error.to_string()));
-    if let Some(details) = downcast_details(error).filter(|details| !details.trim().is_empty()) {
+    if let Some(details) = downcast_details(error)
+        .map(|details| details.trim_end_matches(['\r', '\n']))
+        .filter(|details| !details.trim().is_empty())
+    {
         eprintln!("{details}");
     }
 }

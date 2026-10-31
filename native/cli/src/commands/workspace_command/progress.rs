@@ -103,6 +103,7 @@ impl Progress {
             render_import(output, row);
         }
         print!("{startup}{loaded}");
+        let _ = io::Write::flush(&mut io::stdout());
         for row in &self.imports[split..] {
             render_import(output, row);
         }
@@ -243,7 +244,9 @@ fn loads(value: &Value, snap: bool) -> io::Result<Vec<u64>> {
 fn import(row: &Value) -> io::Result<Import> {
     let reason = match row.get("reason") {
         Some(Value::Null) => None,
-        Some(Value::String(reason)) if known_reason(reason) => Some(reason.clone()),
+        Some(Value::String(reason)) if known_reason(reason.trim()) => {
+            Some(reason.trim().to_string())
+        }
         _ => return Err(decline("native command import progress receipt")),
     };
     let ids = array(row.get("ids"), "import ids")?
@@ -261,27 +264,21 @@ fn import(row: &Value) -> io::Result<Import> {
             .ok_or_else(|| decline("native command import progress receipt"))
     };
     let (components, objects) = (count("components")?, count("objects")?);
-    if ids.len() > 16384 || objects > 16384 {
-        return Err(decline("native command import progress receipt"));
-    }
     let requested = row.get("requested").and_then(Value::as_u64);
-    if requested.is_some_and(|count| count > 16384) {
-        return Err(decline("native command import requested count"));
+    if ids.len() > 16384 || objects > 16384 || requested.is_some_and(|count| count > 16384) {
+        return Err(decline("native command import progress receipt"));
     }
     Ok(Import { requested, reason, ids, objects_only, components, objects })
 }
 
 /// `importReason`: the fixed reasons, and the lane and history templates.
 fn known_reason(reason: &str) -> bool {
-    if matches!(
+    matches!(
         reason,
         "for getting all dependencies"
             | "for getting all dependencies - missing dependencies"
             | "for building graph-ids from the workspace",
-    ) {
-        return true;
-    }
-    REASONS.contains(&reason)
+    ) || REASONS.contains(&reason)
         || reason.strip_prefix("for fetching lane ").is_some_and(lane_name)
         || reason.strip_prefix("of their latest on lane ").is_some_and(lane_name)
         || reason

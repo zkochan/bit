@@ -19,7 +19,7 @@ pub(in crate::commands) struct Loaded {
 }
 impl Loaded {
     pub(in crate::commands) fn dependency_state(&self, identity: &str) -> Option<&Value> {
-        self.capture.dependency_states.get(identity)
+        self.capture.dependency_states.get(identity.trim())
     }
 
     pub(in crate::commands) fn captured(&self) -> &[Value] {
@@ -33,13 +33,15 @@ impl Loaded {
             .zip(&self.counts)
             .zip(&self.progress.identities)
             .map(|((id, count), identity)| {
+                let identity = identity.trim();
                 let identity = identity
                     .split('@')
                     .next()
-                    .unwrap_or(identity);
+                    .unwrap_or(identity)
+                    .trim();
                 let captured = self.capture.captured
                     .iter()
-                    .find(|row| row["identity"] == identity)
+                    .find(|row| row["identity"].as_str().map(str::trim) == Some(identity))
                     .ok_or_else(|| invalid("component service identity"))?;
                 let directory = captured["directory"]
                     .as_str()

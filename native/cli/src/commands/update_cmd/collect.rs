@@ -272,15 +272,21 @@ fn candidate_from_serialized(
     local_pkgs: &HashSet<String>,
     root_names: &HashSet<String>,
 ) -> Option<Candidate> {
-    if dep["isExtension"].as_bool() == Some(true) || dep["lifecycle"].as_str() == Some("peer") {
+    if dep["isExtension"].as_bool() == Some(true)
+        || dep["lifecycle"].as_str().map(str::trim) == Some("peer")
+    {
         return None;
     }
-    let is_comp = dep["__type"].as_str() == Some("component");
-    let name = if is_comp { dep["packageName"].as_str()? } else { dep["id"].as_str()? };
-    if local_pkgs.contains(name) {
+    let is_comp = dep["__type"].as_str().map(str::trim) == Some("component");
+    let name = if is_comp { dep["packageName"].as_str()? } else { dep["id"].as_str()? }.trim();
+    if name.is_empty() || local_pkgs.contains(name) {
         return None;
     }
-    let current_range = dep["version"].as_str()?.to_owned();
+    let current_range = dep["version"]
+        .as_str()
+        .map(str::trim)
+        .filter(|ver| !ver.is_empty())?
+        .to_owned();
     let (field, target) = serialized_field_and_target(dep, entry, name, root_names)?;
     let comp_bare_id = is_comp.then(|| extract_serialized_comp_id(dep)).flatten();
     Some(Candidate {
@@ -298,9 +304,12 @@ fn serialized_field_and_target(
     name: &str,
     root_names: &HashSet<String>,
 ) -> Option<(&'static str, Target)> {
-    let field =
-        if dep["lifecycle"].as_str() == Some("dev") { "devDependencies" } else { "dependencies" };
-    let is_auto = dep["source"].as_str() != Some("config");
+    let field = if dep["lifecycle"].as_str().map(str::trim) == Some("dev") {
+        "devDependencies"
+    } else {
+        "dependencies"
+    };
+    let is_auto = dep["source"].as_str().map(str::trim) != Some("config");
     if is_auto && root_names.contains(name) {
         return None;
     }

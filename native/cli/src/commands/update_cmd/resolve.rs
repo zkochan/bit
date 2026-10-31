@@ -187,9 +187,12 @@ fn evaluate_candidate(
     options: &Options,
     save_prefix: Option<&str>,
 ) -> Option<ResolvedUpdate> {
-    let wanted = wanted_range(&cand.current_range, &cand.target, options)?;
+    let current_range = cand.current_range.trim();
+    let wanted = wanted_range(current_range, &cand.target, options)?;
     let latest_sv = pick_best_version(versions, &wanted)?;
-    let curr_stripped = cand.current_range.trim_start_matches(['^', '~']);
+    let curr_stripped = current_range
+        .trim_start_matches(['^', '~'])
+        .trim();
     if let Ok(curr_sv) = node_semver::Version::parse(curr_stripped)
         && curr_sv >= latest_sv
     {
@@ -206,10 +209,13 @@ fn evaluate_candidate(
 }
 
 fn wanted_range(current_range: &str, target: &Target, options: &Options) -> Option<String> {
+    let current_range = current_range.trim();
     if !options.patch && !options.minor && !options.semver {
         return Some("latest".to_owned());
     }
-    let stripped = current_range.trim_start_matches(['^', '~']);
+    let stripped = current_range
+        .trim_start_matches(['^', '~'])
+        .trim();
     let parsed_ver = node_semver::Version::parse(stripped).ok();
     if options.semver {
         let is_comp_target = matches!(
@@ -235,9 +241,10 @@ fn wanted_range(current_range: &str, target: &Target, options: &Options) -> Opti
 }
 
 fn pick_best_version(versions: &[String], wanted: &str) -> Option<node_semver::Version> {
+    let wanted = wanted.trim();
     let parsed_vers: Vec<node_semver::Version> = versions
         .iter()
-        .filter_map(|raw| node_semver::Version::parse(raw).ok())
+        .filter_map(|raw| node_semver::Version::parse(raw.trim()).ok())
         .collect();
     if wanted == "latest" {
         return parsed_vers

@@ -20,11 +20,17 @@ fn canonical(row: &Value) -> Option<&str> {
     let hash = valid_hash(row["hash"].as_str()?)?;
     let parents = refs(&row["parents"])?;
     let mut value = json!({"hash":hash,"parents":parents});
-    if !row["unrelated"].is_null() {
-        value["unrelated"] = json!(valid_hash(row["unrelated"].as_str()?)?);
+    if let Some(unrelated) = row
+        .get("unrelated")
+        .filter(|val| !val.is_null())
+    {
+        value["unrelated"] = json!(valid_hash(unrelated.as_str()?)?);
     }
-    if !row["squashed"].is_null() {
-        value["squashed"] = json!(refs(&row["squashed"])?);
+    if let Some(squashed) = row
+        .get("squashed")
+        .filter(|val| !val.is_null())
+    {
+        value["squashed"] = json!(refs(squashed)?);
     }
     (serde_json::to_vec(row).ok()? == serde_json::to_vec(&value).ok()?).then_some(hash)
 }

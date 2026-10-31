@@ -18,7 +18,7 @@ pub(in crate::commands) fn error(
         _ => return Err(error),
     };
     let errno = if cfg!(windows) { windows_errno } else { unix_errno };
-    Ok(json!({"errno":errno,"code":code,"syscall":syscall,"path":path}))
+    Ok(json!({"errno":errno,"code":code,"syscall":syscall.trim(),"path":path}))
 }
 
 pub(in crate::commands) fn message(
@@ -29,6 +29,7 @@ pub(in crate::commands) fn message(
     let code = error["code"]
         .as_str()
         .map(str::trim)
+        .filter(|value| !value.is_empty())
         .ok_or_else(|| invalid("service error code"))?;
     let description = match code {
         "EACCES" => "permission denied",

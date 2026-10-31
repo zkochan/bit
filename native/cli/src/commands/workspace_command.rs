@@ -81,6 +81,9 @@ impl Planned {
         let mut ids = Vec::new();
         for row in rows {
             let current = text(row.get("id"))?.trim();
+            if current.is_empty() {
+                continue;
+            }
             ids.push(current.to_owned());
             let identity =
                 current.rsplit_once('@').map_or(current, |(identity, _)| identity.trim());

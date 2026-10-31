@@ -132,6 +132,7 @@ pub(super) fn parse_options(args: &[&str]) -> Option<Options> {
     let mut options = Options::default();
     let mut iter = args.iter().copied();
     while let Some(arg) = iter.next() {
+        let arg = arg.trim();
         if arg == "--" {
             super::internalize::consume_trailing_internalize(iter, &mut options.pattern)?;
             break;
@@ -146,6 +147,7 @@ fn apply_validate_token<'a>(
     iter: &mut impl Iterator<Item = &'a str>,
     options: &mut Options,
 ) -> Option<()> {
+    let arg = arg.trim();
     if apply_validate_combined_short(arg, options) {
         return Some(());
     }

@@ -99,7 +99,7 @@ fn prepare(args: &[OsString]) -> io::Result<Result<Prepared, String>> {
     };
     if cli.bit_dir
         .as_ref()
-        .is_none_or(|dir| dir.as_os_str().is_empty())
+        .is_none_or(|dir| dir.as_os_str().is_empty() || dir.to_string_lossy().trim().is_empty())
     {
         return Ok(Err("the entry is not inside an @teambit/bit package".to_string()));
     }

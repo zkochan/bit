@@ -53,7 +53,7 @@ pub fn pattern_ids(options: &Value, context: &Value) -> io::Result<Option<Vec<St
     let targets = array(context["lane"].get("targets"), "lane targets")?;
     let identities: Vec<&str> = targets
         .iter()
-        .map(|target| text(target.get("identity")))
+        .map(|target| text(target.get("identity")).map(str::trim))
         .collect::<io::Result<_>>()?;
     let distinct: std::collections::HashSet<&&str> = identities.iter().collect();
     if targets.len() > 4096
@@ -88,7 +88,12 @@ impl Steps<'_> {
             "token": self.token,
             "laneReceipt": receipt,
         }))?;
-        if finalized.get("token").and_then(Value::as_str) != Some(self.token) {
+        if finalized
+            .get("token")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            != Some(self.token.trim())
+        {
             return Err(decline("command lane finalization receipt"));
         }
         let progress = plan["progress"].clone();

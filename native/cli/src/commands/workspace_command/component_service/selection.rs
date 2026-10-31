@@ -45,6 +45,10 @@ fn matches(row: &Value, selector: &str) -> bool {
         .trim_end_matches('/');
     let row_dir = row["directory"]
         .as_str()
-        .map(|dir| dir.trim().trim_end_matches('/'));
+        .map(|dir| {
+            dir.trim()
+                .trim_start_matches("./")
+                .trim_end_matches('/')
+        });
     identity == name || component_name == name || row_dir == Some(directory)
 }

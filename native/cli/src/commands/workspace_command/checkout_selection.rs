@@ -67,7 +67,7 @@ pub(super) fn select(
     };
     let identities = selected_identities(&selected);
     let result: Value = engine.request(&json!({"kind":"commandCheckoutSelect","token":prepared.token,"identities":identities,"readSet":proofs}))?;
-    if result["token"] != prepared.token {
+    if result["token"].as_str().map(str::trim) != Some(prepared.token.trim()) {
         return Err(decline("checkout selected owner token"));
     }
     if let Some(captured) = &mut captured {
@@ -83,12 +83,17 @@ pub(super) fn select(
 fn selected_identities(selected: &[Value]) -> Vec<Value> {
     selected
         .iter()
-        .map(|target| {
+        .filter_map(|target| {
             target
                 .get("identity")
                 .or_else(|| target.get("id"))
+                .filter(|id| {
+                    !id.is_null()
+                        && id
+                            .as_str()
+                            .is_none_or(|text| !text.trim().is_empty())
+                })
                 .cloned()
-                .unwrap_or(Value::Null)
         })
         .collect()
 }

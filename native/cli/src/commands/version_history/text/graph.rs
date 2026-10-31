@@ -150,7 +150,11 @@ fn refs<'a>(row: &'a Value, key: &str) -> Option<Vec<&'a str>> {
         None | Some(Value::Null) if matches!(key, "parents" | "squashed") => Some(Vec::new()),
         Some(Value::Array(values)) => values
             .iter()
-            .map(|entry| non_empty_str(entry).or_else(|| entry.get("hash").and_then(non_empty_str)))
+            .map(|entry| {
+                non_empty_str(entry)
+                    .or_else(|| entry.get("hash").and_then(non_empty_str))
+                    .or_else(|| entry.get("id").and_then(non_empty_str))
+            })
             .collect(),
         _ => None,
     }
@@ -163,6 +167,10 @@ fn optional<'a>(row: &'a Value, key: &str) -> Option<Option<&'a str>> {
             let trimmed = value.trim();
             Some((!trimmed.is_empty()).then_some(trimmed))
         }
+        Some(Value::Object(map)) => map
+            .get("head")
+            .and_then(non_empty_str)
+            .map(Some),
         _ => None,
     }
 }

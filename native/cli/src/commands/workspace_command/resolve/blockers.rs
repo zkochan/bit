@@ -80,7 +80,10 @@ fn callback_batch(
 ) -> io::Result<()> {
     let rows = ids
         .iter()
-        .filter_map(|id| rows.iter().find(|row| row["id"] == *id))
+        .filter_map(|id| {
+            rows.iter()
+                .find(|row| row["id"].as_str().map(str::trim) == Some(id.trim()))
+        })
         .cloned()
         .collect::<Vec<_>>();
     let mut context = resolved.context.clone();
@@ -169,17 +172,21 @@ fn non_empty_field<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
 
 fn display_ids(rows: &mut [Value], context: &Value) {
     for row in rows {
+        let Some(id) = non_empty_field(row, "id") else {
+            continue;
+        };
         let target = context["targets"]
             .as_array()
             .into_iter()
             .flatten()
-            .find(|target| target["identity"] == row["id"] || target["id"] == row["id"]);
+            .find(|target| {
+                non_empty_field(target, "identity") == Some(id)
+                    || non_empty_field(target, "id") == Some(id)
+            });
         let version = target.and_then(|target| {
             non_empty_field(target, "version").or_else(|| non_empty_field(target, "head"))
         });
-        if let Some(version) = version
-            && let Some(id) = non_empty_field(row, "id")
-        {
+        if let Some(version) = version {
             row["displayId"] = serde_json::json!(format!("{id}@{version}"));
         }
     }

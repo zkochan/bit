@@ -45,7 +45,7 @@ fn parse_json_flag(args: &[OsString]) -> Option<bool> {
     let mut json = false;
     let rest = &args[1..];
     for (idx, raw) in rest.iter().enumerate() {
-        let token = raw.to_str()?;
+        let token = raw.to_str()?.trim();
         match token {
             "--" => return (idx + 1 == rest.len()).then_some(json),
             "--no-color" | "--no-color=true" | "--no-color=false" => {}

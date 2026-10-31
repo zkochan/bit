@@ -66,13 +66,15 @@ fn hidden_head(hidden: &Value, scope: &str, name: &str) -> Option<Option<String>
         return Some(None);
     }
     let mut head = None;
+    let target = format!("{}/{}", scope.trim(), name.trim());
     for id in hidden.as_array()? {
-        let (id, hash) = id.as_str()?.split_once('@')?;
-        identifier(id)?;
+        let (id, hash) = id.as_str()?.trim().split_once('@')?;
+        let id = identifier(id)?;
+        let hash = hash.trim();
         if hash.len() != 40 || !hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
             return None;
         }
-        if id == format!("{scope}/{name}") && head.replace(hash.to_owned()).is_some() {
+        if id == target && head.replace(hash.to_owned()).is_some() {
             return None;
         }
     }

@@ -106,7 +106,11 @@ impl Steps<'_> {
         let captures = detected.get("components").and_then(Value::as_array);
         match captures {
             Some(captures)
-                if detected.get("token").and_then(Value::as_str) == Some(self.token)
+                if detected
+                    .get("token")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    == Some(self.token.trim())
                     && captures.len() == inputs.len() =>
             {
                 Ok(captures.clone())
@@ -116,7 +120,12 @@ impl Steps<'_> {
     }
 
     fn check_token(&self, receipt: &Value, what: &str) -> io::Result<()> {
-        if receipt.get("token").and_then(Value::as_str) == Some(self.token) {
+        if receipt
+            .get("token")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            == Some(self.token.trim())
+        {
             Ok(())
         } else {
             Err(decline(what))
@@ -206,26 +215,19 @@ fn files(row: &Value) -> io::Result<Vec<String>> {
 
 /// One `commandPolicyPrepare` component.
 fn policy_component(row: &Value, original: &Value, capture: &Capture) -> io::Result<Value> {
-    let identity = text(row.get("identity"))?;
+    let identity = text(row.get("identity"))?.trim();
     if row["scopeOnly"] == true {
         let semver = grammar::config_inputs(&json!([row, original["workspace"]]))
             .ok_or_else(|| decline("command scope configuration grammar"))?;
         return Ok(json!({"identity":identity,"semver":semver}));
     }
     let fast_forward = truthy(row.get("fastForward"));
-    let added = original["lane"]["addedTargets"]
-        .as_array()
-        .is_some_and(|added| {
-            added
-                .iter()
-                .any(|target| target.get("identity").and_then(Value::as_str) == Some(identity))
-        });
-    if added && !fast_forward {
+    if is_added_target(original, identity) && !fast_forward {
         return Err(decline("command new component policy requires incoming projection"));
     }
     let target = array(original.get("targets"), "targets")?
         .iter()
-        .find(|target| target.get("identity").and_then(Value::as_str) == Some(identity))
+        .find(|target| has_identity(target, identity))
         .ok_or_else(|| decline("command policy target"))?;
     let projected = if fast_forward { row.get("otherVersion") } else { None };
     let policy = policy::projected_policy(original, target, projected)?;
@@ -239,6 +241,20 @@ fn policy_component(row: &Value, original: &Value, capture: &Capture) -> io::Res
         component["dependencyState"] = state.clone();
     }
     Ok(component)
+}
+
+fn is_added_target(original: &Value, identity: &str) -> bool {
+    original["lane"]["addedTargets"]
+        .as_array()
+        .is_some_and(|added| added.iter().any(|target| has_identity(target, identity)))
+}
+
+fn has_identity(target: &Value, identity: &str) -> bool {
+    target
+        .get("identity")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        == Some(identity)
 }
 
 /// The `commandDependencyComplete` components: the policy input with the

@@ -78,9 +78,15 @@ fn render_rows(rows: &[Import], output: &Output, wildcard: bool, on_lane: bool) 
     let requested = rows.iter().find(|row| latest_request(row));
     for row in rows {
         if dependency_request(row) {
+            let fallback = requested
+                .unwrap_or(row)
+                .ids
+                .iter()
+                .filter(|id| !id.trim().is_empty())
+                .count() as u64;
             output.status(&format!(
                 "import {} components with their dependencies (if missing)",
-                row.requested.unwrap_or_else(|| requested.unwrap_or(row).ids.len() as u64),
+                row.requested.unwrap_or(fallback),
             ));
             if row.components == 0 && !((wildcard || on_lane) && row.objects > 0) {
                 continue;

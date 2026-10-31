@@ -2,11 +2,11 @@
 use serde_json::{Value, json};
 
 fn project(data: &Value, identity: &str, environment: &str, message: Option<&str>) -> Value {
-    let identity = identity
-        .trim()
+    let trimmed_id = identity.trim();
+    let identity = trimmed_id
         .split('@')
         .next()
-        .unwrap_or(identity)
+        .unwrap_or(trimmed_id)
         .trim();
     let components = data[0]["data"]["components"]
         .as_array()

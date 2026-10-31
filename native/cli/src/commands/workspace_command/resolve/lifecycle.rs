@@ -170,7 +170,7 @@ pub(in crate::commands) fn render_events(
         }
         io::stdout().write_all(text.as_bytes())?;
     }
-    Ok(())
+    io::stdout().flush()
 }
 
 pub(super) fn pre_snap(
@@ -251,12 +251,11 @@ fn validate_graph_targets(context: &Value, plan: &Value, params: &Value) -> io::
     }
     let targets = array(context.get("targets"), "snapshot graph targets")?;
     for identity in array(plan.get("needsSnap"), "snapshot graph selection")? {
-        let identity = text(Some(identity))?;
-        if !targets
+        let identity = text(Some(identity))?.trim();
+        let known = targets
             .iter()
-            .any(|target| target["identity"].as_str() == Some(identity))
-            && !super::super::snapshot::hidden_target(context, identity)
-        {
+            .any(|target| target["identity"].as_str().map(str::trim) == Some(identity));
+        if !known && !super::super::snapshot::hidden_target(context, identity) {
             return Err(crate::commands::status::js::decline("command snapshot target"));
         }
     }
@@ -305,8 +304,8 @@ pub(super) fn build(
     let versions = array(plan.get("versions"), "snapshot builder versions")?
         .iter()
         .map(|version| {
-            let identity = text(version.get("identity"))?;
-            let target = text(version.get("componentVersion"))?;
+            let identity = text(version.get("identity"))?.trim();
+            let target = text(version.get("componentVersion"))?.trim();
             Ok(json!({"identity":identity,"version":target}))
         })
         .collect::<io::Result<Vec<_>>>()?;
@@ -350,7 +349,8 @@ pub(in crate::commands) fn render_build_output(
             progress.render_graph(output);
         }
     }
-    io::stdout().write_all(startup.build_stdout.as_bytes())
+    io::stdout().write_all(startup.build_stdout.as_bytes())?;
+    io::stdout().flush()
 }
 
 fn refresh_sources(session: &mut Session<'_>, result: &Value) -> io::Result<()> {
@@ -375,7 +375,7 @@ pub(super) fn planned_tasks(receipt: &mut Value, capture: &capture::Capture) -> 
     for version in
         versions.as_array_mut().ok_or_else(|| io::Error::other("snapshot allocation versions"))?
     {
-        let identity = text(version.get("identity"))?;
+        let identity = text(version.get("identity"))?.trim();
         if let Some(tasks) =
             capture::snapshot_data(capture, identity).and_then(|data| data.get("plannedTasks"))
         {

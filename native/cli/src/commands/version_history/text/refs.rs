@@ -58,13 +58,14 @@ fn lane_paths(root: &Path) -> Option<Vec<(String, PathBuf)>> {
     let mut paths = Vec::new();
     for remote in entries(&root.join("refs/remotes"))? {
         let remote_name = remote.file_name().into_string().ok()?;
-        if remote_name.starts_with('.') {
+        let remote_name = remote_name.trim();
+        if remote_name.is_empty() || remote_name.starts_with('.') {
             continue;
         }
         if !remote.file_type().ok()?.is_dir() {
             return None;
         }
-        paths.extend(remote_lanes(&remote.path(), &remote_name)?);
+        paths.extend(remote_lanes(&remote.path(), remote_name)?);
     }
     Some(paths)
 }
@@ -73,7 +74,8 @@ fn remote_lanes(root: &Path, remote: &str) -> Option<Vec<(String, PathBuf)>> {
     let mut paths = Vec::new();
     for lane in entries(root)? {
         let name = lane.file_name().into_string().ok()?;
-        if name.starts_with('.') || matches!(name.as_str(), "main" | "master") {
+        let name = name.trim();
+        if name.is_empty() || name.starts_with('.') || matches!(name, "main" | "master") {
             continue;
         }
         if !lane.file_type().ok()?.is_file() {

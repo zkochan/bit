@@ -51,7 +51,7 @@ fn parse_args(args: &[OsString]) -> Option<Option<String>> {
     let mut token = None;
     let mut iter = args.iter().skip(1);
     while let Some(arg) = iter.next() {
-        let str_arg = arg.to_str()?;
+        let str_arg = arg.to_str()?.trim();
         if str_arg == "--" {
             return iter.next().is_none().then_some(token);
         }
@@ -84,10 +84,17 @@ fn resolve_user(cli_token: Option<&str>) -> io::Result<Option<String>> {
     let global_val = bit_workspace_config::read_global_config(&global_config_dir())?;
     let mut global: bit_install::model::GlobalConfig =
         serde_json::from_value(global_val).unwrap_or_default();
-    if let Some(tok) = cli_token {
+    if let Some(tok) = cli_token
+        .map(str::trim)
+        .filter(|tok| !tok.is_empty())
+    {
         global.insert("user.token".to_owned(), serde_json::Value::String(tok.to_owned()));
     }
-    if !global.contains_key("user.token") {
+    if global
+        .get("user.token")
+        .and_then(serde_json::Value::as_str)
+        .is_none_or(|tok| tok.trim().is_empty())
+    {
         return Ok(None);
     }
     let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;

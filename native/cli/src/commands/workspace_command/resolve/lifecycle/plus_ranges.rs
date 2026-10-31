@@ -119,7 +119,7 @@ fn dependencies(session: &Session<'_>, identity: &str) -> Vec<Value> {
     session
         .capture
         .dependency_states
-        .get(identity)
+        .get(identity.trim())
         .and_then(|state| state["entries"].as_array())
         .into_iter()
         .flatten()
@@ -143,6 +143,7 @@ fn environment(root: &Path, component: &Value) -> io::Result<Option<Value>> {
             non_empty_str(file)
                 .or_else(|| non_empty_str(&file["relativePath"]))
                 .or_else(|| non_empty_str(&file["path"]))
+                .or_else(|| non_empty_str(&file["filePath"]))
         })
         .find(|file| matches!(file.trim_start_matches("./"), "env.jsonc" | "env.json"));
     let Some(file) = file else { return Ok(None) };

@@ -160,6 +160,7 @@ fn is_new_or_modified(
         return Some(true);
     }
     for rel_file in &comp.files {
+        let rel_file = rel_file.trim();
         let disk_bytes = fs::read(comp.dir.join(rel_file)).ok()?;
         let Some(stored_bytes) = scope_ref
             .file(&version_val, rel_file)

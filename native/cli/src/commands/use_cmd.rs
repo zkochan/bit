@@ -104,7 +104,10 @@ fn resolve_aspect_id(root: &Path, doc_val: &Value, target: &str) -> Result<Strin
     let entry = bitmap.entries
         .iter()
         .find(|entry| {
-            let root_dir = entry.root_dir.trim().trim_end_matches('/');
+            let root_dir = entry.root_dir
+                .trim()
+                .trim_start_matches("./")
+                .trim_end_matches('/');
             entry.owns_its_dir()
                 && (entry.id.to_string_without_version() == bare
                     || entry.id.name == bare

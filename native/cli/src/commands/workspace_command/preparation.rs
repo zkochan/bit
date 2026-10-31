@@ -99,6 +99,7 @@ fn load_docs(
         .filter(|target| {
             target["directory"]
                 .as_str()
+                .or_else(|| target["rootDir"].as_str())
                 .map(str::trim)
                 .is_some_and(|directory| !directory.is_empty() && root.join(directory).is_dir())
         })

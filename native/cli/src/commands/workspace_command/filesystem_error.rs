@@ -20,7 +20,11 @@ impl Failure {
     fn description(&self) -> String {
         let mut message =
             format!("{}: {}, {} '{}'", self.code, self.message, self.operation, self.path);
-        if let Some(destination) = &self.destination {
+        if let Some(destination) = self.destination
+            .as_deref()
+            .map(str::trim)
+            .filter(|dest| !dest.is_empty())
+        {
             let _ = write!(message, " -> '{destination}'");
         }
         message
@@ -113,7 +117,11 @@ pub(in crate::commands) fn json(error: &io::Error) -> serde_json::Value {
     result["code"] = serde_json::json!(failure.code);
     result["syscall"] = serde_json::json!(failure.operation);
     result["path"] = serde_json::json!(failure.path);
-    if let Some(destination) = &failure.destination {
+    if let Some(destination) = failure.destination
+        .as_deref()
+        .map(str::trim)
+        .filter(|dest| !dest.is_empty())
+    {
         result["dest"] = serde_json::json!(destination);
     }
     result

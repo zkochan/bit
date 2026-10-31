@@ -11,7 +11,7 @@ pub(super) fn target(root: &Path, source: &Path) -> Option<PathBuf> {
     let bucket = source
         .parent()?
         .file_name()
-        .filter(|name| !name.is_empty())?;
+        .filter(|name| !name.is_empty() && !name.to_string_lossy().trim().is_empty())?;
     let trash = root.join("trash");
     let parent = trash.join(bucket);
     let device = fs::metadata(source).ok()?.dev();
@@ -23,7 +23,7 @@ pub(super) fn target(root: &Path, source: &Path) -> Option<PathBuf> {
     }
     let file_name = source
         .file_name()
-        .filter(|name| !name.is_empty())?;
+        .filter(|name| !name.is_empty() && !name.to_string_lossy().trim().is_empty())?;
     let destination = parent.join(file_name);
     match fs::symlink_metadata(&destination) {
         Ok(metadata)

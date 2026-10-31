@@ -104,26 +104,21 @@ impl Settings {
     }
 
     fn apply_inline_or_short(&mut self, value: &str) -> io::Result<()> {
-        if value.starts_with("--scope=") || value.starts_with("-s=") {
-            return Ok(());
+        if let Some(scope_val) = value
+            .strip_prefix("--scope=")
+            .or_else(|| value.strip_prefix("-s="))
+        {
+            return validate_inline_scope(scope_val);
         }
         if let Some(env_val) = value
             .strip_prefix("--env=")
             .or_else(|| value.strip_prefix("-e="))
         {
-            let trimmed = env_val.trim();
-            if trimmed.is_empty() {
-                return Err(invalid("tester environment"));
-            }
-            self.environment = Some(trimmed.to_owned());
+            self.environment = Some(non_empty_inline(env_val, "tester environment")?);
             return Ok(());
         }
         if let Some(junit) = value.strip_prefix("--junit=") {
-            let trimmed = junit.trim();
-            if trimmed.is_empty() {
-                return Err(invalid("tester junit path"));
-            }
-            self.junit = Some(PathBuf::from(trimmed));
+            self.junit = Some(PathBuf::from(non_empty_inline(junit, "tester junit path")?));
             return Ok(());
         }
         if let Some(flags) = value.strip_prefix('-') {
@@ -146,6 +141,22 @@ impl Settings {
         }
         Ok(())
     }
+}
+
+fn validate_inline_scope(scope_val: &str) -> io::Result<()> {
+    let trimmed = scope_val.trim();
+    if trimmed.is_empty() || trimmed.starts_with('-') {
+        return Err(invalid("tester scope"));
+    }
+    Ok(())
+}
+
+fn non_empty_inline(value: &str, label: &str) -> io::Result<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(invalid(label));
+    }
+    Ok(trimmed.to_owned())
 }
 
 fn non_empty_arg<'a>(

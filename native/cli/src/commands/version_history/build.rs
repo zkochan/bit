@@ -19,23 +19,28 @@ pub(super) fn run(
     id: &str,
     from: Option<&str>,
 ) -> io::Result<Outcome> {
+    let delete_existing = args
+        .iter()
+        .any(|arg| {
+            matches!(
+                arg.to_str().map(str::trim),
+                Some("--delete-existing" | "--delete-existing=true"),
+            )
+        });
+    let from_all_lanes = args
+        .iter()
+        .any(|arg| {
+            matches!(
+                arg.to_str().map(str::trim),
+                Some("--from-all-lanes" | "--from-all-lanes=true"),
+            )
+        });
     if root.bare
-        && let Some(plan) = bare::prepare(
-            root,
-            id,
-            from,
-            args.iter()
-                .any(|arg| arg == "--from-all-lanes"),
-            args.iter()
-                .any(|arg| arg == "--delete-existing"),
-        )
+        && let Some(plan) = bare::prepare(root, id, from, from_all_lanes, delete_existing)
     {
         return plan.run(root, args);
     }
-    if args
-        .iter()
-        .any(|arg| arg == "--delete-existing")
-    {
+    if delete_existing {
         return Ok(Outcome::Declined(
             "version-history deletion requires a supported scope layout".into(),
         ));
@@ -179,7 +184,9 @@ fn prepare(root: &ScopeRoot, id: &str, from: Option<&str>) -> Option<String> {
     if kind != "Component" {
         return None;
     }
-    let head = from.or_else(|| model["head"].as_str())?;
+    let head = from
+        .or_else(|| model["head"].as_str())?
+        .trim();
     if head.len() != 40 || !head.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return None;
     }

@@ -69,6 +69,8 @@ fn parse_group_gid(bytes: &[u8], name: &str) -> Option<u32> {
     let contents = std::str::from_utf8(bytes).ok()?;
     let line = contents
         .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
         .find(|line| line.split(':').next().map(str::trim) == Some(name))?;
     line.split(':')
         .nth(2)?

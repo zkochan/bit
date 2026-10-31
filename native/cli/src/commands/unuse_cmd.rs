@@ -160,10 +160,14 @@ fn lookup_bitmap_aspect_id(root: &Path, doc_val: &Value, bare: &str) -> Option<S
     bitmap.entries
         .iter()
         .find(|entry| {
+            let root_dir = entry.root_dir
+                .trim()
+                .trim_start_matches("./")
+                .trim_end_matches('/');
             entry.owns_its_dir()
                 && (entry.id.to_string_without_version() == bare
                     || entry.id.name == bare
-                    || (!entry.root_dir.is_empty() && entry.root_dir == normalized))
+                    || (!root_dir.is_empty() && root_dir == normalized))
         })
         .map(|entry| entry.id.to_string_without_version())
 }

@@ -93,7 +93,7 @@ pub(super) fn parse_options(args: &[&str]) -> Option<Options> {
 }
 
 fn apply_token(args: &[&str], idx: &mut usize, options: &mut Options) -> Option<()> {
-    let arg = args[*idx];
+    let arg = args[*idx].trim();
     if apply_combined_short(arg, options) {
         return Some(());
     }

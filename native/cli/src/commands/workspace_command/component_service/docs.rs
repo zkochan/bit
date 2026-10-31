@@ -48,6 +48,7 @@ fn normalize_file(file: &Value) -> Value {
         .as_str()
         .or_else(|| file["relativePath"].as_str())
         .or_else(|| file["path"].as_str())
+        .or_else(|| file["filePath"].as_str())
         .map(str::trim)
         .filter(|path| !path.is_empty());
     match path {

@@ -231,6 +231,7 @@ fn valid_lane_id(lane_id: &Value) -> bool {
 }
 
 fn object_path(root: &Path, hash: &str) -> Option<PathBuf> {
+    let hash = hash.trim();
     if hash.len() != 40 || !hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return None;
     }
@@ -253,7 +254,7 @@ fn read(
         return None;
     }
     let bytes = fs::read(&path).ok()?;
-    let (actual, value) = bit_object_import::read_scope_object(root, hash).ok()??;
+    let (actual, value) = bit_object_import::read_scope_object(root, hash.trim()).ok()??;
     if actual != kind || fs::read(&path).ok()? != bytes {
         return None;
     }
@@ -292,11 +293,16 @@ impl Plan {
 
     pub fn run(mut self, root: &ScopeRoot, args: &[OsString]) -> io::Result<Outcome> {
         let chalk = Chalk::detect(args);
+        let delete_existing = args
+            .iter()
+            .any(|arg| {
+                matches!(
+                    arg.to_str().map(str::trim),
+                    Some("--delete-existing" | "--delete-existing=true"),
+                )
+            });
         workspace_command::execute_then_scope(&root.path, args, "build", |_| {
-            if args
-                .iter()
-                .any(|arg| arg == "--delete-existing")
-            {
+            if delete_existing {
                 trash::move_history(&mut self, &root.path)
                     .map_err(|error| filesystem_error::report(&error, chalk))?;
             }
@@ -307,24 +313,16 @@ impl Plan {
                 self.payload = payload;
                 self.mode = existing_mode(&self.path);
                 if self.mode.is_none() {
-                    return Err(filesystem_error::report(
-                        &io::Error::other("version-history mode changed"),
-                        chalk,
-                    ));
+                    let err = io::Error::other("version-history mode changed");
+                    return Err(filesystem_error::report(&err, chalk));
                 }
                 self.publish().map_err(|error| filesystem_error::report(&error, chalk))?;
             }
             let summary =
                 Formatter::new(chalk).success_summary("completed building version history");
-            Ok(Report {
-                data: format!(
-                    "{summary}\n{}: added {} hashes",
-                    chalk.bold(&self.identity),
-                    self.count,
-                ),
-                code: 0,
-                details: None,
-            })
+            let data =
+                format!("{summary}\n{}: added {} hashes", chalk.bold(&self.identity), self.count);
+            Ok(Report { data, code: 0, details: None })
         })
     }
 
@@ -341,14 +339,9 @@ impl Plan {
             return Err(io::Error::other("version-history mode changed"));
         }
         let parent = self.path.parent().ok_or_else(|| io::Error::other("version-history path"))?;
-        let temporary = parent.join(format!(
-            ".{}.{}.1",
-            self.path
-                .file_name()
-                .unwrap()
-                .to_string_lossy(),
-            std::process::id(),
-        ));
+        let name = self.path.file_name().ok_or_else(|| io::Error::other("version-history name"))?;
+        let temporary =
+            parent.join(format!(".{}.{}.1", name.to_string_lossy(), std::process::id()));
         let mut created = false;
         let result = self.write_temporary(parent, &temporary, &mut created);
         if result.is_err() && created {
@@ -383,9 +376,7 @@ impl Plan {
             .map_err(|error| filesystem_error::failure(error, "write", temporary))?;
         preserve_mode(temporary, self.mode)?;
         fs::rename(temporary, &self.path)
-            .map_err(|error| {
-                filesystem_error::paired_failure(error, "rename", temporary, &self.path)
-            })
+            .map_err(|err| filesystem_error::paired_failure(err, "rename", temporary, &self.path))
     }
 }
 

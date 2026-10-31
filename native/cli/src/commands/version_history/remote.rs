@@ -54,14 +54,24 @@ fn payload(args: &[OsString], pattern: &str, from: Option<&str>) -> Value {
     }
     if args
         .iter()
-        .any(|arg| arg == "--from-all-lanes")
+        .any(|arg| {
+            matches!(
+                arg.to_str().map(str::trim),
+                Some("--from-all-lanes" | "--from-all-lanes=true"),
+            )
+        })
     {
         payload["from-all-lanes"] = json!(true);
         payload["fromAllLanes"] = json!(true);
     }
     if args
         .iter()
-        .any(|arg| arg == "--delete-existing")
+        .any(|arg| {
+            matches!(
+                arg.to_str().map(str::trim),
+                Some("--delete-existing" | "--delete-existing=true"),
+            )
+        })
     {
         payload["delete-existing"] = json!(true);
         payload["deleteExisting"] = json!(true);

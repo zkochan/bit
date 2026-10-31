@@ -16,10 +16,11 @@ pub(super) fn run(
     id: &str,
     short: bool,
 ) -> io::Result<Outcome> {
+    let id = id.trim();
     let chalk = Chalk::detect(args);
     let Some(report) = prepare(root, id, short, chalk) else {
         let scope_dir = scope_dir_for(root);
-        let bare = id.rsplit_once('@').map_or(id, |(name, _)| name);
+        let bare = id.rsplit_once('@').map_or(id, |(name, _)| name.trim());
         if bare.contains('/')
             && resolve_component_entry(&scope_dir, bare).is_none()
             && env::var_os("CI").is_none_or(|val| val.is_empty())
@@ -35,8 +36,9 @@ pub(super) fn run(
 }
 
 fn prepare(root: &ScopeRoot, id: &str, short: bool, chalk: Chalk) -> Option<String> {
+    let id = id.trim();
     let scope_dir = scope_dir_for(root);
-    let bare = id.rsplit_once('@').map_or(id, |(name, _)| name);
+    let bare = id.rsplit_once('@').map_or(id, |(name, _)| name.trim());
     let (scope, name, model_hash) = resolve_component_entry(&scope_dir, bare)?;
     let scope = scope?;
     let lanes = refs::lanes(&scope_dir, &scope, &name)?;

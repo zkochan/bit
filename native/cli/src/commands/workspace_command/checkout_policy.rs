@@ -11,7 +11,7 @@ impl Steps<'_> {
         let completed: Value = self.engine.request(
             &json!({"kind":"commandCheckoutPolicyComplete","token":self.token,"semver":semver}),
         )?;
-        if completed["token"] != self.token {
+        if completed["token"].as_str().map(str::trim) != Some(self.token.trim()) {
             return Err(decline("checkout policy owner token"));
         }
         plan["result"] = completed["result"].clone();
@@ -55,7 +55,8 @@ fn prefixed_ranges(entry: &Value, dependencies: &[Value]) -> io::Result<Vec<Valu
         })
     {
         for value in array(dependency.get("versions"), "checkout policy versions")? {
-            inputs.push(json!(format!("{prefix}{}", text(Some(value))?)));
+            let ver = text(Some(value))?.trim();
+            inputs.push(json!(format!("{prefix}{ver}")));
         }
     }
     Ok(inputs)

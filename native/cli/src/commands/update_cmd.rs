@@ -132,6 +132,7 @@ fn has_env_jsonc_policy(root: &Path) -> bool {
                     .is_some_and(|(_, cfg)| cfg["removed"] == true)
                 && row["rootDir"]
                     .as_str()
+                    .map(str::trim)
                     .filter(|dir| !dir.is_empty())
                     .is_some_and(|dir| {
                         root.join(dir)
@@ -154,10 +155,14 @@ pub(in crate::commands) fn matches_aspect(entry: &Value, id: &str) -> bool {
     let Some((scope, bare_name)) = id.split_once('/') else {
         return false;
     };
-    entry["extensionId"]["scope"].as_str() == Some(scope)
+    entry["extensionId"]["scope"].as_str().map(str::trim) == Some(scope.trim())
         && entry["extensionId"]["name"]
             .as_str()
-            .is_some_and(|name| name == bare_name || name.starts_with(&format!("{bare_name}@")))
+            .map(str::trim)
+            .is_some_and(|name| {
+                let bare_name = bare_name.trim();
+                name == bare_name || name.starts_with(&format!("{bare_name}@"))
+            })
 }
 
 pub(in crate::commands) fn bitmap_row_name<'a>(key: &'a str, row: &'a Value) -> &'a str {

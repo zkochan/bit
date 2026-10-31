@@ -69,7 +69,7 @@ impl Stream {
             return Err(invalid("tester tool installation"));
         };
         let package = cli.bit_dir
-            .filter(|dir| !dir.as_os_str().is_empty())
+            .filter(|dir| !dir.as_os_str().is_empty() && !dir.to_string_lossy().trim().is_empty())
             .ok_or_else(|| invalid("tester package root"))?
             .join("package.json");
         let assets = Assets::prepare(&package)?;
@@ -163,7 +163,7 @@ fn accept(
                     .take(1024)
                     .read_line(&mut line)?;
                 let value: Value = serde_json::from_str(&line)?;
-                if value["token"] != token {
+                if value["token"].as_str().map(str::trim) != Some(token.trim()) {
                     return Err(invalid("tester control authentication"));
                 }
                 reader.get_ref().set_read_timeout(None)?;

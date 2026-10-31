@@ -112,11 +112,14 @@ fn update_single_comp_json(path: &Path, group: &[&ResolvedUpdate]) -> io::Result
     let key = super::aspect_entry(&parsed["extensions"], DEP_RESOLVER_ID)
         .map_or_else(|| DEP_RESOLVER_ID.to_owned(), |(aspect_key, _)| aspect_key.to_owned());
     for upd in group {
-        let target = &mut parsed["extensions"][&key]["policy"][&upd.field][&upd.name];
+        let field = upd.field.trim();
+        let name = upd.name.trim();
+        let latest_range = upd.latest_range.trim().to_owned();
+        let target = &mut parsed["extensions"][&key]["policy"][field][name];
         if target.is_object() && target.get("version").is_some() {
-            target["version"] = Value::String(upd.latest_range.clone());
+            target["version"] = Value::String(latest_range);
         } else {
-            *target = Value::String(upd.latest_range.clone());
+            *target = Value::String(latest_range);
         }
     }
     let bytes = serialize_json_preserving_newline(&content, &parsed)
@@ -162,10 +165,13 @@ fn apply_bitmap_entry_updates(
         else {
             continue;
         };
+        let field = upd.field.trim();
+        let name = upd.name.trim();
+        let latest_range = upd.latest_range.trim();
         let cfg = json!({
             "policy": {
-                &upd.field: {
-                    &upd.name: &upd.latest_range,
+                field: {
+                    name: latest_range,
                 },
             },
         });

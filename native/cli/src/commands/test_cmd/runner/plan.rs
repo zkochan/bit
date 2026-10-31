@@ -128,9 +128,9 @@ impl Plan {
                 .map(str::trim)
                 .filter(|msg| !msg.is_empty())
                 .unwrap_or("undefined");
+            let environment = self.loaded.progress.environment.trim();
             output.failure(&format!(
-                r#"service "tester" of env "{}" has failed. error: {err_msg}"#,
-                self.loaded.progress.environment,
+                r#"service "tester" of env "{environment}" has failed. error: {err_msg}"#,
             ));
         }
     }

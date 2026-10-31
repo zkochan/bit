@@ -63,7 +63,9 @@ pub fn execute_failure_scope(
     error: io::Error,
 ) -> io::Result<Outcome> {
     execute_mode_at(scope, args, command, json, !json, |_| {
-        io::stdout().lock().write_all(callback_output.as_bytes())?;
+        let mut stdout = io::stdout().lock();
+        stdout.write_all(callback_output.as_bytes())?;
+        stdout.flush()?;
         Err(error)
     })
 }

@@ -84,13 +84,19 @@ fn test(row: &Value) -> Value {
                 .map(str::to_owned)
         });
     if let Some(message) = message {
-        value[if row["status"] == "failed" { "failureErrOrStr" } else { "error" }] = json!(message);
+        let failed = row["status"].as_str().map(str::trim) == Some("failed");
+        value[if failed { "failureErrOrStr" } else { "error" }] = json!(message);
     }
     value
 }
 fn error(row: &Value) -> Option<Value> {
     let source = &row["testExecError"];
-    if source.is_null() && row["failureMessage"].as_str().is_none_or(str::is_empty) {
+    if source.is_null()
+        && row["failureMessage"]
+            .as_str()
+            .map(str::trim)
+            .is_none_or(str::is_empty)
+    {
         return None;
     }
     let mut value = json!({});

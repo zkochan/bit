@@ -38,10 +38,14 @@ impl Formatter {
 
     /// `formatSection(title, description, items)`.
     pub fn section(&self, title: &str, description: &str, items: &[String]) -> String {
-        if items.is_empty() {
+        let non_empty: Vec<&String> = items
+            .iter()
+            .filter(|item| !item.trim().is_empty())
+            .collect();
+        if non_empty.is_empty() {
             return String::new();
         }
-        let mut lines = vec![self.title(&format!("{} ({})", title.trim(), items.len()))];
+        let mut lines = vec![self.title(&format!("{} ({})", title.trim(), non_empty.len()))];
         if !description.trim().is_empty() {
             let indented: Vec<String> = description
                 .lines()
@@ -49,7 +53,7 @@ impl Formatter {
                 .collect();
             lines.push(self.chalk.dim(&indented.join("\n")));
         }
-        lines.extend(items.iter().cloned());
+        lines.extend(non_empty.into_iter().cloned());
         lines.join("\n")
     }
 

@@ -16,8 +16,10 @@ impl Progress {
         let row = import(
             &json!({"ids":value["ids"],"reason":null,"components":0,"objects":0,"requested":requested}),
         )?;
+        let unexpected_fields = !value["reason"].is_null() || !value["objectRequest"].is_null();
         if performed.is_none()
             || completed.is_none()
+            || unexpected_fields
             || requested != Some(row.ids.len() as u64)
             || performed != Some(!row.ids.is_empty())
             || row.ids

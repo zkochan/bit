@@ -274,11 +274,9 @@ fn collect_declared_identifiers(content: &str) -> HashSet<String> {
 }
 
 fn collect_line_declarations(trimmed: &str, declared: &mut HashSet<String>) {
-    let decl_rest = trimmed
-        .strip_prefix("export ")
-        .unwrap_or(trimmed)
-        .strip_prefix("default ")
-        .unwrap_or(trimmed);
+    let after_export = trimmed.strip_prefix("export ").unwrap_or(trimmed);
+    let after_default = after_export.strip_prefix("default ").unwrap_or(after_export);
+    let decl_rest = after_default.strip_prefix("async ").unwrap_or(after_default);
     for kw in ["const ", "let ", "var ", "function ", "class ", "type ", "interface "] {
         if let Some(after) = decl_rest.strip_prefix(kw) {
             let lhs = after
