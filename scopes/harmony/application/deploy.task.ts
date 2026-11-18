@@ -25,6 +25,7 @@ export const DEPLOY_TASK = 'deploy_application';
 
 export class DeployTask implements BuildTask {
   name = DEPLOY_TASK;
+  readonly description = 'Deploying the application';
   aspectId = ApplicationAspect.id;
   readonly location = 'end';
   constructor(
@@ -74,6 +75,13 @@ export class DeployTask implements BuildTask {
     return {
       componentsResults: _componentsResults,
     };
+  }
+
+  /**
+   * apps are loaded from the capsules in order to deploy them, which needs the packages.
+   */
+  requiresCapsuleInstallation(components: Component[]): boolean {
+    return components.some((component) => this.application.hasAppTypePattern(component));
   }
 
   private async runForOneApp(

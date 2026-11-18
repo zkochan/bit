@@ -1,13 +1,20 @@
 import type { BuildContext, BuiltTaskResult, BuildTask, TaskLocation } from '@teambit/builder';
 import type { Logger } from '@teambit/logger';
 import type { Capsule } from '@teambit/isolator';
+import type { Component } from '@teambit/component';
 import type { Publisher } from './publisher';
+import {
+  PACK_LIFECYCLE_SCRIPTS,
+  PUBLISH_LIFECYCLE_SCRIPTS,
+  packageJsonRequiresInstallation,
+} from './package-json-requires-installation';
 
 /**
  * publish components by running "npm publish"
  */
 export class PublishTask implements BuildTask {
   readonly name = 'PublishComponents';
+  readonly description = 'Publishing components to the package registry';
   readonly location: TaskLocation = 'end';
   constructor(
     readonly aspectId: string,
@@ -33,5 +40,16 @@ export class PublishTask implements BuildTask {
       componentsResults: publishResults,
       artifacts: [],
     };
+  }
+
+  /**
+   * normally, it publishes the tarball created by the PackComponents task. without a tarball (e.g. the pack task was
+   * skipped), it publishes the capsule dir, which runs the pack and publish lifecycle scripts and bundles dependencies.
+   */
+  requiresCapsuleInstallation(components: Component[]): boolean {
+    return packageJsonRequiresInstallation(components, this.aspectId, [
+      ...PACK_LIFECYCLE_SCRIPTS,
+      ...PUBLISH_LIFECYCLE_SCRIPTS,
+    ]);
   }
 }

@@ -228,8 +228,15 @@ export class AspectLoaderMain {
 
   isAspectLoaded(id: string) {
     if (this.failedAspects.includes(id)) return true;
+    return this.hasAspectInstance(id);
+  }
+
+  /**
+   * whether the aspect has an instance in harmony. unlike isAspectLoaded, an aspect that failed to load is not counted.
+   */
+  hasAspectInstance(id: string): boolean {
     try {
-      return this.harmony.get(id);
+      return Boolean(this.harmony.get(id));
     } catch {
       return false;
     }
@@ -546,6 +553,7 @@ export class AspectLoaderMain {
   }
 
   async loadEsm(path: string) {
+    this.logger.debug(`loading esm module "${path}"`);
     const module = await esmLoader(path);
     // only a load that succeeded leaves something in memory that needs its files kept around
     recordLoadedEsmFile(path);

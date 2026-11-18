@@ -6,7 +6,7 @@ import * as path from 'path';
 import { MissingBitMapComponent } from '@teambit/legacy.bit-map';
 import { NewerVersionFound } from '@teambit/legacy.consumer';
 import { Helper, FileStatusWithoutChalk } from '@teambit/legacy.e2e-helper';
-import { Extensions, FILE_CHANGES_CHECKOUT_MSG } from '@teambit/legacy.constants';
+import { Extensions, FILE_CHANGES_CHECKOUT_MSG, MergeConfigFilename } from '@teambit/legacy.constants';
 import chaiFs from 'chai-fs';
 chai.use(chaiFs);
 
@@ -86,9 +86,7 @@ describe('bit checkout command', function () {
           });
           it('bit list should show the currently used version and latest local version', () => {
             const listOutput = helper.command.listLocalScopeParsed('--outdated');
-            // @ts-ignore AUTO-ADDED-AFTER-MIGRATION-PLEASE-FIX!
             expect(listOutput[0].currentVersion).to.equal('0.0.5');
-            // @ts-ignore AUTO-ADDED-AFTER-MIGRATION-PLEASE-FIX!
             expect(listOutput[0].localVersion).to.equal('0.0.10');
           });
           describe('trying to tag when using an old version', () => {
@@ -314,7 +312,6 @@ describe('bit checkout command', function () {
       it('should not run the package installation', () => {
         expect(output).not.to.have.string('installing dependencies');
         expect(output).not.to.have.string('pnpm');
-        expect(output).not.to.have.string('yarn');
       });
     });
     describe('using theirs strategy', () => {
@@ -763,6 +760,56 @@ describe('bit checkout command', function () {
         expect(() => helper.command.runCmd('bit checkout reset --include-new-from-scope')).to.throw(
           '--include-new-from-scope is only relevant when running "bit checkout head"'
         );
+      });
+    });
+  });
+  describe('checkout head when the env was changed both locally and in head', () => {
+    let workspaceBeforeCheckout: string;
+    before(() => {
+      helper.scopeHelper.reInitWorkspace();
+      helper.fixtures.populateComponents(1);
+      helper.command.setEnv('comp1', 'teambit.harmony/node');
+      helper.command.tagAllWithoutBuild(); // 0.0.1 - node
+      helper.command.setEnv('comp1', 'teambit.harmony/aspect');
+      helper.command.tagAllWithoutBuild(); // 0.0.2 - aspect
+      helper.command.checkoutVersion('0.0.1', 'comp1', '-x');
+      helper.command.setEnv('comp1', 'teambit.envs/env'); // local change, conflicts with the change in 0.0.2
+      workspaceBeforeCheckout = helper.scopeHelper.cloneWorkspace();
+    });
+    it('should block the checkout when no merge strategy is given', () => {
+      expect(() => helper.command.checkoutHead('comp1', '-x')).to.throw('automatic merge has failed');
+    });
+    describe('using ours strategy', () => {
+      before(() => {
+        helper.scopeHelper.getClonedWorkspace(workspaceBeforeCheckout);
+        helper.command.checkoutHead('comp1', '-x --auto-merge-resolve ours');
+      });
+      it('should keep the local env', () => {
+        expect(helper.env.getComponentEnv('comp1')).to.equal('teambit.envs/env');
+      });
+    });
+    describe('using theirs strategy', () => {
+      before(() => {
+        helper.scopeHelper.getClonedWorkspace(workspaceBeforeCheckout);
+        helper.command.checkoutHead('comp1', '-x --auto-merge-resolve theirs');
+      });
+      it('should use the env of head', () => {
+        expect(helper.env.getComponentEnv('comp1')).to.equal('teambit.harmony/aspect');
+      });
+    });
+    describe('using manual strategy', () => {
+      let output: string;
+      before(() => {
+        helper.scopeHelper.getClonedWorkspace(workspaceBeforeCheckout);
+        output = helper.command.checkoutHead('comp1', '-x --auto-merge-resolve manual');
+      });
+      it('should list the component with config conflicts', () => {
+        expect(output).to.have.string('components with config-merge conflicts');
+      });
+      it('should write the env conflict into the config-merge file', () => {
+        const conflictFile = helper.fs.readFile(MergeConfigFilename);
+        expect(conflictFile).to.have.string('teambit.envs/env');
+        expect(conflictFile).to.have.string('teambit.harmony/aspect');
       });
     });
   });

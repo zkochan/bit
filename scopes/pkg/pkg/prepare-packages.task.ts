@@ -13,6 +13,7 @@ import { writeNpmIgnore } from './write-npm-ignore';
  */
 export class PreparePackagesTask implements BuildTask {
   readonly name = 'PreparePackages';
+  readonly description = 'Preparing the packages for publishing';
   readonly location = 'end';
   constructor(
     readonly aspectId: string,
@@ -28,6 +29,10 @@ export class PreparePackagesTask implements BuildTask {
     };
 
     return result;
+  }
+
+  requiresCapsuleInstallation(): boolean {
+    return false;
   }
 
   private async writeNpmIgnoreFile(context: BuildContext) {
